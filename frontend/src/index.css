@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-amber-50:  #ecfaf5;
+  --color-amber-100: #d3f3e9;
+  --color-amber-200: #b3e9d9;
+  --color-amber-300: #93dec9;
+  --color-amber-400: #7adfcf;
+  --color-amber-500: #5fc4b1;
+  --color-amber-600: #7adfcf;
+  --color-amber-700: #1f7a66;
+  --color-amber-800: #166d5b;
+  --color-amber-900: #106655;
+}
+
+html, body, #root { height: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
