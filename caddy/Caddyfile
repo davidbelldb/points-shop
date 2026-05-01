@@ -2,11 +2,15 @@ sneakypoints.com {
     encode gzip zstd
 
     @api path /api/* /media/*
-    reverse_proxy @api backend:3001
+    handle @api {
+        reverse_proxy backend:3001
+    }
 
-    root * /srv
-    try_files {path} /index.html
-    file_server
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
 }
 
 www.sneakypoints.com {
