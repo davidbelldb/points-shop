@@ -1,3 +1,5 @@
+import path from 'path';
+
 export const config = {
   port: Number(process.env.BACKEND_PORT ?? 3001),
   host: process.env.BACKEND_HOST ?? '0.0.0.0',
@@ -9,4 +11,5 @@ export const config = {
     password: process.env.POSTGRES_PASSWORD,
   },
   logLevel: process.env.LOG_LEVEL ?? 'info',
+  mediaDir: process.env.MEDIA_DIR ?? path.resolve(process.cwd(), '..', 'media'),
 };

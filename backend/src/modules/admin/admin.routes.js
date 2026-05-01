@@ -1,5 +1,6 @@
 import path from 'path';
 import { mkdir, unlink } from 'fs/promises';
+import { config } from '../../config.js';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { randomUUID } from 'crypto';
@@ -16,7 +17,7 @@ import {
 } from './admin.repo.js';
 import { listAllOrders, updateOrderStatus } from '../orders/orders.repo.js';
 
-const MEDIA_DIR = path.resolve(process.cwd(), '..', 'media');
+const MEDIA_DIR = config.mediaDir;
 
 const ALLOWED_IMAGE = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const ALLOWED_VIDEO = new Set(['video/mp4', 'video/webm', 'video/quicktime']);

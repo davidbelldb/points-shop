@@ -1,0 +1,12 @@
+.git
+.gitignore
+.DS_Store
+postgres-data/
+media/
+node_modules/
+**/node_modules/
+**/.env
+.env*
+*.log
+.idea/
+.vscode/

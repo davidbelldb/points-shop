@@ -1,4 +1,3 @@
-import path from 'path';
 import { mkdir } from 'fs/promises';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
@@ -15,7 +14,7 @@ import settingsRoutes from './modules/settings/settings.routes.js';
 import discountsRoutes from './modules/discounts/discounts.routes.js';
 import deliveryRoutes from './modules/delivery/delivery.routes.js';
 
-const MEDIA_DIR = path.resolve(process.cwd(), '..', 'media');
+const MEDIA_DIR = config.mediaDir;
 await mkdir(MEDIA_DIR, { recursive: true });
 
 const fastify = Fastify({
