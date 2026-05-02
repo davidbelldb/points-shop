@@ -635,38 +635,109 @@ function HeroSlidesAdmin() {
 }
 
 function HeroSlideRow({ slide, onChanged }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="rounded-xl border border-neutral-200 bg-white">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full gap-3 p-3 text-left">
+        <div className="aspect-[16/7] w-32 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
+          <img src={slide.image_url} alt="" className="h-full w-full object-cover" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {slide.title || <span className="text-neutral-400">(no title)</span>}
+            {!slide.is_active && <span className="ml-2 text-xs font-normal text-neutral-400">(hidden)</span>}
+          </p>
+          {slide.code && <p className="font-mono text-xs text-amber-700">{slide.code}</p>}
+          {slide.subtitle && <p className="truncate text-xs text-neutral-500">{slide.subtitle}</p>}
+        </div>
+        <span className="self-center text-neutral-400">{open ? '\u2212' : '+'}</span>
+      </button>
+      {open && <HeroSlideEditor slide={slide} onChanged={onChanged} />}
+    </li>
+  );
+}
+
+function HeroSlideEditor({ slide, onChanged }) {
+  const [form, setForm] = useState({
+    image_url: slide.image_url,
+    title: slide.title ?? '',
+    subtitle: slide.subtitle ?? '',
+    code: slide.code ?? '',
+    is_active: slide.is_active,
+  });
   const [busy, setBusy] = useState(false);
-  async function toggle() {
-    setBusy(true);
-    try { await api.admin.updateHeroSlide(slide.id, { is_active: !slide.is_active }); await onChanged(); }
+  const [error, setError] = useState(null);
+
+  async function uploadImage(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setBusy(true); setError(null);
+    try {
+      const { url, type } = await api.admin.upload(file);
+      if (type !== 'image') throw new Error('Image required');
+      setForm((f) => ({ ...f, image_url: url }));
+    } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
+
+  async function save() {
+    setBusy(true); setError(null);
+    try {
+      await api.admin.updateHeroSlide(slide.id, {
+        image_url: form.image_url,
+        title: form.title.trim() || null,
+        subtitle: form.subtitle.trim() || null,
+        code: form.code.trim().toUpperCase() || null,
+        is_active: form.is_active,
+      });
+      await onChanged();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   async function remove() {
     if (!confirm('Delete this slide?')) return;
-    setBusy(true);
-    try { await api.admin.deleteHeroSlide(slide.id); await onChanged(); }
+    setBusy(true); setError(null);
+    try {
+      await api.admin.deleteHeroSlide(slide.id);
+      await onChanged();
+    } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
+
   return (
-    <li className="flex gap-3 rounded-xl border border-neutral-200 bg-white p-3">
-      <div className="aspect-[16/7] w-32 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
-        <img src={slide.image_url} alt="" className="h-full w-full object-cover" />
+    <div className="space-y-3 border-t border-neutral-100 p-3">
+      <div className="aspect-[16/7] overflow-hidden rounded-lg bg-neutral-100">
+        <img src={form.image_url} alt="" className="h-full w-full object-cover" />
       </div>
-      <div className="min-w-0 flex-1">
-        {slide.title && <p className="truncate text-sm font-medium">{slide.title}</p>}
-        {slide.code && <p className="font-mono text-xs text-amber-700">{slide.code}</p>}
-        {slide.subtitle && <p className="truncate text-xs text-neutral-500">{slide.subtitle}</p>}
-        {!slide.is_active && <p className="mt-1 text-xs text-neutral-400">(hidden)</p>}
-      </div>
-      <div className="flex flex-col items-end gap-1">
-        <button onClick={toggle} disabled={busy} className="text-xs font-medium text-amber-700 disabled:opacity-50">
-          {slide.is_active ? 'Disable' : 'Enable'}
-        </button>
-        <button onClick={remove} disabled={busy} className="text-xs text-neutral-400 hover:text-red-600 disabled:opacity-50">
+      <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-neutral-300 px-3 py-2 text-center text-xs text-neutral-500 hover:border-amber-500">
+        Replace image
+        <input type="file" accept="image/*" className="hidden" onChange={uploadImage} />
+      </label>
+      <Field label="Title (optional)">
+        <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+      </Field>
+      <Field label="Subtitle (optional)">
+        <input className={inputCls} value={form.subtitle} onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))} />
+      </Field>
+      <Field label="Code (optional)">
+        <input className={inputCls} value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} placeholder="SUMMER10" />
+      </Field>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
+        Active (visible in carousel)
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-center gap-2">
+        <button onClick={remove} disabled={busy} className="text-sm text-neutral-400 hover:text-red-600 disabled:opacity-50">
           Delete
         </button>
+        <button onClick={save} disabled={busy} className="ml-auto rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-amber-900 disabled:opacity-40">
+          {busy ? 'Saving...' : 'Save'}
+        </button>
       </div>
-    </li>
+    </div>
   );
 }
 

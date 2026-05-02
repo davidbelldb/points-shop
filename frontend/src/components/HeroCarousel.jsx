@@ -9,7 +9,7 @@ export default function HeroCarousel({ slides }) {
     if (slides.length <= 1) return;
     const id = setInterval(() => {
       setIndex((i) => (i + 1) % slides.length);
-    }, 3000);
+    }, 4000);
     return () => clearInterval(id);
   }, [slides.length]);
 
