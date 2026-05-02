@@ -1,6 +1,11 @@
 sneakypoints.com {
     encode gzip zstd
 
+    @admin path /admin /admin/* /api/admin/*
+    basicauth @admin {
+        {$ADMIN_USER} {$ADMIN_PASS_HASH}
+    }
+
     @api path /api/* /media/*
     handle @api {
         reverse_proxy backend:3001

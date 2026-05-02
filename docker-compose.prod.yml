@@ -50,6 +50,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASS_HASH: ${ADMIN_PASS_HASH}
     ports:
       - "80:80"
       - "443:443"
