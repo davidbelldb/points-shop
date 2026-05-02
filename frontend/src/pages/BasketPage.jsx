@@ -14,12 +14,12 @@ export default function BasketPage() {
   const [notesDraft, setNotesDraft] = useState('');
 
   useEffect(() => {
-    setNotesDraft(basket?.notes ?? '');
-  }, [basket?.notes]);
-
-  useEffect(() => {
     api.getDeliveryOptions().then(setDeliveryOptions).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    setNotesDraft(basket?.notes ?? '');
+  }, [basket?.notes]);
 
   if (!basket) return <p className="text-sm text-neutral-500">Loading...</p>;
 
@@ -63,7 +63,6 @@ export default function BasketPage() {
       try { await setNotes(notesDraft); } catch (e) { setError(e.message); }
     }
   }
-
   async function handlePlace() {
     if (!canAfford || placing) return;
     setPlacing(true); setError(null);
