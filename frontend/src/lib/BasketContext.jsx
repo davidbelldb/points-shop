@@ -21,6 +21,7 @@ export function BasketProvider({ children }) {
   const applyPromo   = useCallback(async (code)        => { const b = await api.applyPromo(code); setBasket(b); return b; }, []);
   const removePromo  = useCallback(async ()            => { const b = await api.removePromo(); setBasket(b); return b; }, []);
   const setDelivery  = useCallback(async (id)          => { const b = await api.setBasketDelivery(id); setBasket(b); return b; }, []);
+  const setNotes     = useCallback(async (notes)       => { const b = await api.setBasketNotes(notes); setBasket(b); return b; }, []);
   const placeOrder   = useCallback(async () => {
     const order = await api.placeOrder();
     await refresh();
@@ -29,7 +30,7 @@ export function BasketProvider({ children }) {
 
   return (
     <BasketContext.Provider
-      value={{ basket, account, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, placeOrder }}
+      value={{ basket, account, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder }}
     >
       {children}
     </BasketContext.Provider>

@@ -17,6 +17,9 @@ export async function sendOrderConfirmation(order) {
   if (order.delivery_name_snapshot) {
     lines.push(`Delivery (${order.delivery_name_snapshot}): ${order.delivery_points} pts`);
   }
+  if (order.notes) {
+    lines.push('', `Note from Katie: ${order.notes}`);
+  }
   lines.push(
     `Total: ${order.total_points} pts`,
     `Ref:   ${order.id}`,

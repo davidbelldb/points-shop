@@ -22,7 +22,7 @@ export async function placeOrder() {
     const account = accountRes.rows[0];
 
     const basketRes = await client.query(
-      `SELECT id, discount_code_id, delivery_option_id
+      `SELECT id, discount_code_id, delivery_option_id, notes
          FROM baskets WHERE account_id = $1
         ORDER BY created_at DESC LIMIT 1`,
       [accountId],
@@ -82,13 +82,15 @@ export async function placeOrder() {
       `INSERT INTO orders
          (account_id, status, total_points,
           discount_code_id, discount_points, discount_code_snapshot,
-          delivery_option_id, delivery_points, delivery_name_snapshot)
-       VALUES ($1, 'placed', $2, $3, $4, $5, $6, $7, $8)
+          delivery_option_id, delivery_points, delivery_name_snapshot,
+          notes)
+       VALUES ($1, 'placed', $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
       [
         accountId, total,
         discountCode?.id ?? null, discountPoints, discountCode?.code ?? null,
         deliveryOption?.id ?? null, deliveryPoints, deliveryOption?.name ?? null,
+        basket.notes ?? null,
       ],
     );
     const orderId = orderRes.rows[0].id;
@@ -126,7 +128,7 @@ export async function placeOrder() {
     );
     const defaultDeliveryId = defaultRes.rows[0]?.id ?? null;
     await client.query(
-      `UPDATE baskets SET discount_code_id = NULL, delivery_option_id = $1 WHERE id = $2`,
+      `UPDATE baskets SET discount_code_id = NULL, delivery_option_id = $1, notes = NULL WHERE id = $2`,
       [defaultDeliveryId, basket.id],
     );
 
@@ -145,6 +147,7 @@ export async function getOrderById(id) {
     `SELECT o.id, o.account_id, o.status, o.total_points,
             o.discount_points, o.discount_code_snapshot,
             o.delivery_points, o.delivery_name_snapshot,
+            o.notes,
             o.created_at, o.updated_at,
             a.name AS account_name, a.email AS account_email
        FROM orders o JOIN accounts a ON a.id = o.account_id
@@ -169,7 +172,7 @@ export async function listOrders({ bucket = 'all', limit = 50 } = {}) {
   if (bucket === 'past') where = `account_id = $1 AND status IN ('delivered','cancelled')`;
   const { rows } = await pool.query(
     `SELECT id, status, total_points, discount_points, discount_code_snapshot,
-            delivery_points, delivery_name_snapshot, created_at
+            delivery_points, delivery_name_snapshot, notes, created_at
        FROM orders WHERE ${where}
       ORDER BY created_at DESC LIMIT $2`,
     [accountId, limit],
@@ -180,7 +183,7 @@ export async function listOrders({ bucket = 'all', limit = 50 } = {}) {
 export async function listAllOrders(limit = 100) {
   const { rows } = await pool.query(
     `SELECT o.id, o.status, o.total_points, o.created_at, o.updated_at,
-            o.discount_code_snapshot, o.delivery_name_snapshot,
+            o.discount_code_snapshot, o.delivery_name_snapshot, o.notes,
             COUNT(oi.id) AS item_count
        FROM orders o
        LEFT JOIN order_items oi ON oi.order_id = o.id

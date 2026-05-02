@@ -37,7 +37,7 @@ export async function getBasket() {
   const item_count = itemsRes.rows.reduce((s, r) => s + r.qty, 0);
 
   const basketRes = await query(
-    `SELECT discount_code_id, delivery_option_id FROM baskets WHERE id = $1`,
+    `SELECT discount_code_id, delivery_option_id, notes FROM baskets WHERE id = $1`,
     [basketId],
   );
   const codeId = basketRes.rows[0]?.discount_code_id;
@@ -102,6 +102,7 @@ export async function getBasket() {
     delivery_points,
     total_points,
     item_count,
+    notes: basketRes.rows[0]?.notes ?? null,
   };
 }
 
@@ -163,5 +164,15 @@ export async function setDeliveryOption(deliveryOptionId) {
     }
     await query(`UPDATE baskets SET delivery_option_id = $1 WHERE id = $2`, [deliveryOptionId, basketId]);
   }
+  return getBasket();
+}
+
+export async function setNotes(notes) {
+  const basketId = await getOrCreateBasketId();
+  const cleaned = typeof notes === 'string' ? notes.trim() : '';
+  await query(
+    `UPDATE baskets SET notes = $1 WHERE id = $2`,
+    [cleaned || null, basketId],
+  );
   return getBasket();
 }

@@ -1,6 +1,6 @@
 import {
   getBasket, addItem, setItemQty, removeItem,
-  applyPromoCode, removePromoCode, setDeliveryOption,
+  applyPromoCode, removePromoCode, setDeliveryOption, setNotes,
 } from './basket.repo.js';
 
 export default async function basketRoutes(fastify) {
@@ -33,6 +33,14 @@ export default async function basketRoutes(fastify) {
   });
 
   fastify.delete('/api/basket/promo', async () => removePromoCode());
+
+  fastify.patch('/api/basket/notes', async (req, reply) => {
+    const { notes } = req.body ?? {};
+    if (notes !== null && notes !== undefined && typeof notes !== 'string') {
+      return reply.code(400).send({ error: 'notes must be a string or null' });
+    }
+    return setNotes(notes ?? null);
+  });
 
   fastify.patch('/api/basket/delivery', async (req, reply) => {
     const { delivery_option_id } = req.body ?? {};

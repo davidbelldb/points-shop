@@ -50,6 +50,8 @@ export const api = {
   getDeliveryOptions: () => request('/delivery-options'),
   setBasketDelivery: (delivery_option_id) =>
     request('/basket/delivery', { method: 'PATCH', body: JSON.stringify({ delivery_option_id }) }),
+  setBasketNotes: (notes) =>
+    request('/basket/notes', { method: 'PATCH', body: JSON.stringify({ notes }) }),
   placeOrder: () => request('/orders', { method: 'POST' }),
   getOrder: (id) => request(`/orders/${id}`),
   listOrders: (bucket, limit) => {

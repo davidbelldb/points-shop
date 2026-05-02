@@ -53,6 +53,13 @@ export default function OrderConfirmationPage() {
         )}
       </div>
 
+      {order.notes && (
+        <div className="rounded-xl border border-neutral-200 bg-white p-3 text-sm">
+          <p className="text-xs uppercase tracking-wide text-neutral-500">Your note</p>
+          <p className="mt-1 italic text-neutral-800">{order.notes}</p>
+        </div>
+      )}
+
       <ul className="space-y-2">
         {order.items.map((item) => (
           <li key={item.id} className="flex items-start justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm">

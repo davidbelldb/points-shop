@@ -4,13 +4,18 @@ import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 
 export default function BasketPage() {
-  const { basket, account, setItemQty, removeItem, applyPromo, removePromo, setDelivery, placeOrder } = useBasket();
+  const { basket, account, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder } = useBasket();
   const navigate = useNavigate();
   const [placing, setPlacing] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [deliveryOptions, setDeliveryOptions] = useState([]);
+  const [notesDraft, setNotesDraft] = useState('');
+
+  useEffect(() => {
+    setNotesDraft(basket?.notes ?? '');
+  }, [basket?.notes]);
 
   useEffect(() => {
     api.getDeliveryOptions().then(setDeliveryOptions).catch(console.error);
@@ -52,10 +57,24 @@ export default function BasketPage() {
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
+  async function handleNotesBlur() {
+    const current = basket?.notes ?? '';
+    if (notesDraft.trim() !== current.trim()) {
+      try { await setNotes(notesDraft); } catch (e) { setError(e.message); }
+    }
+  }
+
   async function handlePlace() {
     if (!canAfford || placing) return;
     setPlacing(true); setError(null);
-    try { const order = await placeOrder(); navigate(`/order/${order.id}`); }
+    try {
+      const current = basket?.notes ?? '';
+      if (notesDraft.trim() !== current.trim()) {
+        await setNotes(notesDraft);
+      }
+      const order = await placeOrder();
+      navigate(`/order/${order.id}`);
+    }
     catch (e) { setError(e.message); }
     finally { setPlacing(false); }
   }
@@ -158,6 +177,18 @@ export default function BasketPage() {
           </button>
         </div>
       )}
+
+      <div className="rounded-xl border border-neutral-200 bg-white p-3">
+        <label className="mb-1 block text-sm font-semibold">Note (optional)</label>
+        <textarea
+          value={notesDraft}
+          onChange={(e) => setNotesDraft(e.target.value)}
+          onBlur={handleNotesBlur}
+          placeholder="Specific time, mood, extra demands..."
+          rows={2}
+          className="block w-full resize-none rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+        />
+      </div>
 
       <div className="space-y-1 rounded-xl border border-neutral-200 bg-white p-3 text-sm">
         <div className="flex justify-between">
