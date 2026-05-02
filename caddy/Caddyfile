@@ -3,7 +3,7 @@ sneakypoints.com {
 
     @admin path /admin /admin/* /api/admin/*
     basicauth @admin {
-        {$ADMIN_USER} {$ADMIN_PASS_HASH}
+        david $2a$14$vkQtJbp5G0/mcBzV8TYteOtnAMFisDOcttjVAoHRbjXRPmSYBvfee
     }
 
     @api path /api/* /media/*
