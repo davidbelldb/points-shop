@@ -35,6 +35,7 @@ export default function AdminPage() {
       </div>
 
       <BrandingSection settings={settings} onChanged={refreshSettings} />
+      <HeroSlidesAdmin />
       <AccountSection  account={account}   onChanged={refresh} />
 
       <section className="space-y-3">
@@ -602,3 +603,154 @@ function OrdersAdminSection() {
     </section>
   );
 }
+
+function HeroSlidesAdmin() {
+  const [slides, setSlides] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try { setSlides(await api.admin.listAllHeroSlides()); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold">Hero carousel</h2>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {loading ? (
+        <p className="text-sm text-neutral-500">Loading...</p>
+      ) : (
+        <>
+          <ul className="space-y-2">
+            {slides.map((s) => <HeroSlideRow key={s.id} slide={s} onChanged={load} />)}
+          </ul>
+          <NewHeroSlideForm onCreated={load} />
+        </>
+      )}
+    </section>
+  );
+}
+
+function HeroSlideRow({ slide, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  async function toggle() {
+    setBusy(true);
+    try { await api.admin.updateHeroSlide(slide.id, { is_active: !slide.is_active }); await onChanged(); }
+    finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!confirm('Delete this slide?')) return;
+    setBusy(true);
+    try { await api.admin.deleteHeroSlide(slide.id); await onChanged(); }
+    finally { setBusy(false); }
+  }
+  return (
+    <li className="flex gap-3 rounded-xl border border-neutral-200 bg-white p-3">
+      <div className="aspect-[16/7] w-32 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
+        <img src={slide.image_url} alt="" className="h-full w-full object-cover" />
+      </div>
+      <div className="min-w-0 flex-1">
+        {slide.title && <p className="truncate text-sm font-medium">{slide.title}</p>}
+        {slide.code && <p className="font-mono text-xs text-amber-700">{slide.code}</p>}
+        {slide.subtitle && <p className="truncate text-xs text-neutral-500">{slide.subtitle}</p>}
+        {!slide.is_active && <p className="mt-1 text-xs text-neutral-400">(hidden)</p>}
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <button onClick={toggle} disabled={busy} className="text-xs font-medium text-amber-700 disabled:opacity-50">
+          {slide.is_active ? 'Disable' : 'Enable'}
+        </button>
+        <button onClick={remove} disabled={busy} className="text-xs text-neutral-400 hover:text-red-600 disabled:opacity-50">
+          Delete
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function NewHeroSlideForm({ onCreated }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ image_url: '', title: '', subtitle: '', code: '' });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  function reset() {
+    setForm({ image_url: '', title: '', subtitle: '', code: '' });
+    setError(null);
+  }
+
+  async function uploadImage(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setBusy(true); setError(null);
+    try {
+      const { url, type } = await api.admin.upload(file);
+      if (type !== 'image') throw new Error('Image required');
+      setForm((f) => ({ ...f, image_url: url }));
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+
+  async function submit() {
+    if (!form.image_url) { setError('Image required'); return; }
+    setBusy(true); setError(null);
+    try {
+      await api.admin.createHeroSlide({
+        image_url: form.image_url,
+        title: form.title.trim() || null,
+        subtitle: form.subtitle.trim() || null,
+        code: form.code.trim().toUpperCase() || null,
+      });
+      reset(); setOpen(false); await onCreated();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="block w-full rounded-xl border-2 border-dashed border-neutral-300 py-3 text-sm font-semibold text-neutral-500 hover:border-amber-500 hover:text-amber-700"
+      >
+        + New slide
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-3">
+      <p className="text-sm font-semibold">New slide</p>
+      <div className="aspect-[16/7] overflow-hidden rounded-lg bg-neutral-100">
+        {form.image_url ? (
+          <img src={form.image_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-sm text-neutral-400">No image yet</div>
+        )}
+      </div>
+      <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-neutral-300 px-3 py-2 text-center text-xs text-neutral-500 hover:border-amber-500">
+        {form.image_url ? 'Replace image' : 'Upload image'}
+        <input type="file" accept="image/*" className="hidden" onChange={uploadImage} />
+      </label>
+      <Field label="Title (optional)">
+        <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+      </Field>
+      <Field label="Subtitle (optional)">
+        <input className={inputCls} value={form.subtitle} onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))} />
+      </Field>
+      <Field label="Code (optional)">
+        <input className={inputCls} value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} placeholder="SUMMER10" />
+      </Field>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <button onClick={() => { setOpen(false); reset(); }} className="rounded-md px-3 py-1 text-sm text-neutral-500">Cancel</button>
+        <button onClick={submit} disabled={busy || !form.image_url} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-amber-900 disabled:opacity-40">
+          {busy ? 'Creating...' : 'Create'}
+        </button>
+      </div>
+    </div>
+  );
+}
+

@@ -46,6 +46,7 @@ export const api = {
   applyPromo: (code) =>
     request('/basket/promo', { method: 'POST', body: JSON.stringify({ code }) }),
   removePromo: () => request('/basket/promo', { method: 'DELETE' }),
+  listHeroSlides: () => request('/hero-slides'),
   getDeliveryOptions: () => request('/delivery-options'),
   setBasketDelivery: (delivery_option_id) =>
     request('/basket/delivery', { method: 'PATCH', body: JSON.stringify({ delivery_option_id }) }),
@@ -75,6 +76,10 @@ export const api = {
     createDiscountCode: (data) => request('/admin/discount-codes', { method: 'POST', body: JSON.stringify(data) }),
     updateDiscountCode: (id, patch) => request(`/admin/discount-codes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     deleteDiscountCode: (id) => request(`/admin/discount-codes/${id}`, { method: 'DELETE' }),
+    listAllHeroSlides: () => request('/admin/hero-slides'),
+    createHeroSlide: (data) => request('/admin/hero-slides', { method: 'POST', body: JSON.stringify(data) }),
+    updateHeroSlide: (id, patch) => request(`/admin/hero-slides/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    deleteHeroSlide: (id) => request(`/admin/hero-slides/${id}`, { method: 'DELETE' }),
     listAllOrders: () => request('/admin/orders'),
     updateOrderStatus: (id, status) =>
       request(`/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),

@@ -117,7 +117,7 @@ function OrdersSection({ title, bucket, orders }) {
       {orders === null ? (
         <p className="text-sm text-neutral-500">Loading...</p>
       ) : orders.length === 0 ? (
-        <p className="text-sm text-neutral-500">None yet.</p>
+        <p className="text-sm text-neutral-500">{bucket === 'open' ? "What's the matter, too poor?" : "Who even are you?"}</p>
       ) : (
         <ul className="space-y-2">
           {orders.map((o) => <OrderRow key={o.id} order={o} />)}

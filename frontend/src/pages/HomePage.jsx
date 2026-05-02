@@ -2,15 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useSettings } from '../lib/SettingsContext.jsx';
+import HeroCarousel from '../components/HeroCarousel.jsx';
 
 export default function HomePage() {
   const { settings } = useSettings();
   const [products, setProducts] = useState(null);
+  const [slides, setSlides] = useState([]);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState('newest');
 
   useEffect(() => {
     api.listProducts().then(setProducts).catch((e) => setError(e.message));
+    api.listHeroSlides().then(setSlides).catch(console.error);
   }, []);
 
   const sorted = useMemo(() => {
@@ -34,6 +37,8 @@ export default function HomePage() {
           {settings.hero_subtitle ?? 'The shop of your dreams, funded by your nightmares.'}
         </p>
       </div>
+
+      <HeroCarousel slides={slides} />
 
       <div>
         <div className="flex items-center justify-between gap-3">

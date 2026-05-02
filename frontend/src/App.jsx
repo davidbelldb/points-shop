@@ -55,7 +55,7 @@ export default function App() {
                 <img
                   src="/sphincter-pink.svg"
                   alt=""
-                  className="block h-7 w-7"
+                  className="block h-7 w-7 translate-y-0.5"
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
                 {itemCount > 0 && (

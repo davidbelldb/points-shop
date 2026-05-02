@@ -197,7 +197,7 @@ export default function BasketPage() {
         onClick={handlePlace}
         className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300"
       >
-        {placing ? 'Placing order...' : canAfford ? 'Place order' : 'Not enough points'}
+        {placing ? 'Placing order...' : canAfford ? 'Place order' : "You're a bit too poor for that. Pauper."}
       </button>
     </div>
   );
