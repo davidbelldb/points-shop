@@ -14,6 +14,7 @@ import settingsRoutes from './modules/settings/settings.routes.js';
 import discountsRoutes from './modules/discounts/discounts.routes.js';
 import deliveryRoutes from './modules/delivery/delivery.routes.js';
 import heroRoutes from './modules/hero/hero.routes.js';
+import reviewsRoutes from './modules/reviews/reviews.routes.js';
 
 const MEDIA_DIR = config.mediaDir;
 await mkdir(MEDIA_DIR, { recursive: true });
@@ -50,6 +51,7 @@ await fastify.register(settingsRoutes);
 await fastify.register(discountsRoutes);
 await fastify.register(deliveryRoutes);
 await fastify.register(heroRoutes);
+await fastify.register(reviewsRoutes);
 
 const shutdown = async (signal) => {
   fastify.log.info(`Received ${signal}, shutting down`);

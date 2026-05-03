@@ -47,6 +47,10 @@ export const api = {
     request('/basket/promo', { method: 'POST', body: JSON.stringify({ code }) }),
   removePromo: () => request('/basket/promo', { method: 'DELETE' }),
   listHeroSlides: () => request('/hero-slides'),
+  listReviews: (productId) => request(`/products/${productId}/reviews`),
+  createReview: (productId, body) => request(`/products/${productId}/reviews`, { method: 'POST', body: JSON.stringify({ body }) }),
+  updateReview: (reviewId, body) => request(`/reviews/${reviewId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  deleteReview: (reviewId) => request(`/reviews/${reviewId}`, { method: 'DELETE' }),
   getDeliveryOptions: () => request('/delivery-options'),
   setBasketDelivery: (delivery_option_id) =>
     request('/basket/delivery', { method: 'PATCH', body: JSON.stringify({ delivery_option_id }) }),

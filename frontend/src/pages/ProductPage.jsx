@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import ProductGallery from '../components/ProductGallery.jsx';
+import ProductReviews from '../components/ProductReviews.jsx';
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -72,8 +73,10 @@ export default function ProductPage() {
         onClick={handleAdd}
         className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300"
       >
-        {adding ? 'Adding...' : inStock ? 'Add to basket' : 'Out of stock'}
+        {adding ? 'Adding...' : inStock ? 'Add to safe pocket' : 'Out of stock'}
       </button>
+
+      <ProductReviews productId={product.id} />
     </div>
   );
 }
