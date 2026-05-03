@@ -1,0 +1,2 @@
+ALTER TABLE product_reviews
+  ADD COLUMN IF NOT EXISTS thumbs_up_count INTEGER NOT NULL DEFAULT 0;

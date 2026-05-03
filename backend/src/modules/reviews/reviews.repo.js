@@ -3,7 +3,7 @@ import { getDefaultAccountId } from '../accounts/accounts.repo.js';
 
 export async function listReviewsForProduct(productId) {
   const { rows } = await query(
-    `SELECT r.id, r.body, r.created_at, r.updated_at,
+    `SELECT r.id, r.body, r.thumbs_up_count, r.created_at, r.updated_at,
             a.id AS account_id, a.name AS account_name, a.photo_url AS account_photo
        FROM product_reviews r
        JOIN accounts a ON a.id = r.account_id
@@ -47,4 +47,15 @@ export async function updateReview(reviewId, body) {
 
 export async function deleteReview(reviewId) {
   await query(`DELETE FROM product_reviews WHERE id = $1`, [reviewId]);
+}
+
+export async function adjustThumbsUp(reviewId, delta) {
+  const { rows } = await query(
+    `UPDATE product_reviews
+        SET thumbs_up_count = GREATEST(0, thumbs_up_count + $1)
+      WHERE id = $2
+      RETURNING thumbs_up_count`,
+    [delta, reviewId],
+  );
+  return rows[0]?.thumbs_up_count ?? null;
 }

@@ -51,6 +51,8 @@ export const api = {
   createReview: (productId, body) => request(`/products/${productId}/reviews`, { method: 'POST', body: JSON.stringify({ body }) }),
   updateReview: (reviewId, body) => request(`/reviews/${reviewId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
   deleteReview: (reviewId) => request(`/reviews/${reviewId}`, { method: 'DELETE' }),
+  thumbsUp: (reviewId) => request(`/reviews/${reviewId}/thumbs-up`, { method: 'POST' }),
+  removeThumbsUp: (reviewId) => request(`/reviews/${reviewId}/thumbs-up`, { method: 'DELETE' }),
   getDeliveryOptions: () => request('/delivery-options'),
   setBasketDelivery: (delivery_option_id) =>
     request('/basket/delivery', { method: 'PATCH', body: JSON.stringify({ delivery_option_id }) }),

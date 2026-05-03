@@ -1,4 +1,4 @@
-import { listReviewsForProduct, createReview, updateReview, deleteReview } from './reviews.repo.js';
+import { listReviewsForProduct, createReview, updateReview, deleteReview, adjustThumbsUp } from './reviews.repo.js';
 
 export default async function reviewsRoutes(fastify) {
   fastify.get('/api/products/:productId/reviews', async (req) =>
@@ -30,5 +30,17 @@ export default async function reviewsRoutes(fastify) {
   fastify.delete('/api/reviews/:reviewId', async (req) => {
     await deleteReview(req.params.reviewId);
     return { deleted: true };
+  });
+
+  fastify.post('/api/reviews/:reviewId/thumbs-up', async (req, reply) => {
+    const result = await adjustThumbsUp(req.params.reviewId, 1);
+    if (result === null) return reply.code(404).send({ error: 'Review not found' });
+    return { thumbs_up_count: result };
+  });
+
+  fastify.delete('/api/reviews/:reviewId/thumbs-up', async (req, reply) => {
+    const result = await adjustThumbsUp(req.params.reviewId, -1);
+    if (result === null) return reply.code(404).send({ error: 'Review not found' });
+    return { thumbs_up_count: result };
   });
 }

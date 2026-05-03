@@ -183,7 +183,7 @@ export default function BasketPage() {
           value={notesDraft}
           onChange={(e) => setNotesDraft(e.target.value)}
           onBlur={handleNotesBlur}
-          placeholder="Specific time, mood, extra demands..."
+          placeholder="Just remember to keep it clean..."
           rows={2}
           className="block w-full resize-none rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
         />
