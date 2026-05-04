@@ -62,6 +62,8 @@ export const api = {
   getOrder: (id) => request(`/orders/${id}`),
   getNotifications: () => request('/notifications'),
   markNotificationsRead: () => request('/notifications/mark-read', { method: 'POST' }),
+  dismissNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  clearAllNotifications: () => request('/notifications', { method: 'DELETE' }),
   listOrders: (bucket, limit) => {
     const params = new URLSearchParams();
     if (bucket) params.set('bucket', bucket);

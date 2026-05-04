@@ -7,7 +7,7 @@ const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
 
 export default function AccountPage() {
-  const { account, refresh, notifications, markNotificationsRead } = useBasket();
+  const { account, refresh, notifications, markNotificationsRead, dismissNotification, clearAllNotifications } = useBasket();
   const [editing, setEditing] = useState(false);
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
@@ -101,7 +101,7 @@ export default function AccountPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </section>
 
-      <UpdatesSection notifications={notifications?.items ?? []} />
+      <UpdatesSection notifications={notifications?.items ?? []} onDismiss={dismissNotification} onClearAll={clearAllNotifications} />
       <OrdersSection title="Current orders"  bucket="open"  orders={openOrders}  />
       <OrdersSection title="Past orders"     bucket="past"  orders={pastOrders}  />
       <AdjustmentsSection adjustments={adjustments} />
@@ -175,35 +175,56 @@ function AdjustmentsSection({ adjustments }) {
   );
 }
 
-function UpdatesSection({ notifications }) {
+
+function UpdatesSection({ notifications, onDismiss, onClearAll }) {
   if (!notifications || notifications.length === 0) return null;
+  function handleClearAll() {
+    if (!confirm('Clear all updates?')) return;
+    onClearAll().catch(console.error);
+  }
   return (
     <section className="space-y-2">
-      <h2 className="text-base font-semibold">Updates</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">Updates</h2>
+        <button onClick={handleClearAll} className="text-xs font-medium text-neutral-500 hover:text-red-600">
+          Clear all
+        </button>
+      </div>
       <ul className="space-y-2">
-        {notifications.slice(0, 5).map((n) => {
-          const date = new Date(n.created_at).toLocaleString();
-          const inner = (
-            <>
-              <p className="text-sm font-medium">{n.title}</p>
-              {n.body && <p className="mt-1 text-xs text-neutral-600">{n.body}</p>}
-              <p className="mt-1 text-xs text-neutral-500">{date}</p>
-            </>
-          );
-          return (
-            <li key={n.id}>
-              {n.link_url ? (
-                <Link to={n.link_url} className="block rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm">
-                  {inner}
-                </Link>
-              ) : (
-                <div className="rounded-xl border border-neutral-200 bg-white p-3">{inner}</div>
-              )}
-            </li>
-          );
-        })}
+        {notifications.slice(0, 10).map((n) => (
+          <UpdateRow key={n.id} notification={n} onDismiss={() => onDismiss(n.id)} />
+        ))}
       </ul>
     </section>
+  );
+}
+
+function UpdateRow({ notification: n, onDismiss }) {
+  const date = new Date(n.created_at).toLocaleString();
+  const inner = (
+    <div className="pr-7">
+      <p className="text-sm font-medium">{n.title}</p>
+      {n.body && <p className="mt-1 text-xs text-neutral-600">{n.body}</p>}
+      <p className="mt-1 text-xs text-neutral-500">{date}</p>
+    </div>
+  );
+  return (
+    <li className="relative">
+      {n.link_url ? (
+        <Link to={n.link_url} className="block rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm">
+          {inner}
+        </Link>
+      ) : (
+        <div className="rounded-xl border border-neutral-200 bg-white p-3">{inner}</div>
+      )}
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDismiss(); }}
+        className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-red-600"
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+    </li>
   );
 }
 

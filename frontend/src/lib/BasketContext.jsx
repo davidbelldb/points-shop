@@ -24,6 +24,22 @@ export function BasketProvider({ children }) {
   const removePromo  = useCallback(async ()            => { const b = await api.removePromo(); setBasket(b); return b; }, []);
   const setDelivery  = useCallback(async (id)          => { const b = await api.setBasketDelivery(id); setBasket(b); return b; }, []);
   const setNotes     = useCallback(async (notes)       => { const b = await api.setBasketNotes(notes); setBasket(b); return b; }, []);
+  const dismissNotification = useCallback(async (id) => {
+    setNotifications((prev) => ({
+      items: prev.items.filter((n) => n.id !== id),
+      unread_count: Math.max(0, prev.unread_count - (prev.items.find((n) => n.id === id && !n.read_at) ? 1 : 0)),
+    }));
+    try { await api.dismissNotification(id); }
+    catch (e) { console.error(e); try { setNotifications(await api.getNotifications()); } catch {} }
+  }, []);
+
+  const clearAllNotifications = useCallback(async () => {
+    const previous = notifications;
+    setNotifications({ items: [], unread_count: 0 });
+    try { await api.clearAllNotifications(); }
+    catch (e) { console.error(e); setNotifications(previous); }
+  }, [notifications]);
+
   const markNotificationsRead = useCallback(async () => {
     try {
       await api.markNotificationsRead();
@@ -40,7 +56,7 @@ export function BasketProvider({ children }) {
 
   return (
     <BasketContext.Provider
-      value={{ basket, account, notifications, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder, markNotificationsRead }}
+      value={{ basket, account, notifications, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder, markNotificationsRead, dismissNotification, clearAllNotifications }}
     >
       {children}
     </BasketContext.Provider>

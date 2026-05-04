@@ -33,3 +33,19 @@ export async function markAllRead() {
     [accountId],
   );
 }
+
+export async function deleteNotification(id) {
+  const accountId = getDefaultAccountId();
+  await query(
+    `DELETE FROM notifications WHERE id = $1 AND account_id = $2`,
+    [id, accountId],
+  );
+}
+
+export async function deleteAllNotifications() {
+  const accountId = getDefaultAccountId();
+  await query(
+    `DELETE FROM notifications WHERE account_id = $1`,
+    [accountId],
+  );
+}
