@@ -10,6 +10,7 @@ import AccountPage from './pages/AccountPage.jsx';
 import OrdersListPage from './pages/OrdersListPage.jsx';
 import PointsHistoryPage from './pages/PointsHistoryPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import AdminSurveyResponsesPage from './pages/AdminSurveyResponsesPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import './index.css';
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="account/orders" element={<OrdersListPage />} />
               <Route path="account/points" element={<PointsHistoryPage />} />
               <Route path="admin" element={<AdminPage />} />
+            <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>
           </Routes>
         </BasketProvider>

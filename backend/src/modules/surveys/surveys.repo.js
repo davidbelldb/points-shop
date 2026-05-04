@@ -12,7 +12,11 @@ export async function listAllSurveys() {
          FROM survey_questions WHERE survey_id = $1 ORDER BY sort_order, created_at`,
       [s.id],
     );
-    out.push({ ...s, questions: qs.rows });
+    const rcRes = await query(
+      `SELECT COUNT(*)::int AS count FROM survey_responses WHERE survey_id = $1`,
+      [s.id],
+    );
+    out.push({ ...s, questions: qs.rows, response_count: rcRes.rows[0].count });
   }
   return out;
 }
@@ -109,4 +113,59 @@ export async function updateQuestion(id, patch) {
 
 export async function deleteQuestion(id) {
   await query(`DELETE FROM survey_questions WHERE id = $1`, [id]);
+}
+
+import { pool } from '../../db.js';
+import { getDefaultAccountId } from '../accounts/accounts.repo.js';
+
+export async function createResponse(surveyId, answers) {
+  const accountId = getDefaultAccountId();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const r = await client.query(
+      `INSERT INTO survey_responses (survey_id, account_id) VALUES ($1, $2) RETURNING id, created_at`,
+      [surveyId, accountId],
+    );
+    const responseId = r.rows[0].id;
+
+    for (const a of answers) {
+      await client.query(
+        `INSERT INTO survey_answers (response_id, question_id, value) VALUES ($1, $2, $3)`,
+        [responseId, a.question_id, a.value == null ? '' : String(a.value)],
+      );
+    }
+
+    await client.query('COMMIT');
+    return { id: responseId, created_at: r.rows[0].created_at };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listResponses(surveyId) {
+  const responses = await query(
+    `SELECT id, created_at FROM survey_responses
+      WHERE survey_id = $1
+      ORDER BY created_at DESC`,
+    [surveyId],
+  );
+  const out = [];
+  for (const r of responses.rows) {
+    const answersRes = await query(
+      `SELECT a.id, a.question_id, a.value,
+              q.question_text, q.question_type, q.options, q.sort_order
+         FROM survey_answers a
+         JOIN survey_questions q ON q.id = a.question_id
+        WHERE a.response_id = $1
+        ORDER BY q.sort_order, q.created_at`,
+      [r.id],
+    );
+    out.push({ ...r, answers: answersRes.rows });
+  }
+  return out;
 }

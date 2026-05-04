@@ -64,6 +64,8 @@ export const api = {
   markNotificationsRead: () => request('/notifications/mark-read', { method: 'POST' }),
   dismissNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
   getActiveSurvey: () => request('/surveys/active'),
+  submitSurveyResponse: (surveyId, answers) =>
+    request(`/surveys/${surveyId}/responses`, { method: 'POST', body: JSON.stringify({ answers }) }),
   clearAllNotifications: () => request('/notifications', { method: 'DELETE' }),
   listOrders: (bucket, limit) => {
     const params = new URLSearchParams();
@@ -101,6 +103,7 @@ export const api = {
     createQuestion: (surveyId, data) => request(`/admin/surveys/${surveyId}/questions`, { method: 'POST', body: JSON.stringify(data) }),
     updateQuestion: (id, patch) => request(`/admin/questions/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     deleteQuestion: (id) => request(`/admin/questions/${id}`, { method: 'DELETE' }),
+    listSurveyResponses: (surveyId) => request(`/admin/surveys/${surveyId}/responses`),
     listAllOrders: () => request('/admin/orders'),
     updateOrderStatus: (id, status, reason) =>
       request(`/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),

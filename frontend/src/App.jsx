@@ -1,6 +1,7 @@
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useBasket } from './lib/BasketContext.jsx';
 import { useSettings } from './lib/SettingsContext.jsx';
+import WinBigButton from './components/WinBigButton.jsx';
 
 function AvatarFallback() {
   return (
@@ -12,6 +13,8 @@ function AvatarFallback() {
 }
 
 export default function App() {
+  const location = useLocation();
+  const showFloater = !location.pathname.startsWith('/admin');
   const { account, basket, notifications } = useBasket();
   const { settings } = useSettings();
   const points = account?.points_balance ?? 0;
@@ -79,6 +82,7 @@ export default function App() {
       <main className="mx-auto max-w-md px-4 pb-24 pt-4">
         <Outlet />
       </main>
+      {showFloater && <WinBigButton />}
     </div>
   );
 }

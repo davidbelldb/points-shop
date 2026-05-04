@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
 const inputCls =
@@ -123,6 +124,14 @@ function SurveyEditor({ survey, onChanged }) {
 
   return (
     <div className="space-y-3 border-t border-neutral-100 p-3">
+      <div className="flex items-center justify-between">
+        <Link
+          to={`/admin/surveys/${survey.id}/responses`}
+          className="text-sm font-medium text-amber-700 hover:underline"
+        >
+          View {survey.response_count ?? 0} response{survey.response_count === 1 ? '' : 's'} {'\u2192'}
+        </Link>
+      </div>
       <Field label="Title">
         <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
       </Field>

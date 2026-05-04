@@ -2,12 +2,25 @@ import {
   listAllSurveys, getSurveyById, getActiveSurvey,
   createSurvey, updateSurvey, deleteSurvey,
   createQuestion, updateQuestion, deleteQuestion,
+  createResponse, listResponses,
 } from './surveys.repo.js';
 
 const VALID_TYPES = ['text', 'slider', 'radio', 'dropdown'];
 
 export default async function surveysRoutes(fastify) {
   fastify.get('/api/surveys/active', async () => getActiveSurvey());
+
+  fastify.post('/api/surveys/:id/responses', async (req, reply) => {
+    const { answers } = req.body ?? {};
+    if (!Array.isArray(answers)) {
+      return reply.code(400).send({ error: 'answers (array) required' });
+    }
+    return reply.code(201).send(await createResponse(req.params.id, answers));
+  });
+
+  fastify.get('/api/admin/surveys/:id/responses', async (req) =>
+    listResponses(req.params.id),
+  );
 
   fastify.get('/api/admin/surveys', async () => listAllSurveys());
 
