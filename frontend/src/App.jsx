@@ -56,7 +56,7 @@ export default function App() {
 
             <Link
               to="/basket"
-              className="block rounded-full p-2"
+              className="block rounded-full p-0.5"
               aria-label="Basket"
             >
               <span className="relative inline-block">
