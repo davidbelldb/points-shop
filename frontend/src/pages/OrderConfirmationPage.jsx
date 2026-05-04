@@ -39,9 +39,6 @@ export default function OrderConfirmationPage() {
           <br />
           I can hear those metronomic clapping sounds from here.
         </p>
-        <p className="mt-2 text-sm text-emerald-800">
-          A confirmation has been sent to {order.account_email}.
-        </p>
       </div>
 
       <div className="space-y-1 rounded-xl border border-neutral-200 bg-white p-4 text-sm">

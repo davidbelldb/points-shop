@@ -83,6 +83,7 @@ function SurveyRow({ survey, onChanged }) {
 function SurveyEditor({ survey, onChanged }) {
   const [form, setForm] = useState({
     title: survey.title,
+    banner_text: survey.banner_text ?? '',
     subtitle: survey.subtitle ?? '',
     asterisk_text: survey.asterisk_text ?? '',
     is_active: survey.is_active,
@@ -103,6 +104,7 @@ function SurveyEditor({ survey, onChanged }) {
     try {
       await api.admin.updateSurvey(survey.id, {
         title: form.title.trim(),
+        banner_text: form.banner_text.trim() || null,
         subtitle: form.subtitle.trim() || null,
         asterisk_text: form.asterisk_text.trim() || null,
         is_active: form.is_active,
@@ -134,6 +136,9 @@ function SurveyEditor({ survey, onChanged }) {
       </div>
       <Field label="Title">
         <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+      </Field>
+      <Field label="Banner text (top-of-page CTA, defaults to 'WIN BIG')">
+        <input className={inputCls} value={form.banner_text} onChange={(e) => setForm((f) => ({ ...f, banner_text: e.target.value }))} placeholder="WIN BIG" />
       </Field>
       <Field label="Subtitle">
         <textarea className={inputCls} rows={2} value={form.subtitle} onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))} />

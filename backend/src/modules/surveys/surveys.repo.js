@@ -1,6 +1,6 @@
 import { query } from '../../db.js';
 
-const SURVEY_FIELDS = ['title', 'subtitle', 'asterisk_text', 'is_active'];
+const SURVEY_FIELDS = ['title', 'subtitle', 'asterisk_text', 'banner_text', 'is_active'];
 const QUESTION_FIELDS = ['question_text', 'question_type', 'options', 'sort_order', 'is_required'];
 
 export async function listAllSurveys() {
@@ -46,9 +46,9 @@ export async function getActiveSurvey() {
 
 export async function createSurvey(d) {
   const { rows } = await query(
-    `INSERT INTO surveys (title, subtitle, asterisk_text, is_active)
-     VALUES ($1, $2, $3, COALESCE($4, FALSE)) RETURNING *`,
-    [d.title, d.subtitle ?? null, d.asterisk_text ?? null, d.is_active],
+    `INSERT INTO surveys (title, subtitle, asterisk_text, banner_text, is_active)
+     VALUES ($1, $2, $3, $4, COALESCE($5, FALSE)) RETURNING *`,
+    [d.title, d.subtitle ?? null, d.asterisk_text ?? null, d.banner_text ?? null, d.is_active],
   );
   return { ...rows[0], questions: [] };
 }

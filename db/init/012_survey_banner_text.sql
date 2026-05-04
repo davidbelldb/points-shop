@@ -1,0 +1,1 @@
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS banner_text TEXT;

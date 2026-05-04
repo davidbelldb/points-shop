@@ -7,9 +7,7 @@ function readCompleted() {
   try {
     const raw = localStorage.getItem(COMPLETED_KEY);
     return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+  } catch { return {}; }
 }
 
 function markCompletedLocal(id) {
@@ -20,7 +18,7 @@ function markCompletedLocal(id) {
   } catch {}
 }
 
-export default function WinBigButton() {
+export default function SurveyBanner() {
   const [survey, setSurvey] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -39,15 +37,18 @@ export default function WinBigButton() {
 
   if (!survey || completed) return null;
 
+  const bannerText = (survey.banner_text || '').trim() || 'WIN BIG';
+
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed left-3 top-1/2 z-30 flex h-20 w-20 -translate-y-1/2 items-center justify-center rounded-full bg-amber-600 font-extrabold text-amber-900 shadow-lg ring-4 ring-amber-300/40 transition hover:scale-105 active:scale-95"
-        aria-label="Open survey"
-      >
-        <span className="text-center text-base leading-none">WIN<br/>BIG</span>
-      </button>
+      <div className="border-b border-amber-700/20 bg-amber-600">
+        <button
+          onClick={() => setOpen(true)}
+          className="mx-auto block w-full max-w-md px-4 py-3 text-center text-base font-extrabold tracking-wide text-amber-900 transition active:bg-amber-500/80"
+        >
+          {bannerText}
+        </button>
+      </div>
       {open && (
         <SurveyModal
           survey={survey}
@@ -82,8 +83,7 @@ function SurveyModal({ survey, onClose, onCompleted }) {
         }
       }
     }
-    setBusy(true);
-    setError(null);
+    setBusy(true); setError(null);
     try {
       const list = survey.questions.map((q) => ({
         question_id: q.id,

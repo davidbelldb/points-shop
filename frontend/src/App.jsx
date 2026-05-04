@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useBasket } from './lib/BasketContext.jsx';
 import { useSettings } from './lib/SettingsContext.jsx';
-import WinBigButton from './components/WinBigButton.jsx';
+import SurveyBanner from './components/SurveyBanner.jsx';
 
 function AvatarFallback() {
   return (
@@ -79,10 +79,10 @@ export default function App() {
           </div>
         </div>
       </header>
+      {showFloater && <SurveyBanner />}
       <main className="mx-auto max-w-md px-4 pb-24 pt-4">
         <Outlet />
       </main>
-      {showFloater && <WinBigButton />}
     </div>
   );
 }
