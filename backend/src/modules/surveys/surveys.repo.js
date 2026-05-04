@@ -73,11 +73,12 @@ export async function createQuestion(surveyId, d) {
     [surveyId],
   );
   const nextOrder = r.rows[0].next;
+  const optionsValue = d.options === null || d.options === undefined ? null : JSON.stringify(d.options);
   const { rows } = await query(
     `INSERT INTO survey_questions
        (survey_id, question_text, question_type, options, sort_order, is_required)
      VALUES ($1, $2, $3, $4, $5, COALESCE($6, FALSE)) RETURNING *`,
-    [surveyId, d.question_text, d.question_type, d.options ?? null, d.sort_order ?? nextOrder, d.is_required],
+    [surveyId, d.question_text, d.question_type, optionsValue, d.sort_order ?? nextOrder, d.is_required],
   );
   return rows[0];
 }
@@ -87,7 +88,12 @@ export async function updateQuestion(id, patch) {
   const values = [];
   let i = 1;
   for (const k of QUESTION_FIELDS) {
-    if (k in patch) { fields.push(`${k} = $${i++}`); values.push(patch[k]); }
+    if (k in patch) {
+      fields.push(`${k} = $${i++}`);
+      let v = patch[k];
+      if (k === 'options' && v !== null && v !== undefined) v = JSON.stringify(v);
+      values.push(v);
+    }
   }
   if (fields.length === 0) {
     const { rows } = await query(`SELECT * FROM survey_questions WHERE id = $1`, [id]);
