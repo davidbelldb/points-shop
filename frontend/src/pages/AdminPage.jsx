@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import AdminOrdersSection from './AdminOrdersSection.jsx';
+import AdminSurveysSection from './AdminSurveysSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
 const inputCls =
@@ -58,6 +59,7 @@ export default function AdminPage() {
 
       <DiscountCodesSection codes={codes} onChanged={loadCodes} />
       <AdminOrdersSection />
+      <AdminSurveysSection />
     </div>
   );
 }
