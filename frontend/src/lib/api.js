@@ -60,6 +60,8 @@ export const api = {
     request('/basket/notes', { method: 'PATCH', body: JSON.stringify({ notes }) }),
   placeOrder: () => request('/orders', { method: 'POST' }),
   getOrder: (id) => request(`/orders/${id}`),
+  getNotifications: () => request('/notifications'),
+  markNotificationsRead: () => request('/notifications/mark-read', { method: 'POST' }),
   listOrders: (bucket, limit) => {
     const params = new URLSearchParams();
     if (bucket) params.set('bucket', bucket);
@@ -89,8 +91,8 @@ export const api = {
     updateHeroSlide: (id, patch) => request(`/admin/hero-slides/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     deleteHeroSlide: (id) => request(`/admin/hero-slides/${id}`, { method: 'DELETE' }),
     listAllOrders: () => request('/admin/orders'),
-    updateOrderStatus: (id, status) =>
-      request(`/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    updateOrderStatus: (id, status, reason) =>
+      request(`/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),
     upload: uploadFile,
   },
 };

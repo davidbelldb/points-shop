@@ -6,11 +6,13 @@ const BasketContext = createContext(null);
 export function BasketProvider({ children }) {
   const [basket, setBasket] = useState(null);
   const [account, setAccount] = useState(null);
+  const [notifications, setNotifications] = useState({ items: [], unread_count: 0 });
 
   const refresh = useCallback(async () => {
-    const [b, a] = await Promise.all([api.getBasket(), api.getAccount()]);
+    const [b, a, n] = await Promise.all([api.getBasket(), api.getAccount(), api.getNotifications()]);
     setBasket(b);
     setAccount(a);
+    setNotifications(n);
   }, []);
 
   useEffect(() => { refresh().catch(console.error); }, [refresh]);
@@ -22,6 +24,14 @@ export function BasketProvider({ children }) {
   const removePromo  = useCallback(async ()            => { const b = await api.removePromo(); setBasket(b); return b; }, []);
   const setDelivery  = useCallback(async (id)          => { const b = await api.setBasketDelivery(id); setBasket(b); return b; }, []);
   const setNotes     = useCallback(async (notes)       => { const b = await api.setBasketNotes(notes); setBasket(b); return b; }, []);
+  const markNotificationsRead = useCallback(async () => {
+    try {
+      await api.markNotificationsRead();
+      const n = await api.getNotifications();
+      setNotifications(n);
+    } catch (e) { console.error(e); }
+  }, []);
+
   const placeOrder   = useCallback(async () => {
     const order = await api.placeOrder();
     await refresh();
@@ -30,7 +40,7 @@ export function BasketProvider({ children }) {
 
   return (
     <BasketContext.Provider
-      value={{ basket, account, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder }}
+      value={{ basket, account, notifications, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder, markNotificationsRead }}
     >
       {children}
     </BasketContext.Provider>

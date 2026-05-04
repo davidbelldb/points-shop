@@ -7,7 +7,7 @@ const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
 
 export default function AccountPage() {
-  const { account, refresh } = useBasket();
+  const { account, refresh, notifications, markNotificationsRead } = useBasket();
   const [editing, setEditing] = useState(false);
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
@@ -26,6 +26,7 @@ export default function AccountPage() {
     api.listOrders('open', 3).then(setOpenOrders).catch(console.error);
     api.listOrders('past', 3).then(setPastOrders).catch(console.error);
     api.getLedgerAdjustments(3).then(setAdjustments).catch(console.error);
+    markNotificationsRead().catch(console.error);
   }, []);
 
   if (!account) return <p className="text-sm text-neutral-500">Loading...</p>;
@@ -100,6 +101,7 @@ export default function AccountPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </section>
 
+      <UpdatesSection notifications={notifications?.items ?? []} />
       <OrdersSection title="Current orders"  bucket="open"  orders={openOrders}  />
       <OrdersSection title="Past orders"     bucket="past"  orders={pastOrders}  />
       <AdjustmentsSection adjustments={adjustments} />
@@ -172,3 +174,36 @@ function AdjustmentsSection({ adjustments }) {
     </section>
   );
 }
+
+function UpdatesSection({ notifications }) {
+  if (!notifications || notifications.length === 0) return null;
+  return (
+    <section className="space-y-2">
+      <h2 className="text-base font-semibold">Updates</h2>
+      <ul className="space-y-2">
+        {notifications.slice(0, 5).map((n) => {
+          const date = new Date(n.created_at).toLocaleString();
+          const inner = (
+            <>
+              <p className="text-sm font-medium">{n.title}</p>
+              {n.body && <p className="mt-1 text-xs text-neutral-600">{n.body}</p>}
+              <p className="mt-1 text-xs text-neutral-500">{date}</p>
+            </>
+          );
+          return (
+            <li key={n.id}>
+              {n.link_url ? (
+                <Link to={n.link_url} className="block rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm">
+                  {inner}
+                </Link>
+              ) : (
+                <div className="rounded-xl border border-neutral-200 bg-white p-3">{inner}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+

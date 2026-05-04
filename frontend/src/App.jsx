@@ -12,10 +12,11 @@ function AvatarFallback() {
 }
 
 export default function App() {
-  const { account, basket } = useBasket();
+  const { account, basket, notifications } = useBasket();
   const { settings } = useSettings();
   const points = account?.points_balance ?? 0;
   const itemCount = basket?.item_count ?? 0;
+  const unreadCount = notifications?.unread_count ?? 0;
   const shopName = settings.shop_name ?? 'Sneaky Points';
   const logoUrl  = settings.logo_url;
 
@@ -36,11 +37,18 @@ export default function App() {
               className="flex items-center gap-1.5 rounded-full bg-amber-100 py-1 pl-1 pr-2.5 text-sm font-semibold text-amber-900"
               aria-label="Account"
             >
-              <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-amber-200 text-amber-900">
-                {account?.photo_url ? (
-                  <img src={account.photo_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <AvatarFallback />
+              <span className="relative inline-block">
+                <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-amber-200 text-amber-900">
+                  {account?.photo_url ? (
+                    <img src={account.photo_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <AvatarFallback />
+                  )}
+                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                    {unreadCount}
+                  </span>
                 )}
               </span>
               {points.toLocaleString()} pts

@@ -110,10 +110,10 @@ export default async function adminRoutes(fastify) {
   });
 
   fastify.patch('/api/admin/orders/:id', async (req, reply) => {
-    const { status } = req.body ?? {};
+    const { status, reason } = req.body ?? {};
     if (!status) return reply.code(400).send({ error: 'status required' });
     try {
-      const updated = await updateOrderStatus(req.params.id, status);
+      const updated = await updateOrderStatus(req.params.id, status, reason);
       if (!updated) return reply.code(404).send({ error: 'Order not found' });
       return updated;
     } catch (err) {

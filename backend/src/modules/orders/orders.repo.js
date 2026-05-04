@@ -194,15 +194,48 @@ export async function listAllOrders(limit = 100) {
   return rows;
 }
 
-export async function updateOrderStatus(id, status) {
+export async function updateOrderStatus(id, status, reason = null) {
   if (!VALID_STATUSES.includes(status)) {
     const err = new Error(`Invalid status: ${status}`);
     err.statusCode = 400;
     throw err;
   }
-  const { rows } = await pool.query(
-    `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, status`,
-    [status, id],
-  );
-  return rows[0] ?? null;
+  const cleanedReason = typeof reason === 'string' ? reason.trim() : null;
+  const finalReason = cleanedReason || null;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const updated = await client.query(
+      `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, account_id, status`,
+      [status, id],
+    );
+    if (updated.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    const order = updated.rows[0];
+
+    await client.query(
+      `INSERT INTO order_status_history (order_id, status, reason) VALUES ($1, $2, $3)`,
+      [id, status, finalReason],
+    );
+
+    const refShort = id.slice(0, 8).toUpperCase();
+    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+    await client.query(
+      `INSERT INTO notifications (account_id, type, title, body, link_url)
+       VALUES ($1, 'order_status', $2, $3, $4)`,
+      [order.account_id, `Order #${refShort}: ${statusLabel}`, finalReason, `/order/${id}`],
+    );
+
+    await client.query('COMMIT');
+    return { id: order.id, status: order.status };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
