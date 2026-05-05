@@ -11,19 +11,27 @@ import OrdersListPage from './pages/OrdersListPage.jsx';
 import PointsHistoryPage from './pages/PointsHistoryPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import AdminSurveyResponsesPage from './pages/AdminSurveyResponsesPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
-import LoginPage from './pages/LoginPage.jsx';
+import './index.css';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">Loading...</div>;
-  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+        Loading...
+      </div>
+    );
+  }
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
   return children;
 }
-import './index.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -32,8 +40,16 @@ createRoot(document.getElementById('root')).render(
         <SettingsProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route element={<RequireAuth><BasketProvider><App /></BasketProvider></RequireAuth>}>
-              <Route path="/" element={<App />}>
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  <BasketProvider>
+                    <App />
+                  </BasketProvider>
+                </RequireAuth>
+              }
+            >
               <Route index element={<HomePage />} />
               <Route path="product/:id" element={<ProductPage />} />
               <Route path="basket" element={<BasketPage />} />
@@ -42,10 +58,9 @@ createRoot(document.getElementById('root')).render(
               <Route path="account/orders" element={<OrdersListPage />} />
               <Route path="account/points" element={<PointsHistoryPage />} />
               <Route path="admin" element={<AdminPage />} />
-            <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
+              <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>
           </Routes>
-            </Route>
         </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>
