@@ -1,6 +1,7 @@
 import { mkdir } from 'fs/promises';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { config } from './config.js';
@@ -17,6 +18,8 @@ import heroRoutes from './modules/hero/hero.routes.js';
 import reviewsRoutes from './modules/reviews/reviews.routes.js';
 import notificationsRoutes from './modules/notifications/notifications.routes.js';
 import surveysRoutes from './modules/surveys/surveys.routes.js';
+import authRoutes, { SESSION_COOKIE } from './modules/auth/auth.routes.js';
+import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
 await mkdir(MEDIA_DIR, { recursive: true });
@@ -31,7 +34,28 @@ const fastify = Fastify({
   },
 });
 
-await fastify.register(cors, { origin: true });
+await fastify.register(cors, { origin: true, credentials: true });
+await fastify.register(cookie);
+
+fastify.addHook('onRequest', async (req) => {
+  const token = req.cookies?.[SESSION_COOKIE];
+  if (!token) return;
+  try {
+    const session = await findSession(token);
+    if (session) {
+      req.user = {
+        actualAccountId: session.account_id,
+        actualRole: session.role,
+        actualUsername: session.username,
+        effectiveAccountId: session.impersonating_account_id || session.account_id,
+        impersonating: !!session.impersonating_account_id,
+        token,
+      };
+    }
+  } catch (e) {
+    fastify.log.error({ err: e }, 'auth hook error');
+  }
+});
 await fastify.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
 await fastify.register(fastifyStatic, {
   root: MEDIA_DIR,
@@ -56,6 +80,9 @@ await fastify.register(heroRoutes);
 await fastify.register(reviewsRoutes);
 await fastify.register(notificationsRoutes);
 await fastify.register(surveysRoutes);
+await fastify.register(authRoutes);
+
+await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 
 const shutdown = async (signal) => {
   fastify.log.info(`Received ${signal}, shutting down`);

@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import App from './App.jsx';
 import HomePage from './pages/HomePage.jsx';
 import ProductPage from './pages/ProductPage.jsx';
@@ -13,15 +13,27 @@ import AdminPage from './pages/AdminPage.jsx';
 import AdminSurveyResponsesPage from './pages/AdminSurveyResponsesPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
+import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+
+function RequireAuth({ children }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">Loading...</div>;
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  return children;
+}
 import './index.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <SettingsProvider>
-        <BasketProvider>
+      <AuthProvider>
+        <SettingsProvider>
           <Routes>
-            <Route path="/" element={<App />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<RequireAuth><BasketProvider><App /></BasketProvider></RequireAuth>}>
+              <Route path="/" element={<App />}>
               <Route index element={<HomePage />} />
               <Route path="product/:id" element={<ProductPage />} />
               <Route path="basket" element={<BasketPage />} />
@@ -33,8 +45,9 @@ createRoot(document.getElementById('root')).render(
             <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>
           </Routes>
-        </BasketProvider>
-      </SettingsProvider>
+            </Route>
+        </SettingsProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>
 );

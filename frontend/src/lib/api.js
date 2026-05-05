@@ -5,7 +5,7 @@ async function request(path, options = {}) {
   if (options.body !== undefined && options.body !== null) {
     headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
   }
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${path}`, { credentials: 'include', ...options, headers });
   if (!res.ok) {
     let message = res.statusText;
     try {
@@ -20,7 +20,7 @@ async function request(path, options = {}) {
 async function uploadFile(file) {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`${BASE}/admin/upload`, { method: 'POST', body: fd });
+  const res = await fetch(`${BASE}/admin/upload`, { credentials: 'include', method: 'POST', body: fd });
   if (!res.ok) {
     let message = res.statusText;
     try { const b = await res.json(); if (b?.error) message = b.error; } catch {}
@@ -30,6 +30,10 @@ async function uploadFile(file) {
 }
 
 export const api = {
+  login: (username, password) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  getMe: () => request('/auth/me'),
   getSettings: () => request('/settings'),
   listProducts: () => request('/products'),
   getProduct: (id) => request(`/products/${id}`),

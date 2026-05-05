@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
+import { useAuth } from '../lib/AuthContext.jsx';
 
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
 
 export default function AccountPage() {
   const { account, refresh, notifications, markNotificationsRead, dismissNotification, clearAllNotifications } = useBasket();
+  const { user, logout } = useAuth();
   const [editing, setEditing] = useState(false);
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
@@ -56,6 +58,13 @@ export default function AccountPage() {
         <h1 className="text-xl font-semibold">Your account</h1>
         <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
       </div>
+
+      {user && (
+        <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm">
+          <p>Signed in as <span className="font-semibold">{user.username}</span></p>
+          <button onClick={logout} className="font-medium text-amber-700 hover:text-red-600">Sign out</button>
+        </div>
+      )}
 
       <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
         <div className="flex items-center gap-3">
