@@ -19,6 +19,7 @@ import reviewsRoutes from './modules/reviews/reviews.routes.js';
 import notificationsRoutes from './modules/notifications/notifications.routes.js';
 import surveysRoutes from './modules/surveys/surveys.routes.js';
 import authRoutes, { SESSION_COOKIE } from './modules/auth/auth.routes.js';
+import chatRoutes from './modules/chat/chat.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
@@ -81,6 +82,7 @@ await fastify.register(reviewsRoutes);
 await fastify.register(notificationsRoutes);
 await fastify.register(surveysRoutes);
 await fastify.register(authRoutes);
+await fastify.register(chatRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 

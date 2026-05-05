@@ -66,6 +66,24 @@ export default function AccountPage() {
         </div>
       )}
 
+      <Link
+        to="/messages"
+        className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-100 text-pink-700">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Messages</p>
+            <p className="text-xs text-neutral-500">Have a chat with the other one</p>
+          </div>
+        </div>
+        <span className="text-neutral-400">{'\u2192'}</span>
+      </Link>
+
       <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
         <div className="flex items-center gap-3">
           <label className="relative cursor-pointer">
