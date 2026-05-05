@@ -7,13 +7,15 @@ import HeroCarousel from '../components/HeroCarousel.jsx';
 export default function HomePage() {
   const { settings } = useSettings();
   const [products, setProducts] = useState(null);
-  const [slides, setSlides] = useState([]);
+  const [topSlides, setTopSlides] = useState([]);
+  const [gameSlides, setGameSlides] = useState([]);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState('newest');
 
   useEffect(() => {
     api.listProducts().then(setProducts).catch((e) => setError(e.message));
-    api.listHeroSlides().then(setSlides).catch(console.error);
+    api.listHeroSlides('top').then(setTopSlides).catch(console.error);
+    api.listHeroSlides('games').then(setGameSlides).catch(console.error);
   }, []);
 
   const sorted = useMemo(() => {
@@ -38,7 +40,7 @@ export default function HomePage() {
         </p>
       </div>
 
-      <HeroCarousel slides={slides} />
+      <HeroCarousel slides={topSlides} />
 
       <div>
         <div className="flex items-center justify-between gap-3">
@@ -81,6 +83,20 @@ export default function HomePage() {
               <p className="text-sm font-semibold text-amber-700">{p.price_points} pts</p>
             </Link>
           ))}
+        </div>
+      )}
+
+      {gameSlides.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-neutral-900">
+              {settings.games_title ?? 'Games'}
+            </h2>
+            {settings.games_subtitle && (
+              <p className="mt-1 text-sm text-neutral-500">{settings.games_subtitle}</p>
+            )}
+          </div>
+          <HeroCarousel slides={gameSlides} />
         </div>
       )}
     </div>

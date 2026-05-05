@@ -4,6 +4,8 @@ import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import AdminOrdersSection from './AdminOrdersSection.jsx';
 import AdminImpersonateSection from './AdminImpersonateSection.jsx';
+import AdminHeroSlides from './AdminHeroSlides.jsx';
+import AdminGamesSection from './AdminGamesSection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
@@ -39,7 +41,7 @@ export default function AdminPage() {
 
       <AdminImpersonateSection />
       <BrandingSection settings={settings} onChanged={refreshSettings} />
-      <HeroSlidesAdmin />
+      <AdminHeroSlides />
       <AccountSection  account={account}   onChanged={refresh} />
 
       <section className="space-y-3">
@@ -62,6 +64,7 @@ export default function AdminPage() {
       <DiscountCodesSection codes={codes} onChanged={loadCodes} />
       <AdminOrdersSection />
       <AdminSurveysSection />
+      <AdminGamesSection />
     </div>
   );
 }

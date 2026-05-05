@@ -77,8 +77,8 @@ export default function AccountPage() {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-medium">Messages</p>
-            <p className="text-xs text-neutral-500">Have a chat with the other one</p>
+            <p className="text-sm font-medium">Chat</p>
+            <p className="text-xs text-neutral-500">Because, why not?</p>
           </div>
         </div>
         <span className="text-neutral-400">{'\u2192'}</span>

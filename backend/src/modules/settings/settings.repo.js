@@ -1,6 +1,6 @@
 import { query } from '../../db.js';
 
-const ALLOWED = ['shop_name', 'hero_title', 'hero_subtitle', 'logo_url'];
+const ALLOWED = ['shop_name', 'hero_title', 'hero_subtitle', 'logo_url', 'games_title', 'games_subtitle'];
 
 export async function getAllSettings() {
   const { rows } = await query(`SELECT key, value FROM settings`);

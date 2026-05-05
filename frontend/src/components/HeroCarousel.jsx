@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function HeroCarousel({ slides }) {
   const [index, setIndex] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => { setIndex(0); }, [slides.length]);
 
@@ -15,10 +17,21 @@ export default function HeroCarousel({ slides }) {
 
   if (!slides.length) return null;
 
+  function handleClick() {
+    const slide = slides[index];
+    const link = slide?.link_url;
+    if (link) {
+      if (link.startsWith('/')) navigate(link);
+      else window.location.href = link;
+      return;
+    }
+    setIndex((i) => (i + 1) % slides.length);
+  }
+
   return (
     <div
       className="relative aspect-[16/7] cursor-pointer overflow-hidden rounded-2xl bg-neutral-100"
-      onClick={() => setIndex((i) => (i + 1) % slides.length)}
+      onClick={handleClick}
     >
       {slides.map((slide, i) => (
         <div

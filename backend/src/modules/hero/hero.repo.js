@@ -1,29 +1,38 @@
 import { query } from '../../db.js';
 
-const FIELDS = ['image_url', 'title', 'subtitle', 'code', 'sort_order', 'is_active'];
+const FIELDS = ['image_url', 'title', 'subtitle', 'code', 'link_url', 'placement', 'sort_order', 'is_active'];
 
-export async function listActiveSlides() {
+export async function listActiveSlides(placement = 'top') {
   const { rows } = await query(
-    `SELECT id, image_url, title, subtitle, code, sort_order
-       FROM hero_slides WHERE is_active = TRUE
+    `SELECT id, image_url, title, subtitle, code, link_url, placement, sort_order
+       FROM hero_slides
+      WHERE is_active = TRUE AND placement = $1
       ORDER BY sort_order, created_at`,
+    [placement],
   );
   return rows;
 }
 
 export async function listAllSlides() {
   const { rows } = await query(
-    `SELECT id, image_url, title, subtitle, code, sort_order, is_active, created_at
-       FROM hero_slides ORDER BY sort_order, created_at`,
+    `SELECT id, image_url, title, subtitle, code, link_url, placement,
+            sort_order, is_active, created_at
+       FROM hero_slides
+      ORDER BY placement, sort_order, created_at`,
   );
   return rows;
 }
 
 export async function createSlide(d) {
   const { rows } = await query(
-    `INSERT INTO hero_slides (image_url, title, subtitle, code, sort_order, is_active)
-     VALUES ($1, $2, $3, $4, $5, COALESCE($6, TRUE)) RETURNING *`,
-    [d.image_url, d.title ?? null, d.subtitle ?? null, d.code ?? null, d.sort_order ?? 0, d.is_active],
+    `INSERT INTO hero_slides (image_url, title, subtitle, code, link_url, placement, sort_order, is_active)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'top'), $7, COALESCE($8, TRUE))
+     RETURNING *`,
+    [
+      d.image_url,
+      d.title ?? null, d.subtitle ?? null, d.code ?? null, d.link_url ?? null,
+      d.placement, d.sort_order ?? 0, d.is_active,
+    ],
   );
   return rows[0];
 }
