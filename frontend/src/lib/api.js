@@ -55,8 +55,8 @@ export const api = {
   createReview: (productId, body) => request(`/products/${productId}/reviews`, { method: 'POST', body: JSON.stringify({ body }) }),
   updateReview: (reviewId, body) => request(`/reviews/${reviewId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
   deleteReview: (reviewId) => request(`/reviews/${reviewId}`, { method: 'DELETE' }),
-  thumbsUp: (reviewId) => request(`/reviews/${reviewId}/thumbs-up`, { method: 'POST' }),
-  removeThumbsUp: (reviewId) => request(`/reviews/${reviewId}/thumbs-up`, { method: 'DELETE' }),
+  likeReview: (reviewId) => request(`/reviews/${reviewId}/likes`, { method: 'POST' }),
+  unlikeReview: (reviewId) => request(`/reviews/${reviewId}/likes`, { method: 'DELETE' }),
   getDeliveryOptions: () => request('/delivery-options'),
   setBasketDelivery: (delivery_option_id) =>
     request('/basket/delivery', { method: 'PATCH', body: JSON.stringify({ delivery_option_id }) }),
@@ -108,6 +108,9 @@ export const api = {
     updateQuestion: (id, patch) => request(`/admin/questions/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     deleteQuestion: (id) => request(`/admin/questions/${id}`, { method: 'DELETE' }),
     listSurveyResponses: (surveyId) => request(`/admin/surveys/${surveyId}/responses`),
+    listUsers: () => request('/admin/users'),
+    startImpersonate: (target_user_id) => request('/admin/impersonate', { method: 'POST', body: JSON.stringify({ target_user_id }) }),
+    stopImpersonate: () => request('/admin/impersonate', { method: 'DELETE' }),
     listAllOrders: () => request('/admin/orders'),
     updateOrderStatus: (id, status, reason) =>
       request(`/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),

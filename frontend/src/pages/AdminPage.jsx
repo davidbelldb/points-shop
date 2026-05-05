@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import AdminOrdersSection from './AdminOrdersSection.jsx';
+import AdminImpersonateSection from './AdminImpersonateSection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
@@ -36,6 +37,7 @@ export default function AdminPage() {
         <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
       </div>
 
+      <AdminImpersonateSection />
       <BrandingSection settings={settings} onChanged={refreshSettings} />
       <HeroSlidesAdmin />
       <AccountSection  account={account}   onChanged={refresh} />

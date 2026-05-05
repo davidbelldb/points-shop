@@ -1,5 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useBasket } from './lib/BasketContext.jsx';
+import { useAuth } from './lib/AuthContext.jsx';
+import { api } from './lib/api.js';
 import { useSettings } from './lib/SettingsContext.jsx';
 import SurveyBanner from './components/SurveyBanner.jsx';
 
@@ -16,6 +18,12 @@ export default function App() {
   const location = useLocation();
   const showFloater = !location.pathname.startsWith('/admin');
   const { account, basket, notifications } = useBasket();
+  const { user, refresh: refreshAuth } = useAuth();
+
+  async function stopImpersonate() {
+    try { await api.admin.stopImpersonate(); await refreshAuth(); window.location.href = '/admin'; }
+    catch (e) { console.error(e); }
+  }
   const { settings } = useSettings();
   const points = account?.points_balance ?? 0;
   const itemCount = basket?.item_count ?? 0;
@@ -25,6 +33,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
+      {user?.impersonating && (
+        <div className="bg-amber-100 border-b border-amber-200">
+          <div className="mx-auto flex max-w-md items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900">
+            <span>Viewing as <strong>{user.username}</strong> (signed in as {user.actual_username})</span>
+            <button onClick={stopImpersonate} className="font-semibold underline">Stop</button>
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between gap-2 px-3 py-3">
           <Link to="/" className="flex min-w-0 items-center gap-2">

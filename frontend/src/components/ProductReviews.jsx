@@ -1,21 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useBasket } from '../lib/BasketContext.jsx';
-
-const LIKED_KEY = 'liked_reviews';
-
-function readLikedMap() {
-  try {
-    const raw = localStorage.getItem(LIKED_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeLikedMap(map) {
-  try { localStorage.setItem(LIKED_KEY, JSON.stringify(map)); } catch {}
-}
+import { useAuth } from '../lib/AuthContext.jsx';
 
 function Avatar({ url, name, size = 'sm' }) {
   const cls = size === 'lg' ? 'h-16 w-16' : 'h-8 w-8';
@@ -43,15 +28,24 @@ function ThumbsUp({ filled }) {
   );
 }
 
+function LikedByLabel({ likedBy, currentUserId }) {
+  if (!likedBy || likedBy.length === 0) return null;
+  const labels = likedBy.map((u) => (u.id === currentUserId ? 'You' : (u.name || u.username)));
+  let text;
+  if (labels.length === 1) text = `${labels[0]} liked this`;
+  else if (labels.length === 2) text = `${labels[0]} and ${labels[1]} liked this`;
+  else text = `${labels[0]} and ${labels.length - 1} others liked this`;
+  return <p className="text-xs text-neutral-500">{text}</p>;
+}
+
 export default function ProductReviews({ productId }) {
-  const { account } = useBasket();
+  const { user } = useAuth();
   const [reviews, setReviews] = useState(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState('');
-  const [likedMap, setLikedMap] = useState(readLikedMap);
 
   async function load() {
     try {
@@ -90,26 +84,21 @@ export default function ProductReviews({ productId }) {
   }
 
   async function toggleLike(reviewId, currentlyLiked) {
-    const newMap = { ...likedMap };
-    if (currentlyLiked) delete newMap[reviewId];
-    else newMap[reviewId] = true;
-    setLikedMap(newMap);
-    writeLikedMap(newMap);
-
+    if (!user) return;
     setReviews((rs) =>
-      (rs ?? []).map((r) =>
-        r.id === reviewId
-          ? { ...r, thumbs_up_count: Math.max(0, r.thumbs_up_count + (currentlyLiked ? -1 : 1)) }
-          : r
-      )
+      (rs ?? []).map((r) => {
+        if (r.id !== reviewId) return r;
+        const liked_by = currentlyLiked
+          ? (r.liked_by ?? []).filter((u) => u.id !== user.id)
+          : [...(r.liked_by ?? []), { id: user.id, name: user.name, photo_url: user.photo_url, username: user.username }];
+        return { ...r, liked_by };
+      })
     );
-
     try {
-      if (currentlyLiked) await api.removeThumbsUp(reviewId);
-      else await api.thumbsUp(reviewId);
+      if (currentlyLiked) await api.unlikeReview(reviewId);
+      else await api.likeReview(reviewId);
+      await load();
     } catch (e) {
-      setLikedMap(likedMap);
-      writeLikedMap(likedMap);
       await load();
     }
   }
@@ -126,7 +115,7 @@ export default function ProductReviews({ productId }) {
         ) : (
           <ul className="space-y-2">
             {reviews.map((r) => {
-              const liked = !!likedMap[r.id];
+              const liked = (r.liked_by ?? []).some((u) => u.id === user?.id);
               const date = new Date(r.created_at).toLocaleDateString(undefined, {
                 year: 'numeric', month: 'short', day: 'numeric',
               });
@@ -161,10 +150,7 @@ export default function ProductReviews({ productId }) {
                         className="block w-full resize-none rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
                       />
                       <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="text-sm text-neutral-500"
-                        >Cancel</button>
+                        <button onClick={() => setEditingId(null)} className="text-sm text-neutral-500">Cancel</button>
                         <button
                           onClick={saveEdit}
                           disabled={busy || !editDraft.trim()}
@@ -175,14 +161,15 @@ export default function ProductReviews({ productId }) {
                   ) : (
                     <>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">{r.body}</p>
-                      <div className="mt-2 flex justify-end">
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <LikedByLabel likedBy={r.liked_by} currentUserId={user?.id} />
                         <button
                           onClick={() => toggleLike(r.id, liked)}
                           className={`flex items-center gap-1 text-sm transition ${liked ? 'text-amber-700' : 'text-neutral-400 hover:text-amber-700'}`}
                           aria-label={liked ? 'Remove thumbs up' : 'Give thumbs up'}
                         >
                           <ThumbsUp filled={liked} />
-                          <span>{r.thumbs_up_count}</span>
+                          <span>{(r.liked_by ?? []).length || ''}</span>
                         </button>
                       </div>
                     </>
@@ -196,7 +183,7 @@ export default function ProductReviews({ productId }) {
 
       <div className="space-y-2">
         <div className="flex gap-2">
-          <Avatar url={account?.photo_url} name={account?.name} size="lg" />
+          <Avatar url={user?.photo_url} name={user?.name} size="lg" />
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

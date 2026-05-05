@@ -1,6 +1,7 @@
 import {
   findByUsername, findById, createSession, deleteSession, verifyPassword,
 } from './auth.repo.js';
+import { query } from '../../db.js';
 
 export const SESSION_COOKIE = 'sneaky_session';
 
@@ -22,6 +23,8 @@ function publicUser(account, req) {
     photo_url: account.photo_url ?? null,
     points_balance: account.points_balance ?? 0,
     actual_id: req?.user?.actualAccountId ?? account.id,
+    actual_username: req?.user?.actualUsername ?? account.username,
+    actual_role: req?.user?.actualRole ?? account.role,
     impersonating: req?.user?.impersonating ?? false,
   };
 }
@@ -45,6 +48,39 @@ export default async function authRoutes(fastify) {
     const token = req.cookies?.[SESSION_COOKIE];
     if (token) await deleteSession(token);
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    return { ok: true };
+  });
+
+  fastify.get('/api/admin/users', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'Admin only' });
+    const { rows } = await query(
+      `SELECT id, username, role, name, photo_url FROM accounts ORDER BY role DESC, username ASC`,
+    );
+    return rows;
+  });
+
+  fastify.post('/api/admin/impersonate', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'Admin only' });
+    const { target_user_id } = req.body ?? {};
+    if (!target_user_id) return reply.code(400).send({ error: 'target_user_id required' });
+    const target = await findById(target_user_id);
+    if (!target) return reply.code(404).send({ error: 'User not found' });
+    if (target.id === req.user.actualAccountId) {
+      return reply.code(400).send({ error: 'Cannot impersonate yourself' });
+    }
+    await query(
+      `UPDATE sessions SET impersonating_account_id = $1 WHERE token = $2`,
+      [target_user_id, req.user.token],
+    );
+    return { ok: true, impersonating: target };
+  });
+
+  fastify.delete('/api/admin/impersonate', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'Admin only' });
+    await query(
+      `UPDATE sessions SET impersonating_account_id = NULL WHERE token = $1`,
+      [req.user.token],
+    );
     return { ok: true };
   });
 

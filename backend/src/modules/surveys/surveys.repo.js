@@ -116,10 +116,8 @@ export async function deleteQuestion(id) {
 }
 
 import { pool } from '../../db.js';
-import { getDefaultAccountId } from '../accounts/accounts.repo.js';
 
-export async function createResponse(surveyId, answers) {
-  const accountId = getDefaultAccountId();
+export async function createResponse(accountId, surveyId, answers) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

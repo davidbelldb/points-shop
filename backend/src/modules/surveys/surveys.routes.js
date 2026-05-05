@@ -4,6 +4,7 @@ import {
   createQuestion, updateQuestion, deleteQuestion,
   createResponse, listResponses,
 } from './surveys.repo.js';
+import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
 const VALID_TYPES = ['text', 'slider', 'radio', 'dropdown'];
 
@@ -15,7 +16,7 @@ export default async function surveysRoutes(fastify) {
     if (!Array.isArray(answers)) {
       return reply.code(400).send({ error: 'answers (array) required' });
     }
-    return reply.code(201).send(await createResponse(req.params.id, answers));
+    return reply.code(201).send(await createResponse(getEffectiveAccountId(req), req.params.id, answers));
   });
 
   fastify.get('/api/admin/surveys/:id/responses', async (req) =>

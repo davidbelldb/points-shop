@@ -1,10 +1,11 @@
 import { placeOrder, getOrderById, listOrders, HttpError } from './orders.repo.js';
 import { sendOrderConfirmation } from './emails.js';
+import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
 export default async function ordersRoutes(fastify) {
   fastify.post('/api/orders', async (req, reply) => {
     try {
-      const order = await placeOrder();
+      const order = await placeOrder(getEffectiveAccountId(req));
       sendOrderConfirmation(order).catch((err) =>
         fastify.log.error({ err }, 'Order confirmation email failed'),
       );
@@ -19,7 +20,7 @@ export default async function ordersRoutes(fastify) {
   fastify.get('/api/orders', async (req) => {
     const bucket = req.query?.bucket ?? 'all';
     const limit = Math.min(Number(req.query?.limit ?? 50), 200);
-    return listOrders({ bucket, limit });
+    return listOrders({ accountId: getEffectiveAccountId(req), bucket, limit });
   });
 
   fastify.get('/api/orders/:id', async (req, reply) => {

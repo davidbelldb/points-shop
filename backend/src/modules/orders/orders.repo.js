@@ -1,5 +1,4 @@
 import { pool } from '../../db.js';
-import { getDefaultAccountId } from '../accounts/accounts.repo.js';
 import { calculateDiscount } from '../discounts/discounts.repo.js';
 
 export class HttpError extends Error {
@@ -8,8 +7,7 @@ export class HttpError extends Error {
 
 const VALID_STATUSES = ['placed', 'dispatched', 'delivered', 'cancelled', 'deleted'];
 
-export async function placeOrder() {
-  const accountId = getDefaultAccountId();
+export async function placeOrder(accountId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -33,10 +31,9 @@ export async function placeOrder() {
     const itemsRes = await client.query(
       `SELECT bi.product_id, bi.qty, p.name, p.price_points, i.stock_qty
          FROM basket_items bi
-         JOIN products  p ON p.id = bi.product_id
+         JOIN products p ON p.id = bi.product_id
          JOIN inventory i ON i.product_id = bi.product_id
-        WHERE bi.basket_id = $1
-        FOR UPDATE OF i`,
+        WHERE bi.basket_id = $1 FOR UPDATE OF i`,
       [basket.id],
     );
     if (itemsRes.rows.length === 0) throw new HttpError(400, 'Basket is empty');
@@ -65,14 +62,10 @@ export async function placeOrder() {
     let deliveryPoints = 0;
     if (basket.delivery_option_id) {
       const dr = await client.query(
-        `SELECT id, name, points FROM delivery_options
-          WHERE id = $1 AND is_active = TRUE`,
+        `SELECT id, name, points FROM delivery_options WHERE id = $1 AND is_active = TRUE`,
         [basket.delivery_option_id],
       );
-      if (dr.rows.length > 0) {
-        deliveryOption = dr.rows[0];
-        deliveryPoints = deliveryOption.points;
-      }
+      if (dr.rows.length > 0) { deliveryOption = dr.rows[0]; deliveryPoints = deliveryOption.points; }
     }
 
     const total = Math.max(0, subtotal - discountPoints) + deliveryPoints;
@@ -97,8 +90,7 @@ export async function placeOrder() {
 
     for (const item of itemsRes.rows) {
       await client.query(
-        `INSERT INTO order_items
-           (order_id, product_id, product_name, qty, unit_price_points, line_total_points)
+        `INSERT INTO order_items (order_id, product_id, product_name, qty, unit_price_points, line_total_points)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [orderId, item.product_id, item.name, item.qty, item.price_points, item.qty * item.price_points],
       );
@@ -165,8 +157,7 @@ export async function getOrderById(id) {
   return { ...orderRes.rows[0], subtotal_points: subtotal, items: itemsRes.rows };
 }
 
-export async function listOrders({ bucket = 'all', limit = 50 } = {}) {
-  const accountId = getDefaultAccountId();
+export async function listOrders({ accountId, bucket = 'all', limit = 50 } = {}) {
   let where = `account_id = $1 AND status != 'deleted'`;
   if (bucket === 'open') where = `account_id = $1 AND status IN ('placed','dispatched')`;
   if (bucket === 'past') where = `account_id = $1 AND status IN ('delivered','cancelled')`;
@@ -202,11 +193,9 @@ export async function updateOrderStatus(id, status, reason = null) {
   }
   const cleanedReason = typeof reason === 'string' ? reason.trim() : null;
   const finalReason = cleanedReason || null;
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
     const updated = await client.query(
       `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, account_id, status`,
       [status, id],
@@ -216,12 +205,10 @@ export async function updateOrderStatus(id, status, reason = null) {
       return null;
     }
     const order = updated.rows[0];
-
     await client.query(
       `INSERT INTO order_status_history (order_id, status, reason) VALUES ($1, $2, $3)`,
       [id, status, finalReason],
     );
-
     const refShort = id.slice(0, 8).toUpperCase();
     const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
     await client.query(
@@ -229,7 +216,6 @@ export async function updateOrderStatus(id, status, reason = null) {
        VALUES ($1, 'order_status', $2, $3, $4)`,
       [order.account_id, `Order #${refShort}: ${statusLabel}`, finalReason, `/order/${id}`],
     );
-
     await client.query('COMMIT');
     return { id: order.id, status: order.status };
   } catch (err) {

@@ -1,4 +1,7 @@
-import { listReviewsForProduct, createReview, updateReview, deleteReview, adjustThumbsUp } from './reviews.repo.js';
+import {
+  listReviewsForProduct, createReview, updateReview, deleteReview, addLike, removeLike,
+} from './reviews.repo.js';
+import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
 export default async function reviewsRoutes(fastify) {
   fastify.get('/api/products/:productId/reviews', async (req) =>
@@ -11,7 +14,7 @@ export default async function reviewsRoutes(fastify) {
       return reply.code(400).send({ error: 'body required' });
     }
     try {
-      return reply.code(201).send(await createReview(req.params.productId, body));
+      return reply.code(201).send(await createReview(getEffectiveAccountId(req), req.params.productId, body));
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }
@@ -32,15 +35,13 @@ export default async function reviewsRoutes(fastify) {
     return { deleted: true };
   });
 
-  fastify.post('/api/reviews/:reviewId/thumbs-up', async (req, reply) => {
-    const result = await adjustThumbsUp(req.params.reviewId, 1);
-    if (result === null) return reply.code(404).send({ error: 'Review not found' });
-    return { thumbs_up_count: result };
+  fastify.post('/api/reviews/:reviewId/likes', async (req) => {
+    await addLike(req.params.reviewId, getEffectiveAccountId(req));
+    return { ok: true };
   });
 
-  fastify.delete('/api/reviews/:reviewId/thumbs-up', async (req, reply) => {
-    const result = await adjustThumbsUp(req.params.reviewId, -1);
-    if (result === null) return reply.code(404).send({ error: 'Review not found' });
-    return { thumbs_up_count: result };
+  fastify.delete('/api/reviews/:reviewId/likes', async (req) => {
+    await removeLike(req.params.reviewId, getEffectiveAccountId(req));
+    return { ok: true };
   });
 }

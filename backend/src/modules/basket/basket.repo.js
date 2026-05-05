@@ -1,10 +1,8 @@
 import { query } from '../../db.js';
-import { getDefaultAccountId } from '../accounts/accounts.repo.js';
 import { findValidCodeByCode, calculateDiscount } from '../discounts/discounts.repo.js';
 import { getDefaultDeliveryOptionId, getDeliveryOptionById } from '../delivery/delivery.repo.js';
 
-async function getOrCreateBasketId() {
-  const accountId = getDefaultAccountId();
+async function getOrCreateBasketId(accountId) {
   const existing = await query(
     `SELECT id FROM baskets WHERE account_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [accountId],
@@ -18,8 +16,8 @@ async function getOrCreateBasketId() {
   return created.rows[0].id;
 }
 
-export async function getBasket() {
-  const basketId = await getOrCreateBasketId();
+export async function getBasket(accountId) {
+  const basketId = await getOrCreateBasketId(accountId);
 
   const itemsRes = await query(
     `SELECT bi.id, bi.product_id, bi.qty,
@@ -27,7 +25,7 @@ export async function getBasket() {
             COALESCE(i.stock_qty, 0) AS stock_qty,
             (bi.qty * p.price_points) AS line_total
        FROM basket_items bi
-       JOIN products  p ON p.id = bi.product_id
+       JOIN products p ON p.id = bi.product_id
        LEFT JOIN inventory i ON i.product_id = bi.product_id
       WHERE bi.basket_id = $1
       ORDER BY p.name`,
@@ -69,25 +67,18 @@ export async function getBasket() {
         };
       }
     }
-    if (!discount) {
-      await query(`UPDATE baskets SET discount_code_id = NULL WHERE id = $1`, [basketId]);
-    }
+    if (!discount) await query(`UPDATE baskets SET discount_code_id = NULL WHERE id = $1`, [basketId]);
   }
 
   let delivery = null;
   let delivery_points = 0;
   if (deliveryId) {
     const dRes = await query(
-      `SELECT id, name, points FROM delivery_options
-        WHERE id = $1 AND is_active = TRUE`,
+      `SELECT id, name, points FROM delivery_options WHERE id = $1 AND is_active = TRUE`,
       [deliveryId],
     );
-    if (dRes.rows.length > 0) {
-      delivery = dRes.rows[0];
-      delivery_points = delivery.points;
-    } else {
-      await query(`UPDATE baskets SET delivery_option_id = NULL WHERE id = $1`, [basketId]);
-    }
+    if (dRes.rows.length > 0) { delivery = dRes.rows[0]; delivery_points = delivery.points; }
+    else await query(`UPDATE baskets SET delivery_option_id = NULL WHERE id = $1`, [basketId]);
   }
 
   const total_points = Math.max(0, subtotal_points - discount_points) + delivery_points;
@@ -95,84 +86,73 @@ export async function getBasket() {
   return {
     basket_id: basketId,
     items: itemsRes.rows,
-    subtotal_points,
-    discount,
-    discount_points,
-    delivery,
-    delivery_points,
-    total_points,
-    item_count,
+    subtotal_points, discount, discount_points,
+    delivery, delivery_points, total_points, item_count,
     notes: basketRes.rows[0]?.notes ?? null,
   };
 }
 
-export async function addItem(productId, qty = 1) {
-  const basketId = await getOrCreateBasketId();
+export async function addItem(accountId, productId, qty = 1) {
+  const basketId = await getOrCreateBasketId(accountId);
   await query(
     `INSERT INTO basket_items (basket_id, product_id, qty) VALUES ($1, $2, $3)
-     ON CONFLICT (basket_id, product_id)
-       DO UPDATE SET qty = basket_items.qty + EXCLUDED.qty`,
+     ON CONFLICT (basket_id, product_id) DO UPDATE SET qty = basket_items.qty + EXCLUDED.qty`,
     [basketId, productId, qty],
   );
-  return getBasket();
+  return getBasket(accountId);
 }
 
-export async function setItemQty(productId, qty) {
-  const basketId = await getOrCreateBasketId();
+export async function setItemQty(accountId, productId, qty) {
+  const basketId = await getOrCreateBasketId(accountId);
   if (qty <= 0) {
     await query(`DELETE FROM basket_items WHERE basket_id = $1 AND product_id = $2`, [basketId, productId]);
   } else {
     await query(`UPDATE basket_items SET qty = $1 WHERE basket_id = $2 AND product_id = $3`, [qty, basketId, productId]);
   }
-  return getBasket();
+  return getBasket(accountId);
 }
 
-export async function removeItem(productId) {
-  const basketId = await getOrCreateBasketId();
+export async function removeItem(accountId, productId) {
+  const basketId = await getOrCreateBasketId(accountId);
   await query(`DELETE FROM basket_items WHERE basket_id = $1 AND product_id = $2`, [basketId, productId]);
-  return getBasket();
+  return getBasket(accountId);
 }
 
-export async function applyPromoCode(code) {
-  const basketId = await getOrCreateBasketId();
+export async function applyPromoCode(accountId, code) {
+  const basketId = await getOrCreateBasketId(accountId);
   const found = await findValidCodeByCode(code);
   if (!found) {
     const err = new Error('Invalid or expired code');
-    err.statusCode = 400;
-    throw err;
+    err.statusCode = 400; throw err;
   }
   await query(`UPDATE baskets SET discount_code_id = $1 WHERE id = $2`, [found.id, basketId]);
-  return getBasket();
+  return getBasket(accountId);
 }
 
-export async function removePromoCode() {
-  const basketId = await getOrCreateBasketId();
+export async function removePromoCode(accountId) {
+  const basketId = await getOrCreateBasketId(accountId);
   await query(`UPDATE baskets SET discount_code_id = NULL WHERE id = $1`, [basketId]);
-  return getBasket();
+  return getBasket(accountId);
 }
 
-export async function setDeliveryOption(deliveryOptionId) {
-  const basketId = await getOrCreateBasketId();
+export async function setDeliveryOption(accountId, deliveryOptionId) {
+  const basketId = await getOrCreateBasketId(accountId);
   if (deliveryOptionId == null) {
     await query(`UPDATE baskets SET delivery_option_id = NULL WHERE id = $1`, [basketId]);
   } else {
     const opt = await getDeliveryOptionById(deliveryOptionId);
     if (!opt || !opt.is_active) {
       const err = new Error('Invalid delivery option');
-      err.statusCode = 400;
-      throw err;
+      err.statusCode = 400; throw err;
     }
     await query(`UPDATE baskets SET delivery_option_id = $1 WHERE id = $2`, [deliveryOptionId, basketId]);
   }
-  return getBasket();
+  return getBasket(accountId);
 }
 
-export async function setNotes(notes) {
-  const basketId = await getOrCreateBasketId();
+export async function setNotes(accountId, notes) {
+  const basketId = await getOrCreateBasketId(accountId);
   const cleaned = typeof notes === 'string' ? notes.trim() : '';
-  await query(
-    `UPDATE baskets SET notes = $1 WHERE id = $2`,
-    [cleaned || null, basketId],
-  );
-  return getBasket();
+  await query(`UPDATE baskets SET notes = $1 WHERE id = $2`, [cleaned || null, basketId]);
+  return getBasket(accountId);
 }
