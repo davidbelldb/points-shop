@@ -56,6 +56,7 @@ export const api = {
   removePromo: () => request('/basket/promo', { method: 'DELETE' }),
   listHeroSlides: (placement = 'top') => request(`/hero-slides?placement=${placement}`),
   getRandomTodPrompt: (type) => request(`/games/truth-or-dare/random?type=${type}`),
+  getGamePlayers: () => request('/games/players'),
   listReviews: (productId) => request(`/products/${productId}/reviews`),
   createReview: (productId, body) => request(`/products/${productId}/reviews`, { method: 'POST', body: JSON.stringify({ body }) }),
   updateReview: (reviewId, body) => request(`/reviews/${reviewId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
