@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
 export default function GameRewardsCard() {
@@ -30,7 +29,7 @@ export default function GameRewardsCard() {
     <section className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">Game rewards</h2>
-        <Link to="/account/rewards" className="text-xs font-medium text-teal-700">See all</Link>
+        {pending.length > 0 && <span className="text-xs font-medium text-teal-700">{pending.length} to claim</span>}
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
       {pending.length > 0 ? (

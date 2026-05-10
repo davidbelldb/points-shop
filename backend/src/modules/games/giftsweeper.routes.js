@@ -53,6 +53,7 @@ async function isAdmin(accountId) {
   const r = await query(`SELECT role FROM accounts WHERE id = $1`, [accountId]);
   return (r.rows[0]?.role || '') === 'admin';
 }
+
 function shapeMatch(match, meId, extras = {}) {
   if (!match) return null;
   const isInitiator = match.initiator_account_id === meId;
@@ -68,21 +69,6 @@ function shapeMatch(match, meId, extras = {}) {
     finished: !!match.finished_at,
     ...extras,
   };
-}
-async function fetchWonItems(meId, matchId) {
-  const r = await query(
-    `SELECT r.id, r.text_label, p.id AS pid, p.name AS product_name, p.thumbnail_url AS product_thumbnail
-       FROM game_rewards r LEFT JOIN products p ON p.id = r.product_id
-      WHERE r.account_id = $1 AND r.source_type = 'giftsweeper' AND r.source_id = $2
-      ORDER BY r.created_at`,
-    [meId, matchId],
-  );
-  return r.rows.map((row) => ({
-    id: row.id,
-    label: row.product_name || row.text_label,
-    thumbnail: row.product_thumbnail || null,
-    kind: row.pid ? 'product' : 'forfeit',
-  }));
 }
 
 export default async function giftsweeperRoutes(fastify) {
@@ -112,9 +98,7 @@ export default async function giftsweeperRoutes(fastify) {
     const opponentId = match.initiator_account_id === meId ? match.opponent_account_id : match.initiator_account_id;
     const oppItems = await listGsItems(match.id, opponentId);
     const myGuessRows = (await query(
-      `SELECT cell_row, cell_col, hit_item_id, created_at FROM giftsweeper_guesses
-        WHERE match_id = $1 AND guesser_account_id = $2
-        ORDER BY created_at`,
+      `SELECT cell_row, cell_col, hit_item_id FROM giftsweeper_guesses WHERE match_id = $1 AND guesser_account_id = $2`,
       [match.id, meId],
     )).rows;
     const oppGuessRows = (await query(
@@ -125,23 +109,11 @@ export default async function giftsweeperRoutes(fastify) {
     const myHitsByItem = {}; for (const g of myGuessRows) if (g.hit_item_id) myHitsByItem[g.hit_item_id] = (myHitsByItem[g.hit_item_id]||0)+1;
     const oppHitsByItem = {}; for (const g of oppGuessRows) if (g.hit_item_id) oppHitsByItem[g.hit_item_id] = (oppHitsByItem[g.hit_item_id]||0)+1;
 
-    // Compute item_seq per cell (1-indexed by created_at within the item)
-    const seqByCell = {};
-    const groups = {};
-    for (const g of myGuessRows) if (g.hit_item_id) {
-      groups[g.hit_item_id] = groups[g.hit_item_id] || [];
-      groups[g.hit_item_id].push(g);
-    }
-    for (const [itemId, gs] of Object.entries(groups)) {
-      gs.forEach((g, i) => { seqByCell[`${g.cell_row}-${g.cell_col}`] = i + 1; });
-    }
-
     const oppGridGuesses = myGuessRows.map((g) => {
       const item = g.hit_item_id ? oppItems.find((it) => it.id === g.hit_item_id) : null;
       const total = item ? (item.cells || []).length : 0;
       const hitsForItem = item ? (myHitsByItem[item.id] || 0) : 0;
       const itemRevealed = item ? hitsForItem >= total : false;
-      const seq = item ? (seqByCell[`${g.cell_row}-${g.cell_col}`] || null) : null;
       return {
         r: g.cell_row, c: g.cell_col, hit: !!g.hit_item_id,
         item_id: g.hit_item_id,
@@ -149,7 +121,6 @@ export default async function giftsweeperRoutes(fastify) {
         item_kind: item ? (item.product_id ? 'product' : 'forfeit') : null,
         item_label: item ? (item.product_name || item.text_label) : null,
         item_progress: item ? { current: hitsForItem, total } : null,
-        item_seq: seq,
       };
     });
     const myGridMarks = oppGuessRows.map((g) => ({ r: g.cell_row, c: g.cell_col, hit: !!g.hit_item_id }));
@@ -158,16 +129,12 @@ export default async function giftsweeperRoutes(fastify) {
     const oppItemsRevealedByMe = oppItems.filter((it) => (myHitsByItem[it.id]||0) >= (it.cells||[]).length).length;
     const balance = await getBalance(meId);
 
-    let wonItems = null;
-    if (match.finished_at) wonItems = await fetchWonItems(meId, match.id);
-
     return {
       players,
       match: shapeMatch(match, meId, { my_balance: balance }),
       my_items: myItems,
       opp_grid: { rows: match.grid_rows, cols: match.grid_cols, guesses: oppGridGuesses, items_total: oppItems.length, items_revealed: oppItemsRevealedByMe },
       my_grid:  { marks: myGridMarks, items_total: myItems.length, items_revealed: myItemsRevealedByOpp },
-      won_items: wonItems,
     };
   });
 
@@ -351,6 +318,7 @@ export default async function giftsweeperRoutes(fastify) {
       results.push({ r: cell.r, c: cell.c, hit: !!hitItem, item_id: hitItem?.id || null });
     }
 
+    // Decorate hit results with item info + progress (always, not just when fully won)
     for (const r of results) {
       if (!r.item_id) continue;
       const item = oppItems.find((it) => it.id === r.item_id);
