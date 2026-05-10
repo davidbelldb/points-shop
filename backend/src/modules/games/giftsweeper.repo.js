@@ -45,6 +45,13 @@ export async function listGsItems(matchId, ownerId) {
 export async function deleteGsItemsForOwner(matchId, ownerId) {
   await query(`DELETE FROM giftsweeper_items WHERE match_id = $1 AND owner_account_id = $2`, [matchId, ownerId]);
 }
+export async function getGsItemById(id) {
+  const { rows } = await query(`SELECT * FROM giftsweeper_items WHERE id = $1`, [id]);
+  return rows[0] ?? null;
+}
+export async function deleteGsItemById(id, ownerId) {
+  await query(`DELETE FROM giftsweeper_items WHERE id = $1 AND owner_account_id = $2`, [id, ownerId]);
+}
 export async function insertGsItem(matchId, ownerId, productId, textLabel, cells) {
   const { rows } = await query(
     `INSERT INTO giftsweeper_items (match_id, owner_account_id, product_id, text_label, cells)

@@ -3,7 +3,8 @@ import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { getPlayersFor } from './games.repo.js';
 import {
   getActiveGsMatch, createGsMatch, updateGsMatch,
-  listGsItems, deleteGsItemsForOwner, insertGsItem,
+  listGsItems, deleteGsItemsForOwner, deleteGsItemById,
+  insertGsItem,
 } from './giftsweeper.repo.js';
 
 const DEFAULT_ROWS = 6;
@@ -81,6 +82,55 @@ export default async function giftsweeperRoutes(fastify) {
     return shapeMatch(match, meId);
   });
 
+  fastify.post('/api/games/giftsweeper/item', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    const { product_id, text_label, cells } = req.body ?? {};
+    if (!Array.isArray(cells) || cells.length === 0) {
+      return reply.code(400).send({ error: 'cells required' });
+    }
+    const players = await getPlayersFor(meId);
+    if (!players.other) return reply.code(400).send({ error: 'No opponent available' });
+    const match = await getActiveGsMatch(meId, players.other.id);
+    if (!match) return reply.code(404).send({ error: 'No active match' });
+    const isInitiator = match.initiator_account_id === meId;
+    if (isInitiator ? match.initiator_setup_done : match.opponent_setup_done) {
+      return reply.code(400).send({ error: 'Setup already confirmed' });
+    }
+    if (!isValidPlacement(cells, match.grid_rows, match.grid_cols)) {
+      return reply.code(400).send({ error: 'Invalid placement (single cell or contiguous line, in-bounds)' });
+    }
+    if (isInitiator && !product_id) return reply.code(400).send({ error: 'Pick a product' });
+    if (!isInitiator && !text_label?.trim()) return reply.code(400).send({ error: 'Enter a forfeit description' });
+    const existing = await listGsItems(match.id, meId);
+    for (const ex of existing) {
+      if (cellsOverlap(ex.cells, cells)) {
+        return reply.code(400).send({ error: 'Cells overlap an existing item' });
+      }
+    }
+    const inserted = await insertGsItem(
+      match.id, meId,
+      isInitiator ? product_id : null,
+      isInitiator ? null : text_label.trim(),
+      cells,
+    );
+    return inserted;
+  });
+
+  fastify.delete('/api/games/giftsweeper/item/:id', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    const players = await getPlayersFor(meId);
+    if (!players.other) return reply.code(400).send({ error: 'No opponent available' });
+    const match = await getActiveGsMatch(meId, players.other.id);
+    if (!match) return reply.code(404).send({ error: 'No active match' });
+    const isInitiator = match.initiator_account_id === meId;
+    if (isInitiator ? match.initiator_setup_done : match.opponent_setup_done) {
+      return reply.code(400).send({ error: 'Setup already confirmed; cannot edit items' });
+    }
+    await deleteGsItemById(req.params.id, meId);
+    return { ok: true };
+  });
+
+  // Kept for backward-compat but no longer used by the UI:
   fastify.post('/api/games/giftsweeper/items', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
     const { items } = req.body ?? {};
@@ -93,35 +143,23 @@ export default async function giftsweeperRoutes(fastify) {
     if (isInitiator ? match.initiator_setup_done : match.opponent_setup_done) {
       return reply.code(400).send({ error: 'Setup already confirmed' });
     }
-    if (items.length < MIN_ITEMS) {
-      return reply.code(400).send({ error: `At least ${MIN_ITEMS} items required` });
-    }
-    const seenCells = [];
-    for (const [idx, item] of items.entries()) {
-      if (!isValidPlacement(item.cells, match.grid_rows, match.grid_cols)) {
-        return reply.code(400).send({ error: `Item ${idx + 1}: invalid placement (single cell or contiguous line)` });
+    if (items.length < MIN_ITEMS) return reply.code(400).send({ error: `At least ${MIN_ITEMS} items required` });
+    const seen = [];
+    for (const [idx, it] of items.entries()) {
+      if (!isValidPlacement(it.cells, match.grid_rows, match.grid_cols)) {
+        return reply.code(400).send({ error: `Item ${idx+1}: invalid placement` });
       }
-      for (const prev of seenCells) {
-        if (cellsOverlap(prev, item.cells)) {
-          return reply.code(400).send({ error: `Item ${idx + 1} overlaps with another item` });
-        }
+      for (const prev of seen) if (cellsOverlap(prev, it.cells)) {
+        return reply.code(400).send({ error: `Item ${idx+1} overlaps another item` });
       }
-      seenCells.push(item.cells);
-      if (isInitiator && !item.product_id) {
-        return reply.code(400).send({ error: `Item ${idx + 1}: pick a product` });
-      }
-      if (!isInitiator && !item.text_label?.trim()) {
-        return reply.code(400).send({ error: `Item ${idx + 1}: enter a forfeit description` });
-      }
+      seen.push(it.cells);
     }
     await deleteGsItemsForOwner(match.id, meId);
-    for (const item of items) {
-      await insertGsItem(
-        match.id, meId,
-        isInitiator ? item.product_id : null,
-        isInitiator ? null : item.text_label.trim(),
-        item.cells,
-      );
+    for (const it of items) {
+      await insertGsItem(match.id, meId,
+        isInitiator ? it.product_id : null,
+        isInitiator ? null : it.text_label?.trim() || null,
+        it.cells);
     }
     return { ok: true };
   });

@@ -9,21 +9,6 @@ const TEAL_BTN = "inline-flex items-center justify-center rounded-xl bg-teal-300
 function rowLetter(r) { return ROW_LETTERS[r] ?? String(r+1); }
 function cellLabel(cell) { return rowLetter(cell.r) + (cell.c + 1); }
 
-function parseCoord(s, rows, cols) {
-  const m = String(s).trim().match(/^([a-zA-Z])\s*(\d+)$/);
-  if (!m) return null;
-  const r = m[1].toUpperCase().charCodeAt(0) - 65;
-  const c = parseInt(m[2], 10) - 1;
-  if (r < 0 || r >= rows || c < 0 || c >= cols) return null;
-  return { r, c };
-}
-function parseCoords(input, rows, cols) {
-  const parts = String(input || '').split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
-  if (parts.length === 0) return null;
-  const cells = parts.map((p) => parseCoord(p, rows, cols));
-  if (cells.some((c) => c === null)) return null;
-  return cells;
-}
 function isContiguousLine(cells) {
   if (!cells || cells.length === 0) return false;
   if (cells.length === 1) return true;
@@ -38,22 +23,40 @@ function isContiguousLine(cells) {
   return true;
 }
 
-function MiniGrid({ rows, cols, items, theme }) {
+function PlayGrid({ rows, cols, items, selection, theme, onTapCell, readOnly }) {
   const owner = {};
   items.forEach((item, idx) => { (item.cells || []).forEach((c) => { owner[`${c.r}-${c.c}`] = idx; }); });
-  const fill = theme === 'pink' ? 'bg-pink-300' : 'bg-emerald-300';
+  const sel = new Set((selection || []).map((c) => `${c.r}-${c.c}`));
+  const lockedFill   = theme === 'pink' ? 'bg-pink-300'  : 'bg-emerald-300';
+  const selectedFill = theme === 'pink' ? 'bg-pink-100 ring-2 ring-pink-500' : 'bg-emerald-100 ring-2 ring-emerald-500';
   const tiles = [<div key="hc" />];
-  for (let c = 0; c < cols; c++) tiles.push(<div key={`h${c}`} className="text-center text-[10px] font-semibold text-neutral-500">{c+1}</div>);
+  for (let c = 0; c < cols; c++) {
+    tiles.push(<div key={`h${c}`} className="text-center text-[11px] font-semibold text-neutral-500">{c+1}</div>);
+  }
   for (let r = 0; r < rows; r++) {
-    tiles.push(<div key={`rl${r}`} className="pr-1 text-right text-[10px] font-semibold text-neutral-500">{rowLetter(r).toLowerCase()}</div>);
+    tiles.push(<div key={`rl${r}`} className="pr-1 text-right text-[11px] font-semibold text-neutral-500">{rowLetter(r).toLowerCase()}</div>);
     for (let c = 0; c < cols; c++) {
-      const has = owner[`${r}-${c}`] !== undefined;
-      tiles.push(<div key={`x${r}-${c}`} className={`aspect-square rounded-sm ${has ? fill : 'bg-white border border-neutral-200'}`} />);
+      const k = `${r}-${c}`;
+      const occupied = owner[k] !== undefined;
+      const selected = sel.has(k);
+      let cls = 'bg-white border border-neutral-200';
+      if (occupied) cls = `${lockedFill}`;
+      else if (selected) cls = selectedFill;
+      tiles.push(
+        <button
+          key={`x${k}`}
+          type="button"
+          onClick={() => !readOnly && !occupied && onTapCell?.(r, c)}
+          disabled={readOnly || occupied}
+          className={`aspect-square rounded transition active:scale-95 ${cls} disabled:cursor-default`}
+          aria-label={`${rowLetter(r)}${c+1}${occupied ? ' assigned' : selected ? ' selected' : ''}`}
+        />
+      );
     }
   }
   return (
     <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-2">
-      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `1.25rem repeat(${cols}, minmax(0, 1fr))` }}>
+      <div className="grid gap-[3px]" style={{ gridTemplateColumns: `1.5rem repeat(${cols}, minmax(0, 1fr))` }}>
         {tiles}
       </div>
     </div>
@@ -65,7 +68,10 @@ export default function GiftsweeperPage() {
   const [products, setProducts] = useState([]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState([]);
+  const [selection, setSelection] = useState([]);
+  const [showAssign, setShowAssign] = useState(false);
+  const [assignProductId, setAssignProductId] = useState('');
+  const [assignText, setAssignText] = useState('');
   const { refresh: refreshBasket } = useBasket();
 
   async function load(markRead = true) {
@@ -75,17 +81,6 @@ export default function GiftsweeperPage() {
       if (markRead) {
         await api.gsMarkRead();
         if (refreshBasket) await refreshBasket();
-      }
-      if (data.match && draft.length === 0) {
-        if (data.my_items?.length > 0) {
-          setDraft(data.my_items.map((it) => ({
-            product_id: it.product_id || '',
-            text_label: it.text_label || '',
-            coords: (it.cells || []).map(cellLabel).join(', '),
-          })));
-        } else {
-          setDraft([{product_id:'',text_label:'',coords:''},{product_id:'',text_label:'',coords:''},{product_id:'',text_label:'',coords:''}]);
-        }
       }
     } catch (e) { setError(e.message); }
   }
@@ -100,66 +95,76 @@ export default function GiftsweeperPage() {
 
   const match    = state?.match ?? null;
   const players  = state?.players ?? null;
+  const myItems  = state?.my_items ?? [];
   const meName   = players?.me?.name || 'You';
   const otherName= players?.other?.name || 'Them';
   const isInitiator = match?.you_are === 'initiator';
-  const kind     = isInitiator ? 'product' : 'forfeit';
   const theme    = isInitiator ? 'pink' : 'green';
   const rows     = match?.grid_rows ?? 6;
   const cols     = match?.grid_cols ?? 6;
 
-  const parsedDraft = useMemo(() => draft.map((row) => {
-    const cells = parseCoords(row.coords, rows, cols);
-    let err = null;
-    if (kind === 'product' && !row.product_id) err = 'Pick a product';
-    else if (kind === 'forfeit' && !row.text_label.trim()) err = 'Type a forfeit';
-    else if (cells === null) err = 'Invalid coords (e.g. C3, D3, E3)';
-    else if (!isContiguousLine(cells)) err = 'Must be one cell or a contiguous line';
-    return { ...row, cells: cells || [], err };
-  }), [draft, kind, rows, cols]);
+  const selectionContig = useMemo(() => isContiguousLine(selection), [selection]);
+  const canAssign = selection.length > 0 && selectionContig;
 
-  const overlapErr = useMemo(() => {
-    const seen = {};
-    for (let i = 0; i < parsedDraft.length; i++) {
-      for (const c of parsedDraft[i].cells) {
-        const k = `${c.r}-${c.c}`;
-        if (seen[k] !== undefined) return `Item ${i+1} overlaps item ${seen[k]+1}`;
-        seen[k] = i;
-      }
-    }
-    return null;
-  }, [parsedDraft]);
+  function toggleCell(r, c) {
+    setSelection((s) => {
+      const i = s.findIndex((x) => x.r === r && x.c === c);
+      if (i >= 0) return s.filter((_, idx) => idx !== i);
+      return [...s, { r, c }];
+    });
+  }
 
-  const allValid = parsedDraft.length >= 3 && !overlapErr && parsedDraft.every((r) => !r.err);
+  function openAssign() {
+    if (!canAssign) return;
+    setAssignProductId('');
+    setAssignText('');
+    setShowAssign(true);
+  }
 
-  function setRow(i, patch) { setDraft((d) => d.map((r, idx) => idx === i ? { ...r, ...patch } : r)); }
-  function addRow()  { setDraft((d) => [...d, { product_id:'', text_label:'', coords:'' }]); }
-  function removeRow(i) { setDraft((d) => d.length <= 3 ? d : d.filter((_, idx) => idx !== i)); }
+  async function submitAssign() {
+    if (busy) return;
+    if (isInitiator && !assignProductId) return;
+    if (!isInitiator && !assignText.trim()) return;
+    setBusy(true);
+    try {
+      await api.gsAddItem({
+        product_id: isInitiator ? assignProductId : null,
+        text_label: isInitiator ? null : assignText.trim(),
+        cells: selection,
+      });
+      setSelection([]);
+      setShowAssign(false);
+      await load(false);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function removeItem(id) {
+    if (!confirm('Remove this item?')) return;
+    setBusy(true);
+    try { await api.gsRemoveItem(id); await load(false); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
 
   async function start() {
-    if (busy) return; setBusy(true);
+    if (busy) return;
+    setBusy(true);
     try { await api.gsStart({}); await load(false); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
-  async function saveAndConfirm() {
-    if (busy || !allValid) return; setBusy(true);
-    try {
-      const items = parsedDraft.map((r) => ({
-        product_id: kind === 'product' ? r.product_id : null,
-        text_label: kind === 'forfeit' ? r.text_label.trim() : null,
-        cells: r.cells,
-      }));
-      await api.gsSetItems(items);
-      await api.gsConfirm();
-      await load(false);
-    } catch (e) { setError(e.message); }
+  async function confirmGrid() {
+    if (busy || myItems.length < 3) return;
+    setBusy(true);
+    try { await api.gsConfirm(); await load(false); }
+    catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
   async function abandon() {
     if (!confirm('Cancel this Giftsweeper match?')) return;
     setBusy(true);
-    try { await api.gsAbandon(); setDraft([]); await load(false); }
+    try { await api.gsAbandon(); setSelection([]); await load(false); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
@@ -192,7 +197,7 @@ export default function GiftsweeperPage() {
         <Header canCancel={false} />
         <div className="rounded-2xl border border-neutral-200 bg-white p-5 text-center">
           <p className="text-sm text-neutral-500">No active match.</p>
-          <p className="mt-1 text-xs text-neutral-400">{rows}x{cols} grid - {match?.cost_per_cell ?? 1} pt per cell guess - both players hide items.</p>
+          <p className="mt-1 text-xs text-neutral-400">{rows}x{cols} grid - 1 pt per cell guess - both players hide items.</p>
           <button onClick={start} disabled={busy || !players?.other} className={`mt-4 ${TEAL_BTN}`}>
             Start a Giftsweeper match
           </button>
@@ -227,11 +232,13 @@ export default function GiftsweeperPage() {
 
   const heading = `${meName}'s Grid`;
   const tagline = isInitiator
-    ? <>To get started, <strong>list your products</strong> and their location on the grid.</>
-    : <>To get started, <strong>list your forfeits</strong> and their location on the grid.</>;
+    ? <>Tap cells on the grid to place a <strong>product</strong>, then assign.</>
+    : <>Tap cells on the grid to place a <strong>forfeit</strong>, then assign.</>;
+  const assignBtnLabel = isInitiator ? 'Assign product' : 'Assign forfeit';
   const confirmLabel = isInitiator ? 'Confirm products' : 'Confirm forfeits';
-  const addLabel = isInitiator ? '+ Add product' : '+ Add forfeit';
-  const focusBorder = isInitiator ? 'focus:border-pink-400' : 'focus:border-emerald-400';
+  const itemsHeading = isInitiator
+    ? `Products (${myItems.length}/3 minimum)`
+    : `Forfeits (${myItems.length}/3 minimum)`;
 
   return (
     <div className="space-y-5 py-2">
@@ -240,57 +247,115 @@ export default function GiftsweeperPage() {
         <h2 className="text-xl font-bold">{heading}</h2>
         <p className="mt-1 text-sm text-neutral-500">{tagline}</p>
       </div>
-      <MiniGrid rows={rows} cols={cols} items={parsedDraft} theme={theme} />
-      <div className="space-y-4">
-        <p className="text-sm font-semibold">{isInitiator ? 'Add products (3 minimum)' : 'Add forfeits (3 minimum)'}</p>
-        {parsedDraft.map((row, i) => (
-          <div key={i} className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                {isInitiator ? 'Product' : 'Forfeit'} {i+1}
-              </p>
-              {parsedDraft.length > 3 && (
-                <button onClick={() => removeRow(i)} className="text-xs text-neutral-400 hover:text-red-500">Remove</button>
+
+      <PlayGrid
+        rows={rows}
+        cols={cols}
+        items={myItems}
+        selection={selection}
+        theme={theme}
+        onTapCell={toggleCell}
+      />
+
+      <div className="text-center text-xs">
+        {selection.length === 0 && (
+          <span className="text-neutral-400">Tap empty cells to start placing an item.</span>
+        )}
+        {selection.length > 0 && selectionContig && (
+          <span className="font-medium text-neutral-600">
+            {selection.length} cell{selection.length === 1 ? '' : 's'} selected: {selection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
+          </span>
+        )}
+        {selection.length > 0 && !selectionContig && (
+          <span className="font-medium text-red-500">Selection must be one cell or a contiguous line (no gaps, no L-shapes).</span>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setSelection([])}
+          disabled={selection.length === 0}
+          className="flex-1 rounded-xl border border-neutral-300 bg-white py-2 text-sm font-medium text-neutral-700 disabled:opacity-30"
+        >Clear</button>
+        <button
+          onClick={openAssign}
+          disabled={!canAssign || busy}
+          className={`flex-1 ${TEAL_BTN}`}
+        >{assignBtnLabel}</button>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-semibold">{itemsHeading}</p>
+        {myItems.length === 0 ? (
+          <p className="text-xs text-neutral-400">Nothing assigned yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {myItems.map((it) => (
+              <li key={it.id} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {isInitiator ? (it.product_name || 'Product') : (it.text_label || 'Forfeit')}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {(it.cells || []).slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
+                  </p>
+                </div>
+                <button onClick={() => removeItem(it.id)} disabled={busy} className="shrink-0 text-xs font-medium text-neutral-400 hover:text-red-500 disabled:opacity-30">
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {myItems.length >= 3 && (
+        <button onClick={confirmGrid} disabled={busy} className={`w-full ${TEAL_BTN}`}>
+          {confirmLabel}
+        </button>
+      )}
+
+      {showAssign && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold">{isInitiator ? 'Assign a product' : 'Assign a forfeit'}</h3>
+            <p className="mt-1 text-xs text-neutral-500">
+              {selection.length} cell{selection.length === 1 ? '' : 's'}: {selection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
+            </p>
+            <div className="mt-4">
+              {isInitiator ? (
+                <select
+                  value={assignProductId}
+                  onChange={(e) => setAssignProductId(e.target.value)}
+                  className="block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-pink-400 focus:outline-none"
+                >
+                  <option value="">Select a product</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} - {p.price_points} pts</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={assignText}
+                  onChange={(e) => setAssignText(e.target.value)}
+                  placeholder="e.g. I'll make you a cheesecake"
+                  className="block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                  autoFocus
+                />
               )}
             </div>
-            {isInitiator ? (
-              <select
-                value={row.product_id || ''}
-                onChange={(e) => setRow(i, { product_id: e.target.value })}
-                className={`block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:outline-none ${focusBorder}`}
-              >
-                <option value="">Select product from dropdown</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} - {p.price_points} pts</option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={row.text_label}
-                onChange={(e) => setRow(i, { text_label: e.target.value })}
-                placeholder="Type a forfeit, e.g. I'll kiss you"
-                className={`block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:outline-none ${focusBorder}`}
-              />
-            )}
-            <input
-              type="text"
-              value={row.coords}
-              onChange={(e) => setRow(i, { coords: e.target.value })}
-              placeholder={isInitiator ? 'Product location e.g. C3, D3, E3' : 'Forfeit location e.g. C3, D3, E3'}
-              className={`block w-full rounded-xl border px-3 py-2 text-sm focus:outline-none ${row.err ? 'border-red-300 focus:border-red-400' : `border-neutral-200 ${focusBorder}`}`}
-            />
-            {row.err && <p className="text-xs text-red-500">{row.err}</p>}
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setShowAssign(false)} disabled={busy} className="flex-1 rounded-xl border border-neutral-300 bg-white py-2 text-sm font-medium text-neutral-700 disabled:opacity-30">Cancel</button>
+              <button
+                onClick={submitAssign}
+                disabled={busy || (isInitiator ? !assignProductId : !assignText.trim())}
+                className={`flex-1 ${TEAL_BTN}`}
+              >Save</button>
+            </div>
           </div>
-        ))}
-        <button onClick={addRow} className="text-sm font-medium text-neutral-500 underline">{addLabel}</button>
-      </div>
-      {overlapErr && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{overlapErr}</div>
+        </div>
       )}
-      <button onClick={saveAndConfirm} disabled={!allValid || busy} className={`w-full ${TEAL_BTN}`}>
-        {confirmLabel}
-      </button>
     </div>
   );
 }
