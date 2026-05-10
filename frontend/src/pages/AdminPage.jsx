@@ -157,17 +157,30 @@ function AccountSection({ account, onChanged }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [target, setTarget] = useState('');
+
+  useEffect(() => {
+    api.admin.listUsers().then((u) => {
+      setUsers(u);
+      const katie = u.find((x) => x.role !== 'admin');
+      if (katie) setTarget(katie.id);
+      else if (u[0]) setTarget(u[0].id);
+    }).catch(() => {});
+  }, []);
 
   if (!account) return null;
 
   async function applyCredit() {
     const n = parseInt(delta, 10);
-    if (!Number.isInteger(n) || n === 0 || !reason.trim()) return;
+    if (!Number.isInteger(n) || n === 0 || !reason.trim() || !target) return;
     setBusy(true); setError(null);
-    try { await api.admin.creditPoints(n, reason.trim()); setDelta(''); setReason(''); await onChanged(); }
+    try { await api.admin.creditPoints(n, reason.trim(), target); setDelta(''); setReason(''); await onChanged(); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
+
+  const targetName = users.find((u) => u.id === target)?.name || 'user';
 
   return (
     <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
@@ -178,22 +191,30 @@ function AccountSection({ account, onChanged }) {
       </div>
       <div>
         <p className="mb-1 text-sm font-medium">Adjust points</p>
-        <div className="flex items-stretch gap-2">
+        <div className="flex flex-wrap items-stretch gap-2">
+          <select
+            className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+            value={target} onChange={(e) => setTarget(e.target.value)}
+          >
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
           <input
             className="block w-20 shrink-0 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
             type="number" placeholder="±"
             value={delta} onChange={(e) => setDelta(e.target.value)}
           />
           <input
-            className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+            className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
             placeholder="Reason"
             value={reason} onChange={(e) => setReason(e.target.value)}
           />
-          <button onClick={applyCredit} disabled={busy || !delta || !reason.trim()} className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40">
+          <button onClick={applyCredit} disabled={busy || !delta || !reason.trim() || !target} className="ml-auto rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40">
             Apply
           </button>
         </div>
-        <p className="mt-1 text-xs text-neutral-500">Positive credits, negative debits.</p>
+        <p className="mt-1 text-xs text-neutral-500">Adjusts {targetName}'s points. Positive credits, negative debits.</p>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </section>

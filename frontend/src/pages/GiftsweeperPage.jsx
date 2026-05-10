@@ -57,7 +57,7 @@ function OppGrid({ rows, cols, guesses, selection, theme, onTapCell, disabled })
   const sel = new Set((selection||[]).map((c) => `${c.r}-${c.c}`));
   const revealedFill = theme === 'pink' ? 'bg-pink-400' : 'bg-emerald-500';
   const partialFill  = theme === 'pink' ? 'bg-pink-200' : 'bg-emerald-200';
-  const partialText  = theme === 'pink' ? 'text-pink-700' : 'text-emerald-700';
+  const partialText  = theme === 'pink' ? 'text-pink-800' : 'text-emerald-800';
   const selFill      = theme === 'pink' ? 'bg-pink-100 ring-2 ring-pink-500' : 'bg-emerald-100 ring-2 ring-emerald-500';
   const tiles = [<div key="hc" />];
   for (let c = 0; c < cols; c++) tiles.push(<div key={`h${c}`} className="text-center text-[11px] font-semibold text-neutral-500">{c+1}</div>);
@@ -70,9 +70,18 @@ function OppGrid({ rows, cols, guesses, selection, theme, onTapCell, disabled })
       let cls = 'bg-white border border-neutral-200';
       let content = null;
       if (guess) {
-        if (guess.hit && guess.item_revealed) cls = revealedFill;
-        else if (guess.hit) { cls = partialFill; content = <span className={`text-xs font-bold ${partialText}`}>{'\u2713'}</span>; }
-        else { cls = 'bg-neutral-100'; content = <span className="text-xs text-neutral-400">{'\u2715'}</span>; }
+        const seqStr = (guess.item_seq && guess.item_progress)
+          ? `${guess.item_seq}/${guess.item_progress.total}` : '';
+        if (guess.hit && guess.item_revealed) {
+          cls = revealedFill;
+          content = <span className="text-[10px] font-bold leading-none text-white">{seqStr}</span>;
+        } else if (guess.hit) {
+          cls = partialFill;
+          content = <span className={`text-[10px] font-bold leading-none ${partialText}`}>{seqStr || '\u2713'}</span>;
+        } else {
+          cls = 'bg-neutral-100';
+          content = <span className="text-xs leading-none text-neutral-400">{'\u2715'}</span>;
+        }
       } else if (selected) cls = selFill;
       const cellDisabled = disabled || !!guess;
       tiles.push(<button key={`x${k}`} type="button" onClick={() => !cellDisabled && onTapCell?.(r,c)} disabled={cellDisabled}
@@ -205,6 +214,7 @@ export default function GiftsweeperPage() {
   const match    = state?.match ?? null;
   const players  = state?.players ?? null;
   const myItems  = state?.my_items ?? [];
+  const wonItems = state?.won_items ?? [];
   const meName   = players?.me?.name || 'You';
   const otherName= players?.other?.name || 'Them';
   const isAdmin  = players?.me?.role === 'admin';
@@ -344,12 +354,34 @@ export default function GiftsweeperPage() {
       <div className="space-y-5 py-2">
         <Header canCancel={false} />
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+          <div className="w-full max-w-sm max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 text-center shadow-xl">
             <h2 className="text-xl font-bold">Match over</h2>
-            <p className="mt-1 text-sm text-neutral-500">Won items have been added to your rewards.</p>
-            <p className="mt-3 text-sm">You revealed <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong>.</p>
-            <p className="text-sm">{otherName} revealed <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong>.</p>
-            <button onClick={ackEndModal} className={`mt-5 w-full ${TEAL_BTN}`}>Return home</button>
+            <p className="mt-1 text-sm text-neutral-500">
+              You revealed <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong>.
+              {' '}{otherName} revealed <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong>.
+            </p>
+            {wonItems.length > 0 ? (
+              <>
+                <p className="mt-4 text-sm font-semibold text-teal-700">Your winnings</p>
+                <ul className="mt-2 space-y-2 text-left">
+                  {wonItems.map((w) => (
+                    <li key={w.id} className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 p-2.5">
+                      {w.thumbnail
+                        ? <img src={w.thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                        : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-emerald-200 text-xl">{w.kind === 'product' ? '\uD83C\uDF81' : '\uD83D\uDCDD'}</div>}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-teal-900">{w.label}</p>
+                        <p className="text-[11px] text-teal-700">{w.kind === 'product' ? 'Product' : 'Forfeit'}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-neutral-400">Claim them from your account.</p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-neutral-500">No items won this match.</p>
+            )}
+            <button onClick={ackEndModal} className={`mt-4 w-full ${TEAL_BTN}`}>Return home</button>
           </div>
         </div>
       </div>
@@ -377,28 +409,13 @@ export default function GiftsweeperPage() {
     const itemsHeading = isAdmin ? `Products (${myItems.length}/3 minimum)` : `Forfeits (${myItems.length}/3 minimum)`;
 
     return (
-      <div className="space-y-5 py-2">
+      <div className="space-y-5 py-2 pb-32">
         <Header canCancel />
         <div className="text-center">
           <h2 className="text-xl font-bold">{meName}'s Grid</h2>
           <p className="mt-1 text-sm text-neutral-500">{tagline}</p>
         </div>
         <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={myTheme} onTapCell={tapSetupCell} />
-        <div className="text-center text-xs">
-          {setupSelection.length === 0 && <span className="text-neutral-400">Tap empty cells to start placing an item.</span>}
-          {setupSelection.length > 0 && setupContig && (
-            <span className="font-medium text-neutral-600">
-              {setupSelection.length} cell{setupSelection.length === 1 ? '' : 's'}: {setupSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
-            </span>
-          )}
-          {setupSelection.length > 0 && !setupContig && (
-            <span className="font-medium text-red-500">Item placements cannot contain gaps.</span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setSetupSelection([])} disabled={setupSelection.length === 0} className={PALE_BTN}>Clear</button>
-          <button onClick={openAssign} disabled={!canAssign || busy} className={`flex-1 ${TEAL_BTN}`}>{assignBtnLabel}</button>
-        </div>
         <div className="space-y-2">
           <p className="text-sm font-semibold">{itemsHeading}</p>
           {myItems.length === 0 ? (
@@ -417,9 +434,28 @@ export default function GiftsweeperPage() {
             </ul>
           )}
         </div>
-        {myItems.length >= 3 && (
-          <button onClick={confirmGrid} disabled={busy} className={`w-full ${TEAL_BTN}`}>{confirmLabel}</button>
-        )}
+
+        <div className="sticky bottom-0 -mx-4 border-t border-neutral-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+          <div className="text-center text-xs">
+            {setupSelection.length === 0 && <span className="text-neutral-400">Tap empty cells to place an item.</span>}
+            {setupSelection.length > 0 && setupContig && (
+              <span className="font-medium text-neutral-600">
+                {setupSelection.length} cell{setupSelection.length === 1 ? '' : 's'}: {setupSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
+              </span>
+            )}
+            {setupSelection.length > 0 && !setupContig && (
+              <span className="font-medium text-red-500">Item placements cannot contain gaps.</span>
+            )}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => setSetupSelection([])} disabled={setupSelection.length === 0} className={PALE_BTN}>Clear</button>
+            <button onClick={openAssign} disabled={!canAssign || busy} className={`flex-1 ${TEAL_BTN}`}>{assignBtnLabel}</button>
+          </div>
+          {myItems.length >= 3 && (
+            <button onClick={confirmGrid} disabled={busy} className={`mt-2 w-full ${TEAL_BTN}`}>{confirmLabel}</button>
+          )}
+        </div>
+
         {showAssign && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
             <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
@@ -434,7 +470,7 @@ export default function GiftsweeperPage() {
                     {products.map((p) => <option key={p.id} value={p.id}>{p.name} - {p.price_points} pts</option>)}
                   </select>
                 ) : (
-                  <input type="text" value={assignText} onChange={(e) => setAssignText(e.target.value)} placeholder="e.g. I'll make you a cheesecake" className="block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none" autoFocus />
+                  <input type="text" value={assignText} onChange={(e) => setAssignText(e.target.value)} className="block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none" autoFocus />
                 )}
               </div>
               <div className="mt-4 flex gap-2">
@@ -461,13 +497,13 @@ export default function GiftsweeperPage() {
   const myKindPlural = myKind === 'product' ? 'products' : 'forfeits';
 
   return (
-    <div className="space-y-5 py-2">
+    <div className="space-y-5 py-2 pb-32">
       <Header canCancel />
       <div className="text-center">
         <h2 className="text-xl font-bold">Giftsweeper</h2>
         <p className="mt-1 text-sm text-neutral-500">
           {isMyTurn
-            ? <>Select position(s) on the grid. Each position costs <strong>{match.cost_per_cell || 1} point{(match.cost_per_cell||1) === 1 ? '' : 's'}</strong>.</>
+            ? <>Select position(s) on the grid. Each costs <strong>{match.cost_per_cell || 1} pt{(match.cost_per_cell||1) === 1 ? '' : 's'}</strong>.</>
             : <>Waiting for <span className="font-semibold">{otherName}</span> to take their turn...</>}
         </p>
         <p className="mt-1 text-xs text-neutral-400">Your balance: <strong>{balance} pts</strong></p>
@@ -486,26 +522,25 @@ export default function GiftsweeperPage() {
       </div>
       <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
 
-      {playSelection.length > 0 && (
-        <div className="text-center text-sm">
-          {playSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}{' '}
-          this turn will cost you <strong>{cost} point{cost === 1 ? '' : 's'}</strong>.
+      <div className="sticky bottom-0 -mx-4 border-t border-neutral-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        {playSelection.length > 0 && (
+          <p className="mb-2 text-center text-xs">
+            {playSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}{' '}costs <strong>{cost} pt{cost === 1 ? '' : 's'}</strong>.
+          </p>
+        )}
+        {playSelection.length > 0 && !canAfford && (
+          <p className="mb-2 text-center text-xs text-red-500">Not enough points.</p>
+        )}
+        <div className="flex gap-2">
+          <button onClick={() => setPlaySelection([])} disabled={playSelection.length === 0 || !isMyTurn} className={PALE_BTN}>Clear</button>
+          <button onClick={submitGuess} disabled={!canSubmit || busy} className={`flex-1 ${TEAL_BTN}`}>Submit</button>
         </div>
-      )}
-      {playSelection.length > 0 && !canAfford && (
-        <p className="text-center text-xs text-red-500">Not enough points - clear or shrink your selection.</p>
-      )}
-
-      <div className="flex gap-2">
-        <button onClick={() => setPlaySelection([])} disabled={playSelection.length === 0 || !isMyTurn} className={PALE_BTN}>Clear</button>
-        <button onClick={submitGuess} disabled={!canSubmit || busy} className={`flex-1 ${TEAL_BTN}`}>Submit</button>
+        {cantPlay && (
+          <button onClick={grovel} disabled={busy} className="mt-2 w-full rounded-xl border border-neutral-300 bg-white py-2 text-sm font-medium text-neutral-700">
+            Grovel - you don't have enough points to play
+          </button>
+        )}
       </div>
-
-      {cantPlay && (
-        <button onClick={grovel} disabled={busy} className="w-full rounded-xl border border-neutral-300 bg-white py-2 text-sm font-medium text-neutral-700">
-          Grovel - you don't have enough points to play
-        </button>
-      )}
 
       {showResult && (
         <ResultModal result={showResult} oppTheme={oppTheme} onClose={() => setShowResult(null)} />

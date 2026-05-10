@@ -16,6 +16,7 @@ import MessagesPage from './pages/MessagesPage.jsx';
 import TruthOrDarePage from './pages/TruthOrDarePage.jsx';
 import TicTacFacePage from './pages/TicTacFacePage.jsx';
 import GiftsweeperPage from './pages/GiftsweeperPage.jsx';
+import RewardsPage from './pages/RewardsPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
@@ -65,6 +66,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="games/giftsweeper" element={<GiftsweeperPage />} />
               <Route path="account/orders" element={<OrdersListPage />} />
               <Route path="account/points" element={<PointsHistoryPage />} />
+              <Route path="account/rewards" element={<RewardsPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>

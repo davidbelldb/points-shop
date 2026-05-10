@@ -126,7 +126,7 @@ export default async function adminRoutes(fastify) {
   });
 
   fastify.post('/api/admin/account/credit', async (req, reply) => {
-    const { delta, reason } = req.body ?? {};
+    const { delta, reason, target_account_id } = req.body ?? {};
     if (!Number.isInteger(delta) || delta === 0) {
       return reply.code(400).send({ error: 'delta must be a non-zero integer' });
     }
@@ -134,7 +134,7 @@ export default async function adminRoutes(fastify) {
       return reply.code(400).send({ error: 'reason (string) required' });
     }
     try {
-      const points_balance = await adjustPoints(delta, reason.trim());
+      const points_balance = await adjustPoints(delta, reason.trim(), target_account_id || null);
       return { points_balance };
     } catch (err) {
       return reply.code(400).send({ error: err.message });

@@ -111,8 +111,8 @@ export const api = {
       request(`/admin/products/${id}/media`, { method: 'POST', body: JSON.stringify(payload) }),
     deleteMedia:     (mediaId) => request(`/admin/media/${mediaId}`, { method: 'DELETE' }),
     updateAccount:   (patch) => request('/admin/account', { method: 'PATCH', body: JSON.stringify(patch) }),
-    creditPoints:    (delta, reason) =>
-      request('/admin/account/credit', { method: 'POST', body: JSON.stringify({ delta, reason }) }),
+    creditPoints:    (delta, reason, target_account_id = null) =>
+      request('/admin/account/credit', { method: 'POST', body: JSON.stringify({ delta, reason, target_account_id }) }),
     updateSettings:  (patch) => request('/admin/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
     listDiscountCodes:  () => request('/admin/discount-codes'),
     createDiscountCode: (data) => request('/admin/discount-codes', { method: 'POST', body: JSON.stringify(data) }),

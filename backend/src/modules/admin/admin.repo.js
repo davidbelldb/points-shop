@@ -148,31 +148,31 @@ export async function updateAccount(patch) {
   await query(`UPDATE accounts SET ${fields.join(', ')} WHERE id = $${i}`, values);
 }
 
-export async function adjustPoints(delta, reason) {
-  const accountId = getDefaultAccountId();
+export async function adjustPoints(delta, reason, accountId = null) {
+  const targetId = accountId || getDefaultAccountId();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const accRes = await client.query(
       `SELECT points_balance FROM accounts WHERE id = $1 FOR UPDATE`,
-      [accountId],
+      [targetId],
     );
     if (accRes.rows.length === 0) throw new Error('Account not found');
     const newBalance = accRes.rows[0].points_balance + delta;
     if (newBalance < 0) throw new Error('Resulting balance would be negative');
     await client.query(
       `UPDATE accounts SET points_balance = $1, updated_at = NOW() WHERE id = $2`,
-      [newBalance, accountId],
+      [newBalance, targetId],
     );
     await client.query(
       `INSERT INTO points_ledger (account_id, delta, reason) VALUES ($1, $2, $3)`,
-      [accountId, delta, reason],
+      [targetId, delta, reason],
     );
     const sign = delta > 0 ? '+' : '';
     await client.query(
       `INSERT INTO notifications (account_id, type, title, body)
        VALUES ($1, 'points_adjust', $2, $3)`,
-      [accountId, `${sign}${delta} pts`, reason],
+      [targetId, `${sign}${delta} pts`, reason],
     );
     await client.query('COMMIT');
     return newBalance;
