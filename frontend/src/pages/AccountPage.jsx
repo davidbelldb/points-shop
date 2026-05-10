@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { formatLedgerReason } from '../lib/formatters.js';
+import GameRewardsCard from '../components/GameRewardsCard.jsx';
 
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
@@ -175,6 +176,8 @@ function OrderRow({ order }) {
 
 function AdjustmentsSection({ adjustments }) {
   return (
+    <GameRewardsCard />
+
     <section className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">Recently awarded points</h2>

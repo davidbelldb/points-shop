@@ -49,6 +49,11 @@ async function getBalance(accountId) {
   const r = await query(`SELECT points_balance FROM accounts WHERE id = $1`, [accountId]);
   return r.rows[0]?.points_balance ?? 0;
 }
+async function isAdmin(accountId) {
+  const r = await query(`SELECT role FROM accounts WHERE id = $1`, [accountId]);
+  return (r.rows[0]?.role || '') === 'admin';
+}
+
 function shapeMatch(match, meId, extras = {}) {
   if (!match) return null;
   const isInitiator = match.initiator_account_id === meId;
@@ -92,7 +97,6 @@ export default async function giftsweeperRoutes(fastify) {
 
     const opponentId = match.initiator_account_id === meId ? match.opponent_account_id : match.initiator_account_id;
     const oppItems = await listGsItems(match.id, opponentId);
-
     const myGuessRows = (await query(
       `SELECT cell_row, cell_col, hit_item_id FROM giftsweeper_guesses WHERE match_id = $1 AND guesser_account_id = $2`,
       [match.id, meId],
@@ -107,13 +111,16 @@ export default async function giftsweeperRoutes(fastify) {
 
     const oppGridGuesses = myGuessRows.map((g) => {
       const item = g.hit_item_id ? oppItems.find((it) => it.id === g.hit_item_id) : null;
-      const itemRevealed = item ? (myHitsByItem[item.id]||0) >= (item.cells||[]).length : false;
+      const total = item ? (item.cells || []).length : 0;
+      const hitsForItem = item ? (myHitsByItem[item.id] || 0) : 0;
+      const itemRevealed = item ? hitsForItem >= total : false;
       return {
         r: g.cell_row, c: g.cell_col, hit: !!g.hit_item_id,
         item_id: g.hit_item_id,
         item_revealed: itemRevealed,
-        item_kind: itemRevealed && item ? (item.product_id ? 'product' : 'forfeit') : null,
-        item_label: itemRevealed && item ? (item.product_name || item.text_label) : null,
+        item_kind: item ? (item.product_id ? 'product' : 'forfeit') : null,
+        item_label: item ? (item.product_name || item.text_label) : null,
+        item_progress: item ? { current: hitsForItem, total } : null,
       };
     });
     const myGridMarks = oppGuessRows.map((g) => ({ r: g.cell_row, c: g.cell_col, hit: !!g.hit_item_id }));
@@ -154,18 +161,19 @@ export default async function giftsweeperRoutes(fastify) {
     if (!players.other) return reply.code(400).send({ error: 'No opponent available' });
     const match = await getActiveGsMatch(meId, players.other.id);
     if (!match) return reply.code(404).send({ error: 'No active match' });
-    const isInitiator = match.initiator_account_id === meId;
-    if (isInitiator ? match.initiator_setup_done : match.opponent_setup_done) {
+    const meIsInitiator = match.initiator_account_id === meId;
+    if (meIsInitiator ? match.initiator_setup_done : match.opponent_setup_done) {
       return reply.code(400).send({ error: 'Setup already confirmed' });
     }
     if (!isValidPlacement(cells, match.grid_rows, match.grid_cols)) {
       return reply.code(400).send({ error: 'Item placements cannot contain gaps.' });
     }
-    if (isInitiator && !product_id) return reply.code(400).send({ error: 'Pick a product' });
-    if (!isInitiator && !text_label?.trim()) return reply.code(400).send({ error: 'Enter a forfeit description' });
+    const meIsAdmin = await isAdmin(meId);
+    if (meIsAdmin && !product_id) return reply.code(400).send({ error: 'Pick a product' });
+    if (!meIsAdmin && !text_label?.trim()) return reply.code(400).send({ error: 'Enter a forfeit description' });
     const existing = await listGsItems(match.id, meId);
     for (const ex of existing) if (cellsOverlap(ex.cells, cells)) return reply.code(400).send({ error: 'Cells overlap an existing item' });
-    return await insertGsItem(match.id, meId, isInitiator ? product_id : null, isInitiator ? null : text_label.trim(), cells);
+    return await insertGsItem(match.id, meId, meIsAdmin ? product_id : null, meIsAdmin ? null : text_label.trim(), cells);
   });
 
   fastify.delete('/api/games/giftsweeper/item/:id', async (req, reply) => {
@@ -174,8 +182,8 @@ export default async function giftsweeperRoutes(fastify) {
     if (!players.other) return reply.code(400).send({ error: 'No opponent available' });
     const match = await getActiveGsMatch(meId, players.other.id);
     if (!match) return reply.code(404).send({ error: 'No active match' });
-    const isInitiator = match.initiator_account_id === meId;
-    if (isInitiator ? match.initiator_setup_done : match.opponent_setup_done) {
+    const meIsInitiator = match.initiator_account_id === meId;
+    if (meIsInitiator ? match.initiator_setup_done : match.opponent_setup_done) {
       return reply.code(400).send({ error: 'Setup already confirmed; cannot edit items' });
     }
     await deleteGsItemById(req.params.id, meId);
@@ -190,9 +198,10 @@ export default async function giftsweeperRoutes(fastify) {
     if (!players.other) return reply.code(400).send({ error: 'No opponent available' });
     const match = await getActiveGsMatch(meId, players.other.id);
     if (!match) return reply.code(404).send({ error: 'No active match' });
-    const isInitiator = match.initiator_account_id === meId;
-    if (isInitiator ? match.initiator_setup_done : match.opponent_setup_done) return reply.code(400).send({ error: 'Setup already confirmed' });
+    const meIsInitiator = match.initiator_account_id === meId;
+    if (meIsInitiator ? match.initiator_setup_done : match.opponent_setup_done) return reply.code(400).send({ error: 'Setup already confirmed' });
     if (items.length < MIN_ITEMS) return reply.code(400).send({ error: `At least ${MIN_ITEMS} items required` });
+    const meIsAdmin = await isAdmin(meId);
     const seen = [];
     for (const [idx, it] of items.entries()) {
       if (!isValidPlacement(it.cells, match.grid_rows, match.grid_cols)) return reply.code(400).send({ error: `Item ${idx+1}: item placements cannot contain gaps.` });
@@ -201,7 +210,7 @@ export default async function giftsweeperRoutes(fastify) {
     }
     await deleteGsItemsForOwner(match.id, meId);
     for (const it of items) {
-      await insertGsItem(match.id, meId, isInitiator ? it.product_id : null, isInitiator ? null : it.text_label?.trim() || null, it.cells);
+      await insertGsItem(match.id, meId, meIsAdmin ? it.product_id : null, meIsAdmin ? null : it.text_label?.trim() || null, it.cells);
     }
     return { ok: true };
   });
@@ -214,16 +223,11 @@ export default async function giftsweeperRoutes(fastify) {
     if (!match) return reply.code(404).send({ error: 'No active match' });
     const items = await listGsItems(match.id, meId);
     if (items.length < MIN_ITEMS) return reply.code(400).send({ error: `At least ${MIN_ITEMS} items required to confirm` });
-    const isInitiator = match.initiator_account_id === meId;
-    let updated = await updateGsMatch(match.id, isInitiator ? { initiator_setup_done: true } : { opponent_setup_done: true });
+    const meIsInitiator = match.initiator_account_id === meId;
+    let updated = await updateGsMatch(match.id, meIsInitiator ? { initiator_setup_done: true } : { opponent_setup_done: true });
     if (updated.initiator_setup_done && updated.opponent_setup_done) {
       updated = await updateGsMatch(updated.id, { current_turn_account_id: updated.initiator_account_id });
-      const initiatorId = updated.initiator_account_id;
-      if (initiatorId === meId) {
-        await notifyGs(players.other.id, 'Giftsweeper', `${players.me.name} confirmed their grid. Match is on - they go first.`);
-      } else {
-        await notifyGs(players.other.id, 'Giftsweeper', `${players.me.name} confirmed their grid. Your turn - go first!`);
-      }
+      await notifyGs(players.other.id, 'Giftsweeper', `${players.me.name} confirmed their grid. Match is on!`);
     } else {
       await notifyGs(players.other.id, 'Giftsweeper', `${players.me.name} confirmed their grid. Yours next!`);
     }
@@ -314,6 +318,20 @@ export default async function giftsweeperRoutes(fastify) {
       results.push({ r: cell.r, c: cell.c, hit: !!hitItem, item_id: hitItem?.id || null });
     }
 
+    // Decorate hit results with item info + progress (always, not just when fully won)
+    for (const r of results) {
+      if (!r.item_id) continue;
+      const item = oppItems.find((it) => it.id === r.item_id);
+      if (!item) continue;
+      const total = (item.cells || []).length;
+      const beforeCount = beforeByItem[r.item_id] || 0;
+      const after = beforeCount + (thisTurnByItem[r.item_id] || 0);
+      r.item_kind = item.product_id ? 'product' : 'forfeit';
+      r.item_label = item.product_name || item.text_label;
+      r.item_revealed = after >= total;
+      r.item_progress = { current: after, total };
+    }
+
     const newlyWon = [];
     for (const itemId of Object.keys(thisTurnByItem)) {
       const item = oppItems.find((it) => it.id === itemId);
@@ -333,12 +351,6 @@ export default async function giftsweeperRoutes(fastify) {
            VALUES ($1, 'giftsweeper', $2, $3, $4)`,
           [meId, match.id, item.product_id || null, item.text_label || null],
         );
-      }
-      for (const r of results) {
-        if (r.item_id === itemId) {
-          r.item_revealed = after >= total;
-          if (r.item_revealed) { r.item_kind = item.product_id ? 'product' : 'forfeit'; r.item_label = item.product_name || item.text_label; }
-        }
       }
     }
 

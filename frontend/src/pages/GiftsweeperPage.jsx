@@ -45,10 +45,8 @@ function SetupGrid({ rows, cols, items, selection, theme, onTapCell }) {
       let cls = 'bg-white border border-neutral-200';
       if (occupied) cls = lockedFill;
       else if (selected) cls = selectedFill;
-      tiles.push(
-        <button key={`x${k}`} type="button" onClick={() => !occupied && onTapCell?.(r,c)} disabled={occupied}
-          className={`aspect-square rounded transition active:scale-95 ${cls} disabled:cursor-default`} />
-      );
+      tiles.push(<button key={`x${k}`} type="button" onClick={() => !occupied && onTapCell?.(r,c)} disabled={occupied}
+        className={`aspect-square rounded transition active:scale-95 ${cls} disabled:cursor-default`} />);
     }
   }
   return <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-2"><div className="grid gap-[3px]" style={{ gridTemplateColumns: `1.5rem repeat(${cols}, minmax(0, 1fr))` }}>{tiles}</div></div>;
@@ -77,10 +75,8 @@ function OppGrid({ rows, cols, guesses, selection, theme, onTapCell, disabled })
         else { cls = 'bg-neutral-100'; content = <span className="text-xs text-neutral-400">{'\u2715'}</span>; }
       } else if (selected) cls = selFill;
       const cellDisabled = disabled || !!guess;
-      tiles.push(
-        <button key={`x${k}`} type="button" onClick={() => !cellDisabled && onTapCell?.(r,c)} disabled={cellDisabled}
-          className={`aspect-square rounded transition active:scale-95 flex items-center justify-center ${cls} disabled:cursor-default`}>{content}</button>
-      );
+      tiles.push(<button key={`x${k}`} type="button" onClick={() => !cellDisabled && onTapCell?.(r,c)} disabled={cellDisabled}
+        className={`aspect-square rounded transition active:scale-95 flex items-center justify-center ${cls} disabled:cursor-default`}>{content}</button>);
     }
   }
   return <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-2"><div className="grid gap-[3px]" style={{ gridTemplateColumns: `1.5rem repeat(${cols}, minmax(0, 1fr))` }}>{tiles}</div></div>;
@@ -114,9 +110,18 @@ function ResultModal({ result, oppTheme, onClose }) {
   const { results, newly_won_items, charged_points, my_balance, match_finished } = result;
   const hits = results.filter((r) => r.hit);
   const misses = results.filter((r) => !r.hit);
+  const wonItemIds = new Set((newly_won_items || []).map((w) => w.id));
+  const partialHits = hits.filter((h) => h.item_id && !wonItemIds.has(h.item_id));
   const wonAny = (newly_won_items || []).length > 0;
   const headline = wonAny ? "It's yours!" : (hits.length > 0 ? "It's a hit!" : "It's a miss!");
   const headlineColor = wonAny ? 'text-teal-700' : (hits.length > 0 ? (oppTheme === 'pink' ? 'text-pink-700' : 'text-emerald-700') : 'text-neutral-700');
+  const partialGroups = Object.values(partialHits.reduce((acc, h) => {
+    const k = h.item_id;
+    if (!acc[k]) acc[k] = { label: h.item_label, progress: h.item_progress, cells: [] };
+    acc[k].cells.push(h);
+    return acc;
+  }, {}));
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
@@ -130,10 +135,15 @@ function ResultModal({ result, oppTheme, onClose }) {
               </ul>
             </div>
           )}
-          {hits.length > 0 && !wonAny && (
-            <p className="text-neutral-700">
-              Hit on {hits.length} cell{hits.length === 1 ? '' : 's'}: {hits.map(cellLabel).join(', ')}
-            </p>
+          {partialGroups.length > 0 && (
+            <div className="space-y-1">
+              {partialGroups.map((g, i) => (
+                <p key={i} className="text-neutral-700">
+                  Hit on {g.cells.map(cellLabel).join(', ')} - part of <strong>{g.label || 'an item'}</strong>
+                  {g.progress ? <span className="text-neutral-500"> ({g.progress.current}/{g.progress.total} cells revealed)</span> : null}
+                </p>
+              ))}
+            </div>
           )}
           {misses.length > 0 && (
             <p className="text-neutral-500">
@@ -197,12 +207,13 @@ export default function GiftsweeperPage() {
   const myItems  = state?.my_items ?? [];
   const meName   = players?.me?.name || 'You';
   const otherName= players?.other?.name || 'Them';
-  const isInitiator = match?.you_are === 'initiator';
-  const setupTheme = isInitiator ? 'pink' : 'green';
-  const oppTheme   = isInitiator ? 'green' : 'pink';
-  const myTheme    = setupTheme;
-  const rows       = match?.grid_rows ?? 6;
-  const cols       = match?.grid_cols ?? 6;
+  const isAdmin  = players?.me?.role === 'admin';
+  const myKind   = isAdmin ? 'product' : 'forfeit';
+  const oppKind  = isAdmin ? 'forfeit' : 'product';
+  const myTheme  = isAdmin ? 'pink' : 'green';
+  const oppTheme = isAdmin ? 'green' : 'pink';
+  const rows     = match?.grid_rows ?? 6;
+  const cols     = match?.grid_cols ?? 6;
 
   const setupContig = useMemo(() => isContiguous(setupSelection), [setupSelection]);
   const canAssign = setupSelection.length > 0 && setupContig;
@@ -217,13 +228,13 @@ export default function GiftsweeperPage() {
   function openAssign() { if (!canAssign) return; setAssignProductId(''); setAssignText(''); setShowAssign(true); }
   async function submitAssign() {
     if (busy) return;
-    if (isInitiator && !assignProductId) return;
-    if (!isInitiator && !assignText.trim()) return;
+    if (isAdmin && !assignProductId) return;
+    if (!isAdmin && !assignText.trim()) return;
     setBusy(true);
     try {
       await api.gsAddItem({
-        product_id: isInitiator ? assignProductId : null,
-        text_label: isInitiator ? null : assignText.trim(),
+        product_id: isAdmin ? assignProductId : null,
+        text_label: isAdmin ? null : assignText.trim(),
         cells: setupSelection,
       });
       setSetupSelection([]); setShowAssign(false);
@@ -358,12 +369,12 @@ export default function GiftsweeperPage() {
   }
 
   if (!match.started) {
-    const tagline = isInitiator
+    const tagline = isAdmin
       ? <>Tap cells to place a <strong>product</strong>, then assign.</>
       : <>Tap cells to place a <strong>forfeit</strong>, then assign.</>;
-    const assignBtnLabel = isInitiator ? 'Assign product' : 'Assign forfeit';
-    const confirmLabel = isInitiator ? 'Confirm products' : 'Confirm forfeits';
-    const itemsHeading = isInitiator ? `Products (${myItems.length}/3 minimum)` : `Forfeits (${myItems.length}/3 minimum)`;
+    const assignBtnLabel = isAdmin ? 'Assign product' : 'Assign forfeit';
+    const confirmLabel = isAdmin ? 'Confirm products' : 'Confirm forfeits';
+    const itemsHeading = isAdmin ? `Products (${myItems.length}/3 minimum)` : `Forfeits (${myItems.length}/3 minimum)`;
 
     return (
       <div className="space-y-5 py-2">
@@ -372,7 +383,7 @@ export default function GiftsweeperPage() {
           <h2 className="text-xl font-bold">{meName}'s Grid</h2>
           <p className="mt-1 text-sm text-neutral-500">{tagline}</p>
         </div>
-        <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={setupTheme} onTapCell={tapSetupCell} />
+        <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={myTheme} onTapCell={tapSetupCell} />
         <div className="text-center text-xs">
           {setupSelection.length === 0 && <span className="text-neutral-400">Tap empty cells to start placing an item.</span>}
           {setupSelection.length > 0 && setupContig && (
@@ -397,7 +408,7 @@ export default function GiftsweeperPage() {
               {myItems.map((it) => (
                 <li key={it.id} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{isInitiator ? (it.product_name || 'Product') : (it.text_label || 'Forfeit')}</p>
+                    <p className="truncate text-sm font-medium">{isAdmin ? (it.product_name || 'Product') : (it.text_label || 'Forfeit')}</p>
                     <p className="text-xs text-neutral-500">{(it.cells || []).slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}</p>
                   </div>
                   <button onClick={() => removeItem(it.id)} disabled={busy} className="shrink-0 text-xs font-medium text-neutral-400 hover:text-red-500 disabled:opacity-30">Remove</button>
@@ -412,12 +423,12 @@ export default function GiftsweeperPage() {
         {showAssign && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
             <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-              <h3 className="text-base font-semibold">{isInitiator ? 'Assign a product' : 'Assign a forfeit'}</h3>
+              <h3 className="text-base font-semibold">{isAdmin ? 'Assign a product' : 'Assign a forfeit'}</h3>
               <p className="mt-1 text-xs text-neutral-500">
                 {setupSelection.length} cell{setupSelection.length === 1 ? '' : 's'}: {setupSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
               </p>
               <div className="mt-4">
-                {isInitiator ? (
+                {isAdmin ? (
                   <select value={assignProductId} onChange={(e) => setAssignProductId(e.target.value)} className="block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-pink-400 focus:outline-none">
                     <option value="">Select a product</option>
                     {products.map((p) => <option key={p.id} value={p.id}>{p.name} - {p.price_points} pts</option>)}
@@ -428,7 +439,7 @@ export default function GiftsweeperPage() {
               </div>
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setShowAssign(false)} disabled={busy} className={PALE_BTN}>Cancel</button>
-                <button onClick={submitAssign} disabled={busy || (isInitiator ? !assignProductId : !assignText.trim())} className={`flex-1 ${TEAL_BTN}`}>Save</button>
+                <button onClick={submitAssign} disabled={busy || (isAdmin ? !assignProductId : !assignText.trim())} className={`flex-1 ${TEAL_BTN}`}>Save</button>
               </div>
             </div>
           </div>
@@ -446,6 +457,8 @@ export default function GiftsweeperPage() {
   const canAfford = balance >= cost;
   const canSubmit = isMyTurn && playSelection.length > 0 && canAfford;
   const cantPlay = isMyTurn && balance < (match.cost_per_cell || 1);
+  const oppKindPlural = oppKind === 'product' ? 'products' : 'forfeits';
+  const myKindPlural = myKind === 'product' ? 'products' : 'forfeits';
 
   return (
     <div className="space-y-5 py-2">
@@ -463,13 +476,13 @@ export default function GiftsweeperPage() {
       <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
 
       <div className="text-center text-xs text-neutral-500">
-        You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {isInitiator ? 'forfeits' : 'products'}
+        You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {oppKindPlural}
       </div>
 
       <hr className="border-neutral-200" />
 
       <div className="text-center text-xs text-neutral-500">
-        {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {isInitiator ? 'products' : 'forfeits'}
+        {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {myKindPlural}
       </div>
       <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
 
