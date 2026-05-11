@@ -500,7 +500,7 @@ export default function GiftsweeperPage() {
     <div className="space-y-5 py-2 pb-32">
       <Header canCancel />
       <div className="text-center">
-        <h2 className="text-xl font-bold">Giftsweeper</h2>
+        <h2 className="text-xl font-bold">Match in progress</h2>
         <p className="mt-1 text-sm text-neutral-500">
           {isMyTurn
             ? <>Select position(s) on the grid. Each costs <strong>{match.cost_per_cell || 1} pt{(match.cost_per_cell||1) === 1 ? '' : 's'}</strong>.</>

@@ -42,6 +42,20 @@ export default function HomePage() {
 
       <HeroCarousel slides={topSlides} />
 
+      {gameSlides.length > 0 && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-neutral-900">
+              {settings.games_title ?? 'Games'}
+            </h2>
+            {settings.games_subtitle && (
+              <p className="mt-1 text-sm text-neutral-500">{settings.games_subtitle}</p>
+            )}
+          </div>
+          <HeroCarousel slides={gameSlides} />
+        </div>
+      )}
+
       <div>
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-2xl font-bold tracking-tight text-neutral-900">Latest products</h2>
@@ -86,19 +100,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {gameSlides.length > 0 && (
-        <div className="space-y-3 pt-2">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-neutral-900">
-              {settings.games_title ?? 'Games'}
-            </h2>
-            {settings.games_subtitle && (
-              <p className="mt-1 text-sm text-neutral-500">{settings.games_subtitle}</p>
-            )}
-          </div>
-          <HeroCarousel slides={gameSlides} />
-        </div>
-      )}
     </div>
   );
 }
