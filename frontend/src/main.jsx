@@ -17,6 +17,7 @@ import TruthOrDarePage from './pages/TruthOrDarePage.jsx';
 import TicTacFacePage from './pages/TicTacFacePage.jsx';
 import GiftsweeperPage from './pages/GiftsweeperPage.jsx';
 import RewardsPage from './pages/RewardsPage.jsx';
+import WheelOfMisfortunePage from './pages/WheelOfMisfortunePage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
@@ -64,6 +65,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="games/truth-or-dare" element={<TruthOrDarePage />} />
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />
               <Route path="games/giftsweeper" element={<GiftsweeperPage />} />
+              <Route path="games/wheel-of-misfortune" element={<WheelOfMisfortunePage />} />
               <Route path="account/orders" element={<OrdersListPage />} />
               <Route path="account/points" element={<PointsHistoryPage />} />
               <Route path="account/rewards" element={<RewardsPage />} />

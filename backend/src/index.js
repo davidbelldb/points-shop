@@ -24,6 +24,7 @@ import todRoutes from './modules/tod/tod.routes.js';
 import gamesRoutes from './modules/games/games.routes.js';
 import giftsweeperRoutes from './modules/games/giftsweeper.routes.js';
 import rewardsRoutes from './modules/rewards/rewards.routes.js';
+import wheelRoutes from './modules/wheel/wheel.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
@@ -91,6 +92,7 @@ await fastify.register(todRoutes);
 await fastify.register(gamesRoutes);
 await fastify.register(giftsweeperRoutes);
 await fastify.register(rewardsRoutes);
+await fastify.register(wheelRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 

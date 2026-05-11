@@ -71,6 +71,8 @@ export const api = {
   gsGrovel: () => request('/games/giftsweeper/grovel', { method: 'POST' }),
   listRewards:  () => request('/account/rewards'),
   claimReward:  (id) => request(`/account/rewards/${id}/claim`, { method: 'POST' }),
+  getActiveWheel: () => request('/wheels/active'),
+  spinWheel:      (id) => request(`/wheels/${id}/spin`, { method: 'POST' }),
   gsConfirm:  () => request('/games/giftsweeper/confirm', { method: 'POST' }),
   gsAbandon:  () => request('/games/giftsweeper/abandon', { method: 'POST' }),
   gsMarkRead: () => request('/games/giftsweeper/mark-read', { method: 'POST' }),
@@ -141,6 +143,10 @@ export const api = {
     listAllOrders: () => request('/admin/orders'),
     updateOrderStatus: (id, status, reason) =>
       request(`/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),
+    getWheel:              () => request('/admin/wheel'),
+    addWheelSegment:       (data) => request('/admin/wheel/segments', { method: 'POST', body: JSON.stringify(data) }),
+    updateWheelSegment:    (id, patch) => request(`/admin/wheel/segments/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    deleteWheelSegment:    (id) => request(`/admin/wheel/segments/${id}`, { method: 'DELETE' }),
     upload: uploadFile,
   },
 };
