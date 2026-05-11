@@ -37,37 +37,41 @@ function SegmentRow({ seg, products, onSave, onDelete, busy }) {
     <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-3">
       <div className="flex items-center gap-2">
         <input type="color" value={draft.color} onChange={(e) => set({ color: e.target.value })}
-               className="h-9 w-12 shrink-0 cursor-pointer rounded border border-neutral-200" />
+               className="h-10 w-12 shrink-0 cursor-pointer rounded border border-neutral-200" />
         <input type="text" value={draft.label} onChange={(e) => set({ label: e.target.value })}
-               placeholder="Segment label" className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
+               placeholder="Segment label"
+               className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
         <button onClick={() => onDelete(seg.id)} disabled={busy}
                 className="shrink-0 text-xs font-medium text-neutral-400 hover:text-red-500">Remove</button>
       </div>
-      <div className="flex items-center gap-2">
-        <select value={draft.award_type} onChange={(e) => set({ award_type: e.target.value })}
-                className="block w-44 shrink-0 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none">
-          {AWARD_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+
+      <select value={draft.award_type} onChange={(e) => set({ award_type: e.target.value })}
+              className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none">
+        {AWARD_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+      </select>
+
+      {draft.award_type === 'points' && (
+        <input type="number" value={draft.points_delta} onChange={(e) => set({ points_delta: e.target.value })}
+               placeholder="Points delta (e.g. -3 or +10)"
+               className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
+      )}
+      {draft.award_type === 'product' && (
+        <select value={draft.product_id} onChange={(e) => set({ product_id: e.target.value })}
+                className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none">
+          <option value="">Pick a product</option>
+          {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        {draft.award_type === 'points' && (
-          <input type="number" value={draft.points_delta} onChange={(e) => set({ points_delta: e.target.value })}
-                 placeholder="e.g. -3 or +10"
-                 className="block w-32 shrink-0 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
-        )}
-        {draft.award_type === 'product' && (
-          <select value={draft.product_id} onChange={(e) => set({ product_id: e.target.value })}
-                  className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none">
-            <option value="">Pick a product</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        )}
-        {draft.award_type === 'forfeit' && (
-          <input type="text" value={draft.forfeit_text} onChange={(e) => set({ forfeit_text: e.target.value })}
-                 placeholder="Forfeit description"
-                 className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
-        )}
-        <button onClick={save} disabled={!dirty || busy}
-                className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40">Save</button>
-      </div>
+      )}
+      {draft.award_type === 'forfeit' && (
+        <input type="text" value={draft.forfeit_text} onChange={(e) => set({ forfeit_text: e.target.value })}
+               placeholder="Forfeit description"
+               className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
+      )}
+
+      <button onClick={save} disabled={!dirty || busy}
+              className="w-full rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40">
+        Save segment
+      </button>
     </div>
   );
 }
@@ -124,7 +128,7 @@ export default function AdminWheelSection() {
         <h2 className="text-base font-semibold">Wheel of Misfortune</h2>
         <span className="text-xs text-neutral-400">/games/wheel-of-misfortune</span>
       </div>
-      <p className="text-xs text-neutral-500">Configure 2+ segments. Award types: label (no effect), points (+/-), product, or forfeit. Segments are revealed in clockwise order on the wheel.</p>
+      <p className="text-xs text-neutral-500">Add 2+ segments. Each segment can be a no-effect label, a points adjustment, a product reward, or a forfeit. Segments render clockwise from 12 o'clock.</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {segments.length === 0 ? (
         <p className="text-sm text-neutral-400">No segments yet. Add at least two to make the wheel spinnable.</p>

@@ -155,9 +155,10 @@ function ResultModal({ result, oppTheme, onClose }) {
             </div>
           )}
           {misses.length > 0 && (
-            <p className="text-neutral-500">
-              Miss{misses.length === 1 ? '' : 'es'}: {misses.map(cellLabel).join(', ')}
-            </p>
+            <div className="rounded-xl bg-pink-50 p-3">
+              <p className="font-semibold text-pink-900">Miss{misses.length === 1 ? '' : 'es'}:</p>
+              <p className="mt-1 text-pink-800">{misses.map(cellLabel).join(', ')}</p>
+            </div>
           )}
         </div>
         <div className="mt-4 rounded-xl bg-neutral-50 p-3 text-center text-xs text-neutral-500">
@@ -366,9 +367,15 @@ export default function GiftsweeperPage() {
                 <ul className="mt-2 space-y-2 text-left">
                   {wonItems.map((w) => (
                     <li key={w.id} className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 p-2.5">
-                      {w.thumbnail
-                        ? <img src={w.thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
-                        : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-emerald-200 text-xl">{w.kind === 'product' ? '\uD83C\uDF81' : '\uD83D\uDCDD'}</div>}
+                      {w.kind === 'product' ? (
+                        w.thumbnail
+                          ? <img src={w.thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                          : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-emerald-200 text-xl">{'\uD83C\uDF81'}</div>
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-pink-100">
+                          <img src="/sphincter-pink.svg" alt="" className="h-8 w-8" />
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-teal-900">{w.label}</p>
                         <p className="text-[11px] text-teal-700">{w.kind === 'product' ? 'Product' : 'Forfeit'}</p>

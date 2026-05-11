@@ -5,16 +5,19 @@ import { useBasket } from '../lib/BasketContext.jsx';
 
 const TEAL_BTN = "inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40";
 
-function WheelSvg({ segments, size = 320 }) {
+function WheelSvg({ segments }) {
   if (!segments || segments.length < 2) return null;
-  const cx = size / 2, cy = size / 2, r = size / 2 - 6;
+  const size = 100;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 1.5;
   const n = segments.length;
   const anglePer = 360 / n;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <svg viewBox={`0 0 ${size} ${size}`} className="block h-full w-full">
       {segments.map((s, i) => {
         const startAngle = i * anglePer - 90;
-        const endAngle = (i + 1) * anglePer - 90;
+        const endAngle   = (i + 1) * anglePer - 90;
         const sRad = startAngle * Math.PI / 180;
         const eRad = endAngle   * Math.PI / 180;
         const x1 = cx + r * Math.cos(sRad), y1 = cy + r * Math.sin(sRad);
@@ -22,22 +25,32 @@ function WheelSvg({ segments, size = 320 }) {
         const largeArc = anglePer > 180 ? 1 : 0;
         const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
         const labelAngle = (startAngle + endAngle) / 2;
-        const lx = cx + (r * 0.62) * Math.cos(labelAngle * Math.PI / 180);
-        const ly = cy + (r * 0.62) * Math.sin(labelAngle * Math.PI / 180);
-        const label = (s.label || '').length > 14 ? s.label.slice(0, 13) + '\u2026' : (s.label || '');
+        const labelR = r * 0.6;
+        const lx = cx + labelR * Math.cos(labelAngle * Math.PI / 180);
+        const ly = cy + labelR * Math.sin(labelAngle * Math.PI / 180);
+        const raw = s.label || '';
+        const label = raw.length > 16 ? raw.slice(0, 15) + '\u2026' : raw;
+        const len = Math.max(label.length, 4);
+        const fontSize = Math.max(2.6, Math.min(4.6, 56 / (len * 1.25)));
         return (
           <g key={s.id}>
-            <path d={d} fill={s.color || '#14b8a6'} stroke="white" strokeWidth="2" />
-            <text x={lx} y={ly} fill="white" fontSize="13" fontWeight="bold"
-                  textAnchor="middle" dominantBaseline="middle"
-                  transform={`rotate(${labelAngle + 90} ${lx} ${ly})`}
-                  style={{ pointerEvents: 'none', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+            <path d={d} fill={s.color || '#14b8a6'} stroke="white" strokeWidth="0.6" />
+            <text
+              x={lx} y={ly}
+              fill="white"
+              fontSize={fontSize}
+              fontWeight="800"
+              textAnchor="middle"
+              dominantBaseline="central"
+              transform={`rotate(${labelAngle + 180} ${lx} ${ly})`}
+              style={{ pointerEvents: 'none', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.35)', strokeWidth: 0.3 }}
+            >
               {label}
             </text>
           </g>
         );
       })}
-      <circle cx={cx} cy={cy} r={r * 0.13} fill="white" stroke="#0f766e" strokeWidth="3" />
+      <circle cx={cx} cy={cy} r={r * 0.13} fill="white" stroke="#0f766e" strokeWidth="1" />
     </svg>
   );
 }
@@ -68,14 +81,14 @@ export default function WheelOfMisfortunePage() {
       const targetMod = ((-idx * anglePer - anglePer / 2) % 360 + 360) % 360;
       const currentMod = ((rotation % 360) + 360) % 360;
       const delta = ((targetMod - currentMod + 360) % 360);
-      const turns = 5 + Math.floor(Math.random() * 3);
+      const turns = 6 + Math.floor(Math.random() * 3);
       const newRotation = rotation + (turns * 360) + delta + jitter;
       setRotation(newRotation);
       setTimeout(() => {
         setResult(res);
         setSpinning(false);
         if (refreshBasket) refreshBasket();
-      }, 4500);
+      }, 6700);
     } catch (e) {
       setError(e.message);
       setSpinning(false);
@@ -108,19 +121,23 @@ export default function WheelOfMisfortunePage() {
           <p className="mt-1 text-xs text-neutral-400">Add at least 2 segments from the admin page.</p>
         </div>
       ) : (
-        <div className="flex flex-col items-center space-y-4">
-          <div className="relative w-full max-w-[340px] aspect-square">
-            <div className="absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-2">
-              <div className="h-0 w-0 border-x-[14px] border-t-[28px] border-x-transparent border-t-neutral-900" />
+        <div className="flex flex-col items-center space-y-5">
+          <div className="relative mx-auto aspect-square w-full max-w-[340px]">
+            <div className="pointer-events-none absolute left-1/2 top-0 z-[1] -translate-x-1/2 -translate-y-1">
+              <svg width="26" height="30" viewBox="0 0 26 30" className="drop-shadow-md">
+                <path d="M 13 30 L 0 0 L 26 0 Z" fill="#0f172a" />
+              </svg>
             </div>
             <div
+              className="h-full w-full"
               style={{
                 transform: `rotate(${rotation}deg)`,
-                transition: spinning ? 'transform 4.2s cubic-bezier(0.18, 0.85, 0.25, 1)' : 'none',
+                transformOrigin: '50% 50%',
+                transition: spinning ? 'transform 6.5s cubic-bezier(0.18, 0.85, 0.25, 1)' : 'none',
+                willChange: 'transform',
               }}
-              className="origin-center"
             >
-              <WheelSvg segments={segments} size={340} />
+              <WheelSvg segments={segments} />
             </div>
           </div>
           <button onClick={spin} disabled={spinning || !canSpin} className={`px-8 py-3 text-base font-bold ${TEAL_BTN}`}>

@@ -43,9 +43,15 @@ export default function RewardsPage() {
           <ul className="space-y-2">
             {pending.map((r) => (
               <li key={r.id} className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 p-3">
-                {r.product_thumbnail
-                  ? <img src={r.product_thumbnail} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
-                  : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-emerald-200 text-2xl">{r.product_id ? '\uD83C\uDF81' : '\uD83D\uDCDD'}</div>}
+                {r.product_id ? (
+                  r.product_thumbnail
+                    ? <img src={r.product_thumbnail} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+                    : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-emerald-200 text-2xl">{'\uD83C\uDF81'}</div>
+                ) : (
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-pink-100">
+                    <img src="/sphincter-pink.svg" alt="" className="h-10 w-10" />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-teal-900">
                     {r.product_id ? r.product_name : r.text_label}
@@ -69,9 +75,15 @@ export default function RewardsPage() {
           <ul className="space-y-2">
             {claimed.map((r) => (
               <li key={r.id} className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-3">
-                {r.product_thumbnail
-                  ? <img src={r.product_thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover opacity-70" />
-                  : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-xl">{r.product_id ? '\uD83C\uDF81' : '\uD83D\uDCDD'}</div>}
+                {r.product_id ? (
+                  r.product_thumbnail
+                    ? <img src={r.product_thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover opacity-70" />
+                    : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-xl">{'\uD83C\uDF81'}</div>
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-pink-50 opacity-70">
+                    <img src="/sphincter-pink.svg" alt="" className="h-8 w-8" />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-neutral-700">{r.product_id ? r.product_name : r.text_label}</p>
                   <p className="text-xs text-neutral-500">Claimed {r.claimed_at ? new Date(r.claimed_at).toLocaleString() : ''}</p>

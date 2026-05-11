@@ -37,9 +37,15 @@ export default function GameRewardsCard() {
         <ul className="space-y-2">
           {pending.map((r) => (
             <li key={r.id} className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 p-3">
-              {r.product_thumbnail
-                ? <img src={r.product_thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
-                : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-emerald-200 text-xl">{r.product_id ? '\uD83C\uDF81' : '\uD83D\uDCDD'}</div>}
+              {r.product_id ? (
+                r.product_thumbnail
+                  ? <img src={r.product_thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                  : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-emerald-200 text-xl">{'\uD83C\uDF81'}</div>
+              ) : (
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-pink-100">
+                  <img src="/sphincter-pink.svg" alt="" className="h-8 w-8" />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-teal-900">
                   {r.product_id ? r.product_name : r.text_label}
