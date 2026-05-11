@@ -28,6 +28,12 @@ export default async function rewardsRoutes(fastify) {
     return rows;
   });
 
+  fastify.delete('/api/account/rewards/:id', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    await query(`DELETE FROM game_rewards WHERE id = $1 AND account_id = $2`, [req.params.id, meId]);
+    return { ok: true };
+  });
+
   fastify.post('/api/account/rewards/:id/claim', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
     const { id } = req.params;

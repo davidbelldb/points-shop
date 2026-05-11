@@ -56,6 +56,8 @@ export default function HomePage() {
         </div>
       )}
 
+      <WheelHomeSection />
+
       <div>
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-2xl font-bold tracking-tight text-neutral-900">Latest products</h2>

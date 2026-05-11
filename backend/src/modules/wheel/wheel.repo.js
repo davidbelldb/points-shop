@@ -4,6 +4,16 @@ export async function getActiveWheel() {
   const r = await query(`SELECT * FROM wheels WHERE is_active = true ORDER BY created_at LIMIT 1`);
   return r.rows[0] ?? null;
 }
+export async function updateWheel(id, patch) {
+  const fields = []; const values = []; let i = 1;
+  for (const k of ['name','is_active','homepage_visible','homepage_title','homepage_days','homepage_start_time','homepage_end_time']) {
+    if (k in patch) { fields.push(`${k} = $${i++}`); values.push(patch[k]); }
+  }
+  if (fields.length === 0) return null;
+  fields.push('updated_at = NOW()'); values.push(id);
+  const r = await query(`UPDATE wheels SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`, values);
+  return r.rows[0];
+}
 export async function listSegments(wheelId) {
   const r = await query(
     `SELECT s.*, p.name AS product_name, p.thumbnail_url AS product_thumbnail

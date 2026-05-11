@@ -13,6 +13,14 @@ export default function GameRewardsCard() {
   }
   useEffect(() => { load(); }, []);
 
+  async function remove(id) {
+    if (!confirm('Remove this reward?')) return;
+    setBusy(true);
+    try { await api.deleteReward(id); await load(); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   async function claim(id) {
     if (!confirm('Claim this reward?')) return;
     setBusy(true);
@@ -54,10 +62,13 @@ export default function GameRewardsCard() {
                   {r.product_id ? 'Product - free to claim' : 'Forfeit - mark when redeemed'}
                 </p>
               </div>
-              <button onClick={() => claim(r.id)} disabled={busy}
-                className="shrink-0 rounded-lg bg-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40">
-                {r.product_id ? 'Claim' : 'Redeem'}
-              </button>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <button onClick={() => claim(r.id)} disabled={busy}
+                  className="rounded-lg bg-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40">
+                  {r.product_id ? 'Claim' : 'Redeem'}
+                </button>
+                <button onClick={() => remove(r.id)} disabled={busy} className="text-[11px] text-neutral-500 hover:text-red-500">Remove</button>
+              </div>
             </li>
           ))}
         </ul>

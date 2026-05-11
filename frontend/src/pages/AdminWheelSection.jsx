@@ -8,6 +8,99 @@ const AWARD_TYPES = [
   { value: 'forfeit', label: 'Forfeit' },
 ];
 
+const DAYS = [
+  { value: 'mon', label: 'Mon' },
+  { value: 'tue', label: 'Tue' },
+  { value: 'wed', label: 'Wed' },
+  { value: 'thu', label: 'Thu' },
+  { value: 'fri', label: 'Fri' },
+  { value: 'sat', label: 'Sat' },
+  { value: 'sun', label: 'Sun' },
+];
+
+function HomepageSettings({ wheel, onSave, busy }) {
+  const [draft, setDraft] = useState({
+    homepage_visible: !!wheel.homepage_visible,
+    homepage_title: wheel.homepage_title || '',
+    homepage_days: wheel.homepage_days || [],
+    homepage_start_time: wheel.homepage_start_time ? String(wheel.homepage_start_time).slice(0,5) : '',
+    homepage_end_time:   wheel.homepage_end_time   ? String(wheel.homepage_end_time).slice(0,5)   : '',
+  });
+  const [dirty, setDirty] = useState(false);
+
+  function set(patch) { setDraft((d) => ({ ...d, ...patch })); setDirty(true); }
+  function toggleDay(d) {
+    setDraft((prev) => {
+      const has = prev.homepage_days.includes(d);
+      return { ...prev, homepage_days: has ? prev.homepage_days.filter((x) => x !== d) : [...prev.homepage_days, d] };
+    });
+    setDirty(true);
+  }
+
+  async function save() {
+    await onSave({
+      homepage_visible: draft.homepage_visible,
+      homepage_title: draft.homepage_title.trim() || null,
+      homepage_days: draft.homepage_days,
+      homepage_start_time: draft.homepage_start_time || null,
+      homepage_end_time:   draft.homepage_end_time   || null,
+    });
+    setDirty(false);
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+      <p className="text-sm font-semibold">Home page placement</p>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={draft.homepage_visible} onChange={(e) => set({ homepage_visible: e.target.checked })} />
+        Show on home page
+      </label>
+      <input
+        type="text" value={draft.homepage_title}
+        onChange={(e) => set({ homepage_title: e.target.value })}
+        placeholder="Home page title (e.g. Wheel of Misfortune)"
+        className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+      />
+      <div>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">Days (empty = every day)</p>
+        <div className="flex flex-wrap gap-1.5">
+          {DAYS.map((d) => (
+            <button
+              key={d.value} type="button" onClick={() => toggleDay(d.value)}
+              className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+                draft.homepage_days.includes(d.value)
+                  ? 'border-amber-500 bg-amber-100 text-amber-900'
+                  : 'border-neutral-200 bg-white text-neutral-500'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="shrink-0 text-xs font-medium text-neutral-500">Start</label>
+        <input
+          type="time" value={draft.homepage_start_time}
+          onChange={(e) => set({ homepage_start_time: e.target.value })}
+          className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+        />
+        <label className="shrink-0 text-xs font-medium text-neutral-500">End</label>
+        <input
+          type="time" value={draft.homepage_end_time}
+          onChange={(e) => set({ homepage_end_time: e.target.value })}
+          className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+        />
+      </div>
+      <p className="text-xs text-neutral-400">Leave times blank for 24-hour visibility on selected days.</p>
+      <button onClick={save} disabled={!dirty || busy}
+              className="w-full rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40">
+        Save homepage settings
+      </button>
+    </div>
+  );
+}
+
 function SegmentRow({ seg, products, onSave, onDelete, busy }) {
   const [draft, setDraft] = useState({
     label: seg.label || '',
@@ -44,12 +137,10 @@ function SegmentRow({ seg, products, onSave, onDelete, busy }) {
         <button onClick={() => onDelete(seg.id)} disabled={busy}
                 className="shrink-0 text-xs font-medium text-neutral-400 hover:text-red-500">Remove</button>
       </div>
-
       <select value={draft.award_type} onChange={(e) => set({ award_type: e.target.value })}
               className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none">
         {AWARD_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
       </select>
-
       {draft.award_type === 'points' && (
         <input type="number" value={draft.points_delta} onChange={(e) => set({ points_delta: e.target.value })}
                placeholder="Points delta (e.g. -3 or +10)"
@@ -67,7 +158,6 @@ function SegmentRow({ seg, products, onSave, onDelete, busy }) {
                placeholder="Forfeit description"
                className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
       )}
-
       <button onClick={save} disabled={!dirty || busy}
               className="w-full rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40">
         Save segment
@@ -119,6 +209,13 @@ export default function AdminWheelSection() {
     finally { setBusy(false); }
   }
 
+  async function saveHomepage(patch) {
+    setBusy(true);
+    try { await api.admin.updateWheel(patch); await load(); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   if (!data) return null;
   const segments = data.segments || [];
 
@@ -130,6 +227,11 @@ export default function AdminWheelSection() {
       </div>
       <p className="text-xs text-neutral-500">Add 2+ segments. Each segment can be a no-effect label, a points adjustment, a product reward, or a forfeit. Segments render clockwise from 12 o'clock.</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {data.wheel && (
+        <HomepageSettings wheel={data.wheel} onSave={saveHomepage} busy={busy} />
+      )}
+
       {segments.length === 0 ? (
         <p className="text-sm text-neutral-400">No segments yet. Add at least two to make the wheel spinnable.</p>
       ) : (

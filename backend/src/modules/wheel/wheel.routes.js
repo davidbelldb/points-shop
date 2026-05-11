@@ -1,7 +1,8 @@
 import { query } from '../../db.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import {
-  getActiveWheel, listSegments, insertSegment, updateSegmentById, deleteSegmentById, recordSpin,
+  getActiveWheel, updateWheel, listSegments,
+  insertSegment, updateSegmentById, deleteSegmentById, recordSpin,
 } from './wheel.repo.js';
 
 async function getBalance(accountId) {
@@ -10,12 +11,51 @@ async function getBalance(accountId) {
 }
 function isAdmin(req) { return req.user?.actualRole === 'admin'; }
 
+function timeToHHMM(t) {
+  if (!t) return null;
+  return String(t).slice(0, 5);
+}
+function isVisibleNow(wheel) {
+  if (!wheel?.homepage_visible) return false;
+  const now = new Date();
+  const days = wheel.homepage_days || [];
+  if (days.length > 0) {
+    const map = ['sun','mon','tue','wed','thu','fri','sat'];
+    const today = map[now.getDay()];
+    if (!days.includes(today)) return false;
+  }
+  const start = wheel.homepage_start_time;
+  const end   = wheel.homepage_end_time;
+  if (start && end) {
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const cur = `${hh}:${mm}:00`;
+    const startS = String(start);
+    const endS = String(end);
+    if (startS <= endS) {
+      if (cur < startS || cur > endS) return false;
+    } else {
+      if (cur < startS && cur > endS) return false;
+    }
+  }
+  return true;
+}
+
 export default async function wheelRoutes(fastify) {
   fastify.get('/api/wheels/active', async () => {
     const wheel = await getActiveWheel();
     if (!wheel) return { wheel: null, segments: [] };
     const segments = await listSegments(wheel.id);
     return { wheel, segments };
+  });
+
+  fastify.get('/api/wheels/homepage', async () => {
+    const wheel = await getActiveWheel();
+    if (!wheel) return { wheel: null, segments: [], visible: false };
+    if (!isVisibleNow(wheel)) return { wheel: null, segments: [], visible: false };
+    const segments = await listSegments(wheel.id);
+    if (segments.length < 2) return { wheel: null, segments: [], visible: false };
+    return { wheel, segments, visible: true };
   });
 
   fastify.post('/api/wheels/:id/spin', async (req, reply) => {
@@ -75,7 +115,35 @@ export default async function wheelRoutes(fastify) {
     const wheel = await getActiveWheel();
     if (!wheel) return { wheel: null, segments: [] };
     const segments = await listSegments(wheel.id);
-    return { wheel, segments };
+    return {
+      wheel: {
+        ...wheel,
+        homepage_start_time: timeToHHMM(wheel.homepage_start_time),
+        homepage_end_time:   timeToHHMM(wheel.homepage_end_time),
+      },
+      segments,
+    };
+  });
+
+  fastify.patch('/api/admin/wheel', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    const wheel = await getActiveWheel();
+    if (!wheel) return reply.code(404).send({ error: 'No wheel' });
+    const body = req.body ?? {};
+    const patch = {};
+    if ('homepage_visible' in body) patch.homepage_visible = !!body.homepage_visible;
+    if ('homepage_title' in body)   patch.homepage_title = body.homepage_title || null;
+    if ('homepage_days' in body)    patch.homepage_days = Array.isArray(body.homepage_days) ? body.homepage_days : [];
+    if ('homepage_start_time' in body) patch.homepage_start_time = body.homepage_start_time || null;
+    if ('homepage_end_time' in body)   patch.homepage_end_time = body.homepage_end_time || null;
+    if ('name' in body) patch.name = body.name;
+    await updateWheel(wheel.id, patch);
+    const updated = await getActiveWheel();
+    return {
+      ...updated,
+      homepage_start_time: timeToHHMM(updated.homepage_start_time),
+      homepage_end_time:   timeToHHMM(updated.homepage_end_time),
+    };
   });
 
   fastify.post('/api/admin/wheel/segments', async (req, reply) => {

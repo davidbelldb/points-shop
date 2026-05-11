@@ -1,0 +1,5 @@
+ALTER TABLE wheels ADD COLUMN IF NOT EXISTS homepage_visible    BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE wheels ADD COLUMN IF NOT EXISTS homepage_title      TEXT;
+ALTER TABLE wheels ADD COLUMN IF NOT EXISTS homepage_days       TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE wheels ADD COLUMN IF NOT EXISTS homepage_start_time TIME;
+ALTER TABLE wheels ADD COLUMN IF NOT EXISTS homepage_end_time   TIME;
