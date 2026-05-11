@@ -133,6 +133,7 @@ export default function AccountPage() {
       <UpdatesSection notifications={notifications?.items ?? []} onDismiss={dismissNotification} onClearAll={clearAllNotifications} />
       <OrdersSection title="Current orders"  bucket="open"  orders={openOrders}  />
       <OrdersSection title="Past orders"     bucket="past"  orders={pastOrders}  />
+      <GameRewardsCard />
       <AdjustmentsSection adjustments={adjustments} />
     </div>
   );
@@ -176,8 +177,6 @@ function OrderRow({ order }) {
 
 function AdjustmentsSection({ adjustments }) {
   return (
-    <GameRewardsCard />
-
     <section className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">Recently awarded points</h2>
