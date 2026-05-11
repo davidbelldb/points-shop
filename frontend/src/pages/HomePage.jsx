@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
+import WheelHomeSection from '../components/WheelHomeSection.jsx';
 
 export default function HomePage() {
   const { settings } = useSettings();

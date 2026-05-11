@@ -11,6 +11,8 @@ function WheelSvg({ segments }) {
   const r = 45;
   const n = segments.length;
   const anglePer = 360 / n;
+  // Max chars depends on how many segments. Fewer segments = more room.
+  const maxChars = n <= 4 ? 16 : n <= 6 ? 13 : n <= 8 ? 12 : n <= 10 ? 10 : 9;
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="block h-full w-full">
       {segments.map((s, i) => {
@@ -23,13 +25,17 @@ function WheelSvg({ segments }) {
         const largeArc = anglePer > 180 ? 1 : 0;
         const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
         const labelAngle = (startAngle + endAngle) / 2;
-        const labelR = r * 0.62;
+        // Position label closer to centre so it has more radial space
+        const labelR = r * 0.58;
         const lx = cx + labelR * Math.cos(labelAngle * Math.PI / 180);
         const ly = cy + labelR * Math.sin(labelAngle * Math.PI / 180);
         const raw = (s.label || '').toUpperCase();
-        const label = raw.length > 16 ? raw.slice(0, 15) + '\u2026' : raw;
+        const label = raw.length > maxChars ? raw.slice(0, maxChars - 1) + '\u2026' : raw;
+        // Compact font: shrink hard for long labels
         const len = Math.max(label.length, 4);
-        const fontSize = Math.max(2.5, Math.min(4.6, 56 / (len * 1.25)));
+        const fontSize = Math.max(2.0, Math.min(3.6, 36 / len));
+        // Tangential available width at labelR for this segment
+        const tangentialWidth = 2 * labelR * Math.sin((anglePer * Math.PI / 180) / 2) * 0.85;
         return (
           <g key={s.id}>
             <path d={d} fill={s.color || '#14b8a6'} stroke="white" strokeWidth="0.6" />
@@ -41,7 +47,13 @@ function WheelSvg({ segments }) {
               textAnchor="middle"
               dominantBaseline="central"
               transform={`rotate(${labelAngle + 180} ${lx} ${ly})`}
-              style={{ pointerEvents: 'none', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.35)', strokeWidth: 0.3, letterSpacing: '0.5px' }}
+              style={{
+                pointerEvents: 'none',
+                paintOrder: 'stroke',
+                stroke: 'rgba(0,0,0,0.35)',
+                strokeWidth: 0.25,
+                letterSpacing: '0.2px',
+              }}
             >
               {label}
             </text>
