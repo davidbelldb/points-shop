@@ -102,6 +102,7 @@ export default async function wheelRoutes(fastify) {
     if (!wheel) return reply.code(404).send({ error: 'No wheel' });
     const body = req.body ?? {};
     const patch = {};
+    if ('spin_label' in body)          patch.spin_label = body.spin_label || null;
     if ('homepage_visible' in body)    patch.homepage_visible = !!body.homepage_visible;
     if ('homepage_title' in body)      patch.homepage_title = body.homepage_title || null;
     if ('homepage_subtitle' in body)   patch.homepage_subtitle = body.homepage_subtitle || null;

@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 
 const TEAL_BTN = "inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40";
 
 function paramsForCount(n) {
-  if (n <= 4)  return { fontSize: 4.2, maxChars: 18 };
-  if (n <= 6)  return { fontSize: 3.7, maxChars: 16 };
-  if (n <= 8)  return { fontSize: 3.2, maxChars: 14 };
-  if (n <= 10) return { fontSize: 2.8, maxChars: 12 };
-  if (n <= 12) return { fontSize: 2.5, maxChars: 10 };
-  return { fontSize: 2.2, maxChars: 9 };
+  if (n <= 4)  return { fontSize: 4.5 };
+  if (n <= 6)  return { fontSize: 3.8 };
+  if (n <= 8)  return { fontSize: 3.4 };
+  if (n <= 10) return { fontSize: 3.1 };
+  if (n <= 12) return { fontSize: 2.8 };
+  if (n <= 16) return { fontSize: 2.6 };
+  return { fontSize: 2.4 };
 }
 
 function WheelSvg({ segments }) {
@@ -20,7 +21,10 @@ function WheelSvg({ segments }) {
   const r = 45;
   const n = segments.length;
   const anglePer = 360 / n;
-  const { fontSize, maxChars } = paramsForCount(n);
+  const { fontSize } = paramsForCount(n);
+  const labelR = r * 0.92;
+  // Available radial space for text from labelR inward, minus the SPIN button area (~13 viewBox units) and a margin
+  const maxRadialWidth = labelR - 13 - 1.5;
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="block h-full w-full">
       {segments.map((s, i) => {
@@ -33,12 +37,12 @@ function WheelSvg({ segments }) {
         const largeArc = anglePer > 180 ? 1 : 0;
         const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
         const labelAngle = (startAngle + endAngle) / 2;
-        // Position near outer rim with a small margin
-        const labelR = r * 0.92;
         const lx = cx + labelR * Math.cos(labelAngle * Math.PI / 180);
         const ly = cy + labelR * Math.sin(labelAngle * Math.PI / 180);
-        const raw = (s.label || '').toUpperCase();
-        const label = raw.length > maxChars ? raw.slice(0, maxChars - 1) + '\u2026' : raw;
+        const raw = (s.label || '').toUpperCase().trim();
+        const label = raw.length > 32 ? raw.slice(0, 31) + '\u2026' : raw;
+        const naturalWidth = label.length * fontSize * 0.58;
+        const useScale = naturalWidth > maxRadialWidth;
         return (
           <g key={s.id}>
             <path d={d} fill={s.color || '#14b8a6'} stroke="white" strokeWidth="0.6" />
@@ -50,12 +54,12 @@ function WheelSvg({ segments }) {
               textAnchor="start"
               dominantBaseline="central"
               transform={`rotate(${labelAngle + 180} ${lx} ${ly})`}
+              {...(useScale ? { textLength: maxRadialWidth, lengthAdjust: 'spacingAndGlyphs' } : {})}
               style={{
                 pointerEvents: 'none',
                 paintOrder: 'stroke',
                 stroke: 'rgba(0,0,0,0.35)',
                 strokeWidth: 0.25,
-                letterSpacing: '0.15px',
               }}
             >
               {label}
@@ -63,13 +67,15 @@ function WheelSvg({ segments }) {
           </g>
         );
       })}
+      {/* Teal outer ring */}
       <circle cx={cx} cy={cy} r={r + 1.4} fill="none" stroke="#d3f3ea" strokeWidth="1.6" />
+      {/* Pegs sit just inside the rim, on the coloured segments */}
       {Array.from({ length: n }).map((_, i) => {
         const angle = (i * anglePer - 90) * Math.PI / 180;
-        const pegR = r + 1.4;
+        const pegR = r * 0.94;
         const px = cx + pegR * Math.cos(angle);
         const py = cy + pegR * Math.sin(angle);
-        return <circle key={`peg${i}`} cx={px} cy={py} r="0.95" fill="#0f172a" />;
+        return <circle key={`peg${i}`} cx={px} cy={py} r="1" fill="#0f172a" />;
       })}
     </svg>
   );
@@ -80,7 +86,63 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const wheelRef = useRef(null);
+  const pointerRef = useRef(null);
+  const prevAnimRef = useRef(null);
   const { refresh: refreshBasket } = useBasket();
+
+  function triggerFlap() {
+    if (!pointerRef.current) return;
+    if (prevAnimRef.current) {
+      try { prevAnimRef.current.cancel(); } catch {}
+    }
+    prevAnimRef.current = pointerRef.current.animate(
+      [
+        { transform: 'rotate(0deg)' },
+        { transform: 'rotate(22deg)', offset: 0.35 },
+        { transform: 'rotate(0deg)' },
+      ],
+      { duration: 140, easing: 'ease-out' },
+    );
+  }
+
+  // While spinning, watch the wheel's actual rotation and flap on each peg crossing
+  useEffect(() => {
+    if (!spinning || !wheelRef.current) return;
+    const n = segments.length;
+    const anglePer = 360 / n;
+    let raf;
+    let lastAngle = null;
+    let totalDelta = 0;
+    let crossings = 0;
+    function readAngle() {
+      if (!wheelRef.current) return 0;
+      const t = getComputedStyle(wheelRef.current).transform;
+      if (!t || t === 'none') return 0;
+      const m = t.match(/matrix\(([^)]+)\)/);
+      if (!m) return 0;
+      const parts = m[1].split(',').map(Number);
+      return Math.atan2(parts[1], parts[0]) * 180 / Math.PI;
+    }
+    function tick() {
+      const cur = readAngle();
+      if (lastAngle === null) { lastAngle = cur; raf = requestAnimationFrame(tick); return; }
+      let delta = cur - lastAngle;
+      if (delta < -180) delta += 360;
+      if (delta > 180) delta -= 360;
+      totalDelta += Math.abs(delta);
+      lastAngle = cur;
+      const newCrossings = Math.floor(totalDelta / anglePer);
+      if (newCrossings > crossings) {
+        crossings = newCrossings;
+        triggerFlap();
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spinning, segments.length]);
 
   async function spin() {
     if (spinning || !wheel || !segments || segments.length < 2) return;
@@ -110,6 +172,7 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
 
   if (!wheel || !segments || segments.length < 2) return null;
 
+  const spinLabel = (wheel.spin_label || 'SPIN').toUpperCase();
   const isProduct = !!(result?.segment?.award_type === 'product' && result?.segment?.product_name);
   const titleText = result
     ? (isProduct ? result.segment.product_name : (result.segment.label || '').toUpperCase())
@@ -118,12 +181,16 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
   return (
     <div className="flex flex-col items-center">
       <div className="relative mx-auto aspect-square w-full" style={{ maxWidth: `${maxWidth}px` }}>
-        <div className="pointer-events-none absolute left-1/2 top-0 z-[1] -translate-x-1/2 -translate-y-1">
-          <svg width="26" height="30" viewBox="0 0 26 30" className="drop-shadow-md">
-            <path d="M 13 30 L 0 0 L 26 0 Z" fill="#0f172a" />
-          </svg>
+        {/* Pointer: outer wrapper positions it so apex sits at top rim, inner element gets the flap animation */}
+        <div className="pointer-events-none absolute left-1/2 top-[4%] z-[1] -translate-x-1/2 -translate-y-full">
+          <div ref={pointerRef} style={{ transformOrigin: '50% 0%' }}>
+            <svg width="30" height="36" viewBox="0 0 32 40" className="drop-shadow-md">
+              <path d="M 6 10 A 10 10 0 0 0 26 10 L 16 40 Z" fill="#0c7367" />
+            </svg>
+          </div>
         </div>
         <div
+          ref={wheelRef}
           className="h-full w-full"
           style={{
             transform: `rotate(${rotation}deg)`,
@@ -141,7 +208,7 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
           style={{ fontSize: 'clamp(0.7rem, 3.5vw, 1.1rem)' }}
           aria-label="Spin the wheel"
         >
-          {spinning ? '...' : 'SPIN'}
+          {spinning ? '...' : spinLabel}
         </button>
       </div>
       {error && <p className="mt-3 text-xs text-red-500">{error}</p>}

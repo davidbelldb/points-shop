@@ -16,6 +16,7 @@ const DAYS = [
 
 function HomepageSettings({ wheel, onSave, busy }) {
   const [draft, setDraft] = useState({
+    spin_label:        wheel.spin_label || '',
     homepage_visible:  !!wheel.homepage_visible,
     homepage_title:    wheel.homepage_title    || '',
     homepage_subtitle: wheel.homepage_subtitle || '',
@@ -35,6 +36,7 @@ function HomepageSettings({ wheel, onSave, busy }) {
   }
   async function save() {
     await onSave({
+      spin_label:          draft.spin_label.trim() || null,
       homepage_visible:    draft.homepage_visible,
       homepage_title:      draft.homepage_title.trim()    || null,
       homepage_subtitle:   draft.homepage_subtitle.trim() || null,
@@ -47,7 +49,15 @@ function HomepageSettings({ wheel, onSave, busy }) {
 
   return (
     <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-      <p className="text-sm font-semibold">Home page placement</p>
+      <p className="text-sm font-semibold">Wheel settings</p>
+      <div>
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">Centre button label</label>
+        <input type="text" value={draft.spin_label}
+          onChange={(e) => set({ spin_label: e.target.value })}
+          placeholder="SPIN"
+          className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
+      </div>
+      <p className="text-sm font-semibold pt-1">Home page placement</p>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={draft.homepage_visible} onChange={(e) => set({ homepage_visible: e.target.checked })} />
         Show on home page
