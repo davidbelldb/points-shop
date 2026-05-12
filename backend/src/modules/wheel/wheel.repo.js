@@ -6,7 +6,7 @@ export async function getActiveWheel() {
 }
 export async function updateWheel(id, patch) {
   const fields = []; const values = []; let i = 1;
-  for (const k of ['name','is_active','spin_label','homepage_visible','homepage_title','homepage_subtitle','homepage_days','homepage_start_time','homepage_end_time']) {
+  for (const k of ['name','is_active','spin_label','peg_color','homepage_visible','homepage_title','homepage_subtitle','homepage_days','homepage_start_time','homepage_end_time']) {
     if (k in patch) { fields.push(`${k} = $${i++}`); values.push(patch[k]); }
   }
   if (fields.length === 0) return null;

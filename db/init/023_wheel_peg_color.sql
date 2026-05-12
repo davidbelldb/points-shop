@@ -1,0 +1,1 @@
+ALTER TABLE wheels ADD COLUMN IF NOT EXISTS peg_color TEXT;

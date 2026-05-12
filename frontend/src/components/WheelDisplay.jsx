@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 
 const TEAL_BTN = "inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40";
+const INITIAL_OFFSET = -7; // small rest rotation so the pointer sits between two pegs
 
 function paramsForCount(n) {
   if (n <= 4)  return { fontSize: 4.5 };
@@ -14,7 +15,7 @@ function paramsForCount(n) {
   return { fontSize: 2.4 };
 }
 
-function WheelSvg({ segments }) {
+function WheelSvg({ segments, pegColor }) {
   if (!segments || segments.length < 2) return null;
   const size = 100;
   const cx = size / 2, cy = size / 2;
@@ -23,8 +24,8 @@ function WheelSvg({ segments }) {
   const anglePer = 360 / n;
   const { fontSize } = paramsForCount(n);
   const labelR = r * 0.92;
-  // Available radial space for text from labelR inward, minus the SPIN button area (~13 viewBox units) and a margin
   const maxRadialWidth = labelR - 13 - 1.5;
+  const pegFill = pegColor || '#0f172a';
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="block h-full w-full">
       {segments.map((s, i) => {
@@ -69,20 +70,20 @@ function WheelSvg({ segments }) {
       })}
       {/* Teal outer ring */}
       <circle cx={cx} cy={cy} r={r + 1.4} fill="none" stroke="#d3f3ea" strokeWidth="1.6" />
-      {/* Pegs sit just inside the rim, on the coloured segments */}
+      {/* Pegs straddle the rim - larger + configurable colour */}
       {Array.from({ length: n }).map((_, i) => {
         const angle = (i * anglePer - 90) * Math.PI / 180;
-        const pegR = r * 0.94;
+        const pegR = r;
         const px = cx + pegR * Math.cos(angle);
         const py = cy + pegR * Math.sin(angle);
-        return <circle key={`peg${i}`} cx={px} cy={py} r="1" fill="#0f172a" />;
+        return <circle key={`peg${i}`} cx={px} cy={py} r="1.6" fill={pegFill} />;
       })}
     </svg>
   );
 }
 
 export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
-  const [rotation, setRotation] = useState(0);
+  const [rotation, setRotation] = useState(INITIAL_OFFSET);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -106,7 +107,6 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
     );
   }
 
-  // While spinning, watch the wheel's actual rotation and flap on each peg crossing
   useEffect(() => {
     if (!spinning || !wheelRef.current) return;
     const n = segments.length;
@@ -181,12 +181,15 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
   return (
     <div className="flex flex-col items-center">
       <div className="relative mx-auto aspect-square w-full" style={{ maxWidth: `${maxWidth}px` }}>
-        {/* Pointer: outer wrapper positions it so apex sits at top rim, inner element gets the flap animation */}
         <div className="pointer-events-none absolute left-1/2 top-[4%] z-[1] -translate-x-1/2 -translate-y-full">
           <div ref={pointerRef} style={{ transformOrigin: '50% 0%' }}>
-            <svg width="30" height="36" viewBox="0 0 32 40" className="drop-shadow-md">
-              <path d="M 6 10 A 10 10 0 0 0 26 10 L 16 40 Z" fill="#0c7367" />
-            </svg>
+            <img
+              src="/wheel-pointer.svg"
+              alt=""
+              width="30" height="38"
+              className="block select-none drop-shadow-md"
+              draggable="false"
+            />
           </div>
         </div>
         <div
@@ -199,12 +202,12 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
             willChange: 'transform',
           }}
         >
-          <WheelSvg segments={segments} />
+          <WheelSvg segments={segments} pegColor={wheel.peg_color} />
         </div>
         <button
           onClick={spin}
           disabled={spinning}
-          className="absolute left-1/2 top-1/2 z-[2] flex aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-teal-300 font-extrabold tracking-wider text-teal-900 shadow-md ring-[3px] ring-white transition hover:bg-teal-400 active:scale-95 disabled:opacity-60"
+          className="absolute left-1/2 top-1/2 z-[2] flex aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#d3f3ea] font-extrabold tracking-wider text-teal-900 shadow-md ring-[3px] ring-white transition hover:brightness-95 active:scale-95 disabled:opacity-60"
           style={{ fontSize: 'clamp(0.7rem, 3.5vw, 1.1rem)' }}
           aria-label="Spin the wheel"
         >
