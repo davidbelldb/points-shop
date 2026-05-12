@@ -184,7 +184,7 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
     : '';
 
   return (
-    <div className="flex flex-col items-center pt-10" style={{ touchAction: 'manipulation' }}>
+    <div className="flex flex-col items-center pt-5" style={{ touchAction: 'manipulation' }}>
       <div className="relative mx-auto aspect-square w-full" style={{ maxWidth: `${maxWidth}px` }}>
         <div className="pointer-events-none absolute left-1/2 top-[6%] z-[1] -translate-x-1/2 -translate-y-full">
           <div ref={pointerRef} style={{ transformOrigin: '50% 0%' }}>
