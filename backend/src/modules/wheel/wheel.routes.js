@@ -10,35 +10,14 @@ async function getBalance(accountId) {
   return r.rows[0]?.points_balance ?? 0;
 }
 function isAdmin(req) { return req.user?.actualRole === 'admin'; }
-
-function timeToHHMM(t) {
-  if (!t) return null;
-  return String(t).slice(0, 5);
-}
-function isVisibleNow(wheel) {
-  if (!wheel?.homepage_visible) return false;
-  const now = new Date();
-  const days = wheel.homepage_days || [];
-  if (days.length > 0) {
-    const map = ['sun','mon','tue','wed','thu','fri','sat'];
-    const today = map[now.getDay()];
-    if (!days.includes(today)) return false;
-  }
-  const start = wheel.homepage_start_time;
-  const end   = wheel.homepage_end_time;
-  if (start && end) {
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const cur = `${hh}:${mm}:00`;
-    const startS = String(start);
-    const endS = String(end);
-    if (startS <= endS) {
-      if (cur < startS || cur > endS) return false;
-    } else {
-      if (cur < startS && cur > endS) return false;
-    }
-  }
-  return true;
+function timeToHHMM(t) { if (!t) return null; return String(t).slice(0, 5); }
+function shapeWheel(w) {
+  if (!w) return null;
+  return {
+    ...w,
+    homepage_start_time: timeToHHMM(w.homepage_start_time),
+    homepage_end_time:   timeToHHMM(w.homepage_end_time),
+  };
 }
 
 export default async function wheelRoutes(fastify) {
@@ -46,16 +25,15 @@ export default async function wheelRoutes(fastify) {
     const wheel = await getActiveWheel();
     if (!wheel) return { wheel: null, segments: [] };
     const segments = await listSegments(wheel.id);
-    return { wheel, segments };
+    return { wheel: shapeWheel(wheel), segments };
   });
 
   fastify.get('/api/wheels/homepage', async () => {
     const wheel = await getActiveWheel();
-    if (!wheel) return { wheel: null, segments: [], visible: false };
-    if (!isVisibleNow(wheel)) return { wheel: null, segments: [], visible: false };
+    if (!wheel || !wheel.homepage_visible) return { wheel: null, segments: [] };
     const segments = await listSegments(wheel.id);
-    if (segments.length < 2) return { wheel: null, segments: [], visible: false };
-    return { wheel, segments, visible: true };
+    if (segments.length < 2) return { wheel: null, segments: [] };
+    return { wheel: shapeWheel(wheel), segments };
   });
 
   fastify.post('/api/wheels/:id/spin', async (req, reply) => {
@@ -73,7 +51,7 @@ export default async function wheelRoutes(fastify) {
          VALUES ($1, 'wheel-of-misfortune', $2, $3)`,
         [meId, seg.id, seg.product_id],
       );
-      summary = `Won product: ${seg.product_name || seg.label}`;
+      summary = `Won: ${seg.product_name || seg.label}`;
     } else if (seg.award_type === 'points' && Number.isInteger(seg.points_delta) && seg.points_delta !== 0) {
       const balance = await getBalance(meId);
       const delta = Math.max(-balance, seg.points_delta);
@@ -115,14 +93,7 @@ export default async function wheelRoutes(fastify) {
     const wheel = await getActiveWheel();
     if (!wheel) return { wheel: null, segments: [] };
     const segments = await listSegments(wheel.id);
-    return {
-      wheel: {
-        ...wheel,
-        homepage_start_time: timeToHHMM(wheel.homepage_start_time),
-        homepage_end_time:   timeToHHMM(wheel.homepage_end_time),
-      },
-      segments,
-    };
+    return { wheel: shapeWheel(wheel), segments };
   });
 
   fastify.patch('/api/admin/wheel', async (req, reply) => {
@@ -131,19 +102,15 @@ export default async function wheelRoutes(fastify) {
     if (!wheel) return reply.code(404).send({ error: 'No wheel' });
     const body = req.body ?? {};
     const patch = {};
-    if ('homepage_visible' in body) patch.homepage_visible = !!body.homepage_visible;
-    if ('homepage_title' in body)   patch.homepage_title = body.homepage_title || null;
-    if ('homepage_days' in body)    patch.homepage_days = Array.isArray(body.homepage_days) ? body.homepage_days : [];
+    if ('homepage_visible' in body)    patch.homepage_visible = !!body.homepage_visible;
+    if ('homepage_title' in body)      patch.homepage_title = body.homepage_title || null;
+    if ('homepage_subtitle' in body)   patch.homepage_subtitle = body.homepage_subtitle || null;
+    if ('homepage_days' in body)       patch.homepage_days = Array.isArray(body.homepage_days) ? body.homepage_days : [];
     if ('homepage_start_time' in body) patch.homepage_start_time = body.homepage_start_time || null;
-    if ('homepage_end_time' in body)   patch.homepage_end_time = body.homepage_end_time || null;
-    if ('name' in body) patch.name = body.name;
+    if ('homepage_end_time' in body)   patch.homepage_end_time   = body.homepage_end_time   || null;
+    if ('name' in body)                patch.name = body.name;
     await updateWheel(wheel.id, patch);
-    const updated = await getActiveWheel();
-    return {
-      ...updated,
-      homepage_start_time: timeToHHMM(updated.homepage_start_time),
-      homepage_end_time:   timeToHHMM(updated.homepage_end_time),
-    };
+    return shapeWheel(await getActiveWheel());
   });
 
   fastify.post('/api/admin/wheel/segments', async (req, reply) => {

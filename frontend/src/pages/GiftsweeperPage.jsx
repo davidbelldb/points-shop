@@ -473,8 +473,8 @@ export default function GiftsweeperPage() {
               <div className="mt-4">
                 {isAdmin ? (
                   <select value={assignProductId} onChange={(e) => setAssignProductId(e.target.value)} className="block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-pink-400 focus:outline-none">
-                    <option value="">Select a product</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.name} - {p.price_points} pts</option>)}
+                    <option value="">Select a product (in stock only)</option>
+                    {products.filter((p) => (p.stock_qty || 0) > 0 || p.id === assignProductId).map((p) => <option key={p.id} value={p.id}>{p.name} - {p.price_points} pts{(p.stock_qty || 0) === 0 ? ' (out of stock)' : ''}</option>)}
                   </select>
                 ) : (
                   <input type="text" value={assignText} onChange={(e) => setAssignText(e.target.value)} className="block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none" autoFocus />
