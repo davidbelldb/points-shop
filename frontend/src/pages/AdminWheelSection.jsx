@@ -18,6 +18,7 @@ function HomepageSettings({ wheel, onSave, busy }) {
   const [draft, setDraft] = useState({
     spin_label:        wheel.spin_label || '',
     peg_color:         wheel.peg_color || '#0f172a',
+    text_color:        wheel.text_color || '#ffffff',
     homepage_visible:  !!wheel.homepage_visible,
     homepage_title:    wheel.homepage_title    || '',
     homepage_subtitle: wheel.homepage_subtitle || '',
@@ -39,6 +40,7 @@ function HomepageSettings({ wheel, onSave, busy }) {
     await onSave({
       spin_label:          draft.spin_label.trim() || null,
       peg_color:           draft.peg_color || null,
+      text_color:          draft.text_color || null,
       homepage_visible:    draft.homepage_visible,
       homepage_title:      draft.homepage_title.trim()    || null,
       homepage_subtitle:   draft.homepage_subtitle.trim() || null,
@@ -65,6 +67,13 @@ function HomepageSettings({ wheel, onSave, busy }) {
           onChange={(e) => set({ peg_color: e.target.value })}
           className="h-9 w-12 shrink-0 cursor-pointer rounded border border-neutral-200" />
         <span className="text-xs text-neutral-400">Colour of the dots around the rim</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="shrink-0 text-xs font-medium uppercase tracking-wide text-neutral-500">Segment text</label>
+        <input type="color" value={draft.text_color}
+          onChange={(e) => set({ text_color: e.target.value })}
+          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-neutral-200" />
+        <span className="text-xs text-neutral-400">Colour of segment labels</span>
       </div>
       <p className="text-sm font-semibold pt-1">Home page placement</p>
       <label className="flex items-center gap-2 text-sm">

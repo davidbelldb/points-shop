@@ -104,6 +104,7 @@ export default async function wheelRoutes(fastify) {
     const patch = {};
     if ('spin_label' in body)          patch.spin_label = body.spin_label || null;
     if ('peg_color' in body)           patch.peg_color = body.peg_color || null;
+    if ('text_color' in body)          patch.text_color = body.text_color || null;
     if ('homepage_visible' in body)    patch.homepage_visible = !!body.homepage_visible;
     if ('homepage_title' in body)      patch.homepage_title = body.homepage_title || null;
     if ('homepage_subtitle' in body)   patch.homepage_subtitle = body.homepage_subtitle || null;

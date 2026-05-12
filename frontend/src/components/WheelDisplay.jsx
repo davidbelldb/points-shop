@@ -15,7 +15,7 @@ function paramsForCount(n) {
   return { fontSize: 2.4 };
 }
 
-function WheelSvg({ segments, pegColor }) {
+function WheelSvg({ segments, pegColor, textColor }) {
   if (!segments || segments.length < 2) return null;
   const size = 100;
   const cx = size / 2, cy = size / 2;
@@ -25,7 +25,8 @@ function WheelSvg({ segments, pegColor }) {
   const { fontSize } = paramsForCount(n);
   const labelR = r * 0.92;
   const maxRadialWidth = labelR - 13 - 1.5;
-  const pegFill = pegColor || '#0f172a';
+  const pegFill  = pegColor  || '#0f172a';
+  const textFill = textColor || '#ffffff';
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="block h-full w-full">
       {segments.map((s, i) => {
@@ -49,7 +50,7 @@ function WheelSvg({ segments, pegColor }) {
             <path d={d} fill={s.color || '#14b8a6'} stroke="white" strokeWidth="0.6" />
             <text
               x={lx} y={ly}
-              fill="white"
+              fill={textFill}
               fontSize={fontSize}
               fontWeight="800"
               textAnchor="start"
@@ -181,12 +182,12 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
   return (
     <div className="flex flex-col items-center">
       <div className="relative mx-auto aspect-square w-full" style={{ maxWidth: `${maxWidth}px` }}>
-        <div className="pointer-events-none absolute left-1/2 top-[4%] z-[1] -translate-x-1/2 -translate-y-full">
+        <div className="pointer-events-none absolute left-1/2 top-[6%] z-[1] -translate-x-1/2 -translate-y-full">
           <div ref={pointerRef} style={{ transformOrigin: '50% 0%' }}>
             <img
               src="/wheel-pointer.svg"
               alt=""
-              width="30" height="38"
+              width="20" height="25"
               className="block select-none drop-shadow-md"
               draggable="false"
             />
@@ -202,7 +203,7 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
             willChange: 'transform',
           }}
         >
-          <WheelSvg segments={segments} pegColor={wheel.peg_color} />
+          <WheelSvg segments={segments} pegColor={wheel.peg_color} textColor={wheel.text_color} />
         </div>
         <button
           onClick={spin}
