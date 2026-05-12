@@ -15,3 +15,6 @@
 
 html, body, #root { height: 100%; }
 body { -webkit-tap-highlight-color: transparent; }
+
+
+html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }

@@ -15,7 +15,7 @@ function paramsForCount(n) {
   return { fontSize: 2.4 };
 }
 
-function WheelSvg({ segments, pegColor, textColor }) {
+function WheelSvg({ segments, pegColor, textColor, textOpacity }) {
   if (!segments || segments.length < 2) return null;
   const size = 100;
   const cx = size / 2, cy = size / 2;
@@ -27,6 +27,7 @@ function WheelSvg({ segments, pegColor, textColor }) {
   const maxRadialWidth = labelR - 13 - 1.5;
   const pegFill  = pegColor  || '#0f172a';
   const textFill = textColor || '#ffffff';
+  const textFillOpacity = (textOpacity == null) ? 1 : Math.max(0, Math.min(1, textOpacity / 100));
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="block h-full w-full">
       {segments.map((s, i) => {
@@ -51,6 +52,7 @@ function WheelSvg({ segments, pegColor, textColor }) {
             <text
               x={lx} y={ly}
               fill={textFill}
+              fillOpacity={textFillOpacity}
               fontSize={fontSize}
               fontWeight="800"
               textAnchor="start"
@@ -92,6 +94,8 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
   const pointerRef = useRef(null);
   const prevAnimRef = useRef(null);
   const { refresh: refreshBasket } = useBasket();
+  const spinsRemaining = wheel?.spins_remaining;
+  const quotaExhausted = typeof spinsRemaining === 'number' && spinsRemaining <= 0;
 
   function triggerFlap() {
     if (!pointerRef.current) return;
@@ -146,7 +150,7 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
   }, [spinning, segments.length]);
 
   async function spin() {
-    if (spinning || !wheel || !segments || segments.length < 2) return;
+    if (spinning || !wheel || !segments || segments.length < 2 || quotaExhausted) return;
     setSpinning(true); setResult(null);
     try {
       const res = await api.spinWheel(wheel.id);
@@ -180,7 +184,7 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
     : '';
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center pt-4" style={{ touchAction: 'manipulation' }}>
       <div className="relative mx-auto aspect-square w-full" style={{ maxWidth: `${maxWidth}px` }}>
         <div className="pointer-events-none absolute left-1/2 top-[6%] z-[1] -translate-x-1/2 -translate-y-full">
           <div ref={pointerRef} style={{ transformOrigin: '50% 0%' }}>
@@ -203,19 +207,25 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
             willChange: 'transform',
           }}
         >
-          <WheelSvg segments={segments} pegColor={wheel.peg_color} textColor={wheel.text_color} />
+          <WheelSvg segments={segments} pegColor={wheel.peg_color} textColor={wheel.text_color} textOpacity={wheel.text_opacity} />
         </div>
         <button
           onClick={spin}
-          disabled={spinning}
-          className="absolute left-1/2 top-1/2 z-[2] flex aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#d3f3ea] font-extrabold tracking-wider text-teal-900 shadow-md ring-[3px] ring-white transition hover:brightness-95 active:scale-95 disabled:opacity-60"
+          disabled={spinning || quotaExhausted}
+          className="absolute left-1/2 top-1/2 z-[2] flex aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#d3f3ea] font-extrabold tracking-wider text-teal-900 shadow-md ring-[3px] ring-white transition hover:brightness-95 active:scale-95"
           style={{ fontSize: 'clamp(0.7rem, 3.5vw, 1.1rem)' }}
           aria-label="Spin the wheel"
         >
-          {spinning ? '...' : spinLabel}
+          {spinning ? 'Weee!' : (quotaExhausted ? 'WAIT' : spinLabel)}
         </button>
       </div>
       {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
+      {!error && quotaExhausted && (
+        <p className="mt-3 text-center text-sm font-semibold text-pink-600">No more spins today - come back tomorrow.</p>
+      )}
+      {!error && !quotaExhausted && typeof spinsRemaining === 'number' && spinsRemaining < 4 && (
+        <p className="mt-3 text-center text-xs text-neutral-500">{spinsRemaining} spin{spinsRemaining === 1 ? '' : 's'} left today</p>
+      )}
 
       {result && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
