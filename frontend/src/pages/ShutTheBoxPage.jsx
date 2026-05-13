@@ -14,10 +14,10 @@ const ALL_TILES = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 // "I_MISS_U!" — 2 and 7 are blank tiles
 const LETTERS = { 1: 'I', 2: '', 3: 'M', 4: 'I', 5: 'S', 6: 'S', 7: '', 8: 'U', 9: '!' };
 
-const BOX_COLOUR = '#0b8476';          // wood (frame + tiles)
-const BOX_DARK_COLOUR = '#085f55';     // darker teal for accents
+const BOX_COLOUR = '#0b8476';          // dark teal — frame + tiles
+const BOX_DARK_COLOUR = '#085f55';     // even darker teal — base
 const INK_COLOUR = '#faf5e6';          // numbers + letters
-const FELT_COLOUR = '#fbb8d8';
+const FELT_COLOUR = '#15b8a6';         // medium teal felt
 const TABLE_COLOUR = '#d3f3ea';
 
 const TEAL_BTN =
@@ -43,17 +43,20 @@ function makeFeltTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
   const ctx = c.getContext('2d');
+  // teal base
   ctx.fillStyle = FELT_COLOUR;
   ctx.fillRect(0, 0, 512, 512);
+  // fibre noise (dark teal + occasional cream)
   for (let i = 0; i < 18000; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
     const v = Math.random();
     ctx.fillStyle = v > 0.6
       ? `rgba(255,255,255,${0.04 + Math.random() * 0.08})`
-      : `rgba(190,90,140,${0.05 + Math.random() * 0.1})`;
+      : `rgba(8,80,72,${0.06 + Math.random() * 0.12})`;
     ctx.fillRect(x, y, 1.4, 1.4);
   }
+  // short fibre strokes
   for (let i = 0; i < 1200; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
@@ -292,6 +295,7 @@ const WALL_H = 0.65;
 const WALL_THICK = 0.22;
 
 function BoxFrame({ feltTex }) {
+  const R = 0.05; // corner radius for rounded box edges
   return (
     <group>
       {/* Felt floor */}
@@ -299,30 +303,60 @@ function BoxFrame({ feltTex }) {
         <boxGeometry args={[BOX_W - WALL_THICK * 2 + 0.02, 0.01, BOX_D - WALL_THICK * 2 + 0.02]} />
         <meshStandardMaterial map={feltTex} color={FELT_COLOUR} roughness={0.95} />
       </mesh>
-      {/* Floor base */}
-      <mesh position={[0, -0.06, 0]} receiveShadow>
-        <boxGeometry args={[BOX_W, 0.12, BOX_D]} />
+      {/* Floor base — rounded box */}
+      <RoundedBox
+        args={[BOX_W, 0.12, BOX_D]}
+        radius={R}
+        smoothness={3}
+        position={[0, -0.06, 0]}
+        receiveShadow
+      >
         <meshStandardMaterial color={BOX_DARK_COLOUR} roughness={0.6} />
-      </mesh>
-      {/* Side walls */}
-      <mesh position={[-BOX_W / 2 + WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[WALL_THICK, WALL_H, BOX_D]} />
+      </RoundedBox>
+      {/* Left wall */}
+      <RoundedBox
+        args={[WALL_THICK, WALL_H, BOX_D]}
+        radius={R}
+        smoothness={3}
+        position={[-BOX_W / 2 + WALL_THICK / 2, WALL_H / 2, 0]}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
-      </mesh>
-      <mesh position={[BOX_W / 2 - WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[WALL_THICK, WALL_H, BOX_D]} />
+      </RoundedBox>
+      {/* Right wall */}
+      <RoundedBox
+        args={[WALL_THICK, WALL_H, BOX_D]}
+        radius={R}
+        smoothness={3}
+        position={[BOX_W / 2 - WALL_THICK / 2, WALL_H / 2, 0]}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
-      </mesh>
+      </RoundedBox>
       {/* Back wall */}
-      <mesh position={[0, WALL_H / 2, -BOX_D / 2 + WALL_THICK / 2]} castShadow receiveShadow>
-        <boxGeometry args={[BOX_W, WALL_H, WALL_THICK]} />
+      <RoundedBox
+        args={[BOX_W, WALL_H, WALL_THICK]}
+        radius={R}
+        smoothness={3}
+        position={[0, WALL_H / 2, -BOX_D / 2 + WALL_THICK / 2]}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
-      </mesh>
+      </RoundedBox>
       {/* Front wall (lower) */}
-      <mesh position={[0, 0.2, BOX_D / 2 - WALL_THICK / 2]} castShadow receiveShadow>
-        <boxGeometry args={[BOX_W, 0.4, WALL_THICK]} />
+      <RoundedBox
+        args={[BOX_W, 0.4, WALL_THICK]}
+        radius={R}
+        smoothness={3}
+        position={[0, 0.2, BOX_D / 2 - WALL_THICK / 2]}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
-      </mesh>
+      </RoundedBox>
       {/* Rod */}
       <mesh position={[0, 0.08, -1.0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.03, 0.03, BOX_W - WALL_THICK * 2 - 0.1, 16]} />
@@ -537,7 +571,7 @@ export default function ShutTheBoxPage() {
         <Canvas
           shadows
           dpr={[1, 2]}
-          camera={{ position: [0, 5.0, 4.5], fov: 38 }}
+          camera={{ position: [0, 5.6, 5.1], fov: 40 }}
           gl={{ antialias: true, alpha: true }}
         >
           <Suspense fallback={null}>
