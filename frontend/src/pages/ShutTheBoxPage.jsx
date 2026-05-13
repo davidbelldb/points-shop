@@ -11,20 +11,33 @@ import { useBasket } from '../lib/BasketContext.jsx';
  * ========================================================================== */
 
 const ALL_TILES = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-// "I_MISS_U!" — 2 and 7 are blank tiles
-const LETTERS = { 1: 'I', 2: '', 3: 'M', 4: 'I', 5: 'S', 6: 'S', 7: '', 8: 'U', 9: '!' };
 
-const BOX_COLOUR = '#0b8476';          // dark teal — frame + tiles
-const BOX_DARK_COLOUR = '#085f55';     // even darker teal — base
-const INK_COLOUR = '#faf5e6';          // numbers + letters
-const FELT_COLOUR = '#15b8a6';         // vibrant teal felt
-const DICE_COLOUR = '#e773b0';         // pink dice
+// Default config — overridden by server config when loaded
+const DEFAULT_CONFIG = {
+  felt_colour: '#15b8a6',
+  frame_colour: '#0b8476',
+  tile_colour: '#0b8476',
+  ink_colour: '#faf5e6',
+  hidden_message: 'I_MISS_U!',
+};
+
+const DICE_COLOUR = '#e773b0';
 const TABLE_COLOUR = '#d3f3ea';
 
+function lettersFromMessage(msg) {
+  const m = (msg || 'I_MISS_U!').padEnd(9, '_').slice(0, 9);
+  const out = {};
+  for (let i = 0; i < 9; i++) {
+    const ch = m[i];
+    out[i + 1] = ch === '_' ? '' : ch;
+  }
+  return out;
+}
+
 const TEAL_BTN =
-  'inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40';
+  'inline-flex items-center justify-center rounded-full px-6 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40 shadow';
 const PALE_BTN =
-  'rounded-xl border border-neutral-300 bg-white py-2 px-4 text-sm font-medium text-neutral-700 disabled:opacity-30';
+  'rounded-full border-2 px-4 py-2 text-sm font-medium disabled:opacity-40';
 
 function hasValidClose(openTiles, target) {
   const n = openTiles.length;
@@ -40,24 +53,21 @@ function hasValidClose(openTiles, target) {
  * Felt fabric texture
  * ========================================================================== */
 
-function makeFeltTexture() {
+function makeFeltTexture(baseColour) {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
   const ctx = c.getContext('2d');
-  // vibrant teal base
-  ctx.fillStyle = FELT_COLOUR;
+  ctx.fillStyle = baseColour;
   ctx.fillRect(0, 0, 512, 512);
-  // very subtle fibre noise — mostly white highlights so the teal stays vibrant
   for (let i = 0; i < 9000; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
     const v = Math.random();
     ctx.fillStyle = v > 0.4
       ? `rgba(255,255,255,${0.03 + Math.random() * 0.07})`
-      : `rgba(11,132,118,${0.02 + Math.random() * 0.05})`; // very faint #0b8476 flecks
+      : `rgba(0,0,0,${0.02 + Math.random() * 0.05})`;
     ctx.fillRect(x, y, 1.3, 1.3);
   }
-  // sparse white fibre strokes
   for (let i = 0; i < 600; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
@@ -77,7 +87,7 @@ function makeFeltTexture() {
 }
 
 /* ============================================================================
- * Dice — frosted glass, rounded, with pip textures on small face planes
+ * Dice — pink with black pips
  * ========================================================================== */
 
 const PIP_PATTERNS = {
@@ -105,7 +115,6 @@ function makePipTexture(value) {
   return tex;
 }
 
-// Die is 30% smaller — 0.385 cube
 const DIE_SIZE = 0.385;
 const DIE_HALF = DIE_SIZE / 2;
 const PIP_OFFSET = DIE_HALF + 0.006;
@@ -147,18 +156,13 @@ function Die({ value, throwSeed, throwVec, indexOffset, visible }) {
       const x = Math.sin(throwSeed * 9301 + i * 49297 + indexOffset * 233) * 43758;
       return x - Math.floor(x);
     };
-    // Horizontal swipe biases x landing
     const swipeX = throwVec ? Math.max(-1, Math.min(1, throwVec.x / 200)) : 0;
     const lane = indexOffset === 0 ? -1 : 1;
     animRef.current = {
       active: true,
       startTime: performance.now() / 1000,
       duration: 1.45,
-      startPos: new THREE.Vector3(
-        lane * 0.8 - swipeX * 1.8,
-        3.5 + seedRand(1) * 0.4,
-        -1.0
-      ),
+      startPos: new THREE.Vector3(lane * 0.8 - swipeX * 1.8, 3.5 + seedRand(1) * 0.4, -1.0),
       endPos: new THREE.Vector3(
         lane * 0.6 + swipeX * 1.2 + (seedRand(2) - 0.5) * 0.5,
         DIE_HALF + 0.01,
@@ -217,15 +221,15 @@ function Die({ value, throwSeed, throwVec, indexOffset, visible }) {
 }
 
 /* ============================================================================
- * Tile — flat teal board, reclined when open, flips forward when closed
+ * Tile
  * ========================================================================== */
 
 const TILE_W = 0.42;
 const TILE_H = 0.75;
 const TILE_D = 0.1;
-const TILE_OPEN_ANGLE = -Math.PI / 12; // ~15° backward lean
+const TILE_OPEN_ANGLE = -Math.PI / 12;
 
-function Tile({ value, x, closed, selected, onClick }) {
+function Tile({ value, x, closed, selected, onClick, tileColour, inkColour, letter, interactive }) {
   const groupRef = useRef();
   const angleRef = useRef(TILE_OPEN_ANGLE);
 
@@ -237,48 +241,41 @@ function Tile({ value, x, closed, selected, onClick }) {
     groupRef.current.rotation.x = angleRef.current;
   });
 
-  const tileColor = selected ? '#1aa999' : BOX_COLOUR;
-
   return (
     <group ref={groupRef} position={[x, 0.08, -1.0]}>
       <mesh
         position={[0, TILE_H / 2, 0]}
         castShadow
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.(value);
-        }}
+        onClick={interactive ? (e) => { e.stopPropagation(); onClick?.(value); } : undefined}
       >
         <boxGeometry args={[TILE_W, TILE_H, TILE_D]} />
-        <meshStandardMaterial color={tileColor} roughness={0.55} />
+        <meshStandardMaterial color={selected ? '#1aa999' : tileColour} roughness={0.55} />
       </mesh>
-      {/* Number on +Z (front) face */}
       <Text
         position={[0, TILE_H / 2, TILE_D / 2 + 0.001]}
         fontSize={0.38}
-        color={INK_COLOUR}
+        color={inkColour}
         anchorX="center"
         anchorY="middle"
       >
         {value}
       </Text>
-      {/* Letter on -Z (back) face, rotation [π,0,0] reads upright when tile is flat */}
       <Text
         position={[0, TILE_H / 2, -TILE_D / 2 - 0.001]}
         rotation={[Math.PI, 0, 0]}
         fontSize={0.42}
-        color={INK_COLOUR}
+        color={inkColour}
         anchorX="center"
         anchorY="middle"
       >
-        {LETTERS[value] || ''}
+        {letter || ''}
       </Text>
     </group>
   );
 }
 
 /* ============================================================================
- * Box frame + felt floor
+ * Box frame
  * ========================================================================== */
 
 const BOX_W = 5.6;
@@ -286,73 +283,33 @@ const BOX_D = 3.0;
 const WALL_H = 0.65;
 const WALL_THICK = 0.22;
 
-function BoxFrame({ feltTex }) {
-  const R = 0.05; // corner radius for rounded box edges
+function BoxFrame({ feltTex, frameColour, feltColour }) {
+  const R = 0.05;
+  const darkFrame = '#085f55';
   return (
     <group>
-      {/* Felt floor */}
       <mesh position={[0, 0.005, 0]} receiveShadow>
         <boxGeometry args={[BOX_W - WALL_THICK * 2 + 0.02, 0.01, BOX_D - WALL_THICK * 2 + 0.02]} />
-        <meshStandardMaterial map={feltTex} color={FELT_COLOUR} roughness={0.95} />
+        <meshStandardMaterial map={feltTex} color={feltColour} roughness={0.95} />
       </mesh>
-      {/* Floor base — rounded box */}
-      <RoundedBox
-        args={[BOX_W, 0.12, BOX_D]}
-        radius={R}
-        smoothness={3}
-        position={[0, -0.06, 0]}
-        receiveShadow
-      >
-        <meshStandardMaterial color={BOX_DARK_COLOUR} roughness={0.6} />
+      <RoundedBox args={[BOX_W, 0.12, BOX_D]} radius={R} smoothness={3} position={[0, -0.06, 0]} receiveShadow>
+        <meshStandardMaterial color={darkFrame} roughness={0.6} />
       </RoundedBox>
-      {/* Left wall */}
-      <RoundedBox
-        args={[WALL_THICK, WALL_H, BOX_D]}
-        radius={R}
-        smoothness={3}
-        position={[-BOX_W / 2 + WALL_THICK / 2, WALL_H / 2, 0]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
+      <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[-BOX_W / 2 + WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
+        <meshStandardMaterial color={frameColour} roughness={0.6} />
       </RoundedBox>
-      {/* Right wall */}
-      <RoundedBox
-        args={[WALL_THICK, WALL_H, BOX_D]}
-        radius={R}
-        smoothness={3}
-        position={[BOX_W / 2 - WALL_THICK / 2, WALL_H / 2, 0]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
+      <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[BOX_W / 2 - WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
+        <meshStandardMaterial color={frameColour} roughness={0.6} />
       </RoundedBox>
-      {/* Back wall */}
-      <RoundedBox
-        args={[BOX_W, WALL_H, WALL_THICK]}
-        radius={R}
-        smoothness={3}
-        position={[0, WALL_H / 2, -BOX_D / 2 + WALL_THICK / 2]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
+      <RoundedBox args={[BOX_W, WALL_H, WALL_THICK]} radius={R} smoothness={3} position={[0, WALL_H / 2, -BOX_D / 2 + WALL_THICK / 2]} castShadow receiveShadow>
+        <meshStandardMaterial color={frameColour} roughness={0.6} />
       </RoundedBox>
-      {/* Front wall (lower) */}
-      <RoundedBox
-        args={[BOX_W, 0.4, WALL_THICK]}
-        radius={R}
-        smoothness={3}
-        position={[0, 0.2, BOX_D / 2 - WALL_THICK / 2]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial color={BOX_COLOUR} roughness={0.6} />
+      <RoundedBox args={[BOX_W, 0.4, WALL_THICK]} radius={R} smoothness={3} position={[0, 0.2, BOX_D / 2 - WALL_THICK / 2]} castShadow receiveShadow>
+        <meshStandardMaterial color={frameColour} roughness={0.6} />
       </RoundedBox>
-      {/* Rod */}
       <mesh position={[0, 0.08, -1.0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.03, 0.03, BOX_W - WALL_THICK * 2 - 0.1, 16]} />
-        <meshStandardMaterial color={BOX_DARK_COLOUR} roughness={0.5} />
+        <meshStandardMaterial color={darkFrame} roughness={0.5} />
       </mesh>
     </group>
   );
@@ -362,8 +319,18 @@ function BoxFrame({ feltTex }) {
  * Scene
  * ========================================================================== */
 
-function Scene({ openTiles, selected, dice, throwSeed, throwVec, onTileTap }) {
-  const feltTex = useMemo(() => makeFeltTexture(), []);
+export function StbScene({
+  openTiles = ALL_TILES,
+  selected = [],
+  dice = [null, null],
+  throwSeed = 0,
+  throwVec = null,
+  onTileTap,
+  config = DEFAULT_CONFIG,
+  interactive = true,
+}) {
+  const feltTex = useMemo(() => makeFeltTexture(config.felt_colour), [config.felt_colour]);
+  const letters = useMemo(() => lettersFromMessage(config.hidden_message), [config.hidden_message]);
 
   return (
     <>
@@ -381,7 +348,7 @@ function Scene({ openTiles, selected, dice, throwSeed, throwVec, onTileTap }) {
       />
       <directionalLight position={[-5, 4, -2]} intensity={0.3} />
 
-      <BoxFrame feltTex={feltTex} />
+      <BoxFrame feltTex={feltTex} frameColour={config.frame_colour} feltColour={config.felt_colour} />
 
       {ALL_TILES.map((v, i) => {
         const x = (i - 4) * 0.5;
@@ -393,6 +360,10 @@ function Scene({ openTiles, selected, dice, throwSeed, throwVec, onTileTap }) {
             closed={!openTiles.includes(v)}
             selected={selected.includes(v)}
             onClick={onTileTap}
+            tileColour={config.tile_colour}
+            inkColour={config.ink_colour}
+            letter={letters[v]}
+            interactive={interactive}
           />
         );
       })}
@@ -404,11 +375,49 @@ function Scene({ openTiles, selected, dice, throwSeed, throwVec, onTileTap }) {
 }
 
 /* ============================================================================
- * Main page
+ * Reusable canvas wrapper (with control strip styled like the front of the box)
+ * ========================================================================== */
+
+export function StbCanvasShell({ config, onPointerDown, onPointerUp, children, footer, height }) {
+  return (
+    <div
+      className="overflow-hidden rounded-2xl shadow-lg"
+      style={{ background: TABLE_COLOUR }}
+    >
+      <div
+        className="relative"
+        style={{ aspectRatio: '7 / 5', height, touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+      >
+        <Canvas
+          shadows
+          dpr={[1, 2]}
+          camera={{ position: [0, 6.6, 3.8], fov: 40 }}
+          gl={{ antialias: true, alpha: true }}
+        >
+          <Suspense fallback={null}>{children}</Suspense>
+        </Canvas>
+      </div>
+      {footer && (
+        <div
+          className="flex items-center justify-center gap-2 px-3 py-3"
+          style={{ background: config?.frame_colour ?? DEFAULT_CONFIG.frame_colour }}
+        >
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
+ * Main game page
  * ========================================================================== */
 
 export default function ShutTheBoxPage() {
   const { refresh: refreshBasket } = useBasket();
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [game, setGame] = useState(null);
   const [openTiles, setOpenTiles] = useState([...ALL_TILES]);
   const [selected, setSelected] = useState([]);
@@ -423,6 +432,10 @@ export default function ShutTheBoxPage() {
   const diceSum = (dice[0] || 0) + (dice[1] || 0);
   const selectedSum = useMemo(() => selected.reduce((a, b) => a + b, 0), [selected]);
   const canConfirm = phase === 'rolled' && selectedSum === diceSum && selected.length > 0;
+
+  useEffect(() => {
+    api.getStbConfig().then((c) => c && setConfig(c)).catch(() => {});
+  }, []);
 
   async function newGame() {
     if (busy) return;
@@ -501,7 +514,6 @@ export default function ShutTheBoxPage() {
     setMessage('');
   }
 
-  /* --- Swipe-to-throw — now left/right --- */
   const swipeStart = useRef(null);
   function onPointerDown(e) {
     if (phase !== 'idle' || !game) return;
@@ -529,6 +541,50 @@ export default function ShutTheBoxPage() {
     );
   }
 
+  const btnStyle = {
+    background: config.ink_colour,
+    color: config.frame_colour,
+    boxShadow: '0 2px 4px rgba(0,0,0,0.25), inset 0 -1px 0 rgba(0,0,0,0.15)',
+  };
+  const ghostBtnStyle = {
+    color: config.ink_colour,
+    borderColor: config.ink_colour,
+  };
+
+  const footer = (() => {
+    if (!game) {
+      return (
+        <button onClick={newGame} disabled={busy} className={TEAL_BTN} style={btnStyle}>
+          {busy ? '...' : 'Start game'}
+        </button>
+      );
+    }
+    if (phase === 'over' || phase === 'won') {
+      return (
+        <button onClick={newGame} disabled={busy} className={TEAL_BTN} style={btnStyle}>
+          New game
+        </button>
+      );
+    }
+    if (phase === 'rolled') {
+      return (
+        <>
+          <button onClick={() => setSelected([])} disabled={selected.length === 0} className={PALE_BTN} style={ghostBtnStyle}>
+            Clear
+          </button>
+          <button onClick={confirmClose} disabled={!canConfirm || busy} className={TEAL_BTN} style={btnStyle}>
+            Close ({selectedSum}/{diceSum})
+          </button>
+        </>
+      );
+    }
+    return (
+      <button onClick={() => triggerRoll(null)} disabled={phase === 'rolling' || busy} className={TEAL_BTN} style={btnStyle}>
+        {phase === 'rolling' ? 'Rolling...' : 'Roll the dice'}
+      </button>
+    );
+  })();
+
   return (
     <div className="space-y-3 py-2">
       <div className="flex items-center justify-between">
@@ -539,35 +595,18 @@ export default function ShutTheBoxPage() {
         ) : <span className="w-10" />}
       </div>
 
-      {/* 3D scene — box-shaped aspect (7:5), transparent canvas over teal table */}
-      <div
-        className="overflow-hidden rounded-2xl shadow-lg"
-        style={{
-          aspectRatio: '7 / 5',
-          background: TABLE_COLOUR,
-          touchAction: 'none',
-        }}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-      >
-        <Canvas
-          shadows
-          dpr={[1, 2]}
-          camera={{ position: [0, 6.6, 3.8], fov: 40 }}
-          gl={{ antialias: true, alpha: true }}
-        >
-          <Suspense fallback={null}>
-            <Scene
-              openTiles={openTiles}
-              selected={selected}
-              dice={dice}
-              throwSeed={throwSeed}
-              throwVec={throwVec}
-              onTileTap={tapTile}
-            />
-          </Suspense>
-        </Canvas>
-      </div>
+      <StbCanvasShell config={config} onPointerDown={onPointerDown} onPointerUp={onPointerUp} footer={footer}>
+        <StbScene
+          openTiles={openTiles}
+          selected={selected}
+          dice={dice}
+          throwSeed={throwSeed}
+          throwVec={throwVec}
+          onTileTap={tapTile}
+          config={config}
+          interactive
+        />
+      </StbCanvasShell>
 
       {phase === 'idle' && game && (
         <p className="text-center text-xs text-neutral-500">Swipe right to roll.. it's all in the fingers.</p>
@@ -581,47 +620,14 @@ export default function ShutTheBoxPage() {
             </>
           )}
           {message && (
-            <span
-              className={
-                phase === 'won'
-                  ? 'font-semibold text-teal-700'
-                  : phase === 'over'
-                  ? 'font-semibold text-pink-600'
-                  : ''
-              }
-            >
-              {message}
-            </span>
+            <span className={
+              phase === 'won' ? 'font-semibold text-teal-700'
+              : phase === 'over' ? 'font-semibold text-pink-600'
+              : ''
+            }>{message}</span>
           )}
         </div>
       )}
-
-      <div className="flex gap-2">
-        {!game ? (
-          <button onClick={newGame} disabled={busy} className={`flex-1 ${TEAL_BTN}`}>
-            {busy ? '...' : 'Start game'}
-          </button>
-        ) : phase === 'over' || phase === 'won' ? (
-          <button onClick={newGame} disabled={busy} className={`flex-1 ${TEAL_BTN}`}>
-            New game
-          </button>
-        ) : phase === 'rolled' ? (
-          <>
-            <button onClick={() => setSelected([])} disabled={selected.length === 0} className={`flex-1 ${PALE_BTN}`}>Clear</button>
-            <button onClick={confirmClose} disabled={!canConfirm || busy} className={`flex-1 ${TEAL_BTN}`}>
-              Close tiles ({selectedSum}/{diceSum})
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={() => triggerRoll(null)}
-            disabled={phase === 'rolling' || busy}
-            className={`flex-1 ${TEAL_BTN}`}
-          >
-            {phase === 'rolling' ? 'Rolling...' : 'Roll the dice'}
-          </button>
-        )}
-      </div>
     </div>
   );
 }

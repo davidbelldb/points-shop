@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
 import WheelHomeSection from '../components/WheelHomeSection.jsx';
+import ShutTheBoxHomeSection from '../components/ShutTheBoxHomeSection.jsx';
 
 export default function HomePage() {
   const { settings } = useSettings();
@@ -58,6 +59,8 @@ export default function HomePage() {
       )}
 
       <WheelHomeSection />
+
+      <ShutTheBoxHomeSection />
 
       <div>
         <div className="flex items-center justify-between gap-3">

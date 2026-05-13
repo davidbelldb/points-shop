@@ -7,6 +7,7 @@ import AdminImpersonateSection from './AdminImpersonateSection.jsx';
 import AdminHeroSlides from './AdminHeroSlides.jsx';
 import AdminGamesSection from './AdminGamesSection.jsx';
 import AdminWheelSection from './AdminWheelSection.jsx';
+import AdminShutTheBoxSection from './AdminShutTheBoxSection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
@@ -67,6 +68,7 @@ export default function AdminPage() {
       <AdminSurveysSection />
       <AdminGamesSection />
       <AdminWheelSection />
+      <AdminShutTheBoxSection />
     </div>
   );
 }

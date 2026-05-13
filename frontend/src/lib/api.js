@@ -81,7 +81,7 @@ export const api = {
   stbState:   () => request('/games/shut-the-box/state'),
   stbStart:   () => request('/games/shut-the-box/start', { method: 'POST' }),
   stbEnd:     (payload) => request('/games/shut-the-box/end', { method: 'POST', body: JSON.stringify(payload) }),
-  listTrophies: () => request('/account/trophies'),
+  getStbConfig: () => request('/games/shut-the-box/config'),
   listReviews: (productId) => request(`/products/${productId}/reviews`),
   createReview: (productId, body) => request(`/products/${productId}/reviews`, { method: 'POST', body: JSON.stringify({ body }) }),
   updateReview: (reviewId, body) => request(`/reviews/${reviewId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
@@ -154,6 +154,8 @@ export const api = {
     addWheelSegment:       (data) => request('/admin/wheel/segments', { method: 'POST', body: JSON.stringify(data) }),
     updateWheelSegment:    (id, patch) => request(`/admin/wheel/segments/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     deleteWheelSegment:    (id) => request(`/admin/wheel/segments/${id}`, { method: 'DELETE' }),
+    getStbConfig:          () => request('/admin/shut-the-box'),
+    updateStbConfig:       (patch) => request('/admin/shut-the-box', { method: 'PATCH', body: JSON.stringify(patch) }),
     upload: uploadFile,
   },
 };
