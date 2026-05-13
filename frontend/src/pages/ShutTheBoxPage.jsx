@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Text, RoundedBox, MeshTransmissionMaterial } from '@react-three/drei';
+import { Text, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
@@ -17,7 +17,8 @@ const LETTERS = { 1: 'I', 2: '', 3: 'M', 4: 'I', 5: 'S', 6: 'S', 7: '', 8: 'U', 
 const BOX_COLOUR = '#0b8476';          // dark teal — frame + tiles
 const BOX_DARK_COLOUR = '#085f55';     // even darker teal — base
 const INK_COLOUR = '#faf5e6';          // numbers + letters
-const FELT_COLOUR = '#15b8a6';         // medium teal felt
+const FELT_COLOUR = '#15b8a6';         // vibrant teal felt
+const DICE_COLOUR = '#e773b0';         // pink dice
 const TABLE_COLOUR = '#d3f3ea';
 
 const TEAL_BTN =
@@ -43,26 +44,26 @@ function makeFeltTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
   const ctx = c.getContext('2d');
-  // teal base
+  // vibrant teal base
   ctx.fillStyle = FELT_COLOUR;
   ctx.fillRect(0, 0, 512, 512);
-  // fibre noise (dark teal + occasional cream)
-  for (let i = 0; i < 18000; i++) {
+  // very subtle fibre noise — mostly white highlights so the teal stays vibrant
+  for (let i = 0; i < 9000; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
     const v = Math.random();
-    ctx.fillStyle = v > 0.6
-      ? `rgba(255,255,255,${0.04 + Math.random() * 0.08})`
-      : `rgba(8,80,72,${0.06 + Math.random() * 0.12})`;
-    ctx.fillRect(x, y, 1.4, 1.4);
+    ctx.fillStyle = v > 0.4
+      ? `rgba(255,255,255,${0.03 + Math.random() * 0.07})`
+      : `rgba(11,132,118,${0.02 + Math.random() * 0.05})`; // very faint #0b8476 flecks
+    ctx.fillRect(x, y, 1.3, 1.3);
   }
-  // short fibre strokes
-  for (let i = 0; i < 1200; i++) {
+  // sparse white fibre strokes
+  for (let i = 0; i < 600; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
     const len = 2 + Math.random() * 3;
     const angle = Math.random() * Math.PI * 2;
-    ctx.strokeStyle = `rgba(255,255,255,${0.04 + Math.random() * 0.1})`;
+    ctx.strokeStyle = `rgba(255,255,255,${0.04 + Math.random() * 0.08})`;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -93,10 +94,10 @@ function makePipTexture(value) {
   c.width = c.height = 256;
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, 256, 256);
-  ctx.fillStyle = '#1c0d05';
+  ctx.fillStyle = '#000000';
   (PIP_PATTERNS[value] || []).forEach(([x, y]) => {
     ctx.beginPath();
-    ctx.arc(x * 256, y * 256, 18, 0, Math.PI * 2);
+    ctx.arc(x * 256, y * 256, 20, 0, Math.PI * 2);
     ctx.fill();
   });
   const tex = new THREE.CanvasTexture(c);
@@ -203,16 +204,7 @@ function Die({ value, throwSeed, throwVec, indexOffset, visible }) {
   return (
     <group ref={groupRef}>
       <RoundedBox args={[DIE_SIZE, DIE_SIZE, DIE_SIZE]} radius={0.05} smoothness={4} castShadow>
-        <MeshTransmissionMaterial
-          transmission={0.85}
-          roughness={0.45}
-          thickness={0.3}
-          ior={1.45}
-          chromaticAberration={0.02}
-          color="#ffffff"
-          samples={4}
-          resolution={256}
-        />
+        <meshStandardMaterial color={DICE_COLOUR} roughness={0.45} metalness={0.05} />
       </RoundedBox>
       {FACE_VALUES_LAYOUT.map((f) => (
         <mesh key={f.value} position={f.pos} rotation={f.rot}>
@@ -417,7 +409,6 @@ function Scene({ openTiles, selected, dice, throwSeed, throwVec, onTileTap }) {
 
 export default function ShutTheBoxPage() {
   const { refresh: refreshBasket } = useBasket();
-  const [quota, setQuota] = useState({ games_used_today: 0, games_limit: 5, games_remaining: 5 });
   const [game, setGame] = useState(null);
   const [openTiles, setOpenTiles] = useState([...ALL_TILES]);
   const [selected, setSelected] = useState([]);
@@ -432,13 +423,6 @@ export default function ShutTheBoxPage() {
   const diceSum = (dice[0] || 0) + (dice[1] || 0);
   const selectedSum = useMemo(() => selected.reduce((a, b) => a + b, 0), [selected]);
   const canConfirm = phase === 'rolled' && selectedSum === diceSum && selected.length > 0;
-  const quotaExhausted = (quota.games_remaining != null) && quota.games_remaining <= 0 && phase === 'idle';
-
-  async function loadQuota() {
-    try { setQuota(await api.stbState()); }
-    catch (e) { setError(e.message); }
-  }
-  useEffect(() => { loadQuota(); }, []);
 
   async function newGame() {
     if (busy) return;
@@ -451,7 +435,6 @@ export default function ShutTheBoxPage() {
       setDice([null, null]);
       setThrowSeed(0);
       setPhase('idle');
-      await loadQuota();
     } catch (e) {
       setError(e.message);
     } finally { setBusy(false); }
@@ -496,7 +479,7 @@ export default function ShutTheBoxPage() {
       try {
         const res = await api.stbEnd({ game_id: game.id, result: 'win', final_tiles_open: [] });
         if (refreshBasket) await refreshBasket();
-        setMessage(`You shut the box! +${res.credited_pts} pts and a dice trophy.`);
+        setMessage(`You shut the box! +${res.credited_pts} pts.`);
       } catch (e) { setError(e.message); }
       finally { setBusy(false); }
     } else {
@@ -516,7 +499,6 @@ export default function ShutTheBoxPage() {
     setThrowSeed(0);
     setPhase('idle');
     setMessage('');
-    await loadQuota();
   }
 
   /* --- Swipe-to-throw — now left/right --- */
@@ -571,7 +553,7 @@ export default function ShutTheBoxPage() {
         <Canvas
           shadows
           dpr={[1, 2]}
-          camera={{ position: [0, 5.6, 5.1], fov: 40 }}
+          camera={{ position: [0, 6.6, 3.8], fov: 40 }}
           gl={{ antialias: true, alpha: true }}
         >
           <Suspense fallback={null}>
@@ -588,7 +570,7 @@ export default function ShutTheBoxPage() {
       </div>
 
       {phase === 'idle' && game && (
-        <p className="text-center text-xs text-neutral-500">Swipe across the box to throw, or tap Roll.</p>
+        <p className="text-center text-xs text-neutral-500">Swipe right to roll.. it's all in the fingers.</p>
       )}
 
       {(message || phase === 'rolled') && (
@@ -616,11 +598,11 @@ export default function ShutTheBoxPage() {
 
       <div className="flex gap-2">
         {!game ? (
-          <button onClick={newGame} disabled={busy || quotaExhausted} className={`flex-1 ${TEAL_BTN}`}>
+          <button onClick={newGame} disabled={busy} className={`flex-1 ${TEAL_BTN}`}>
             {busy ? '...' : 'Start game'}
           </button>
         ) : phase === 'over' || phase === 'won' ? (
-          <button onClick={newGame} disabled={busy || quotaExhausted} className={`flex-1 ${TEAL_BTN}`}>
+          <button onClick={newGame} disabled={busy} className={`flex-1 ${TEAL_BTN}`}>
             New game
           </button>
         ) : phase === 'rolled' ? (
@@ -640,14 +622,6 @@ export default function ShutTheBoxPage() {
           </button>
         )}
       </div>
-
-      {quota.games_limit != null && (
-        <p className="text-center text-xs text-neutral-500">
-          {quotaExhausted
-            ? 'No more games today - come back tomorrow.'
-            : `${quota.games_remaining} game${quota.games_remaining === 1 ? '' : 's'} left today`}
-        </p>
-      )}
     </div>
   );
 }
