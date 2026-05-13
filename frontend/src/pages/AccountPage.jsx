@@ -134,6 +134,7 @@ export default function AccountPage() {
       <OrdersSection title="Current orders"  bucket="open"  orders={openOrders}  />
       <OrdersSection title="Past orders"     bucket="past"  orders={pastOrders}  />
       <GameRewardsCard />
+      <Link to="/account/trophies" className="block rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900 hover:bg-amber-100">Dice trophies →</Link>
       <AdjustmentsSection adjustments={adjustments} />
     </div>
   );
