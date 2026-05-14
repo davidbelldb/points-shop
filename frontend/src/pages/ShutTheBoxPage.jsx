@@ -26,7 +26,7 @@ const DEFAULT_CONFIG = {
 };
 
 const TABLE_COLOUR = '#d3f3ea';
-const WOOD_TEX_URL = '/textures/wood_table_worn_diffuse.jpg';
+const WOOD_TEX_URL = '/textures/oak_veneer_diffuse.jpg';
 const VELVET_TEX_URL = '/textures/velour_velvet_diffuse.jpg';
 
 function lettersFromMessage(msg, len) {
@@ -150,30 +150,27 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
   // Apply a fresh throw whenever throwSeed bumps
   useEffect(() => {
     if (!bodyRef.current || !throwSeed) return;
-    const seedRand = (i) => {
-      const x = Math.sin(throwSeed * 9301 + i * 49297 + indexOffset * 233) * 43758;
-      return x - Math.floor(x);
-    };
+    // True randomness per throw — Math.random() makes each roll independent of the previous.
+    const r = () => Math.random();
     const swipeX = throwVec ? Math.max(-1, Math.min(1, throwVec.x / 200)) : 0;
     const lane = indexOffset === 0 ? -1 : 1;
 
-    // Place die above the box, biased by swipe + lane
-    const startX = lane * 0.6 - swipeX * 1.4;
-    const startY = 2.2 + seedRand(1) * 0.3;
-    const startZ = 1.1 + seedRand(2) * 0.3;
-    bodyRef.current.setTranslation({ x: startX, y: startY, z: startZ }, true);
+    bodyRef.current.setTranslation({
+      x: lane * 0.6 - swipeX * 1.4 + (r() - 0.5) * 0.6,
+      y: 2.2 + r() * 0.4,
+      z: 1.1 + r() * 0.3,
+    }, true);
     bodyRef.current.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
 
-    // Throw into the box: small +X bias from swipe, downward, away from camera (-Z)
     bodyRef.current.setLinvel({
-      x: swipeX * 3 + (seedRand(3) - 0.5) * 1.5,
-      y: -2.5 - seedRand(4) * 1.5,
-      z: -3.5 - seedRand(5) * 1.5,
+      x: swipeX * 3 + (r() - 0.5) * 2.0,
+      y: -2.5 - r() * 2.0,
+      z: -3.5 - r() * 2.0,
     }, true);
     bodyRef.current.setAngvel({
-      x: (seedRand(6) - 0.5) * 18,
-      y: (seedRand(7) - 0.5) * 18,
-      z: (seedRand(8) - 0.5) * 18,
+      x: (r() - 0.5) * 22,
+      y: (r() - 0.5) * 22,
+      z: (r() - 0.5) * 22,
     }, true);
 
     settledRef.current = false;
@@ -304,8 +301,7 @@ function ScatteredTile({ letter, position, rotationY, inkColour }) {
   );
 }
 
-function ScatteredRow({ letters, baseZ, inkColour, seed }) {
-  const count = 8;
+function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8 }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => {
@@ -384,28 +380,22 @@ const WALL_THICK = 0.22;
 const FRONT_LIP_Z = BOX_D / 2 + WALL_THICK / 2 + 0.35;
 const BUTTON_Y = 0.09;
 
-function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGame, onReset, busy, canConfirm, selectedSum, diceSum, selectedCount, inkColour }) {
+function ButtonBar({ phase, hasGame, onClose, onReset, busy, canConfirm, selectedSum, diceSum, inkColour }) {
+  // Only show buttons on the front lip while a game is in progress (no game / won / over use
+  // the in-box big button instead — see <BigBoxButton/>).
   const buttons = useMemo(() => {
-    if (!hasGame) {
-      return [{ label: 'Start game', onClick: onStart, width: 2.4, disabled: busy }];
-    }
-    if (phase === 'over' || phase === 'won') {
-      return [
-        { label: 'Reset', onClick: onReset, width: 1.1, disabled: busy },
-        { label: 'New game', onClick: onNewGame, width: 1.7, disabled: busy },
-      ];
-    }
+    if (!hasGame || phase === 'over' || phase === 'won') return [];
     if (phase === 'rolled') {
       return [
-        { label: 'Clear', onClick: onClear, width: 1.1, disabled: selectedCount === 0 },
+        { label: 'Reset', onClick: onReset, width: 1.0, disabled: busy },
         { label: `Close ${selectedSum}/${diceSum}`, onClick: onClose, width: 1.9, disabled: !canConfirm || busy },
       ];
     }
-    return [
-      { label: 'Reset', onClick: onReset, width: 1.1, disabled: busy },
-      { label: phase === 'rolling' ? 'Rolling…' : 'Roll dice', onClick: onRoll, width: 1.7, disabled: phase === 'rolling' || busy },
-    ];
-  }, [phase, hasGame, busy, canConfirm, selectedCount, selectedSum, diceSum]);
+    // idle / rolling: just Reset
+    return [{ label: phase === 'rolling' ? 'Rolling…' : 'Reset', onClick: onReset, width: 1.4, disabled: phase === 'rolling' || busy }];
+  }, [phase, hasGame, busy, canConfirm, selectedSum, diceSum]);
+
+  if (buttons.length === 0) return null;
 
   const totalWidth = buttons.reduce((s, b) => s + b.width, 0) + (buttons.length - 1) * 0.12;
   let cursor = -totalWidth / 2;
@@ -426,6 +416,51 @@ function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGam
           />
         );
       })}
+    </group>
+  );
+}
+
+// Big wooden "Start game" / "New game" panel sitting on the felt inside the box.
+function BigBoxButton({ label, onClick, disabled, inkColour }) {
+  const { woodTex } = useStbTextures();
+  const meshRef = useRef();
+  const pressedRef = useRef(false);
+  const offsetY = useRef(0);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+    const target = pressedRef.current ? -0.06 : 0;
+    offsetY.current += (target - offsetY.current) * Math.min(delta * 18, 1);
+    meshRef.current.position.y = offsetY.current;
+  });
+
+  return (
+    <group position={[0, 0.35, 0.3]}>
+      <mesh
+        ref={meshRef}
+        onPointerDown={(e) => { if (!disabled) { e.stopPropagation(); pressedRef.current = true; } }}
+        onPointerUp={(e) => { if (!disabled) { e.stopPropagation(); pressedRef.current = false; onClick?.(); } }}
+        onPointerLeave={() => { pressedRef.current = false; }}
+        castShadow
+        receiveShadow
+      >
+        <boxGeometry args={[2.7, 0.25, 0.75]} />
+        <meshStandardMaterial map={woodTex} roughness={0.55} />
+      </mesh>
+      <Text
+        position={[0, 0.18, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.32}
+        color={inkColour}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.018}
+        outlineColor="#000"
+        fillOpacity={disabled ? 0.4 : 1}
+        renderOrder={10}
+      >
+        {label}
+      </Text>
     </group>
   );
 }
@@ -511,10 +546,12 @@ export function StbScene({
   config = DEFAULT_CONFIG,
   interactive = true,
   buttonBar = null,
+  bigButton = null,
+  scatteredSet = { back: '', front: '' },
 }) {
   const inboxLetters = useMemo(() => lettersFromMessage(config.hidden_message, 9), [config.hidden_message]);
-  const backLetters = useMemo(() => lettersFromMessage(config.scattered_letters_back, 8), [config.scattered_letters_back]);
-  const frontLetters = useMemo(() => lettersFromMessage(config.scattered_letters_front, 8), [config.scattered_letters_front]);
+  const backLetters = useMemo(() => lettersFromMessage(scatteredSet.back, 8), [scatteredSet.back]);
+  const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 7), [scatteredSet.front]);
 
   return (
     <>
@@ -553,8 +590,8 @@ export function StbScene({
           );
         })}
 
-        <ScatteredRow letters={backLetters} baseZ={-2.6} inkColour={config.ink_colour} seed={1.3} />
-        <ScatteredRow letters={frontLetters} baseZ={2.4} inkColour={config.ink_colour} seed={4.7} />
+        <ScatteredRow letters={backLetters} baseZ={-2.7} inkColour={config.ink_colour} seed={1.3} count={8} />
+        <ScatteredRow letters={frontLetters} baseZ={2.55} inkColour={config.ink_colour} seed={4.7} count={7} />
 
         <PhysicsDie
           throwSeed={throwSeed}
@@ -575,6 +612,7 @@ export function StbScene({
           visible={diceVisible}
         />
 
+        {bigButton}
         {buttonBar}
       </Physics>
     </>
@@ -590,14 +628,14 @@ export function StbCanvasShell({ children, onPointerDown, onPointerUp }) {
     <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: TABLE_COLOUR }}>
       <div
         className="relative"
-        style={{ aspectRatio: '7 / 5', touchAction: 'none' }}
+        style={{ aspectRatio: '6 / 5', touchAction: 'none' }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
       >
         <Canvas
           shadows
           dpr={[1, 2]}
-          camera={{ position: [0, 7.5, 5.0], fov: 42 }}
+          camera={{ position: [0, 6.4, 4.0], fov: 36 }}
           gl={{ antialias: true, alpha: true }}
         >
           <Suspense fallback={null}>{children}</Suspense>
@@ -614,6 +652,7 @@ export function StbCanvasShell({ children, onPointerDown, onPointerUp }) {
 export function ShutKatiesBoxGame({ showStatus = true }) {
   const { refresh: refreshBasket } = useBasket();
   const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [scatteredSet, setScatteredSet] = useState({ back: '', front: '' });
   const [game, setGame] = useState(null);
   const [openTiles, setOpenTiles] = useState([...ALL_TILES]);
   const [selected, setSelected] = useState([]);
@@ -630,8 +669,19 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   const selectedSum = useMemo(() => selected.reduce((a, b) => a + b, 0), [selected]);
   const canConfirm = phase === 'rolled' && selectedSum === diceSum && selected.length > 0;
 
+  // On mount, load config and pick a random ACTIVE scattered set
   useEffect(() => {
-    api.getStbConfig().then((c) => c && setConfig(c)).catch(() => {});
+    api.getStbConfig().then((c) => {
+      if (!c) return;
+      setConfig(c);
+      const sets = Array.isArray(c.scattered_sets) ? c.scattered_sets.filter((s) => s.active) : [];
+      if (sets.length > 0) {
+        const pick = sets[Math.floor(Math.random() * sets.length)];
+        setScatteredSet({ back: pick.back || '', front: pick.front || '' });
+      } else {
+        setScatteredSet({ back: '', front: '' });
+      }
+    }).catch(() => {});
   }, []);
 
   async function newGame() {
@@ -749,20 +799,23 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
     <ButtonBar
       phase={phase}
       hasGame={!!game}
-      onStart={newGame}
-      onRoll={() => triggerRoll(null)}
-      onClear={() => setSelected([])}
       onClose={confirmClose}
-      onNewGame={newGame}
       onReset={resetGame}
       busy={busy}
       canConfirm={canConfirm}
       selectedSum={selectedSum}
       diceSum={diceSum}
-      selectedCount={selected.length}
       inkColour={config.ink_colour}
     />
   );
+
+  // Big inner-box button for Start / New game — shown when no active session.
+  let bigButton = null;
+  if (!game) {
+    bigButton = <BigBoxButton label="Start game" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
+  } else if (phase === 'won' || phase === 'over') {
+    bigButton = <BigBoxButton label="New game" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
+  }
 
   const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
 
@@ -781,6 +834,8 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
           config={config}
           interactive
           buttonBar={buttonBar}
+          bigButton={bigButton}
+          scatteredSet={scatteredSet}
         />
       </StbCanvasShell>
 

@@ -24,11 +24,6 @@ export default function AdminShutTheBoxSection() {
 
   // Local edit buffers (so user can type freely without immediate save)
   const [hidden, setHidden] = useState('');
-  const [scatBack, setScatBack] = useState('');
-  const [scatFront, setScatFront] = useState('');
-  const [feltC, setFeltC] = useState('');
-  const [frameC, setFrameC] = useState('');
-  const [tileC, setTileC] = useState('');
   const [inkC, setInkC] = useState('');
   const [diceC, setDiceC] = useState('');
   const [pipC, setPipC] = useState('');
@@ -40,11 +35,6 @@ export default function AdminShutTheBoxSection() {
       const c = await api.admin.getStbConfig();
       setCfg(c);
       setHidden(c.hidden_message ?? '');
-      setScatBack(c.scattered_letters_back ?? '');
-      setScatFront(c.scattered_letters_front ?? '');
-      setFeltC(c.felt_colour ?? '');
-      setFrameC(c.frame_colour ?? '');
-      setTileC(c.tile_colour ?? '');
       setInkC(c.ink_colour ?? '');
       setDiceC(c.dice_colour ?? '');
       setPipC(c.pip_colour ?? '');
@@ -86,12 +76,16 @@ export default function AdminShutTheBoxSection() {
     save({ hidden_message: hidden });
   }
 
-  function commitScat(field, value) {
-    if (value.length > 8) {
-      setError('Scattered letters must be 0-8 characters.');
-      return;
-    }
-    save({ [field]: value });
+  async function saveSet(ord, patch) {
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      const updated = await api.admin.updateStbScatteredSet(ord, patch);
+      setCfg(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setError(e.message);
+    } finally { setBusy(false); }
   }
 
   function commitColour(field, value) {
@@ -160,27 +154,12 @@ export default function AdminShutTheBoxSection() {
       <hr className="border-neutral-200" />
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Scattered tiles around the box</p>
-        <p className="text-xs text-neutral-500">8 tiles behind, 8 in front. Use <code>_</code> for blank tiles.</p>
-        <div className="flex gap-2">
-          <input
-            value={scatBack}
-            onChange={(e) => setScatBack(e.target.value.slice(0, 8))}
-            maxLength={8}
-            className={inputCls + ' font-mono tracking-widest'}
-            placeholder="Behind (8 chars)"
-          />
-          <button onClick={() => commitScat('scattered_letters_back', scatBack)} disabled={busy || scatBack === cfg.scattered_letters_back} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={scatFront}
-            onChange={(e) => setScatFront(e.target.value.slice(0, 8))}
-            maxLength={8}
-            className={inputCls + ' font-mono tracking-widest'}
-            placeholder="In front (8 chars)"
-          />
-          <button onClick={() => commitScat('scattered_letters_front', scatFront)} disabled={busy || scatFront === cfg.scattered_letters_front} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Scattered tile messages</p>
+        <p className="text-xs text-neutral-500">5 sets — the game picks one at random from the <em>active</em> sets on each page load. Each set has 8 tiles behind and 7 in front. Use <code>_</code> for blank tiles.</p>
+        <div className="space-y-2">
+          {(cfg.scattered_sets || []).map((s) => (
+            <ScatteredSetEditor key={s.ord} set={s} busy={busy} onSave={(patch) => saveSet(s.ord, patch)} />
+          ))}
         </div>
       </div>
 
@@ -233,6 +212,51 @@ export default function AdminShutTheBoxSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+function ScatteredSetEditor({ set, busy, onSave }) {
+  const [back, setBack] = useState(set.back ?? '');
+  const [front, setFront] = useState(set.front ?? '');
+  useEffect(() => { setBack(set.back ?? ''); setFront(set.front ?? ''); }, [set.back, set.front]);
+
+  const dirty = back !== (set.back ?? '') || front !== (set.front ?? '');
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-2 space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-neutral-700">Set {set.ord}</span>
+        <button
+          onClick={() => onSave({ active: !set.active })}
+          disabled={busy}
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${set.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {set.active ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={back}
+          onChange={(e) => setBack(e.target.value.slice(0, 8))}
+          maxLength={8}
+          className={inputCls + ' font-mono tracking-widest'}
+          placeholder="Behind (8)"
+        />
+        <input
+          value={front}
+          onChange={(e) => setFront(e.target.value.slice(0, 7))}
+          maxLength={7}
+          className={inputCls + ' font-mono tracking-widest'}
+          placeholder="Front (7)"
+        />
+        <button
+          onClick={() => onSave({ back, front })}
+          disabled={busy || !dirty}
+          className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30"
+        >
+          Save
+        </button>
+      </div>
+    </div>
   );
 }
 

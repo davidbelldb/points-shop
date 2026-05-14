@@ -17,7 +17,11 @@ async function creditPts(accountId, delta, reason) {
 
 async function getConfig() {
   const { rows } = await query(`SELECT * FROM stb_config WHERE id = 1`);
-  return rows[0] || null;
+  const cfg = rows[0] || null;
+  if (!cfg) return null;
+  const { rows: sets } = await query(`SELECT ord, back, front, active FROM stb_scattered_sets ORDER BY ord`);
+  cfg.scattered_sets = sets;
+  return cfg;
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -26,11 +30,6 @@ function validatePatch(patch) {
   if ('hidden_message' in patch) {
     if (typeof patch.hidden_message !== 'string' || patch.hidden_message.length !== 9) {
       return 'hidden_message must be exactly 9 characters (use _ for blank tiles)';
-    }
-  }
-  for (const k of ['scattered_letters_back', 'scattered_letters_front']) {
-    if (k in patch && (typeof patch[k] !== 'string' || patch[k].length > 8)) {
-      return `${k} must be 0-8 characters (use _ for blank tiles)`;
     }
   }
   for (const k of ['felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'dice_colour', 'pip_colour']) {
@@ -49,13 +48,24 @@ function validatePatch(patch) {
   return null;
 }
 
+function validateScatteredPatch(patch) {
+  if ('back' in patch && (typeof patch.back !== 'string' || patch.back.length > 8)) {
+    return 'back must be 0-8 characters (use _ for blank)';
+  }
+  if ('front' in patch && (typeof patch.front !== 'string' || patch.front.length > 7)) {
+    return 'front must be 0-7 characters (use _ for blank)';
+  }
+  if ('active' in patch && typeof patch.active !== 'boolean') {
+    return 'active must be a boolean';
+  }
+  return null;
+}
+
 export default async function stbRoutes(fastify) {
-  // Public config (used by game page + homepage embed)
   fastify.get('/api/games/shut-the-box/config', async () => {
     return await getConfig();
   });
 
-  // Game state — unlimited plays
   fastify.get('/api/games/shut-the-box/state', async () => {
     return { games_used_today: 0, games_limit: null, games_remaining: null };
   });
@@ -83,7 +93,6 @@ export default async function stbRoutes(fastify) {
     return { ok: true, credited_pts: creditedPts };
   });
 
-  // Admin config endpoints
   fastify.get('/api/admin/shut-the-box', async (req, reply) => {
     if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
     return await getConfig();
@@ -97,7 +106,7 @@ export default async function stbRoutes(fastify) {
     const allowed = [
       'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days',
       'felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'hidden_message',
-      'dice_colour', 'pip_colour', 'scattered_letters_back', 'scattered_letters_front',
+      'dice_colour', 'pip_colour',
     ];
     const updates = [];
     const values = [];
@@ -110,6 +119,30 @@ export default async function stbRoutes(fastify) {
     if (updates.length) {
       updates.push(`updated_at = NOW()`);
       await query(`UPDATE stb_config SET ${updates.join(', ')} WHERE id = 1`, values);
+    }
+    return await getConfig();
+  });
+
+  // Scattered-set admin endpoint — update one of the 5 sets by ord (1..5)
+  fastify.patch('/api/admin/shut-the-box/scattered-sets/:ord', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    const ord = Number(req.params.ord);
+    if (!Number.isInteger(ord) || ord < 1 || ord > 5) return reply.code(400).send({ error: 'ord must be 1..5' });
+    const patch = req.body ?? {};
+    const err = validateScatteredPatch(patch);
+    if (err) return reply.code(400).send({ error: err });
+    const updates = [];
+    const values = [];
+    for (const k of ['back', 'front', 'active']) {
+      if (k in patch) {
+        values.push(patch[k]);
+        updates.push(`${k} = $${values.length}`);
+      }
+    }
+    if (updates.length) {
+      updates.push(`updated_at = NOW()`);
+      values.push(ord);
+      await query(`UPDATE stb_scattered_sets SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
     return await getConfig();
   });

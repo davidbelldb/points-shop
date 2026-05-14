@@ -156,6 +156,7 @@ export const api = {
     deleteWheelSegment:    (id) => request(`/admin/wheel/segments/${id}`, { method: 'DELETE' }),
     getStbConfig:          () => request('/admin/shut-the-box'),
     updateStbConfig:       (patch) => request('/admin/shut-the-box', { method: 'PATCH', body: JSON.stringify(patch) }),
+    updateStbScatteredSet: (ord, patch) => request(`/admin/shut-the-box/scattered-sets/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     upload: uploadFile,
   },
 };
