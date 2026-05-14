@@ -26,8 +26,8 @@ const DEFAULT_CONFIG = {
 };
 
 const TABLE_COLOUR = '#d3f3ea';
-const WOOD_TEX_URL = '/textures/oak_veneer_diffuse.jpg';
-const VELVET_TEX_URL = '/textures/velour_velvet_diffuse.jpg';
+const WOOD_TEX_URL = '/textures/wood_table_worn_diff_4k.jpg';
+const VELVET_TEX_URL = '/textures/velour_velvet_diff_4k.jpg';
 
 function lettersFromMessage(msg, len) {
   const m = (msg || '').padEnd(len, '_').slice(0, len);
@@ -233,7 +233,7 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
 const TILE_W = 0.42;
 const TILE_H = 0.75;
 const TILE_D = 0.1;
-const TILE_OPEN_ANGLE = -Math.PI / 7;
+const TILE_OPEN_ANGLE = -Math.PI / 5.5; // steeper backward lean
 
 function Tile({ value, x, closed, selected, onClick, inkColour, letter, interactive }) {
   const { woodTex } = useStbTextures();
@@ -249,7 +249,7 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
   });
 
   return (
-    <group ref={groupRef} position={[x, 0.08, -1.0]}>
+    <group ref={groupRef} position={[x, 0.08, -0.8]}>
       <mesh
         position={[0, TILE_H / 2, 0]}
         castShadow
@@ -498,7 +498,7 @@ function BoxFrame() {
         <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       {/* Rod — keeps a dark wood look */}
-      <mesh position={[0, 0.08, -1.0]} rotation={[0, 0, Math.PI / 2]}>
+      <mesh position={[0, 0.08, -0.8]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.03, 0.03, BOX_W - WALL_THICK * 2 - 0.1, 16]} />
         <meshStandardMaterial map={woodTex || null} roughness={0.5} />
       </mesh>
@@ -525,7 +525,7 @@ function BoxColliders() {
       {/* Right wall */}
       <CuboidCollider args={[WALL_THICK / 2, halfTall, innerD / 2]} position={[BOX_W / 2 - WALL_THICK / 2, halfTall, 0]} restitution={0.35} friction={0.4} />
       {/* Rod — short cuboid approximating the cylinder, blocks dice from rolling under the tiles */}
-      <CuboidCollider args={[innerW / 2, 0.03, 0.03]} position={[0, 0.08, -1.0]} restitution={0.2} friction={0.5} />
+      <CuboidCollider args={[innerW / 2, 0.03, 0.03]} position={[0, 0.08, -0.8]} restitution={0.2} friction={0.5} />
     </RigidBody>
   );
 }
@@ -635,7 +635,7 @@ export function StbCanvasShell({ children, onPointerDown, onPointerUp }) {
         <Canvas
           shadows
           dpr={[1, 2]}
-          camera={{ position: [0, 6.4, 4.0], fov: 36 }}
+          camera={{ position: [0, 7.5, 5.0], fov: 42 }}
           gl={{ antialias: true, alpha: true }}
         >
           <Suspense fallback={null}>{children}</Suspense>
@@ -795,19 +795,17 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
     );
   }
 
-  const buttonBar = (
-    <ButtonBar
-      phase={phase}
-      hasGame={!!game}
-      onClose={confirmClose}
-      onReset={resetGame}
-      busy={busy}
-      canConfirm={canConfirm}
-      selectedSum={selectedSum}
-      diceSum={diceSum}
-      inkColour={config.ink_colour}
-    />
-  );
+  // Front-lip buttons removed — selection auto-closes when its sum matches the dice.
+  const buttonBar = null;
+
+  // Auto-close on sum match
+  useEffect(() => {
+    if (phase !== 'rolled') return;
+    if (selected.length === 0) return;
+    if (selectedSum !== diceSum) return;
+    const t = setTimeout(() => { confirmClose(); }, 650);
+    return () => clearTimeout(t);
+  }, [selected, selectedSum, diceSum, phase]);
 
   // Big inner-box button for Start / New game — shown when no active session.
   let bigButton = null;
