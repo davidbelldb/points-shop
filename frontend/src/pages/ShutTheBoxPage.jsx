@@ -26,8 +26,9 @@ const DEFAULT_CONFIG = {
 };
 
 const TABLE_COLOUR = '#d3f3ea';
-const WOOD_FALLBACK = '#5a3618';      // dark walnut brown — when wood texture missing
-const WOOD_DARK_FALLBACK = '#3a2316'; // even darker walnut — for base / rod
+const WOOD_FALLBACK = '#8b5a2b';      // saddle-brown — when wood JPG missing
+const WOOD_DARK_FALLBACK = '#3a2316'; // very dark walnut — for base / rod
+const FELT_FALLBACK = '#15b8a6';      // teal — when velvet JPG missing
 const WOOD_TEX_URL = '/textures/wood_table_worn_diffuse.jpg';
 const VELVET_TEX_URL = '/textures/velour_velvet_diffuse.jpg';
 
@@ -54,20 +55,50 @@ function hasValidClose(openTiles, target) {
  * Textures
  * ========================================================================== */
 
-function useOptionalTexture(url, repeatX = 1, repeatY = 1) {
-  const [tex, setTex] = useState(null);
-  useEffect(() => {
-    const loader = new THREE.TextureLoader();
-    loader.load(
+// Module-level cache so every component using the same URL shares one THREE.Texture.
+const _texCache = new Map();
+const _texPromises = new Map();
+
+function loadTextureOnce(url) {
+  if (_texCache.has(url)) return Promise.resolve(_texCache.get(url));
+  if (_texPromises.has(url)) return _texPromises.get(url);
+  const p = new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(
       url,
       (t) => {
+        // JPGs are stored sRGB; without this they render washed-out / grey.
+        t.colorSpace = THREE.SRGBColorSpace;
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(repeatX, repeatY);
-        setTex(t);
+        t.anisotropy = 4;
+        _texCache.set(url, t);
+        resolve(t);
       },
       undefined,
-      () => setTex(null)
+      (err) => {
+        console.warn('[stb] texture failed to load', url, err?.message || err);
+        reject(err);
+      }
     );
+  });
+  _texPromises.set(url, p);
+  return p;
+}
+
+function useOptionalTexture(url, repeatX = 1, repeatY = 1) {
+  const [tex, setTex] = useState(() => _texCache.get(url) || null);
+  useEffect(() => {
+    let active = true;
+    loadTextureOnce(url)
+      .then((t) => {
+        if (!active) return;
+        // Per-instance repeat — clone the texture so we can vary repeats by surface
+        const inst = t.clone();
+        inst.needsUpdate = true;
+        inst.repeat.set(repeatX, repeatY);
+        setTex(inst);
+      })
+      .catch(() => { if (active) setTex(null); });
+    return () => { active = false; };
   }, [url, repeatX, repeatY]);
   return tex;
 }
@@ -278,9 +309,9 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
  * ========================================================================== */
 
 function ScatteredTile({ letter, position, rotationY, inkColour, woodTex }) {
-  const W = 0.55;
-  const H = 0.45;
-  const D = 0.09;
+  const W = 0.7;
+  const H = 0.6;
+  const D = 0.12;
   const baseColour = woodTex ? '#ffffff' : WOOD_FALLBACK;
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
@@ -290,12 +321,14 @@ function ScatteredTile({ letter, position, rotationY, inkColour, woodTex }) {
       </mesh>
       {letter ? (
         <Text
-          position={[0, D + 0.003, 0]}
+          position={[0, D + 0.005, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.28}
+          fontSize={0.38}
           color={inkColour}
           anchorX="center"
           anchorY="middle"
+          outlineWidth={0.008}
+          outlineColor="#000"
         >
           {letter}
         </Text>
@@ -310,15 +343,15 @@ function ScatteredRow({ letters, baseZ, inkColour, woodTex, seed }) {
     <>
       {Array.from({ length: count }).map((_, i) => {
         const t = (i - (count - 1) / 2) / ((count - 1) / 2);
-        const x = t * 3.2;
+        const x = t * 3.7;
         const jitter = Math.sin((seed + i) * 9.7);
-        const z = baseZ + jitter * 0.22;
+        const z = baseZ + jitter * 0.25;
         const yRot = jitter * 0.45;
         return (
           <ScatteredTile
             key={i}
             letter={letters[i] || ''}
-            position={[x + Math.cos((seed + i) * 4.3) * 0.06, 0, z]}
+            position={[x + Math.cos((seed + i) * 4.3) * 0.08, 0, z]}
             rotationY={yRot}
             inkColour={inkColour}
             woodTex={woodTex}
@@ -439,11 +472,11 @@ function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGam
  * Box frame + colliders for physics
  * ========================================================================== */
 
-function BoxFrame({ feltTex, woodTex, feltColour }) {
+function BoxFrame({ feltTex, woodTex }) {
   const R = 0.05;
   const woodCol = woodTex ? '#ffffff' : WOOD_FALLBACK;
-  const woodDarkCol = woodTex ? '#cccccc' : WOOD_DARK_FALLBACK; // slight darken on base
-  const feltCol = feltTex ? '#ffffff' : feltColour;
+  const woodDarkCol = woodTex ? '#bdbdbd' : WOOD_DARK_FALLBACK; // slight darken on base when textured
+  const feltCol = feltTex ? '#ffffff' : FELT_FALLBACK;
 
   return (
     <group>
@@ -542,7 +575,7 @@ export function StbScene({
       <directionalLight position={[-5, 4, -2]} intensity={0.3} />
 
       <Physics gravity={[0, -22, 0]}>
-        <BoxFrame feltTex={velvetTex} woodTex={woodTex} feltColour={config.felt_colour} />
+        <BoxFrame feltTex={velvetTex} woodTex={woodTex} />
         <BoxColliders />
 
         {ALL_TILES.map((v, i) => {
