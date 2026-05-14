@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Text, RoundedBox } from '@react-three/drei';
@@ -29,6 +29,13 @@ const TABLE_COLOUR = '#d3f3ea';
 const WOOD_FALLBACK = '#8b5a2b';      // saddle-brown — when wood JPG missing
 const WOOD_DARK_FALLBACK = '#3a2316'; // very dark walnut — for base / rod
 const FELT_FALLBACK = '#15b8a6';      // teal — when velvet JPG missing
+
+// Tints multiplied into the diffuse texture so the pale Poly Haven JPGs read as wood / felt.
+// White (#fff) means "show the texture untouched". A darker / coloured tint enriches the result.
+const WOOD_TINT = '#9a6a3c';          // warm tan-brown — applied over the wood texture
+const WOOD_DARK_TINT = '#5a3a1f';     // darker tan — for the base under the felt
+const VELVET_TINT = '#ffffff';        // velour velvet's natural red comes through
+
 const WOOD_TEX_URL = '/textures/wood_table_worn_diffuse.jpg';
 const VELVET_TEX_URL = '/textures/velour_velvet_diffuse.jpg';
 
@@ -55,53 +62,39 @@ function hasValidClose(openTiles, target) {
  * Textures
  * ========================================================================== */
 
-// Module-level cache so every component using the same URL shares one THREE.Texture.
-const _texCache = new Map();
-const _texPromises = new Map();
-
-function loadTextureOnce(url) {
-  if (_texCache.has(url)) return Promise.resolve(_texCache.get(url));
-  if (_texPromises.has(url)) return _texPromises.get(url);
-  const p = new Promise((resolve, reject) => {
+// Load a texture once per call. Each consumer gets its own THREE.Texture so the GPU upload
+// is independent — avoids cloning headaches where a cloned texture renders white.
+function useOptionalTexture(url, repeatX = 1, repeatY = 1) {
+  const [tex, setTex] = useState(null);
+  useEffect(() => {
+    let active = true;
     new THREE.TextureLoader().load(
       url,
       (t) => {
-        // JPGs are stored sRGB; without this they render washed-out / grey.
+        if (!active) return;
+        // JPGs are stored sRGB — without this they render washed-out.
         t.colorSpace = THREE.SRGBColorSpace;
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(repeatX, repeatY);
         t.anisotropy = 4;
-        _texCache.set(url, t);
-        resolve(t);
+        t.needsUpdate = true;
+        setTex(t);
       },
       undefined,
       (err) => {
         console.warn('[stb] texture failed to load', url, err?.message || err);
-        reject(err);
+        if (active) setTex(null);
       }
     );
-  });
-  _texPromises.set(url, p);
-  return p;
-}
-
-function useOptionalTexture(url, repeatX = 1, repeatY = 1) {
-  const [tex, setTex] = useState(() => _texCache.get(url) || null);
-  useEffect(() => {
-    let active = true;
-    loadTextureOnce(url)
-      .then((t) => {
-        if (!active) return;
-        // Per-instance repeat — clone the texture so we can vary repeats by surface
-        const inst = t.clone();
-        inst.needsUpdate = true;
-        inst.repeat.set(repeatX, repeatY);
-        setTex(inst);
-      })
-      .catch(() => { if (active) setTex(null); });
     return () => { active = false; };
   }, [url, repeatX, repeatY]);
   return tex;
 }
+
+// Single-shared-texture context so the whole scene uses ONE wood + ONE velvet upload
+// instead of duplicating heavy 12 MB JPGs across every mesh.
+const StbTexCtx = createContext({ woodTex: null, velvetTex: null });
+function useStbTextures() { return useContext(StbTexCtx); }
 
 /* ============================================================================
  * Dice — pip planes + Rapier physics
@@ -268,7 +261,8 @@ const TILE_H = 0.75;
 const TILE_D = 0.1;
 const TILE_OPEN_ANGLE = -Math.PI / 7;
 
-function Tile({ value, x, closed, selected, onClick, inkColour, letter, interactive, woodTex }) {
+function Tile({ value, x, closed, selected, onClick, inkColour, letter, interactive }) {
+  const { woodTex } = useStbTextures();
   const groupRef = useRef();
   const angleRef = useRef(TILE_OPEN_ANGLE);
 
@@ -280,8 +274,8 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
     groupRef.current.rotation.x = angleRef.current;
   });
 
-  // Selected tiles glow with the ink colour overlay; otherwise pure wood
-  const baseColour = woodTex ? '#ffffff' : WOOD_FALLBACK;
+  // Selected tiles glow with a warm highlight; otherwise wood-tinted texture or solid wood fallback
+  const baseColour = woodTex ? WOOD_TINT : WOOD_FALLBACK;
   const tintColour = selected ? '#ffd58a' : baseColour;
 
   return (
@@ -308,11 +302,12 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
  * Scattered loose letter tiles (table — 8 back, 8 front)
  * ========================================================================== */
 
-function ScatteredTile({ letter, position, rotationY, inkColour, woodTex }) {
+function ScatteredTile({ letter, position, rotationY, inkColour }) {
+  const { woodTex } = useStbTextures();
   const W = 0.7;
   const H = 0.6;
   const D = 0.12;
-  const baseColour = woodTex ? '#ffffff' : WOOD_FALLBACK;
+  const baseColour = woodTex ? WOOD_TINT : WOOD_FALLBACK;
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
       <mesh position={[0, D / 2, 0]} castShadow>
@@ -337,7 +332,7 @@ function ScatteredTile({ letter, position, rotationY, inkColour, woodTex }) {
   );
 }
 
-function ScatteredRow({ letters, baseZ, inkColour, woodTex, seed }) {
+function ScatteredRow({ letters, baseZ, inkColour, seed }) {
   const count = 8;
   return (
     <>
@@ -354,7 +349,6 @@ function ScatteredRow({ letters, baseZ, inkColour, woodTex, seed }) {
             position={[x + Math.cos((seed + i) * 4.3) * 0.08, 0, z]}
             rotationY={yRot}
             inkColour={inkColour}
-            woodTex={woodTex}
           />
         );
       })}
@@ -366,7 +360,8 @@ function ScatteredRow({ letters, baseZ, inkColour, woodTex, seed }) {
  * 3D wooden "spacebar" buttons
  * ========================================================================== */
 
-function SpacebarButton({ position, width, onClick, disabled, label, woodTex, inkColour }) {
+function SpacebarButton({ position, width, onClick, disabled, label, inkColour }) {
+  const { woodTex } = useStbTextures();
   const meshRef = useRef();
   const pressedRef = useRef(false);
   const offsetY = useRef(0);
@@ -378,7 +373,7 @@ function SpacebarButton({ position, width, onClick, disabled, label, woodTex, in
     meshRef.current.position.y = offsetY.current;
   });
 
-  const baseColour = woodTex ? '#ffffff' : WOOD_FALLBACK;
+  const baseColour = woodTex ? WOOD_TINT : WOOD_FALLBACK;
 
   return (
     <group position={position}>
@@ -420,8 +415,6 @@ const FRONT_LIP_Z = BOX_D / 2 + WALL_THICK / 2 + 0.35;
 const BUTTON_Y = 0.09;
 
 function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGame, onReset, busy, canConfirm, selectedSum, diceSum, selectedCount, inkColour }) {
-  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1, 1);
-
   const buttons = useMemo(() => {
     if (!hasGame) {
       return [{ label: 'Start game', onClick: onStart, width: 2.4, disabled: busy }];
@@ -459,7 +452,6 @@ function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGam
             onClick={b.onClick}
             disabled={b.disabled}
             label={b.label}
-            woodTex={woodTex}
             inkColour={inkColour}
           />
         );
@@ -472,18 +464,19 @@ function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGam
  * Box frame + colliders for physics
  * ========================================================================== */
 
-function BoxFrame({ feltTex, woodTex }) {
+function BoxFrame() {
+  const { woodTex, velvetTex } = useStbTextures();
   const R = 0.05;
-  const woodCol = woodTex ? '#ffffff' : WOOD_FALLBACK;
-  const woodDarkCol = woodTex ? '#bdbdbd' : WOOD_DARK_FALLBACK; // slight darken on base when textured
-  const feltCol = feltTex ? '#ffffff' : FELT_FALLBACK;
+  const woodCol = woodTex ? WOOD_TINT : WOOD_FALLBACK;
+  const woodDarkCol = woodTex ? WOOD_DARK_TINT : WOOD_DARK_FALLBACK;
+  const feltCol = velvetTex ? VELVET_TINT : FELT_FALLBACK;
 
   return (
     <group>
       {/* Felt floor */}
       <mesh position={[0, 0.005, 0]} receiveShadow>
         <boxGeometry args={[BOX_W - WALL_THICK * 2 + 0.02, 0.01, BOX_D - WALL_THICK * 2 + 0.02]} />
-        <meshStandardMaterial map={feltTex || null} color={feltCol} roughness={0.95} />
+        <meshStandardMaterial map={velvetTex || null} color={feltCol} roughness={0.95} />
       </mesh>
       {/* Floor base — wood textured */}
       <RoundedBox args={[BOX_W, 0.12, BOX_D]} radius={R} smoothness={3} position={[0, -0.06, 0]} receiveShadow>
@@ -552,14 +545,15 @@ export function StbScene({
   interactive = true,
   buttonBar = null,
 }) {
-  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1, 1);
-  const velvetTex = useOptionalTexture(VELVET_TEX_URL, 2, 1);
+  // One wood + one velvet texture for the whole scene — heavy 12 MB JPGs uploaded once
+  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1.5, 1);
+  const velvetTex = useOptionalTexture(VELVET_TEX_URL, 3, 1.5);
   const inboxLetters = useMemo(() => lettersFromMessage(config.hidden_message, 9), [config.hidden_message]);
   const backLetters = useMemo(() => lettersFromMessage(config.scattered_letters_back, 8), [config.scattered_letters_back]);
   const frontLetters = useMemo(() => lettersFromMessage(config.scattered_letters_front, 8), [config.scattered_letters_front]);
 
   return (
-    <>
+    <StbTexCtx.Provider value={{ woodTex, velvetTex }}>
       <ambientLight intensity={0.55} />
       <directionalLight
         position={[4, 8, 4]}
@@ -575,7 +569,7 @@ export function StbScene({
       <directionalLight position={[-5, 4, -2]} intensity={0.3} />
 
       <Physics gravity={[0, -22, 0]}>
-        <BoxFrame feltTex={velvetTex} woodTex={woodTex} />
+        <BoxFrame />
         <BoxColliders />
 
         {ALL_TILES.map((v, i) => {
@@ -591,13 +585,12 @@ export function StbScene({
               inkColour={config.ink_colour}
               letter={inboxLetters[v - 1]}
               interactive={interactive}
-              woodTex={woodTex}
             />
           );
         })}
 
-        <ScatteredRow letters={backLetters} baseZ={-3.0} inkColour={config.ink_colour} woodTex={woodTex} seed={1.3} />
-        <ScatteredRow letters={frontLetters} baseZ={3.0} inkColour={config.ink_colour} woodTex={woodTex} seed={4.7} />
+        <ScatteredRow letters={backLetters} baseZ={-3.0} inkColour={config.ink_colour} seed={1.3} />
+        <ScatteredRow letters={frontLetters} baseZ={3.0} inkColour={config.ink_colour} seed={4.7} />
 
         <PhysicsDie
           throwSeed={throwSeed}
@@ -620,7 +613,7 @@ export function StbScene({
 
         {buttonBar}
       </Physics>
-    </>
+    </StbTexCtx.Provider>
   );
 }
 
