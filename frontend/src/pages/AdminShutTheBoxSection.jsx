@@ -24,10 +24,14 @@ export default function AdminShutTheBoxSection() {
 
   // Local edit buffers (so user can type freely without immediate save)
   const [hidden, setHidden] = useState('');
+  const [scatBack, setScatBack] = useState('');
+  const [scatFront, setScatFront] = useState('');
   const [feltC, setFeltC] = useState('');
   const [frameC, setFrameC] = useState('');
   const [tileC, setTileC] = useState('');
   const [inkC, setInkC] = useState('');
+  const [diceC, setDiceC] = useState('');
+  const [pipC, setPipC] = useState('');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
 
@@ -36,10 +40,14 @@ export default function AdminShutTheBoxSection() {
       const c = await api.admin.getStbConfig();
       setCfg(c);
       setHidden(c.hidden_message ?? '');
+      setScatBack(c.scattered_letters_back ?? '');
+      setScatFront(c.scattered_letters_front ?? '');
       setFeltC(c.felt_colour ?? '');
       setFrameC(c.frame_colour ?? '');
       setTileC(c.tile_colour ?? '');
       setInkC(c.ink_colour ?? '');
+      setDiceC(c.dice_colour ?? '');
+      setPipC(c.pip_colour ?? '');
       setTitle(c.homepage_title ?? '');
       setSubtitle(c.homepage_subtitle ?? '');
     } catch (e) { setError(e.message); }
@@ -76,6 +84,14 @@ export default function AdminShutTheBoxSection() {
       return;
     }
     save({ hidden_message: hidden });
+  }
+
+  function commitScat(field, value) {
+    if (value.length > 7) {
+      setError('Scattered letters must be 0-7 characters.');
+      return;
+    }
+    save({ [field]: value });
   }
 
   function commitColour(field, value) {
@@ -137,6 +153,35 @@ export default function AdminShutTheBoxSection() {
         <ColourField label="Frame" value={frameC} setValue={setFrameC} current={cfg.frame_colour} onCommit={() => commitColour('frame_colour', frameC)} busy={busy} />
         <ColourField label="Tiles" value={tileC} setValue={setTileC} current={cfg.tile_colour} onCommit={() => commitColour('tile_colour', tileC)} busy={busy} />
         <ColourField label="Ink (numbers + letters)" value={inkC} setValue={setInkC} current={cfg.ink_colour} onCommit={() => commitColour('ink_colour', inkC)} busy={busy} />
+        <ColourField label="Dice body" value={diceC} setValue={setDiceC} current={cfg.dice_colour} onCommit={() => commitColour('dice_colour', diceC)} busy={busy} />
+        <ColourField label="Dice pips" value={pipC} setValue={setPipC} current={cfg.pip_colour} onCommit={() => commitColour('pip_colour', pipC)} busy={busy} />
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Scattered tiles around the box</p>
+        <p className="text-xs text-neutral-500">7 tiles behind, 7 in front. Use <code>_</code> for blank tiles.</p>
+        <div className="flex gap-2">
+          <input
+            value={scatBack}
+            onChange={(e) => setScatBack(e.target.value.slice(0, 7))}
+            maxLength={7}
+            className={inputCls + ' font-mono tracking-widest'}
+            placeholder="Behind (7 chars)"
+          />
+          <button onClick={() => commitScat('scattered_letters_back', scatBack)} disabled={busy || scatBack === cfg.scattered_letters_back} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={scatFront}
+            onChange={(e) => setScatFront(e.target.value.slice(0, 7))}
+            maxLength={7}
+            className={inputCls + ' font-mono tracking-widest'}
+            placeholder="In front (7 chars)"
+          />
+          <button onClick={() => commitScat('scattered_letters_front', scatFront)} disabled={busy || scatFront === cfg.scattered_letters_front} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
+        </div>
       </div>
 
       <hr className="border-neutral-200" />

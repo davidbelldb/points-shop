@@ -1,0 +1,5 @@
+ALTER TABLE stb_config
+  ADD COLUMN IF NOT EXISTS dice_colour TEXT NOT NULL DEFAULT '#e773b0',
+  ADD COLUMN IF NOT EXISTS pip_colour TEXT NOT NULL DEFAULT '#000000',
+  ADD COLUMN IF NOT EXISTS scattered_letters_back TEXT NOT NULL DEFAULT '_______',
+  ADD COLUMN IF NOT EXISTS scattered_letters_front TEXT NOT NULL DEFAULT '_______';
