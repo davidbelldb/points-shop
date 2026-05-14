@@ -87,8 +87,8 @@ export default function AdminShutTheBoxSection() {
   }
 
   function commitScat(field, value) {
-    if (value.length > 7) {
-      setError('Scattered letters must be 0-7 characters.');
+    if (value.length > 8) {
+      setError('Scattered letters must be 0-8 characters.');
       return;
     }
     save({ [field]: value });
@@ -149,36 +149,36 @@ export default function AdminShutTheBoxSection() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <ColourField label="Felt" value={feltC} setValue={setFeltC} current={cfg.felt_colour} onCommit={() => commitColour('felt_colour', feltC)} busy={busy} />
-        <ColourField label="Frame" value={frameC} setValue={setFrameC} current={cfg.frame_colour} onCommit={() => commitColour('frame_colour', frameC)} busy={busy} />
-        <ColourField label="Tiles" value={tileC} setValue={setTileC} current={cfg.tile_colour} onCommit={() => commitColour('tile_colour', tileC)} busy={busy} />
         <ColourField label="Ink (numbers + letters)" value={inkC} setValue={setInkC} current={cfg.ink_colour} onCommit={() => commitColour('ink_colour', inkC)} busy={busy} />
         <ColourField label="Dice body" value={diceC} setValue={setDiceC} current={cfg.dice_colour} onCommit={() => commitColour('dice_colour', diceC)} busy={busy} />
         <ColourField label="Dice pips" value={pipC} setValue={setPipC} current={cfg.pip_colour} onCommit={() => commitColour('pip_colour', pipC)} busy={busy} />
       </div>
+      <p className="text-xs text-neutral-500">
+        Felt, frame and tile colours are now driven by Poly Haven textures (velvet for the felt, wood for the frame and tiles). Drop the JPGs into <code>frontend/public/textures/</code>.
+      </p>
 
       <hr className="border-neutral-200" />
 
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Scattered tiles around the box</p>
-        <p className="text-xs text-neutral-500">7 tiles behind, 7 in front. Use <code>_</code> for blank tiles.</p>
+        <p className="text-xs text-neutral-500">8 tiles behind, 8 in front. Use <code>_</code> for blank tiles.</p>
         <div className="flex gap-2">
           <input
             value={scatBack}
-            onChange={(e) => setScatBack(e.target.value.slice(0, 7))}
-            maxLength={7}
+            onChange={(e) => setScatBack(e.target.value.slice(0, 8))}
+            maxLength={8}
             className={inputCls + ' font-mono tracking-widest'}
-            placeholder="Behind (7 chars)"
+            placeholder="Behind (8 chars)"
           />
           <button onClick={() => commitScat('scattered_letters_back', scatBack)} disabled={busy || scatBack === cfg.scattered_letters_back} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
         </div>
         <div className="flex gap-2">
           <input
             value={scatFront}
-            onChange={(e) => setScatFront(e.target.value.slice(0, 7))}
-            maxLength={7}
+            onChange={(e) => setScatFront(e.target.value.slice(0, 8))}
+            maxLength={8}
             className={inputCls + ' font-mono tracking-widest'}
-            placeholder="In front (7 chars)"
+            placeholder="In front (8 chars)"
           />
           <button onClick={() => commitScat('scattered_letters_front', scatFront)} disabled={busy || scatFront === cfg.scattered_letters_front} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
         </div>

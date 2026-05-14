@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Text, RoundedBox } from '@react-three/drei';
+import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
@@ -20,16 +21,17 @@ const DEFAULT_CONFIG = {
   dice_colour: '#e773b0',
   pip_colour: '#000000',
   hidden_message: 'I_MISS_U!',
-  scattered_letters_back: '_______',
-  scattered_letters_front: '_______',
+  scattered_letters_back: '________',
+  scattered_letters_front: '________',
 };
 
 const TABLE_COLOUR = '#d3f3ea';
-// Poly Haven texture paths (drop files into frontend/public/textures/)
+const WOOD_FALLBACK = '#5a3618';      // dark walnut brown — when wood texture missing
+const WOOD_DARK_FALLBACK = '#3a2316'; // even darker walnut — for base / rod
 const WOOD_TEX_URL = '/textures/wood_table_worn_diffuse.jpg';
 const VELVET_TEX_URL = '/textures/velour_velvet_diffuse.jpg';
 
-function lettersFromMessage(msg, len = 9) {
+function lettersFromMessage(msg, len) {
   const m = (msg || '').padEnd(len, '_').slice(0, len);
   const out = [];
   for (let i = 0; i < len; i++) {
@@ -49,10 +51,10 @@ function hasValidClose(openTiles, target) {
 }
 
 /* ============================================================================
- * Textures — try Poly Haven JPGs, fall back to procedural
+ * Textures
  * ========================================================================== */
 
-function useOptionalTexture(url) {
+function useOptionalTexture(url, repeatX = 1, repeatY = 1) {
   const [tex, setTex] = useState(null);
   useEffect(() => {
     const loader = new THREE.TextureLoader();
@@ -60,50 +62,18 @@ function useOptionalTexture(url) {
       url,
       (t) => {
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(repeatX, repeatY);
         setTex(t);
       },
       undefined,
       () => setTex(null)
     );
-  }, [url]);
-  return tex;
-}
-
-function makeFeltTexture(baseColour) {
-  const c = document.createElement('canvas');
-  c.width = c.height = 512;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = baseColour;
-  ctx.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 9000; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const v = Math.random();
-    ctx.fillStyle = v > 0.4
-      ? `rgba(255,255,255,${0.03 + Math.random() * 0.07})`
-      : `rgba(0,0,0,${0.02 + Math.random() * 0.05})`;
-    ctx.fillRect(x, y, 1.3, 1.3);
-  }
-  for (let i = 0; i < 600; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const len = 2 + Math.random() * 3;
-    const angle = Math.random() * Math.PI * 2;
-    ctx.strokeStyle = `rgba(255,255,255,${0.04 + Math.random() * 0.08})`;
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2.5, 1.5);
+  }, [url, repeatX, repeatY]);
   return tex;
 }
 
 /* ============================================================================
- * Dice
+ * Dice — pip planes + Rapier physics
  * ========================================================================== */
 
 const PIP_PATTERNS = {
@@ -136,7 +106,8 @@ const DIE_HALF = DIE_SIZE / 2;
 const PIP_OFFSET = DIE_HALF + 0.006;
 const PIP_PLANE = DIE_SIZE * 0.78;
 
-const FACE_VALUES_LAYOUT = [
+// Face layout: +Y=1, -Y=6, +Z=2, -Z=5, +X=3, -X=4. Pip-plane local positions/rotations:
+const FACE_PIPS = [
   { value: 1, pos: [0, PIP_OFFSET, 0], rot: [-Math.PI / 2, 0, 0] },
   { value: 6, pos: [0, -PIP_OFFSET, 0], rot: [Math.PI / 2, 0, 0] },
   { value: 2, pos: [0, 0, PIP_OFFSET], rot: [0, 0, 0] },
@@ -145,18 +116,29 @@ const FACE_VALUES_LAYOUT = [
   { value: 4, pos: [-PIP_OFFSET, 0, 0], rot: [0, -Math.PI / 2, 0] },
 ];
 
-const FACE_QUATS = {
-  1: new THREE.Quaternion(),
-  6: new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)),
-  2: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)),
-  5: new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)),
-  3: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2)),
-  4: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -Math.PI / 2)),
-};
+// Face normals in local space — used to read which face is up after settling
+const FACE_NORMALS = [
+  { v: 1, n: new THREE.Vector3(0, 1, 0) },
+  { v: 6, n: new THREE.Vector3(0, -1, 0) },
+  { v: 3, n: new THREE.Vector3(1, 0, 0) },
+  { v: 4, n: new THREE.Vector3(-1, 0, 0) },
+  { v: 2, n: new THREE.Vector3(0, 0, 1) },
+  { v: 5, n: new THREE.Vector3(0, 0, -1) },
+];
 
-function Die({ value, throwSeed, throwVec, indexOffset, visible, diceColour, pipColour }) {
-  const groupRef = useRef();
-  const animRef = useRef({ active: false });
+function readDieFace(quaternion) {
+  let best = { v: 1, y: -Infinity };
+  for (const f of FACE_NORMALS) {
+    const v = f.n.clone().applyQuaternion(quaternion);
+    if (v.y > best.y) best = { v: f.v, y: v.y };
+  }
+  return best.v;
+}
+
+function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, pipColour, visible }) {
+  const bodyRef = useRef();
+  const restFramesRef = useRef(0);
+  const settledRef = useRef(false);
 
   const pipTextures = useMemo(() => ({
     1: makePipTexture(1, pipColour), 2: makePipTexture(2, pipColour),
@@ -164,76 +146,85 @@ function Die({ value, throwSeed, throwVec, indexOffset, visible, diceColour, pip
     5: makePipTexture(5, pipColour), 6: makePipTexture(6, pipColour),
   }), [pipColour]);
 
+  // Apply a fresh throw whenever throwSeed bumps
   useEffect(() => {
-    if (!throwSeed || !visible) {
-      animRef.current.active = false;
-      return;
-    }
+    if (!bodyRef.current || !throwSeed) return;
     const seedRand = (i) => {
       const x = Math.sin(throwSeed * 9301 + i * 49297 + indexOffset * 233) * 43758;
       return x - Math.floor(x);
     };
     const swipeX = throwVec ? Math.max(-1, Math.min(1, throwVec.x / 200)) : 0;
     const lane = indexOffset === 0 ? -1 : 1;
-    animRef.current = {
-      active: true,
-      startTime: performance.now() / 1000,
-      duration: 1.45,
-      startPos: new THREE.Vector3(lane * 0.8 - swipeX * 1.8, 3.5 + seedRand(1) * 0.4, -1.0),
-      endPos: new THREE.Vector3(
-        lane * 0.6 + swipeX * 1.2 + (seedRand(2) - 0.5) * 0.5,
-        DIE_HALF + 0.01,
-        0.4 + (seedRand(3) - 0.5) * 0.5
-      ),
-      spinAxis: new THREE.Vector3(seedRand(4) - 0.5, seedRand(5) - 0.5, seedRand(6) - 0.5).normalize(),
-      spinSpeed: 14 + seedRand(7) * 6,
-      targetQuat: FACE_QUATS[value].clone(),
-      midQuat: new THREE.Quaternion(),
-    };
-    if (groupRef.current) {
-      groupRef.current.position.copy(animRef.current.startPos);
-      groupRef.current.quaternion.identity();
-    }
-  }, [throwSeed, value, indexOffset, visible, throwVec]);
 
-  useFrame((state) => {
-    const a = animRef.current;
-    if (!a.active || !groupRef.current) return;
-    const elapsed = state.clock.elapsedTime - a.startTime;
-    const t = Math.min(elapsed / a.duration, 1);
-    if (t < 0.78) {
-      const k = t / 0.78;
-      groupRef.current.position.x = THREE.MathUtils.lerp(a.startPos.x, a.endPos.x, k);
-      groupRef.current.position.z = THREE.MathUtils.lerp(a.startPos.z, a.endPos.z, k);
-      groupRef.current.position.y =
-        THREE.MathUtils.lerp(a.startPos.y, a.endPos.y, k) + Math.sin(k * Math.PI) * 1.2;
-      groupRef.current.quaternion.setFromAxisAngle(a.spinAxis, elapsed * a.spinSpeed);
-      a.midQuat.copy(groupRef.current.quaternion);
-    } else if (t < 1) {
-      const k = (t - 0.78) / 0.22;
-      const ease = 1 - Math.pow(1 - k, 3);
-      groupRef.current.position.copy(a.endPos);
-      groupRef.current.quaternion.slerpQuaternions(a.midQuat, a.targetQuat, ease);
+    // Place die above the box, biased by swipe + lane
+    const startX = lane * 0.6 - swipeX * 1.4;
+    const startY = 2.2 + seedRand(1) * 0.3;
+    const startZ = 1.1 + seedRand(2) * 0.3;
+    bodyRef.current.setTranslation({ x: startX, y: startY, z: startZ }, true);
+    bodyRef.current.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+
+    // Throw into the box: small +X bias from swipe, downward, away from camera (-Z)
+    bodyRef.current.setLinvel({
+      x: swipeX * 3 + (seedRand(3) - 0.5) * 1.5,
+      y: -2.5 - seedRand(4) * 1.5,
+      z: -3.5 - seedRand(5) * 1.5,
+    }, true);
+    bodyRef.current.setAngvel({
+      x: (seedRand(6) - 0.5) * 18,
+      y: (seedRand(7) - 0.5) * 18,
+      z: (seedRand(8) - 0.5) * 18,
+    }, true);
+
+    settledRef.current = false;
+    restFramesRef.current = 0;
+  }, [throwSeed, throwVec, indexOffset]);
+
+  // Settling detection + face-value reading
+  useFrame(() => {
+    if (settledRef.current || !bodyRef.current) return;
+    const body = bodyRef.current;
+    const lv = body.linvel();
+    const av = body.angvel();
+    const linSq = lv.x * lv.x + lv.y * lv.y + lv.z * lv.z;
+    const angSq = av.x * av.x + av.y * av.y + av.z * av.z;
+    if (linSq < 0.005 && angSq < 0.005) {
+      restFramesRef.current += 1;
+      if (restFramesRef.current > 25) {
+        const r = body.rotation();
+        const q = new THREE.Quaternion(r.x, r.y, r.z, r.w);
+        const value = readDieFace(q);
+        settledRef.current = true;
+        onSettled?.(indexOffset, value);
+      }
     } else {
-      groupRef.current.position.copy(a.endPos);
-      groupRef.current.quaternion.copy(a.targetQuat);
-      a.active = false;
+      restFramesRef.current = 0;
     }
   });
 
   if (!visible) return null;
+
   return (
-    <group ref={groupRef}>
+    <RigidBody
+      ref={bodyRef}
+      type="dynamic"
+      colliders={false}
+      restitution={0.35}
+      friction={0.55}
+      linearDamping={0.2}
+      angularDamping={0.4}
+      ccd
+    >
+      <CuboidCollider args={[DIE_HALF, DIE_HALF, DIE_HALF]} />
       <RoundedBox args={[DIE_SIZE, DIE_SIZE, DIE_SIZE]} radius={0.05} smoothness={4} castShadow>
         <meshStandardMaterial color={diceColour} roughness={0.45} metalness={0.05} />
       </RoundedBox>
-      {FACE_VALUES_LAYOUT.map((f) => (
+      {FACE_PIPS.map((f) => (
         <mesh key={f.value} position={f.pos} rotation={f.rot}>
           <planeGeometry args={[PIP_PLANE, PIP_PLANE]} />
           <meshStandardMaterial map={pipTextures[f.value]} transparent roughness={0.5} />
         </mesh>
       ))}
-    </group>
+    </RigidBody>
   );
 }
 
@@ -244,9 +235,9 @@ function Die({ value, throwSeed, throwVec, indexOffset, visible, diceColour, pip
 const TILE_W = 0.42;
 const TILE_H = 0.75;
 const TILE_D = 0.1;
-const TILE_OPEN_ANGLE = -Math.PI / 7; // ~25° backward lean
+const TILE_OPEN_ANGLE = -Math.PI / 7;
 
-function Tile({ value, x, closed, selected, onClick, tileColour, inkColour, letter, interactive, woodTex }) {
+function Tile({ value, x, closed, selected, onClick, inkColour, letter, interactive, woodTex }) {
   const groupRef = useRef();
   const angleRef = useRef(TILE_OPEN_ANGLE);
 
@@ -258,6 +249,10 @@ function Tile({ value, x, closed, selected, onClick, tileColour, inkColour, lett
     groupRef.current.rotation.x = angleRef.current;
   });
 
+  // Selected tiles glow with the ink colour overlay; otherwise pure wood
+  const baseColour = woodTex ? '#ffffff' : WOOD_FALLBACK;
+  const tintColour = selected ? '#ffd58a' : baseColour;
+
   return (
     <group ref={groupRef} position={[x, 0.08, -1.0]}>
       <mesh
@@ -266,12 +261,12 @@ function Tile({ value, x, closed, selected, onClick, tileColour, inkColour, lett
         onClick={interactive ? (e) => { e.stopPropagation(); onClick?.(value); } : undefined}
       >
         <boxGeometry args={[TILE_W, TILE_H, TILE_D]} />
-        <meshStandardMaterial map={woodTex || null} color={selected ? '#1aa999' : tileColour} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} color={tintColour} roughness={0.6} />
       </mesh>
-      <Text position={[0, TILE_H / 2, TILE_D / 2 + 0.001]} fontSize={0.38} color={inkColour} anchorX="center" anchorY="middle">
+      <Text position={[0, TILE_H / 2, TILE_D / 2 + 0.002]} fontSize={0.38} color={inkColour} anchorX="center" anchorY="middle">
         {value}
       </Text>
-      <Text position={[0, TILE_H / 2, -TILE_D / 2 - 0.001]} rotation={[Math.PI, 0, 0]} fontSize={0.42} color={inkColour} anchorX="center" anchorY="middle">
+      <Text position={[0, TILE_H / 2, -TILE_D / 2 - 0.002]} rotation={[Math.PI, 0, 0]} fontSize={0.42} color={inkColour} anchorX="center" anchorY="middle">
         {letter || ''}
       </Text>
     </group>
@@ -279,24 +274,25 @@ function Tile({ value, x, closed, selected, onClick, tileColour, inkColour, lett
 }
 
 /* ============================================================================
- * Scattered loose letter tiles around the box
+ * Scattered loose letter tiles (table — 8 back, 8 front)
  * ========================================================================== */
 
-function ScatteredTile({ letter, position, rotationY, tileColour, inkColour, woodTex }) {
-  const W = 0.5;
-  const H = 0.4;
-  const D = 0.08;
+function ScatteredTile({ letter, position, rotationY, inkColour, woodTex }) {
+  const W = 0.55;
+  const H = 0.45;
+  const D = 0.09;
+  const baseColour = woodTex ? '#ffffff' : WOOD_FALLBACK;
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
-      <mesh position={[0, D / 2, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[W, H, D]} />
-        <meshStandardMaterial map={woodTex || null} color={tileColour} roughness={0.6} />
+      <mesh position={[0, D / 2, 0]} castShadow>
+        <boxGeometry args={[W, D, H]} />
+        <meshStandardMaterial map={woodTex || null} color={baseColour} roughness={0.6} />
       </mesh>
       {letter ? (
         <Text
-          position={[0, D + 0.002, 0]}
+          position={[0, D + 0.003, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.24}
+          fontSize={0.28}
           color={inkColour}
           anchorX="center"
           anchorY="middle"
@@ -308,24 +304,22 @@ function ScatteredTile({ letter, position, rotationY, tileColour, inkColour, woo
   );
 }
 
-function ScatteredRow({ letters, baseZ, tileColour, inkColour, woodTex, seed }) {
-  // Deterministic mild jitter per index so positions are stable per render
-  const count = 7;
+function ScatteredRow({ letters, baseZ, inkColour, woodTex, seed }) {
+  const count = 8;
   return (
     <>
       {Array.from({ length: count }).map((_, i) => {
-        const t = (i - (count - 1) / 2) / ((count - 1) / 2); // -1..+1
-        const x = t * 2.6;
+        const t = (i - (count - 1) / 2) / ((count - 1) / 2);
+        const x = t * 3.2;
         const jitter = Math.sin((seed + i) * 9.7);
-        const z = baseZ + jitter * 0.18;
-        const yRot = jitter * 0.4;
+        const z = baseZ + jitter * 0.22;
+        const yRot = jitter * 0.45;
         return (
           <ScatteredTile
             key={i}
             letter={letters[i] || ''}
-            position={[x + Math.cos((seed + i) * 4.3) * 0.05, 0, z]}
+            position={[x + Math.cos((seed + i) * 4.3) * 0.06, 0, z]}
             rotationY={yRot}
-            tileColour={tileColour}
             inkColour={inkColour}
             woodTex={woodTex}
           />
@@ -336,10 +330,10 @@ function ScatteredRow({ letters, baseZ, tileColour, inkColour, woodTex, seed }) 
 }
 
 /* ============================================================================
- * 3D wooden "spacebar" buttons on the front of the box
+ * 3D wooden "spacebar" buttons
  * ========================================================================== */
 
-function SpacebarButton({ position, width, onClick, disabled, label, woodTex, frameColour, inkColour }) {
+function SpacebarButton({ position, width, onClick, disabled, label, woodTex, inkColour }) {
   const meshRef = useRef();
   const pressedRef = useRef(false);
   const offsetY = useRef(0);
@@ -348,8 +342,10 @@ function SpacebarButton({ position, width, onClick, disabled, label, woodTex, fr
     if (!meshRef.current) return;
     const target = pressedRef.current ? -0.04 : 0;
     offsetY.current += (target - offsetY.current) * Math.min(delta * 18, 1);
-    meshRef.current.position.y = position[1] + offsetY.current;
+    meshRef.current.position.y = offsetY.current;
   });
+
+  const baseColour = woodTex ? '#ffffff' : WOOD_FALLBACK;
 
   return (
     <group position={position}>
@@ -361,18 +357,21 @@ function SpacebarButton({ position, width, onClick, disabled, label, woodTex, fr
         castShadow
         receiveShadow
       >
-        <boxGeometry args={[width, 0.16, 0.5]} />
-        <meshStandardMaterial map={woodTex || null} color={frameColour} roughness={0.55} />
+        <boxGeometry args={[width, 0.18, 0.55]} />
+        <meshStandardMaterial map={woodTex || null} color={baseColour} roughness={0.55} />
       </mesh>
+      {/* Label rendered above the button top face, depth-test disabled so it can't be hidden behind the wood */}
       <Text
-        position={[0, 0.09, 0]}
+        position={[0, 0.15, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.13}
+        fontSize={0.18}
         color={inkColour}
         anchorX="center"
         anchorY="middle"
-        material-opacity={disabled ? 0.35 : 1}
-        material-transparent
+        outlineWidth={0.012}
+        outlineColor={disabled ? '#555' : '#000'}
+        fillOpacity={disabled ? 0.45 : 1}
+        renderOrder={10}
       >
         {label}
       </Text>
@@ -384,43 +383,41 @@ const BOX_W = 5.6;
 const BOX_D = 3.0;
 const WALL_H = 0.65;
 const WALL_THICK = 0.22;
-const FRONT_LIP_Z = BOX_D / 2 + WALL_THICK / 2 + 0.18; // just in front of the front wall
-const BUTTON_Y = 0.08; // sits on the table level
+const FRONT_LIP_Z = BOX_D / 2 + WALL_THICK / 2 + 0.35;
+const BUTTON_Y = 0.09;
 
-function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGame, onReset, busy, canConfirm, selectedSum, diceSum, selectedCount, frameColour, inkColour }) {
-  const woodTex = useOptionalTexture(WOOD_TEX_URL);
-  // Decide what buttons to show in 3D
+function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGame, onReset, busy, canConfirm, selectedSum, diceSum, selectedCount, inkColour }) {
+  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1, 1);
+
   const buttons = useMemo(() => {
     if (!hasGame) {
-      return [{ label: 'Start game', onClick: onStart, width: 2.2, disabled: busy }];
+      return [{ label: 'Start game', onClick: onStart, width: 2.4, disabled: busy }];
     }
     if (phase === 'over' || phase === 'won') {
       return [
-        { label: 'Reset', onClick: onReset, width: 1.0, disabled: busy },
-        { label: 'New game', onClick: onNewGame, width: 1.6, disabled: busy },
+        { label: 'Reset', onClick: onReset, width: 1.1, disabled: busy },
+        { label: 'New game', onClick: onNewGame, width: 1.7, disabled: busy },
       ];
     }
     if (phase === 'rolled') {
       return [
-        { label: 'Clear', onClick: onClear, width: 1.0, disabled: selectedCount === 0 },
-        { label: `Close ${selectedSum}/${diceSum}`, onClick: onClose, width: 1.8, disabled: !canConfirm || busy },
+        { label: 'Clear', onClick: onClear, width: 1.1, disabled: selectedCount === 0 },
+        { label: `Close ${selectedSum}/${diceSum}`, onClick: onClose, width: 1.9, disabled: !canConfirm || busy },
       ];
     }
-    // idle game / rolling
     return [
-      { label: 'Reset', onClick: onReset, width: 1.0, disabled: busy },
-      { label: phase === 'rolling' ? 'Rolling…' : 'Roll', onClick: onRoll, width: 1.6, disabled: phase === 'rolling' || busy },
+      { label: 'Reset', onClick: onReset, width: 1.1, disabled: busy },
+      { label: phase === 'rolling' ? 'Rolling…' : 'Roll dice', onClick: onRoll, width: 1.7, disabled: phase === 'rolling' || busy },
     ];
   }, [phase, hasGame, busy, canConfirm, selectedCount, selectedSum, diceSum]);
 
-  // Position them centered, in front of the box
-  const totalWidth = buttons.reduce((s, b) => s + b.width, 0) + (buttons.length - 1) * 0.08;
+  const totalWidth = buttons.reduce((s, b) => s + b.width, 0) + (buttons.length - 1) * 0.12;
   let cursor = -totalWidth / 2;
   return (
     <group>
       {buttons.map((b, i) => {
         const x = cursor + b.width / 2;
-        cursor += b.width + 0.08;
+        cursor += b.width + 0.12;
         return (
           <SpacebarButton
             key={i}
@@ -430,7 +427,6 @@ function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGam
             disabled={b.disabled}
             label={b.label}
             woodTex={woodTex}
-            frameColour={frameColour}
             inkColour={inkColour}
           />
         );
@@ -440,66 +436,94 @@ function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGam
 }
 
 /* ============================================================================
- * Box frame
+ * Box frame + colliders for physics
  * ========================================================================== */
 
-function BoxFrame({ feltTex, woodTex, frameColour, feltColour }) {
+function BoxFrame({ feltTex, woodTex, feltColour }) {
   const R = 0.05;
-  const darkFrame = '#085f55';
+  const woodCol = woodTex ? '#ffffff' : WOOD_FALLBACK;
+  const woodDarkCol = woodTex ? '#cccccc' : WOOD_DARK_FALLBACK; // slight darken on base
+  const feltCol = feltTex ? '#ffffff' : feltColour;
+
   return (
     <group>
       {/* Felt floor */}
       <mesh position={[0, 0.005, 0]} receiveShadow>
         <boxGeometry args={[BOX_W - WALL_THICK * 2 + 0.02, 0.01, BOX_D - WALL_THICK * 2 + 0.02]} />
-        <meshStandardMaterial map={feltTex} color={feltColour} roughness={0.95} />
+        <meshStandardMaterial map={feltTex || null} color={feltCol} roughness={0.95} />
       </mesh>
+      {/* Floor base — wood textured */}
       <RoundedBox args={[BOX_W, 0.12, BOX_D]} radius={R} smoothness={3} position={[0, -0.06, 0]} receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={darkFrame} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} color={woodDarkCol} roughness={0.6} />
       </RoundedBox>
+      {/* Walls */}
       <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[-BOX_W / 2 + WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={frameColour} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
       </RoundedBox>
       <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[BOX_W / 2 - WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={frameColour} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
       </RoundedBox>
       <RoundedBox args={[BOX_W, WALL_H, WALL_THICK]} radius={R} smoothness={3} position={[0, WALL_H / 2, -BOX_D / 2 + WALL_THICK / 2]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={frameColour} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
       </RoundedBox>
       <RoundedBox args={[BOX_W, 0.4, WALL_THICK]} radius={R} smoothness={3} position={[0, 0.2, BOX_D / 2 - WALL_THICK / 2]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={frameColour} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
       </RoundedBox>
+      {/* Rod */}
       <mesh position={[0, 0.08, -1.0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.03, 0.03, BOX_W - WALL_THICK * 2 - 0.1, 16]} />
-        <meshStandardMaterial color={darkFrame} roughness={0.5} />
+        <meshStandardMaterial color={WOOD_DARK_FALLBACK} roughness={0.5} />
       </mesh>
     </group>
   );
 }
 
+// Static colliders matching the box interior — keeps dice contained
+function BoxColliders() {
+  const innerW = BOX_W - WALL_THICK * 2;
+  const innerD = BOX_D - WALL_THICK * 2;
+  const tallH = 2.0;     // taller than visible walls so fast dice don't escape
+  const halfTall = tallH / 2;
+  return (
+    <RigidBody type="fixed" colliders={false}>
+      {/* Floor */}
+      <CuboidCollider args={[BOX_W / 2, 0.05, BOX_D / 2]} position={[0, 0.005, 0]} restitution={0.2} friction={0.7} />
+      {/* Back wall */}
+      <CuboidCollider args={[innerW / 2, halfTall, WALL_THICK / 2]} position={[0, halfTall, -BOX_D / 2 + WALL_THICK / 2]} restitution={0.35} friction={0.4} />
+      {/* Front wall (full collision height even though visible part is short) */}
+      <CuboidCollider args={[innerW / 2, halfTall, WALL_THICK / 2]} position={[0, halfTall, BOX_D / 2 - WALL_THICK / 2]} restitution={0.35} friction={0.4} />
+      {/* Left wall */}
+      <CuboidCollider args={[WALL_THICK / 2, halfTall, innerD / 2]} position={[-BOX_W / 2 + WALL_THICK / 2, halfTall, 0]} restitution={0.35} friction={0.4} />
+      {/* Right wall */}
+      <CuboidCollider args={[WALL_THICK / 2, halfTall, innerD / 2]} position={[BOX_W / 2 - WALL_THICK / 2, halfTall, 0]} restitution={0.35} friction={0.4} />
+      {/* Rod — short cuboid approximating the cylinder, blocks dice from rolling under the tiles */}
+      <CuboidCollider args={[innerW / 2, 0.03, 0.03]} position={[0, 0.08, -1.0]} restitution={0.2} friction={0.5} />
+    </RigidBody>
+  );
+}
+
 /* ============================================================================
- * Scene (full layout — box, scattered tiles, dice, buttons)
+ * Scene
  * ========================================================================== */
 
 export function StbScene({
   openTiles = ALL_TILES,
   selected = [],
   dice = [null, null],
+  diceVisible = false,
   throwSeed = 0,
   throwVec = null,
   onTileTap,
+  onDieSettled,
   config = DEFAULT_CONFIG,
   interactive = true,
   buttonBar = null,
 }) {
-  const feltTex = useMemo(() => makeFeltTexture(config.felt_colour), [config.felt_colour]);
-  const woodTex = useOptionalTexture(WOOD_TEX_URL);
-  const velvetTex = useOptionalTexture(VELVET_TEX_URL);
+  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1, 1);
+  const velvetTex = useOptionalTexture(VELVET_TEX_URL, 2, 1);
   const inboxLetters = useMemo(() => lettersFromMessage(config.hidden_message, 9), [config.hidden_message]);
-  const backLetters = useMemo(() => lettersFromMessage(config.scattered_letters_back, 7), [config.scattered_letters_back]);
-  const frontLetters = useMemo(() => lettersFromMessage(config.scattered_letters_front, 7), [config.scattered_letters_front]);
-
-  // Prefer the Poly Haven velvet texture over the canvas-procedural felt when available
-  const activeFeltTex = velvetTex || feltTex;
+  const backLetters = useMemo(() => lettersFromMessage(config.scattered_letters_back, 8), [config.scattered_letters_back]);
+  const frontLetters = useMemo(() => lettersFromMessage(config.scattered_letters_front, 8), [config.scattered_letters_front]);
 
   return (
     <>
@@ -510,94 +534,70 @@ export function StbScene({
         castShadow
         shadow-mapSize-width={512}
         shadow-mapSize-height={512}
-        shadow-camera-left={-5}
-        shadow-camera-right={5}
-        shadow-camera-top={5}
-        shadow-camera-bottom={-5}
+        shadow-camera-left={-6}
+        shadow-camera-right={6}
+        shadow-camera-top={6}
+        shadow-camera-bottom={-6}
       />
       <directionalLight position={[-5, 4, -2]} intensity={0.3} />
 
-      <BoxFrame
-        feltTex={activeFeltTex}
-        woodTex={woodTex}
-        frameColour={config.frame_colour}
-        feltColour={config.felt_colour}
-      />
+      <Physics gravity={[0, -22, 0]}>
+        <BoxFrame feltTex={velvetTex} woodTex={woodTex} feltColour={config.felt_colour} />
+        <BoxColliders />
 
-      {/* In-box hinged tiles */}
-      {ALL_TILES.map((v, i) => {
-        const x = (i - 4) * 0.5;
-        return (
-          <Tile
-            key={v}
-            value={v}
-            x={x}
-            closed={!openTiles.includes(v)}
-            selected={selected.includes(v)}
-            onClick={onTileTap}
-            tileColour={config.tile_colour}
-            inkColour={config.ink_colour}
-            letter={inboxLetters[v - 1]}
-            interactive={interactive}
-            woodTex={woodTex}
-          />
-        );
-      })}
+        {ALL_TILES.map((v, i) => {
+          const x = (i - 4) * 0.5;
+          return (
+            <Tile
+              key={v}
+              value={v}
+              x={x}
+              closed={!openTiles.includes(v)}
+              selected={selected.includes(v)}
+              onClick={onTileTap}
+              inkColour={config.ink_colour}
+              letter={inboxLetters[v - 1]}
+              interactive={interactive}
+              woodTex={woodTex}
+            />
+          );
+        })}
 
-      {/* Scattered loose letter tiles on the table */}
-      <ScatteredRow
-        letters={backLetters}
-        baseZ={-2.15}
-        tileColour={config.tile_colour}
-        inkColour={config.ink_colour}
-        woodTex={woodTex}
-        seed={1.3}
-      />
-      <ScatteredRow
-        letters={frontLetters}
-        baseZ={2.15}
-        tileColour={config.tile_colour}
-        inkColour={config.ink_colour}
-        woodTex={woodTex}
-        seed={4.7}
-      />
+        <ScatteredRow letters={backLetters} baseZ={-3.0} inkColour={config.ink_colour} woodTex={woodTex} seed={1.3} />
+        <ScatteredRow letters={frontLetters} baseZ={3.0} inkColour={config.ink_colour} woodTex={woodTex} seed={4.7} />
 
-      {/* Dice */}
-      <Die
-        value={dice[0] || 1}
-        indexOffset={0}
-        throwSeed={throwSeed}
-        throwVec={throwVec}
-        visible={!!dice[0]}
-        diceColour={config.dice_colour}
-        pipColour={config.pip_colour}
-      />
-      <Die
-        value={dice[1] || 1}
-        indexOffset={1}
-        throwSeed={throwSeed}
-        throwVec={throwVec}
-        visible={!!dice[1]}
-        diceColour={config.dice_colour}
-        pipColour={config.pip_colour}
-      />
+        <PhysicsDie
+          throwSeed={throwSeed}
+          throwVec={throwVec}
+          indexOffset={0}
+          onSettled={onDieSettled}
+          diceColour={config.dice_colour}
+          pipColour={config.pip_colour}
+          visible={diceVisible}
+        />
+        <PhysicsDie
+          throwSeed={throwSeed}
+          throwVec={throwVec}
+          indexOffset={1}
+          onSettled={onDieSettled}
+          diceColour={config.dice_colour}
+          pipColour={config.pip_colour}
+          visible={diceVisible}
+        />
 
-      {/* 3D button bar */}
-      {buttonBar}
+        {buttonBar}
+      </Physics>
     </>
   );
 }
 
 /* ============================================================================
- * Canvas shell — just the rounded container + canvas
+ * Canvas shell
  * ========================================================================== */
 
 export function StbCanvasShell({ children, onPointerDown, onPointerUp }) {
   return (
-    <div
-      className="overflow-hidden rounded-2xl shadow-lg"
-      style={{ background: TABLE_COLOUR }}
-    >
+    <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: TABLE_COLOUR }}>
       <div
         className="relative"
         style={{ aspectRatio: '7 / 5', touchAction: 'none' }}
@@ -618,7 +618,7 @@ export function StbCanvasShell({ children, onPointerDown, onPointerUp }) {
 }
 
 /* ============================================================================
- * Playable game component — used by both the page and the home embed
+ * Playable game
  * ========================================================================== */
 
 export function ShutKatiesBoxGame({ showStatus = true }) {
@@ -634,6 +634,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const settledRef = useRef([null, null]);
 
   const diceSum = (dice[0] || 0) + (dice[1] || 0);
   const selectedSum = useMemo(() => selected.reduce((a, b) => a + b, 0), [selected]);
@@ -654,30 +655,39 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
       setDice([null, null]);
       setThrowSeed(0);
       setPhase('idle');
+      settledRef.current = [null, null];
     } catch (e) {
       setError(e.message);
     } finally { setBusy(false); }
+  }
+
+  function onDieSettled(index, value) {
+    if (settledRef.current[index] !== null) return;
+    settledRef.current = settledRef.current.slice();
+    settledRef.current[index] = value;
+    if (settledRef.current[0] !== null && settledRef.current[1] !== null) {
+      const d1 = settledRef.current[0];
+      const d2 = settledRef.current[1];
+      setDice([d1, d2]);
+      const target = d1 + d2;
+      if (!hasValidClose(openTiles, target)) {
+        setPhase('over');
+        setMessage(`No valid combination for ${target}. Game over!`);
+        api.stbEnd({ game_id: game?.id, result: 'loss', final_tiles_open: openTiles }).catch(() => {});
+      } else {
+        setPhase('rolled');
+      }
+    }
   }
 
   function triggerRoll(swipeVec = null) {
     if (!game || phase === 'rolled' || phase === 'rolling' || busy) return;
     setMessage('');
     setPhase('rolling');
-    const d1 = 1 + Math.floor(Math.random() * 6);
-    const d2 = 1 + Math.floor(Math.random() * 6);
-    setDice([d1, d2]);
+    setDice([null, null]);
+    settledRef.current = [null, null];
     setThrowVec(swipeVec);
     setThrowSeed((s) => s + 1);
-    setTimeout(() => {
-      const target = d1 + d2;
-      if (!hasValidClose(openTiles, target)) {
-        setPhase('over');
-        setMessage(`No valid combination for ${target}. Game over!`);
-        api.stbEnd({ game_id: game.id, result: 'loss', final_tiles_open: openTiles }).catch(() => {});
-      } else {
-        setPhase('rolled');
-      }
-    }, 1500);
   }
 
   function tapTile(v) {
@@ -691,6 +701,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
     setOpenTiles(newOpen);
     setSelected([]);
     setDice([null, null]);
+    settledRef.current = [null, null];
     if (newOpen.length === 0) {
       setPhase('won');
       setMessage('You shut the box!');
@@ -715,6 +726,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
     setSelected([]);
     setDice([null, null]);
     setThrowSeed(0);
+    settledRef.current = [null, null];
     setPhase('idle');
     setMessage('');
   }
@@ -758,11 +770,11 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
       selectedSum={selectedSum}
       diceSum={diceSum}
       selectedCount={selected.length}
-      frameColour={config.frame_colour}
       inkColour={config.ink_colour}
-      // woodTex is loaded inside StbScene; ButtonBar gets it through that closure too via prop drilling
     />
   );
+
+  const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
 
   return (
     <div className="space-y-3">
@@ -771,9 +783,11 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
           openTiles={openTiles}
           selected={selected}
           dice={dice}
+          diceVisible={diceVisible}
           throwSeed={throwSeed}
           throwVec={throwVec}
           onTileTap={tapTile}
+          onDieSettled={onDieSettled}
           config={config}
           interactive
           buttonBar={buttonBar}

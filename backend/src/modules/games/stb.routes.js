@@ -29,8 +29,8 @@ function validatePatch(patch) {
     }
   }
   for (const k of ['scattered_letters_back', 'scattered_letters_front']) {
-    if (k in patch && (typeof patch[k] !== 'string' || patch[k].length > 7)) {
-      return `${k} must be 0-7 characters (use _ for blank tiles)`;
+    if (k in patch && (typeof patch[k] !== 'string' || patch[k].length > 8)) {
+      return `${k} must be 0-8 characters (use _ for blank tiles)`;
     }
   }
   for (const k of ['felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'dice_colour', 'pip_colour']) {
