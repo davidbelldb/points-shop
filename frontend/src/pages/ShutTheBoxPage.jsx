@@ -26,16 +26,6 @@ const DEFAULT_CONFIG = {
 };
 
 const TABLE_COLOUR = '#d3f3ea';
-const WOOD_FALLBACK = '#8b5a2b';      // saddle-brown — when wood JPG missing
-const WOOD_DARK_FALLBACK = '#3a2316'; // very dark walnut — for base / rod
-const FELT_FALLBACK = '#15b8a6';      // teal — when velvet JPG missing
-
-// Tints multiplied into the diffuse texture so the pale Poly Haven JPGs read as wood / felt.
-// White (#fff) means "show the texture untouched". A darker / coloured tint enriches the result.
-const WOOD_TINT = '#9a6a3c';          // warm tan-brown — applied over the wood texture
-const WOOD_DARK_TINT = '#5a3a1f';     // darker tan — for the base under the felt
-const VELVET_TINT = '#ffffff';        // velour velvet's natural red comes through
-
 const WOOD_TEX_URL = '/textures/wood_table_worn_diffuse.jpg';
 const VELVET_TEX_URL = '/textures/velour_velvet_diffuse.jpg';
 
@@ -274,10 +264,6 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
     groupRef.current.rotation.x = angleRef.current;
   });
 
-  // Selected tiles glow with a warm highlight; otherwise wood-tinted texture or solid wood fallback
-  const baseColour = woodTex ? WOOD_TINT : WOOD_FALLBACK;
-  const tintColour = selected ? '#ffd58a' : baseColour;
-
   return (
     <group ref={groupRef} position={[x, 0.08, -1.0]}>
       <mesh
@@ -286,7 +272,7 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
         onClick={interactive ? (e) => { e.stopPropagation(); onClick?.(value); } : undefined}
       >
         <boxGeometry args={[TILE_W, TILE_H, TILE_D]} />
-        <meshStandardMaterial map={woodTex || null} color={tintColour} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} emissive={selected ? '#aa7733' : '#000000'} emissiveIntensity={selected ? 0.35 : 0} />
       </mesh>
       <Text position={[0, TILE_H / 2, TILE_D / 2 + 0.002]} fontSize={0.38} color={inkColour} anchorX="center" anchorY="middle">
         {value}
@@ -307,12 +293,11 @@ function ScatteredTile({ letter, position, rotationY, inkColour }) {
   const W = 0.7;
   const H = 0.6;
   const D = 0.12;
-  const baseColour = woodTex ? WOOD_TINT : WOOD_FALLBACK;
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
       <mesh position={[0, D / 2, 0]} castShadow>
         <boxGeometry args={[W, D, H]} />
-        <meshStandardMaterial map={woodTex || null} color={baseColour} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </mesh>
       {letter ? (
         <Text
@@ -373,8 +358,6 @@ function SpacebarButton({ position, width, onClick, disabled, label, inkColour }
     meshRef.current.position.y = offsetY.current;
   });
 
-  const baseColour = woodTex ? WOOD_TINT : WOOD_FALLBACK;
-
   return (
     <group position={position}>
       <mesh
@@ -386,7 +369,7 @@ function SpacebarButton({ position, width, onClick, disabled, label, inkColour }
         receiveShadow
       >
         <boxGeometry args={[width, 0.18, 0.55]} />
-        <meshStandardMaterial map={woodTex || null} color={baseColour} roughness={0.55} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.55} />
       </mesh>
       {/* Label rendered above the button top face, depth-test disabled so it can't be hidden behind the wood */}
       <Text
@@ -467,38 +450,35 @@ function ButtonBar({ phase, hasGame, onStart, onRoll, onClear, onClose, onNewGam
 function BoxFrame() {
   const { woodTex, velvetTex } = useStbTextures();
   const R = 0.05;
-  const woodCol = woodTex ? WOOD_TINT : WOOD_FALLBACK;
-  const woodDarkCol = woodTex ? WOOD_DARK_TINT : WOOD_DARK_FALLBACK;
-  const feltCol = velvetTex ? VELVET_TINT : FELT_FALLBACK;
 
   return (
     <group>
-      {/* Felt floor */}
+      {/* Felt floor — velvet texture only */}
       <mesh position={[0, 0.005, 0]} receiveShadow>
         <boxGeometry args={[BOX_W - WALL_THICK * 2 + 0.02, 0.01, BOX_D - WALL_THICK * 2 + 0.02]} />
-        <meshStandardMaterial map={velvetTex || null} color={feltCol} roughness={0.95} />
+        <meshStandardMaterial map={velvetTex || null} roughness={0.95} />
       </mesh>
-      {/* Floor base — wood textured */}
+      {/* Floor base — wood */}
       <RoundedBox args={[BOX_W, 0.12, BOX_D]} radius={R} smoothness={3} position={[0, -0.06, 0]} receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={woodDarkCol} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       {/* Walls */}
       <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[-BOX_W / 2 + WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[BOX_W / 2 - WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       <RoundedBox args={[BOX_W, WALL_H, WALL_THICK]} radius={R} smoothness={3} position={[0, WALL_H / 2, -BOX_D / 2 + WALL_THICK / 2]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       <RoundedBox args={[BOX_W, 0.4, WALL_THICK]} radius={R} smoothness={3} position={[0, 0.2, BOX_D / 2 - WALL_THICK / 2]} castShadow receiveShadow>
-        <meshStandardMaterial map={woodTex || null} color={woodCol} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
-      {/* Rod */}
+      {/* Rod — keeps a dark wood look */}
       <mesh position={[0, 0.08, -1.0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.03, 0.03, BOX_W - WALL_THICK * 2 - 0.1, 16]} />
-        <meshStandardMaterial color={WOOD_DARK_FALLBACK} roughness={0.5} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.5} />
       </mesh>
     </group>
   );
@@ -546,8 +526,8 @@ export function StbScene({
   buttonBar = null,
 }) {
   // One wood + one velvet texture for the whole scene — heavy 12 MB JPGs uploaded once
-  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1.5, 1);
-  const velvetTex = useOptionalTexture(VELVET_TEX_URL, 3, 1.5);
+  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1, 1);
+  const velvetTex = useOptionalTexture(VELVET_TEX_URL, 1, 1);
   const inboxLetters = useMemo(() => lettersFromMessage(config.hidden_message, 9), [config.hidden_message]);
   const backLetters = useMemo(() => lettersFromMessage(config.scattered_letters_back, 8), [config.scattered_letters_back]);
   const frontLetters = useMemo(() => lettersFromMessage(config.scattered_letters_front, 8), [config.scattered_letters_front]);
