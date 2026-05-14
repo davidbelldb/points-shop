@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Text, RoundedBox } from '@react-three/drei';
+import { Text, RoundedBox, useTexture } from '@react-three/drei';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 import { api } from '../lib/api.js';
@@ -52,39 +52,26 @@ function hasValidClose(openTiles, target) {
  * Textures
  * ========================================================================== */
 
-// Load a texture once per call. Each consumer gets its own THREE.Texture so the GPU upload
-// is independent — avoids cloning headaches where a cloned texture renders white.
-function useOptionalTexture(url, repeatX = 1, repeatY = 1) {
-  const [tex, setTex] = useState(null);
-  useEffect(() => {
-    let active = true;
-    new THREE.TextureLoader().load(
-      url,
-      (t) => {
-        if (!active) return;
-        // JPGs are stored sRGB — without this they render washed-out.
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(repeatX, repeatY);
-        t.anisotropy = 4;
-        t.needsUpdate = true;
-        setTex(t);
-      },
-      undefined,
-      (err) => {
-        console.warn('[stb] texture failed to load', url, err?.message || err);
-        if (active) setTex(null);
-      }
-    );
-    return () => { active = false; };
-  }, [url, repeatX, repeatY]);
-  return tex;
+// Load both textures via drei's useTexture — Suspends the scene until ready, so every
+// material is constructed with the texture already in place (no stale-binding bug where
+// a material was first compiled with map=null and never picks up the late-arriving map).
+function useStbTextures() {
+  const [woodTex, velvetTex] = useTexture([WOOD_TEX_URL, VELVET_TEX_URL]);
+  // Configure once on first use — these settings are idempotent.
+  if (woodTex && woodTex.colorSpace !== THREE.SRGBColorSpace) {
+    woodTex.colorSpace = THREE.SRGBColorSpace;
+    woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
+    woodTex.anisotropy = 4;
+    woodTex.needsUpdate = true;
+  }
+  if (velvetTex && velvetTex.colorSpace !== THREE.SRGBColorSpace) {
+    velvetTex.colorSpace = THREE.SRGBColorSpace;
+    velvetTex.wrapS = velvetTex.wrapT = THREE.RepeatWrapping;
+    velvetTex.anisotropy = 4;
+    velvetTex.needsUpdate = true;
+  }
+  return { woodTex, velvetTex };
 }
-
-// Single-shared-texture context so the whole scene uses ONE wood + ONE velvet upload
-// instead of duplicating heavy 12 MB JPGs across every mesh.
-const StbTexCtx = createContext({ woodTex: null, velvetTex: null });
-function useStbTextures() { return useContext(StbTexCtx); }
 
 /* ============================================================================
  * Dice — pip planes + Rapier physics
@@ -525,15 +512,12 @@ export function StbScene({
   interactive = true,
   buttonBar = null,
 }) {
-  // One wood + one velvet texture for the whole scene — heavy 12 MB JPGs uploaded once
-  const woodTex = useOptionalTexture(WOOD_TEX_URL, 1, 1);
-  const velvetTex = useOptionalTexture(VELVET_TEX_URL, 1, 1);
   const inboxLetters = useMemo(() => lettersFromMessage(config.hidden_message, 9), [config.hidden_message]);
   const backLetters = useMemo(() => lettersFromMessage(config.scattered_letters_back, 8), [config.scattered_letters_back]);
   const frontLetters = useMemo(() => lettersFromMessage(config.scattered_letters_front, 8), [config.scattered_letters_front]);
 
   return (
-    <StbTexCtx.Provider value={{ woodTex, velvetTex }}>
+    <>
       <ambientLight intensity={0.55} />
       <directionalLight
         position={[4, 8, 4]}
@@ -569,8 +553,8 @@ export function StbScene({
           );
         })}
 
-        <ScatteredRow letters={backLetters} baseZ={-3.0} inkColour={config.ink_colour} seed={1.3} />
-        <ScatteredRow letters={frontLetters} baseZ={3.0} inkColour={config.ink_colour} seed={4.7} />
+        <ScatteredRow letters={backLetters} baseZ={-2.6} inkColour={config.ink_colour} seed={1.3} />
+        <ScatteredRow letters={frontLetters} baseZ={2.4} inkColour={config.ink_colour} seed={4.7} />
 
         <PhysicsDie
           throwSeed={throwSeed}
@@ -593,7 +577,7 @@ export function StbScene({
 
         {buttonBar}
       </Physics>
-    </StbTexCtx.Provider>
+    </>
   );
 }
 
