@@ -21,6 +21,14 @@ export default function RewardsPage() {
     finally { setBusy(false); }
   }
 
+  async function dismiss(id) {
+    if (!confirm('Remove this reward from your profile? This cannot be undone.')) return;
+    setBusy(true);
+    try { await api.deleteReward(id); await load(); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   if (rewards === null) return <div className="py-6 text-center text-sm text-neutral-500">Loading...</div>;
   const pending = rewards.filter((r) => r.status === 'pending');
   const claimed = rewards.filter((r) => r.status === 'claimed');
@@ -59,10 +67,16 @@ export default function RewardsPage() {
                   <p className="text-xs text-teal-700">{r.product_id ? 'Product - free to claim' : 'Forfeit - mark when redeemed'}</p>
                   <p className="mt-1 text-[11px] text-neutral-500">Won {new Date(r.created_at).toLocaleString()}</p>
                 </div>
-                <button onClick={() => claim(r.id)} disabled={busy}
-                  className="shrink-0 rounded-lg bg-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40">
-                  {r.product_id ? 'Claim' : 'Redeem'}
-                </button>
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button onClick={() => claim(r.id)} disabled={busy}
+                    className="rounded-lg bg-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40">
+                    {r.product_id ? 'Claim' : 'Redeem'}
+                  </button>
+                  <button onClick={() => dismiss(r.id)} disabled={busy}
+                    className="rounded-lg border border-neutral-300 bg-white px-3 py-1 text-[11px] font-medium text-neutral-500 transition hover:border-red-300 hover:text-red-600 disabled:opacity-40">
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

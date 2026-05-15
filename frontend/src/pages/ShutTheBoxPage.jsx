@@ -26,8 +26,10 @@ const DEFAULT_CONFIG = {
 };
 
 const TABLE_COLOUR = '#d3f3ea';
-const WOOD_TEX_URL = '/textures/wood_table_worn_diff_4k.jpg';
-const VELVET_TEX_URL = '/textures/velour_velvet_diff_4k.jpg';
+// Bump the ?v query string when you re-upload a texture file with the same name
+// to bust the browser cache.
+const WOOD_TEX_URL = '/textures/wood_table_worn_diff_4k.jpg?v=2';
+const VELVET_TEX_URL = '/textures/velour_velvet_diff_4k.jpg?v=2';
 
 function lettersFromMessage(msg, len) {
   const m = (msg || '').padEnd(len, '_').slice(0, len);
@@ -272,11 +274,11 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
  * Scattered loose letter tiles (table — 8 back, 8 front)
  * ========================================================================== */
 
-function ScatteredTile({ letter, position, rotationY, inkColour }) {
+function ScatteredTile({ letter, position, rotationY, inkColour, size = 1 }) {
   const { woodTex } = useStbTextures();
-  const W = 0.7;
-  const H = 0.6;
-  const D = 0.12;
+  const W = 0.7 * size;
+  const H = 0.6 * size;
+  const D = 0.12 * size;
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
       <mesh position={[0, D / 2, 0]} castShadow>
@@ -287,11 +289,11 @@ function ScatteredTile({ letter, position, rotationY, inkColour }) {
         <Text
           position={[0, D + 0.005, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.38}
+          fontSize={0.38 * size}
           color={inkColour}
           anchorX="center"
           anchorY="middle"
-          outlineWidth={0.008}
+          outlineWidth={0.008 * size}
           outlineColor="#000"
         >
           {letter}
@@ -301,14 +303,14 @@ function ScatteredTile({ letter, position, rotationY, inkColour }) {
   );
 }
 
-function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8 }) {
+function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, spread = 3.7 }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => {
         const t = (i - (count - 1) / 2) / ((count - 1) / 2);
-        const x = t * 3.7;
+        const x = t * spread;
         const jitter = Math.sin((seed + i) * 9.7);
-        const z = baseZ + jitter * 0.25;
+        const z = baseZ + jitter * 0.18 * size;
         const yRot = jitter * 0.45;
         return (
           <ScatteredTile
@@ -317,6 +319,7 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8 }) {
             position={[x + Math.cos((seed + i) * 4.3) * 0.08, 0, z]}
             rotationY={yRot}
             inkColour={inkColour}
+            size={size}
           />
         );
       })}
@@ -525,7 +528,9 @@ function BoxColliders() {
       {/* Right wall */}
       <CuboidCollider args={[WALL_THICK / 2, halfTall, innerD / 2]} position={[BOX_W / 2 - WALL_THICK / 2, halfTall, 0]} restitution={0.35} friction={0.4} />
       {/* Rod — short cuboid approximating the cylinder, blocks dice from rolling under the tiles */}
-      <CuboidCollider args={[innerW / 2, 0.03, 0.03]} position={[0, 0.08, -0.8]} restitution={0.2} friction={0.5} />
+      {/* Tall invisible barrier at the rod position — keeps dice in the front half of the felt
+          so they never collide with the number panels. Tiles are visual-only so they pass through. */}
+      <CuboidCollider args={[innerW / 2, 0.45, 0.04]} position={[0, 0.45, -0.7]} restitution={0.3} friction={0.4} />
     </RigidBody>
   );
 }
@@ -590,8 +595,8 @@ export function StbScene({
           );
         })}
 
-        <ScatteredRow letters={backLetters} baseZ={-2.7} inkColour={config.ink_colour} seed={1.3} count={8} />
-        <ScatteredRow letters={frontLetters} baseZ={2.55} inkColour={config.ink_colour} seed={4.7} count={7} />
+        <ScatteredRow letters={backLetters}  baseZ={-3.05} inkColour={config.ink_colour} seed={1.3} count={8} size={1.0}  spread={3.7} />
+        <ScatteredRow letters={frontLetters} baseZ={2.55}  inkColour={config.ink_colour} seed={4.7} count={7} size={0.65} spread={2.4} />
 
         <PhysicsDie
           throwSeed={throwSeed}
