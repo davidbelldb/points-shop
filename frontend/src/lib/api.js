@@ -159,6 +159,7 @@ export const api = {
     updateStbConfig:       (patch) => request('/admin/shut-the-box', { method: 'PATCH', body: JSON.stringify(patch) }),
     updateStbScatteredSet: (ord, patch) => request(`/admin/shut-the-box/scattered-sets/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateStbTableColour: (ord, patch) => request(`/admin/shut-the-box/table-colours/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    updateStbDicePalette: (ord, patch) => request(`/admin/shut-the-box/dice-palettes/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     upload: uploadFile,
   },
 };

@@ -23,6 +23,8 @@ async function getConfig() {
   cfg.scattered_sets = sets;
   const { rows: tableColours } = await query(`SELECT ord, colour, active FROM stb_table_colours ORDER BY ord`);
   cfg.table_colours = tableColours;
+  const { rows: dicePalettes } = await query(`SELECT ord, body, pip, active FROM stb_dice_palettes ORDER BY ord`);
+  cfg.dice_palettes = dicePalettes;
   return cfg;
 }
 
@@ -121,6 +123,36 @@ export default async function stbRoutes(fastify) {
     if (updates.length) {
       updates.push(`updated_at = NOW()`);
       await query(`UPDATE stb_config SET ${updates.join(', ')} WHERE id = 1`, values);
+    }
+    return await getConfig();
+  });
+
+  // Dice-palette admin endpoint — update one of the 4 palettes by ord (1..4)
+  fastify.patch('/api/admin/shut-the-box/dice-palettes/:ord', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    const ord = Number(req.params.ord);
+    if (!Number.isInteger(ord) || ord < 1 || ord > 4) return reply.code(400).send({ error: 'ord must be 1..4' });
+    const patch = req.body ?? {};
+    for (const k of ['body', 'pip']) {
+      if (k in patch && (typeof patch[k] !== 'string' || !HEX_RE.test(patch[k]))) {
+        return reply.code(400).send({ error: `${k} must be a hex like #e773b0` });
+      }
+    }
+    if ('active' in patch && typeof patch.active !== 'boolean') {
+      return reply.code(400).send({ error: 'active must be a boolean' });
+    }
+    const updates = [];
+    const values = [];
+    for (const k of ['body', 'pip', 'active']) {
+      if (k in patch) {
+        values.push(patch[k]);
+        updates.push(`${k} = $${values.length}`);
+      }
+    }
+    if (updates.length) {
+      updates.push(`updated_at = NOW()`);
+      values.push(ord);
+      await query(`UPDATE stb_dice_palettes SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
     return await getConfig();
   });

@@ -137,16 +137,33 @@ function readDieFace(quaternion) {
   return best.v;
 }
 
-function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, pipColour, visible }) {
+function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, pipColour, palettes, visible }) {
   const bodyRef = useRef();
   const restFramesRef = useRef(0);
   const settledRef = useRef(false);
 
+  // Each die independently picks a random ACTIVE palette every throw. If no palettes are
+  // active, fall back to the legacy single dice/pip colours.
+  const [activeBody, setActiveBody] = useState(diceColour);
+  const [activePip, setActivePip] = useState(pipColour);
+
+  useEffect(() => {
+    if (!throwSeed) return;
+    if (palettes && palettes.length > 0) {
+      const pick = palettes[Math.floor(Math.random() * palettes.length)];
+      setActiveBody(pick.body);
+      setActivePip(pick.pip);
+    } else {
+      setActiveBody(diceColour);
+      setActivePip(pipColour);
+    }
+  }, [throwSeed, palettes, diceColour, pipColour]);
+
   const pipTextures = useMemo(() => ({
-    1: makePipTexture(1, pipColour), 2: makePipTexture(2, pipColour),
-    3: makePipTexture(3, pipColour), 4: makePipTexture(4, pipColour),
-    5: makePipTexture(5, pipColour), 6: makePipTexture(6, pipColour),
-  }), [pipColour]);
+    1: makePipTexture(1, activePip), 2: makePipTexture(2, activePip),
+    3: makePipTexture(3, activePip), 4: makePipTexture(4, activePip),
+    5: makePipTexture(5, activePip), 6: makePipTexture(6, activePip),
+  }), [activePip]);
 
   // Apply a fresh throw whenever throwSeed bumps
   useEffect(() => {
@@ -215,7 +232,7 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
     >
       <CuboidCollider args={[DIE_HALF, DIE_HALF, DIE_HALF]} />
       <RoundedBox args={[DIE_SIZE, DIE_SIZE, DIE_SIZE]} radius={0.05} smoothness={4} castShadow>
-        <meshStandardMaterial color={diceColour} roughness={0.45} metalness={0.05} />
+        <meshStandardMaterial color={activeBody} roughness={0.45} metalness={0.05} />
       </RoundedBox>
       {FACE_PIPS.map((f) => (
         <mesh key={f.value} position={f.pos} rotation={f.rot}>
@@ -554,6 +571,10 @@ export function StbScene({
   const inboxLetters = useMemo(() => lettersFromMessage(config.hidden_message, 9), [config.hidden_message]);
   const backLetters = useMemo(() => lettersFromMessage(scatteredSet.back, 8), [scatteredSet.back]);
   const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 7), [scatteredSet.front]);
+  const activePalettes = useMemo(
+    () => (Array.isArray(config.dice_palettes) ? config.dice_palettes.filter((p) => p.active && p.body && p.pip) : []),
+    [config.dice_palettes],
+  );
 
   return (
     <>
@@ -602,6 +623,7 @@ export function StbScene({
           onSettled={onDieSettled}
           diceColour={config.dice_colour}
           pipColour={config.pip_colour}
+          palettes={activePalettes}
           visible={diceVisible}
         />
         <PhysicsDie
@@ -611,6 +633,7 @@ export function StbScene({
           onSettled={onDieSettled}
           diceColour={config.dice_colour}
           pipColour={config.pip_colour}
+          palettes={activePalettes}
           visible={diceVisible}
         />
 

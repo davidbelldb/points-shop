@@ -25,8 +25,6 @@ export default function AdminShutTheBoxSection() {
   // Local edit buffers (so user can type freely without immediate save)
   const [hidden, setHidden] = useState('');
   const [inkC, setInkC] = useState('');
-  const [diceC, setDiceC] = useState('');
-  const [pipC, setPipC] = useState('');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
 
@@ -36,8 +34,6 @@ export default function AdminShutTheBoxSection() {
       setCfg(c);
       setHidden(c.hidden_message ?? '');
       setInkC(c.ink_colour ?? '');
-      setDiceC(c.dice_colour ?? '');
-      setPipC(c.pip_colour ?? '');
       setTitle(c.homepage_title ?? '');
       setSubtitle(c.homepage_subtitle ?? '');
     } catch (e) { setError(e.message); }
@@ -92,6 +88,18 @@ export default function AdminShutTheBoxSection() {
     setBusy(true); setError(null); setSaved(false);
     try {
       const updated = await api.admin.updateStbTableColour(ord, patch);
+      setCfg(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setError(e.message);
+    } finally { setBusy(false); }
+  }
+
+  async function saveDicePalette(ord, patch) {
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      const updated = await api.admin.updateStbDicePalette(ord, patch);
       setCfg(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
@@ -156,8 +164,6 @@ export default function AdminShutTheBoxSection() {
 
       <div className="grid grid-cols-2 gap-3">
         <ColourField label="Ink (numbers + letters)" value={inkC} setValue={setInkC} current={cfg.ink_colour} onCommit={() => commitColour('ink_colour', inkC)} busy={busy} />
-        <ColourField label="Dice body" value={diceC} setValue={setDiceC} current={cfg.dice_colour} onCommit={() => commitColour('dice_colour', diceC)} busy={busy} />
-        <ColourField label="Dice pips" value={pipC} setValue={setPipC} current={cfg.pip_colour} onCommit={() => commitColour('pip_colour', pipC)} busy={busy} />
       </div>
       <p className="text-xs text-neutral-500">
         Felt, frame and tile colours are now driven by Poly Haven textures (velvet for the felt, wood for the frame and tiles). Drop the JPGs into <code>frontend/public/textures/</code>.
@@ -183,6 +189,18 @@ export default function AdminShutTheBoxSection() {
         <div className="space-y-2">
           {(cfg.table_colours || []).map((t) => (
             <TableColourEditor key={t.ord} slot={t} busy={busy} onSave={(patch) => saveTableColour(t.ord, patch)} />
+          ))}
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Dice palettes</p>
+        <p className="text-xs text-neutral-500">4 palettes — each die independently picks one at random from the <em>active</em> palettes on every throw. So dice 1 and dice 2 can come out different colours.</p>
+        <div className="space-y-2">
+          {(cfg.dice_palettes || []).map((p) => (
+            <DicePaletteEditor key={p.ord} slot={p} busy={busy} onSave={(patch) => saveDicePalette(p.ord, patch)} />
           ))}
         </div>
       </div>
@@ -236,6 +254,53 @@ export default function AdminShutTheBoxSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+function DicePaletteEditor({ slot, busy, onSave }) {
+  const [body, setBody] = useState(slot.body ?? '');
+  const [pip, setPip] = useState(slot.pip ?? '');
+  useEffect(() => { setBody(slot.body ?? ''); setPip(slot.pip ?? ''); }, [slot.body, slot.pip]);
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  const dirty = body !== (slot.body ?? '') || pip !== (slot.pip ?? '');
+  const valid = HEX.test(body) && HEX.test(pip);
+
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-2 space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-neutral-700">Palette {slot.ord}</span>
+        <button
+          onClick={() => onSave({ active: !slot.active })}
+          disabled={busy}
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${slot.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {slot.active ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="inline-block h-6 w-6 shrink-0 rounded border border-neutral-300" style={{ background: slot.body }} title="Body" />
+        <input
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          className={inputCls + ' font-mono'}
+          placeholder="Body #e773b0"
+        />
+        <span className="inline-block h-6 w-6 shrink-0 rounded border border-neutral-300" style={{ background: slot.pip }} title="Pip" />
+        <input
+          value={pip}
+          onChange={(e) => setPip(e.target.value)}
+          className={inputCls + ' font-mono'}
+          placeholder="Pip #000000"
+        />
+        <button
+          onClick={() => onSave({ body, pip })}
+          disabled={busy || !dirty || !valid}
+          className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30"
+        >
+          Save
+        </button>
+      </div>
+    </div>
   );
 }
 
