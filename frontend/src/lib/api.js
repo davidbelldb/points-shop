@@ -44,6 +44,7 @@ export const api = {
   getAccount: () => request('/account'),
   updateAccount: (patch) => request('/account', { method: 'PATCH', body: JSON.stringify(patch) }),
   getLedgerAdjustments: (limit) => request(`/account/ledger/adjustments${limit ? `?limit=${limit}` : ''}`),
+  deleteLedgerEntry: (id) => request(`/account/ledger/${id}`, { method: 'DELETE' }),
   getBasket: () => request('/basket'),
   addToBasket: (productId, qty = 1) =>
     request('/basket/items', { method: 'POST', body: JSON.stringify({ productId, qty }) }),

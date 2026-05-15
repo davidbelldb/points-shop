@@ -667,7 +667,7 @@ export function StbCanvasShell({ children, onPointerDown, onPointerUp, tableColo
  * ========================================================================== */
 
 export function ShutKatiesBoxGame({ showStatus = true }) {
-  const { refresh: refreshBasket } = useBasket();
+  const { refresh: refreshBasket, account } = useBasket();
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [scatteredSet, setScatteredSet] = useState({ back: '', front: '' });
   const [game, setGame] = useState(null);
@@ -831,7 +831,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   if (!game) {
     bigButton = <BigBoxButton label="START" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
   } else if (phase === 'won' || phase === 'over') {
-    bigButton = <BigBoxButton label="NEW GAME" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
+    bigButton = <BigBoxButton label="TRY AGAIN" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
   }
 
   const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
@@ -876,26 +876,36 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
       )}
 
       {winModal && (
-        <ShutWinModal pts={winModal.pts} onClose={() => setWinModal(null)} />
+        <ShutWinModal pts={winModal.pts} balance={account?.points_balance} onClose={() => setWinModal(null)} />
       )}
     </div>
   );
 }
 
-function ShutWinModal({ pts, onClose }) {
+function ShutWinModal({ pts, balance, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-        <p className="text-center text-xs font-semibold uppercase tracking-wider text-neutral-500">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
           Congratulations!
         </p>
-        <p className="mt-2 text-center text-2xl font-extrabold leading-tight text-pink-500">
-          YOU&apos;VE SHUT YOUR OWN BOX
+        <p className="mt-3 text-center text-3xl font-extrabold leading-none text-pink-500">
+          +{pts} POINTS
         </p>
-        <p className="mt-3 text-center text-3xl font-extrabold text-pink-500">+{pts} POINTS</p>
+
+        <div className="mt-5 rounded-xl bg-neutral-100 px-4 py-3 text-center text-sm font-medium text-neutral-700">
+          You&apos;ve shut your own box!
+        </div>
+
+        {typeof balance === 'number' && (
+          <p className="mt-4 text-center text-sm text-neutral-600">
+            Your balance: <span className="font-semibold text-neutral-900">{balance.toLocaleString()} pts</span>
+          </p>
+        )}
+
         <button
           onClick={onClose}
-          className="mt-6 block w-full rounded-xl bg-teal-300 py-3 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95"
+          className="mt-6 block w-full rounded-xl bg-teal-300 py-3 text-base font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95"
         >
           Continue
         </button>
