@@ -1,0 +1,2 @@
+ALTER TABLE stb_config
+  ADD COLUMN IF NOT EXISTS table_colour TEXT NOT NULL DEFAULT '#d3f3ea';

@@ -27,6 +27,7 @@ export default function AdminShutTheBoxSection() {
   const [inkC, setInkC] = useState('');
   const [diceC, setDiceC] = useState('');
   const [pipC, setPipC] = useState('');
+  const [tableC, setTableC] = useState('');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
 
@@ -38,6 +39,7 @@ export default function AdminShutTheBoxSection() {
       setInkC(c.ink_colour ?? '');
       setDiceC(c.dice_colour ?? '');
       setPipC(c.pip_colour ?? '');
+      setTableC(c.table_colour ?? '');
       setTitle(c.homepage_title ?? '');
       setSubtitle(c.homepage_subtitle ?? '');
     } catch (e) { setError(e.message); }
@@ -146,6 +148,7 @@ export default function AdminShutTheBoxSection() {
         <ColourField label="Ink (numbers + letters)" value={inkC} setValue={setInkC} current={cfg.ink_colour} onCommit={() => commitColour('ink_colour', inkC)} busy={busy} />
         <ColourField label="Dice body" value={diceC} setValue={setDiceC} current={cfg.dice_colour} onCommit={() => commitColour('dice_colour', diceC)} busy={busy} />
         <ColourField label="Dice pips" value={pipC} setValue={setPipC} current={cfg.pip_colour} onCommit={() => commitColour('pip_colour', pipC)} busy={busy} />
+        <ColourField label="Table (around the box)" value={tableC} setValue={setTableC} current={cfg.table_colour} onCommit={() => commitColour('table_colour', tableC)} busy={busy} />
       </div>
       <p className="text-xs text-neutral-500">
         Felt, frame and tile colours are now driven by Poly Haven textures (velvet for the felt, wood for the frame and tiles). Drop the JPGs into <code>frontend/public/textures/</code>.

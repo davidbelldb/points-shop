@@ -20,12 +20,11 @@ const DEFAULT_CONFIG = {
   ink_colour: '#faf5e6',
   dice_colour: '#e773b0',
   pip_colour: '#000000',
+  table_colour: '#d3f3ea',
   hidden_message: 'I_MISS_U!',
   scattered_letters_back: '________',
   scattered_letters_front: '________',
 };
-
-const TABLE_COLOUR = '#d3f3ea';
 // Bump the ?v query string when you re-upload a texture file with the same name
 // to bust the browser cache.
 const WOOD_TEX_URL = '/textures/wood_table_worn.jpg?v=4';
@@ -615,10 +614,10 @@ export function StbScene({
           visible={diceVisible}
         />
 
-        {/* In-felt score display — bottom-left corner of the fabric, white, number only. */}
+        {/* In-felt score display — bottom-left, just inside the felt so it's not clipped. */}
         {dice[0] && dice[1] && (
           <Text
-            position={[-2.4, 0.06, 1.1]}
+            position={[-2.4, 0.06, 0.75]}
             rotation={[-Math.PI / 2, 0, 0]}
             fontSize={0.5}
             color="#ffffff"
@@ -641,9 +640,9 @@ export function StbScene({
  * Canvas shell
  * ========================================================================== */
 
-export function StbCanvasShell({ children, onPointerDown, onPointerUp }) {
+export function StbCanvasShell({ children, onPointerDown, onPointerUp, tableColour = '#d3f3ea' }) {
   return (
-    <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: TABLE_COLOUR }}>
+    <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
       <div
         className="relative"
         style={{ aspectRatio: '6 / 5', touchAction: 'none' }}
@@ -679,6 +678,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   const [throwVec, setThrowVec] = useState(null);
   const [phase, setPhase] = useState('idle');
   const [message, setMessage] = useState('');
+  const [winModal, setWinModal] = useState(null); // { pts, balance? }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const settledRef = useRef([null, null]);
@@ -768,6 +768,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
         const res = await api.stbEnd({ game_id: game.id, result: 'win', final_tiles_open: [] });
         if (refreshBasket) await refreshBasket();
         setMessage(`You shut the box! +${res.credited_pts} pts.`);
+        setWinModal({ pts: res.credited_pts ?? 48 });
       } catch (e) { setError(e.message); }
       finally { setBusy(false); }
     } else {
@@ -837,7 +838,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
 
   return (
     <div className="space-y-3">
-      <StbCanvasShell onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
+      <StbCanvasShell onPointerDown={onPointerDown} onPointerUp={onPointerUp} tableColour={config.table_colour}>
         <StbScene
           openTiles={openTiles}
           selected={selected}
@@ -873,6 +874,32 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
           )}
         </div>
       )}
+
+      {winModal && (
+        <ShutWinModal pts={winModal.pts} onClose={() => setWinModal(null)} />
+      )}
+    </div>
+  );
+}
+
+function ShutWinModal({ pts, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <p className="text-center text-xs font-semibold uppercase tracking-wider text-neutral-500">
+          Congratulations!
+        </p>
+        <p className="mt-2 text-center text-2xl font-extrabold leading-tight text-pink-500">
+          YOU&apos;VE SHUT YOUR OWN BOX
+        </p>
+        <p className="mt-3 text-center text-3xl font-extrabold text-pink-500">+{pts} POINTS</p>
+        <button
+          onClick={onClose}
+          className="mt-6 block w-full rounded-xl bg-teal-300 py-3 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95"
+        >
+          Continue
+        </button>
+      </div>
     </div>
   );
 }

@@ -32,7 +32,7 @@ function validatePatch(patch) {
       return 'hidden_message must be exactly 9 characters (use _ for blank tiles)';
     }
   }
-  for (const k of ['felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'dice_colour', 'pip_colour']) {
+  for (const k of ['felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'dice_colour', 'pip_colour', 'table_colour']) {
     if (k in patch && (typeof patch[k] !== 'string' || !HEX_RE.test(patch[k]))) {
       return `${k} must be a hex colour like #15b8a6`;
     }
@@ -106,7 +106,7 @@ export default async function stbRoutes(fastify) {
     const allowed = [
       'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days',
       'felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'hidden_message',
-      'dice_colour', 'pip_colour',
+      'dice_colour', 'pip_colour', 'table_colour',
     ];
     const updates = [];
     const values = [];

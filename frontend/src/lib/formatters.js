@@ -8,6 +8,8 @@ export function formatLedgerReason(reason) {
   if (reason.startsWith('wheel-of-misfortune:'))     return 'Wheel of Misfortune award';
   if (reason.startsWith('giftsweeper:turn-'))         return 'Giftsweeper turn cost';
   if (reason.startsWith('giftsweeper:'))             return 'Giftsweeper award';
+  if (reason.startsWith('shut-the-box:win-'))         return "Shut Katie's Box - shut!";
+  if (reason.startsWith('shut-the-box:'))             return "Shut Katie's Box";
   if (reason.startsWith('order:'))                   return 'Order purchase';
   if (reason.startsWith('admin:'))                   return 'Admin adjustment';
   return reason;
