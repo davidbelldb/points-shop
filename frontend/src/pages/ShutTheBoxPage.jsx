@@ -28,8 +28,8 @@ const DEFAULT_CONFIG = {
 const TABLE_COLOUR = '#d3f3ea';
 // Bump the ?v query string when you re-upload a texture file with the same name
 // to bust the browser cache.
-const WOOD_TEX_URL = '/textures/wood_table_worn_diff_4k.jpg?v=2';
-const VELVET_TEX_URL = '/textures/velour_velvet_diff_4k.jpg?v=2';
+const WOOD_TEX_URL = '/textures/wood_table_worn_diff.jpg?v=3';
+const VELVET_TEX_URL = '/textures/velour_velvet_diff.jpg?v=3';
 
 function lettersFromMessage(msg, len) {
   const m = (msg || '').padEnd(len, '_').slice(0, len);
@@ -258,7 +258,7 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
         onClick={interactive ? (e) => { e.stopPropagation(); onClick?.(value); } : undefined}
       >
         <boxGeometry args={[TILE_W, TILE_H, TILE_D]} />
-        <meshStandardMaterial map={woodTex || null} roughness={0.6} emissive={selected ? '#aa7733' : '#000000'} emissiveIntensity={selected ? 0.35 : 0} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} emissive={selected ? '#d861a8' : '#000000'} emissiveIntensity={selected ? 0.55 : 0} />
       </mesh>
       <Text position={[0, TILE_H / 2, TILE_D / 2 + 0.002]} fontSize={0.38} color={inkColour} anchorX="center" anchorY="middle">
         {value}
@@ -438,7 +438,7 @@ function BigBoxButton({ label, onClick, disabled, inkColour }) {
   });
 
   return (
-    <group position={[0, 0.35, 0.3]}>
+    <group position={[0, 0.35, 0.85]}>
       <mesh
         ref={meshRef}
         onPointerDown={(e) => { if (!disabled) { e.stopPropagation(); pressedRef.current = true; } }}
@@ -447,7 +447,7 @@ function BigBoxButton({ label, onClick, disabled, inkColour }) {
         castShadow
         receiveShadow
       >
-        <boxGeometry args={[2.7, 0.25, 0.75]} />
+        <boxGeometry args={[2.7, 0.25, 0.7]} />
         <meshStandardMaterial map={woodTex} roughness={0.55} />
       </mesh>
       <Text
@@ -528,9 +528,9 @@ function BoxColliders() {
       {/* Right wall */}
       <CuboidCollider args={[WALL_THICK / 2, halfTall, innerD / 2]} position={[BOX_W / 2 - WALL_THICK / 2, halfTall, 0]} restitution={0.35} friction={0.4} />
       {/* Rod — short cuboid approximating the cylinder, blocks dice from rolling under the tiles */}
-      {/* Tall invisible barrier at the rod position — keeps dice in the front half of the felt
-          so they never collide with the number panels. Tiles are visual-only so they pass through. */}
-      <CuboidCollider args={[innerW / 2, 0.45, 0.04]} position={[0, 0.45, -0.7]} restitution={0.3} friction={0.4} />
+      {/* Tall, thick invisible barrier in front of the panel zone — dice physically can't reach
+          the number tiles. Tiles are visual-only so they pass through this collider. */}
+      <CuboidCollider args={[innerW / 2, 0.7, 0.1]} position={[0, 0.7, -0.55]} restitution={0.3} friction={0.4} />
     </RigidBody>
   );
 }
@@ -595,8 +595,8 @@ export function StbScene({
           );
         })}
 
-        <ScatteredRow letters={backLetters}  baseZ={-3.05} inkColour={config.ink_colour} seed={1.3} count={8} size={1.0}  spread={3.7} />
-        <ScatteredRow letters={frontLetters} baseZ={2.55}  inkColour={config.ink_colour} seed={4.7} count={7} size={0.65} spread={2.4} />
+        <ScatteredRow letters={backLetters}  baseZ={-3.4}  inkColour={config.ink_colour} seed={1.3} count={8} size={1.0}  spread={3.7} />
+        <ScatteredRow letters={frontLetters} baseZ={2.45}  inkColour={config.ink_colour} seed={4.7} count={7} size={0.55} spread={2.0} />
 
         <PhysicsDie
           throwSeed={throwSeed}
@@ -616,6 +616,23 @@ export function StbScene({
           pipColour={config.pip_colour}
           visible={diceVisible}
         />
+
+        {/* In-felt score display — top-left corner of the fabric, white. */}
+        {dice[0] && dice[1] && (
+          <Text
+            position={[-2.4, 0.06, -0.3]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            fontSize={0.32}
+            color="#ffffff"
+            anchorX="left"
+            anchorY="middle"
+            outlineWidth={0.012}
+            outlineColor="#000000"
+            renderOrder={5}
+          >
+            {`Rolled: ${dice[0] + dice[1]}`}
+          </Text>
+        )}
 
         {bigButton}
         {buttonBar}
@@ -640,7 +657,7 @@ export function StbCanvasShell({ children, onPointerDown, onPointerUp }) {
         <Canvas
           shadows
           dpr={[1, 2]}
-          camera={{ position: [0, 7.5, 5.0], fov: 42 }}
+          camera={{ position: [0, 7.5, 5.0], fov: 39 }}
           gl={{ antialias: true, alpha: true }}
         >
           <Suspense fallback={null}>{children}</Suspense>
@@ -815,9 +832,9 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   // Big inner-box button for Start / New game — shown when no active session.
   let bigButton = null;
   if (!game) {
-    bigButton = <BigBoxButton label="Start game" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
+    bigButton = <BigBoxButton label="START" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
   } else if (phase === 'won' || phase === 'over') {
-    bigButton = <BigBoxButton label="New game" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
+    bigButton = <BigBoxButton label="NEW GAME" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
   }
 
   const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
