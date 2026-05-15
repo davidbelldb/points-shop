@@ -274,7 +274,7 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
         onClick={interactive ? (e) => { e.stopPropagation(); onClick?.(value); } : undefined}
       >
         <boxGeometry args={[TILE_W, TILE_H, TILE_D]} />
-        <meshStandardMaterial map={woodTex || null} roughness={0.6} emissive={selected ? '#d861a8' : '#000000'} emissiveIntensity={selected ? 0.55 : 0} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} emissive={selected ? '#15b8a6' : '#000000'} emissiveIntensity={selected ? 0.55 : 0} />
       </mesh>
       <Text position={[0, TILE_H / 2, TILE_D / 2 + 0.002]} fontSize={0.38} color={inkColour} anchorX="center" anchorY="middle">
         {value}
