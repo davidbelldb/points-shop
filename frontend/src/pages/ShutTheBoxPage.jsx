@@ -28,7 +28,7 @@ const DEFAULT_CONFIG = {
 const TABLE_COLOUR = '#d3f3ea';
 // Bump the ?v query string when you re-upload a texture file with the same name
 // to bust the browser cache.
-const WOOD_TEX_URL = '/textures/wood_table_worn_diff.jpg?v=3';
+const WOOD_TEX_URL = '/textures/wood_table_worn.jpg?v=4';
 const VELVET_TEX_URL = '/textures/velour_velvet_diff.jpg?v=3';
 
 function lettersFromMessage(msg, len) {
@@ -457,8 +457,6 @@ function BigBoxButton({ label, onClick, disabled, inkColour }) {
         color={inkColour}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.018}
-        outlineColor="#000"
         fillOpacity={disabled ? 0.4 : 1}
         renderOrder={10}
       >
@@ -596,7 +594,7 @@ export function StbScene({
         })}
 
         <ScatteredRow letters={backLetters}  baseZ={-3.4}  inkColour={config.ink_colour} seed={1.3} count={8} size={1.0}  spread={3.7} />
-        <ScatteredRow letters={frontLetters} baseZ={2.45}  inkColour={config.ink_colour} seed={4.7} count={7} size={0.55} spread={2.0} />
+        <ScatteredRow letters={frontLetters} baseZ={2.45}  inkColour={config.ink_colour} seed={4.7} count={7} size={0.66} spread={2.4} />
 
         <PhysicsDie
           throwSeed={throwSeed}
@@ -617,20 +615,18 @@ export function StbScene({
           visible={diceVisible}
         />
 
-        {/* In-felt score display — top-left corner of the fabric, white. */}
+        {/* In-felt score display — bottom-left corner of the fabric, white, number only. */}
         {dice[0] && dice[1] && (
           <Text
-            position={[-2.4, 0.06, -0.3]}
+            position={[-2.4, 0.06, 1.1]}
             rotation={[-Math.PI / 2, 0, 0]}
-            fontSize={0.32}
+            fontSize={0.5}
             color="#ffffff"
             anchorX="left"
             anchorY="middle"
-            outlineWidth={0.012}
-            outlineColor="#000000"
             renderOrder={5}
           >
-            {`Rolled: ${dice[0] + dice[1]}`}
+            {`${dice[0] + dice[1]}`}
           </Text>
         )}
 
