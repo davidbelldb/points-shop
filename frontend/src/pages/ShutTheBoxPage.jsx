@@ -670,6 +670,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   const { refresh: refreshBasket, account } = useBasket();
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [scatteredSet, setScatteredSet] = useState({ back: '', front: '' });
+  const [tableColour, setTableColour] = useState('#d3f3ea');
   const [game, setGame] = useState(null);
   const [openTiles, setOpenTiles] = useState([...ALL_TILES]);
   const [selected, setSelected] = useState([]);
@@ -687,7 +688,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   const selectedSum = useMemo(() => selected.reduce((a, b) => a + b, 0), [selected]);
   const canConfirm = phase === 'rolled' && selectedSum === diceSum && selected.length > 0;
 
-  // On mount, load config and pick a random ACTIVE scattered set
+  // On mount, load config and pick a random ACTIVE scattered set + table colour
   useEffect(() => {
     api.getStbConfig().then((c) => {
       if (!c) return;
@@ -698,6 +699,13 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
         setScatteredSet({ back: pick.back || '', front: pick.front || '' });
       } else {
         setScatteredSet({ back: '', front: '' });
+      }
+      const tableSlots = Array.isArray(c.table_colours) ? c.table_colours.filter((t) => t.active && t.colour) : [];
+      if (tableSlots.length > 0) {
+        const pick = tableSlots[Math.floor(Math.random() * tableSlots.length)];
+        setTableColour(pick.colour);
+      } else {
+        setTableColour(c.table_colour || '#d3f3ea');
       }
     }).catch(() => {});
   }, []);
@@ -838,7 +846,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
 
   return (
     <div className="space-y-3">
-      <StbCanvasShell onPointerDown={onPointerDown} onPointerUp={onPointerUp} tableColour={config.table_colour}>
+      <StbCanvasShell onPointerDown={onPointerDown} onPointerUp={onPointerUp} tableColour={tableColour}>
         <StbScene
           openTiles={openTiles}
           selected={selected}

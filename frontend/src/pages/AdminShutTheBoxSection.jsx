@@ -27,7 +27,6 @@ export default function AdminShutTheBoxSection() {
   const [inkC, setInkC] = useState('');
   const [diceC, setDiceC] = useState('');
   const [pipC, setPipC] = useState('');
-  const [tableC, setTableC] = useState('');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
 
@@ -39,7 +38,6 @@ export default function AdminShutTheBoxSection() {
       setInkC(c.ink_colour ?? '');
       setDiceC(c.dice_colour ?? '');
       setPipC(c.pip_colour ?? '');
-      setTableC(c.table_colour ?? '');
       setTitle(c.homepage_title ?? '');
       setSubtitle(c.homepage_subtitle ?? '');
     } catch (e) { setError(e.message); }
@@ -82,6 +80,18 @@ export default function AdminShutTheBoxSection() {
     setBusy(true); setError(null); setSaved(false);
     try {
       const updated = await api.admin.updateStbScatteredSet(ord, patch);
+      setCfg(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setError(e.message);
+    } finally { setBusy(false); }
+  }
+
+  async function saveTableColour(ord, patch) {
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      const updated = await api.admin.updateStbTableColour(ord, patch);
       setCfg(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
@@ -148,7 +158,6 @@ export default function AdminShutTheBoxSection() {
         <ColourField label="Ink (numbers + letters)" value={inkC} setValue={setInkC} current={cfg.ink_colour} onCommit={() => commitColour('ink_colour', inkC)} busy={busy} />
         <ColourField label="Dice body" value={diceC} setValue={setDiceC} current={cfg.dice_colour} onCommit={() => commitColour('dice_colour', diceC)} busy={busy} />
         <ColourField label="Dice pips" value={pipC} setValue={setPipC} current={cfg.pip_colour} onCommit={() => commitColour('pip_colour', pipC)} busy={busy} />
-        <ColourField label="Table (around the box)" value={tableC} setValue={setTableC} current={cfg.table_colour} onCommit={() => commitColour('table_colour', tableC)} busy={busy} />
       </div>
       <p className="text-xs text-neutral-500">
         Felt, frame and tile colours are now driven by Poly Haven textures (velvet for the felt, wood for the frame and tiles). Drop the JPGs into <code>frontend/public/textures/</code>.
@@ -162,6 +171,18 @@ export default function AdminShutTheBoxSection() {
         <div className="space-y-2">
           {(cfg.scattered_sets || []).map((s) => (
             <ScatteredSetEditor key={s.ord} set={s} busy={busy} onSave={(patch) => saveSet(s.ord, patch)} />
+          ))}
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Background surface colours</p>
+        <p className="text-xs text-neutral-500">3 slots — the game picks one at random from the <em>active</em> slots on each page load.</p>
+        <div className="space-y-2">
+          {(cfg.table_colours || []).map((t) => (
+            <TableColourEditor key={t.ord} slot={t} busy={busy} onSave={(patch) => saveTableColour(t.ord, patch)} />
           ))}
         </div>
       </div>
@@ -215,6 +236,49 @@ export default function AdminShutTheBoxSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+function TableColourEditor({ slot, busy, onSave }) {
+  const [val, setVal] = useState(slot.colour ?? '');
+  useEffect(() => { setVal(slot.colour ?? ''); }, [slot.colour]);
+  const dirty = val !== (slot.colour ?? '');
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+
+  function commit() {
+    if (!HEX.test(val)) return;
+    onSave({ colour: val });
+  }
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-2 space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-neutral-700">Slot {slot.ord}</span>
+        <button
+          onClick={() => onSave({ active: !slot.active })}
+          disabled={busy}
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${slot.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {slot.active ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="inline-block h-6 w-6 rounded border border-neutral-300" style={{ background: slot.colour }} />
+        <input
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={() => { if (dirty && HEX.test(val)) commit(); }}
+          className={inputCls + ' font-mono'}
+          placeholder="#d3f3ea"
+        />
+        <button
+          onClick={commit}
+          disabled={busy || !dirty || !HEX.test(val)}
+          className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30"
+        >
+          Save
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -21,6 +21,8 @@ async function getConfig() {
   if (!cfg) return null;
   const { rows: sets } = await query(`SELECT ord, back, front, active FROM stb_scattered_sets ORDER BY ord`);
   cfg.scattered_sets = sets;
+  const { rows: tableColours } = await query(`SELECT ord, colour, active FROM stb_table_colours ORDER BY ord`);
+  cfg.table_colours = tableColours;
   return cfg;
 }
 
@@ -119,6 +121,34 @@ export default async function stbRoutes(fastify) {
     if (updates.length) {
       updates.push(`updated_at = NOW()`);
       await query(`UPDATE stb_config SET ${updates.join(', ')} WHERE id = 1`, values);
+    }
+    return await getConfig();
+  });
+
+  // Table-colour admin endpoint — update one of the 3 slots by ord (1..3)
+  fastify.patch('/api/admin/shut-the-box/table-colours/:ord', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    const ord = Number(req.params.ord);
+    if (!Number.isInteger(ord) || ord < 1 || ord > 3) return reply.code(400).send({ error: 'ord must be 1..3' });
+    const patch = req.body ?? {};
+    if ('colour' in patch && (typeof patch.colour !== 'string' || !HEX_RE.test(patch.colour))) {
+      return reply.code(400).send({ error: 'colour must be a hex like #d3f3ea' });
+    }
+    if ('active' in patch && typeof patch.active !== 'boolean') {
+      return reply.code(400).send({ error: 'active must be a boolean' });
+    }
+    const updates = [];
+    const values = [];
+    for (const k of ['colour', 'active']) {
+      if (k in patch) {
+        values.push(patch[k]);
+        updates.push(`${k} = $${values.length}`);
+      }
+    }
+    if (updates.length) {
+      updates.push(`updated_at = NOW()`);
+      values.push(ord);
+      await query(`UPDATE stb_table_colours SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
     return await getConfig();
   });
