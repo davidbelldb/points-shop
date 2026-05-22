@@ -160,6 +160,7 @@ export const api = {
     updateStbScatteredSet: (ord, patch) => request(`/admin/shut-the-box/scattered-sets/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateStbTableColour: (ord, patch) => request(`/admin/shut-the-box/table-colours/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateStbDicePalette: (ord, patch) => request(`/admin/shut-the-box/dice-palettes/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    updateStbTileMessage: (ord, patch) => request(`/admin/shut-the-box/tile-messages/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     upload: uploadFile,
   },
 };

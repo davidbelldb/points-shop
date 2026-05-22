@@ -39,6 +39,15 @@ function lettersFromMessage(msg, len) {
   return out;
 }
 
+// Pick a random ACTIVE 9-char tile message; fall back to the legacy single hidden_message.
+function pickTileMessage(config) {
+  const msgs = Array.isArray(config?.tile_messages)
+    ? config.tile_messages.filter((m) => m.active && m.message)
+    : [];
+  if (msgs.length > 0) return msgs[Math.floor(Math.random() * msgs.length)].message;
+  return config?.hidden_message || 'I_MISS_U!';
+}
+
 function hasValidClose(openTiles, target) {
   const n = openTiles.length;
   for (let mask = 1; mask < (1 << n); mask++) {
@@ -567,8 +576,12 @@ export function StbScene({
   buttonBar = null,
   bigButton = null,
   scatteredSet = { back: '', front: '' },
+  tileMessage = '',
 }) {
-  const inboxLetters = useMemo(() => lettersFromMessage(config.hidden_message, 9), [config.hidden_message]);
+  const inboxLetters = useMemo(
+    () => lettersFromMessage(tileMessage || config.hidden_message, 9),
+    [tileMessage, config.hidden_message],
+  );
   const backLetters = useMemo(() => lettersFromMessage(scatteredSet.back, 8), [scatteredSet.back]);
   const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 7), [scatteredSet.front]);
   const activePalettes = useMemo(
@@ -694,6 +707,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [scatteredSet, setScatteredSet] = useState({ back: '', front: '' });
   const [tableColour, setTableColour] = useState('#d3f3ea');
+  const [tileMessage, setTileMessage] = useState('I_MISS_U!');
   const [game, setGame] = useState(null);
   const [openTiles, setOpenTiles] = useState([...ALL_TILES]);
   const [selected, setSelected] = useState([]);
@@ -730,6 +744,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
       } else {
         setTableColour(c.table_colour || '#d3f3ea');
       }
+      setTileMessage(pickTileMessage(c));
     }).catch(() => {});
   }, []);
 
@@ -745,6 +760,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
       setThrowSeed(0);
       setPhase('idle');
       settledRef.current = [null, null];
+      setTileMessage(pickTileMessage(config)); // fresh hidden message each new game
     } catch (e) {
       setError(e.message);
     } finally { setBusy(false); }
@@ -884,6 +900,7 @@ export function ShutKatiesBoxGame({ showStatus = true }) {
           buttonBar={buttonBar}
           bigButton={bigButton}
           scatteredSet={scatteredSet}
+          tileMessage={tileMessage}
         />
       </StbCanvasShell>
 

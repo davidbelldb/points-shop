@@ -77,14 +77,31 @@ function BrandingSection({ settings, onChanged }) {
   const [shopName, setShopName] = useState('');
   const [heroTitle, setHeroTitle] = useState('');
   const [heroSubtitle, setHeroSubtitle] = useState('');
+  const [bannerText, setBannerText] = useState('');
+  const [bannerBg, setBannerBg] = useState('#0b8476');
+  const [bannerFg, setBannerFg] = useState('#ffffff');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  const bannerEnabled = settings.banner_enabled === 'true';
 
   useEffect(() => {
     setShopName(settings.shop_name ?? '');
     setHeroTitle(settings.hero_title ?? '');
     setHeroSubtitle(settings.hero_subtitle ?? '');
-  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle]);
+    setBannerText(settings.banner_text ?? '');
+    setBannerBg(settings.banner_bg_colour ?? '#0b8476');
+    setBannerFg(settings.banner_text_colour ?? '#ffffff');
+  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle, settings.banner_text, settings.banner_bg_colour, settings.banner_text_colour]);
+
+  async function toggleBanner() {
+    setBusy(true); setError(null);
+    try {
+      await api.admin.updateSettings({ banner_enabled: bannerEnabled ? 'false' : 'true' });
+      await onChanged();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
 
   async function uploadLogo(e) {
     const file = e.target.files?.[0];
@@ -113,6 +130,9 @@ function BrandingSection({ settings, onChanged }) {
         shop_name: shopName,
         hero_title: heroTitle,
         hero_subtitle: heroSubtitle,
+        banner_text: bannerText,
+        banner_bg_colour: bannerBg,
+        banner_text_colour: bannerFg,
       });
       await onChanged();
     } catch (err) { setError(err.message); }
@@ -147,6 +167,35 @@ function BrandingSection({ settings, onChanged }) {
       <Field label="Shop name"><input className={inputCls} value={shopName} onChange={(e) => setShopName(e.target.value)} /></Field>
       <Field label="Hero title"><input className={inputCls} value={heroTitle} onChange={(e) => setHeroTitle(e.target.value)} /></Field>
       <Field label="Hero subtitle"><input className={inputCls} value={heroSubtitle} onChange={(e) => setHeroSubtitle(e.target.value)} /></Field>
+      <p className="text-xs text-neutral-500">Tip: use <code>{'{name}'}</code> in the hero title or subtitle to insert the user&apos;s name (e.g. &quot;Welcome back {'{name}'}&quot;).</p>
+
+      <hr className="border-neutral-200" />
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Top banner</p>
+        <button
+          onClick={toggleBanner}
+          disabled={busy}
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${bannerEnabled ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {bannerEnabled ? 'Shown' : 'Hidden'}
+        </button>
+      </div>
+      <Field label="Banner message"><input className={inputCls} value={bannerText} onChange={(e) => setBannerText(e.target.value)} placeholder="e.g. Free delivery this weekend!" /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Banner colour">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-6 w-6 rounded border border-neutral-300" style={{ background: bannerBg }} />
+            <input className={inputCls + ' font-mono'} value={bannerBg} onChange={(e) => setBannerBg(e.target.value)} placeholder="#0b8476" />
+          </div>
+        </Field>
+        <Field label="Banner font colour">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-6 w-6 rounded border border-neutral-300" style={{ background: bannerFg }} />
+            <input className={inputCls + ' font-mono'} value={bannerFg} onChange={(e) => setBannerFg(e.target.value)} placeholder="#ffffff" />
+          </div>
+        </Field>
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button onClick={saveText} disabled={busy} className="w-full rounded-md bg-amber-600 py-2 text-sm font-semibold text-amber-900 disabled:opacity-40">

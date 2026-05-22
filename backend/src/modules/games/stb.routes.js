@@ -25,6 +25,8 @@ async function getConfig() {
   cfg.table_colours = tableColours;
   const { rows: dicePalettes } = await query(`SELECT ord, body, pip, active FROM stb_dice_palettes ORDER BY ord`);
   cfg.dice_palettes = dicePalettes;
+  const { rows: tileMessages } = await query(`SELECT ord, message, active FROM stb_tile_messages ORDER BY ord`);
+  cfg.tile_messages = tileMessages;
   return cfg;
 }
 
@@ -123,6 +125,34 @@ export default async function stbRoutes(fastify) {
     if (updates.length) {
       updates.push(`updated_at = NOW()`);
       await query(`UPDATE stb_config SET ${updates.join(', ')} WHERE id = 1`, values);
+    }
+    return await getConfig();
+  });
+
+  // Tile-message admin endpoint — update one of the 10 messages by ord (1..10)
+  fastify.patch('/api/admin/shut-the-box/tile-messages/:ord', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    const ord = Number(req.params.ord);
+    if (!Number.isInteger(ord) || ord < 1 || ord > 10) return reply.code(400).send({ error: 'ord must be 1..10' });
+    const patch = req.body ?? {};
+    if ('message' in patch && (typeof patch.message !== 'string' || patch.message.length !== 9)) {
+      return reply.code(400).send({ error: 'message must be exactly 9 characters (use _ for blank tiles)' });
+    }
+    if ('active' in patch && typeof patch.active !== 'boolean') {
+      return reply.code(400).send({ error: 'active must be a boolean' });
+    }
+    const updates = [];
+    const values = [];
+    for (const k of ['message', 'active']) {
+      if (k in patch) {
+        values.push(patch[k]);
+        updates.push(`${k} = $${values.length}`);
+      }
+    }
+    if (updates.length) {
+      updates.push(`updated_at = NOW()`);
+      values.push(ord);
+      await query(`UPDATE stb_tile_messages SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
     return await getConfig();
   });

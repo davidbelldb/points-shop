@@ -393,9 +393,10 @@ export default async function giftsweeperRoutes(fastify) {
       [match.id, opponentId],
     )).rows;
     const oppHitsByItem = {}; for (const r of oppHits) oppHitsByItem[r.hit_item_id] = r.c;
-    const myAllRevealed = myItems.every((it) => (oppHitsByItem[it.id]||0) >= (it.cells||[]).length);
     const oppAllRevealed = oppItems.every((it) => ((beforeByItem[it.id]||0) + (thisTurnByItem[it.id]||0)) >= (it.cells||[]).length);
-    const matchFinished = myAllRevealed && oppAllRevealed;
+    // Match ends as soon as the player taking this turn has found ALL the opponent's hidden
+    // items — no need for the other player to also finish first.
+    const matchFinished = oppAllRevealed;
 
     if (matchFinished) {
       await updateGsMatch(match.id, { finished_at: new Date(), current_turn_account_id: null });

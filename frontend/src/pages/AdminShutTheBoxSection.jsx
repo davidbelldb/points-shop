@@ -23,7 +23,6 @@ export default function AdminShutTheBoxSection() {
   const [saved, setSaved] = useState(false);
 
   // Local edit buffers (so user can type freely without immediate save)
-  const [hidden, setHidden] = useState('');
   const [inkC, setInkC] = useState('');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
@@ -32,7 +31,6 @@ export default function AdminShutTheBoxSection() {
     try {
       const c = await api.admin.getStbConfig();
       setCfg(c);
-      setHidden(c.hidden_message ?? '');
       setInkC(c.ink_colour ?? '');
       setTitle(c.homepage_title ?? '');
       setSubtitle(c.homepage_subtitle ?? '');
@@ -64,12 +62,16 @@ export default function AdminShutTheBoxSection() {
     save({ homepage_days: next });
   }
 
-  function commitHidden() {
-    if (hidden.length !== 9) {
-      setError('Message must be exactly 9 characters (use _ for blank tiles).');
-      return;
-    }
-    save({ hidden_message: hidden });
+  async function saveTileMessage(ord, patch) {
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      const updated = await api.admin.updateStbTileMessage(ord, patch);
+      setCfg(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setError(e.message);
+    } finally { setBusy(false); }
   }
 
   async function saveSet(ord, patch) {
@@ -139,27 +141,14 @@ export default function AdminShutTheBoxSection() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Hidden message</p>
-        <p className="mt-1 text-xs text-neutral-500">Exactly 9 characters. Use <code>_</code> for blank tiles.</p>
-        <div className="mt-2 flex gap-2">
-          <input
-            value={hidden}
-            onChange={(e) => setHidden(e.target.value.slice(0, 9))}
-            maxLength={9}
-            className={inputCls + ' font-mono tracking-widest'}
-            placeholder="I_MISS_U!"
-          />
-          <button onClick={commitHidden} disabled={busy || hidden === cfg.hidden_message} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">
-            Save
-          </button>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Hidden tile messages</p>
+        <p className="text-xs text-neutral-500">Up to 10 messages, each exactly 9 characters. The game picks one at random from the <em>active</em> messages every new game. Use <code>_</code> for blank tiles.</p>
+        <div className="space-y-2">
+          {(cfg.tile_messages || []).map((m) => (
+            <TileMessageEditor key={m.ord} slot={m} busy={busy} onSave={(patch) => saveTileMessage(m.ord, patch)} />
+          ))}
         </div>
-        <p className="mt-1 text-xs text-neutral-500">
-          Current letters: {[1,2,3,4,5,6,7,8,9].map((i) => {
-            const ch = (cfg.hidden_message || '').padEnd(9, '_').slice(0, 9)[i - 1];
-            return ch === '_' ? '·' : ch;
-          }).join(' ')}
-        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -254,6 +243,44 @@ export default function AdminShutTheBoxSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+function TileMessageEditor({ slot, busy, onSave }) {
+  const [msg, setMsg] = useState(slot.message ?? '');
+  useEffect(() => { setMsg(slot.message ?? ''); }, [slot.message]);
+  const dirty = msg !== (slot.message ?? '');
+  const valid = msg.length === 9;
+
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-2 space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-neutral-700">Message {slot.ord}</span>
+        <button
+          onClick={() => onSave({ active: !slot.active })}
+          disabled={busy}
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${slot.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {slot.active ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={msg}
+          onChange={(e) => setMsg(e.target.value.slice(0, 9))}
+          maxLength={9}
+          className={inputCls + ' font-mono tracking-widest'}
+          placeholder="I_MISS_U!"
+        />
+        <button
+          onClick={() => { if (valid) onSave({ message: msg }); }}
+          disabled={busy || !dirty || !valid}
+          className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30"
+        >
+          Save
+        </button>
+      </div>
+    </div>
   );
 }
 
