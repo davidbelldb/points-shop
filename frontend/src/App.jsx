@@ -31,17 +31,11 @@ export default function App() {
   const shopName = settings.shop_name ?? 'Sneaky Points';
   const logoUrl  = settings.logo_url;
 
+  const isHome = location.pathname === '/';
   const bannerOn = settings.banner_enabled === 'true' && (settings.banner_text || '').trim();
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
-      {bannerOn && (
-        <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
-          <div className="mx-auto max-w-md px-3 py-1.5 text-center text-xs font-semibold tracking-wide">
-            {settings.banner_text}
-          </div>
-        </div>
-      )}
       {user?.impersonating && (
         <div className="bg-amber-100 border-b border-amber-200">
           <div className="mx-auto flex max-w-md items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900">
@@ -104,6 +98,13 @@ export default function App() {
           </div>
         </div>
       </header>
+      {isHome && bannerOn && (
+        <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
+          <div className="mx-auto max-w-md px-3 py-1.5 text-center text-xs font-semibold tracking-wide">
+            {settings.banner_text}
+          </div>
+        </div>
+      )}
       {showFloater && <SurveyBanner />}
       <main className="mx-auto max-w-md px-4 pb-24 pt-4">
         <Outlet />
