@@ -86,6 +86,26 @@ export default function AccountPage() {
         <span className="text-neutral-400">{'\u2192'}</span>
       </Link>
 
+      <Link
+        to="/rewatch"
+        className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <path d="m10 8 5 3-5 3V8z" />
+              <path d="M7 21h10" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Rewatch list</p>
+            <p className="text-xs text-neutral-500">Films & shows to watch</p>
+          </div>
+        </div>
+        <span className="text-neutral-400">{'\u2192'}</span>
+      </Link>
+
       <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
         <div className="flex items-center gap-3">
           <label className="relative cursor-pointer">

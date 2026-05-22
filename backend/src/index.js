@@ -26,6 +26,7 @@ import giftsweeperRoutes from './modules/games/giftsweeper.routes.js';
 import rewardsRoutes from './modules/rewards/rewards.routes.js';
 import wheelRoutes from './modules/wheel/wheel.routes.js';
 import stbRoutes from './modules/games/stb.routes.js';
+import rewatchRoutes from './modules/rewatch/rewatch.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
@@ -95,6 +96,7 @@ await fastify.register(giftsweeperRoutes);
 await fastify.register(rewardsRoutes);
 await fastify.register(wheelRoutes);
 await fastify.register(stbRoutes);
+await fastify.register(rewatchRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 
