@@ -279,7 +279,7 @@ export default function DuckyDerbyPage() {
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {/* ---- Race track (single layered container) ---- */}
-      <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
+      <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
         {/* far bank: grass + mud — above the water/start line, below the ducks */}
         <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
         {/* cartoon grass tufts fringing the far bank */}
