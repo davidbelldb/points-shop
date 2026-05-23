@@ -3,16 +3,24 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 
-const LEADER_X = 54;   // % — the front of the pack sits here
-const SPREAD_K = 230;  // % per unit of progress difference (pack tightness)
-const COURSE_K = 138;  // % the finish line travels in from the right
-const DUCK_W = 76;     // px
-const LANE_GAP = 16;   // px between lanes (heavy overlap)
+/* --- side-scroller camera model ---
+ * The course is COURSE_LEN screen-widths long. Each duck has a world-X = progress*COURSE_LEN.
+ * The camera follows the leader, keeping it at ANCHOR once it has moved in from the left.
+ * screen% of a world-X = (worldX - camX) * 100.  camX is clamped so the course start shows
+ * the ducks on the LEFT and the finish line ends near the right edge. */
+const COURSE_LEN = 2.5;   // screen-widths
+const ANCHOR = 0.4;       // where the leader settles, in screen-widths
+const SPREAD = 235;       // % screen per unit of progress difference (pack tightness)
+const DUCK_W = 78;
+const DUCK_H = 66;
+const LANE_GAP = 17;
+const TOP_PAD = 30;       // room above the top duck for its speech bubble
+const BOTTOM_PAD = 12;
 
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function oddsLabel(num, den) { return `${num}/${den}`; }
 function oddsMult(num, den) { return num / den + 1; }
 
-/* lighten/darken a #rrggbb hex by amt (-255..255) */
 function shade(hex, amt) {
   const h = (hex || '#4aa3c7').replace('#', '');
   const ch = [0, 2, 4].map((i) => {
@@ -26,16 +34,19 @@ function waveBg(col) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-function DuckSprite({ ord, duckColour, billColour, size }) {
+function DuckSprite({ ord, duckColour, billColour, w, h }) {
   const [broken, setBroken] = useState(false);
   if (broken) {
     return (
-      <div className="relative rounded-full" style={{ width: size, height: size * 0.78, background: duckColour }}>
-        <span className="absolute" style={{ right: -size * 0.15, top: '40%', width: size * 0.28, height: size * 0.17, background: billColour, borderRadius: '0 50% 50% 0' }} />
+      <div className="relative" style={{ width: w, height: h }}>
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ width: w * 0.82, height: w * 0.64, background: duckColour }}>
+          <span className="absolute" style={{ right: -w * 0.13, top: '42%', width: w * 0.26, height: w * 0.16, background: billColour, borderRadius: '0 50% 50% 0' }} />
+        </div>
       </div>
     );
   }
-  return <img src={`/duck_${ord}.png`} alt="" style={{ width: size, height: 'auto', display: 'block' }} onError={() => setBroken(true)} />;
+  return <img src={`/duck_${ord}.png`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
 /* Walk a duck's whirlpool timeline -> { m: progress 0-1, whirl: null | {frac, loops} } */
@@ -72,6 +83,7 @@ export default function DuckyDerbyPage() {
   const laneRefs = useRef({});
   const spriteRefs = useRef({});
   const finishRef = useRef(null);
+  const startRef = useRef(null);
   const resultTimer = useRef(null);
 
   async function newLineup() {
@@ -103,15 +115,16 @@ export default function DuckyDerbyPage() {
 
   const ducks = (result?.ducks) || lineup?.ducks || [];
   const n = ducks.length || 1;
-  const WATER_H = (n - 1) * LANE_GAP + 84;
+  const WATER_H = TOP_PAD + (n - 1) * LANE_GAP + DUCK_H + BOTTOM_PAD;
   const laneIndex = useMemo(() => {
     const map = {};
     ducks.forEach((d, i) => { map[d.ord] = i; });
     return map;
   }, [ducks]);
-  const stagger = (i) => (n - 1 - i) * 1.5;
+  const stagger = (i) => (n - 1 - i) * 1.4;
+  const laneTop = (i) => TOP_PAD + i * LANE_GAP;
 
-  /* ---- rAF race animation: leader-camera scrolling course ---- */
+  /* ---- rAF race animation ---- */
   useEffect(() => {
     if (phase !== 'racing' || !result) return;
     const t0 = performance.now();
@@ -122,14 +135,18 @@ export default function DuckyDerbyPage() {
         d, ...duckState(elapsed, result.finish_ms[d.ord], result.whirlpools?.[d.ord]),
       }));
       const leaderM = states.reduce((mx, s) => Math.max(mx, s.m), 0);
+      const leaderWorldX = leaderM * COURSE_LEN;
+      const camX = clamp(leaderWorldX - ANCHOR, 0, COURSE_LEN - 0.95);
+      const leaderScreen = (leaderWorldX - camX) * 100;
+
       for (const s of states) {
         const i = laneIndex[s.d.ord] ?? 0;
         const lane = laneRefs.current[s.d.ord];
         if (lane) {
-          lane.style.left = `${LEADER_X - (leaderM - s.m) * SPREAD_K + stagger(i)}%`;
+          lane.style.left = `${leaderScreen - (leaderM - s.m) * SPREAD + stagger(i)}%`;
           if (s.whirl) {
             const ang = s.whirl.frac * s.whirl.loops * Math.PI * 2;
-            lane.style.transform = `translate(${Math.cos(ang) * 17}px, ${Math.sin(ang) * 13}px)`;
+            lane.style.transform = `translate(${Math.cos(ang) * 16}px, ${Math.sin(ang) * 12}px)`;
           } else {
             lane.style.transform = 'translate(0, 0)';
           }
@@ -137,9 +154,9 @@ export default function DuckyDerbyPage() {
         const sprite = spriteRefs.current[s.d.ord];
         if (sprite) sprite.style.transform = `rotate(${Math.sin(elapsed / 320 + i) * 6}deg)`;
       }
-      if (finishRef.current) {
-        finishRef.current.style.left = `${LEADER_X + (1 - leaderM) * COURSE_K}%`;
-      }
+      if (finishRef.current) finishRef.current.style.left = `${(COURSE_LEN - camX) * 100}%`;
+      if (startRef.current) startRef.current.style.left = `${(0 - camX) * 100}%`;
+
       const maxMs = Math.max(...Object.values(result.finish_ms));
       if (elapsed < maxMs + 500) raf = requestAnimationFrame(tick);
     };
@@ -159,7 +176,7 @@ export default function DuckyDerbyPage() {
       const fin = result.finish_ms[d.ord];
       const count = 1 + (Math.random() < 0.5 ? 1 : 0);
       for (let i = 0; i < count; i++) {
-        const at = 1600 + Math.random() * Math.max(1000, fin - 4500);
+        const at = 1800 + Math.random() * Math.max(1000, fin - 5000);
         const text = activePhrases[Math.floor(Math.random() * activePhrases.length)];
         timers.push(setTimeout(() => setBubbles((b) => ({ ...b, [d.ord]: text })), at));
         timers.push(setTimeout(() => setBubbles((b) => { const x = { ...b }; delete x[d.ord]; return x; }), at + 2600));
@@ -208,6 +225,9 @@ export default function DuckyDerbyPage() {
   const banners = (config?.banners || []).filter((b) => b.active && b.text.trim());
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
+  // betting-phase static positions
+  const bettingStartX = 0;
+  const bettingFinishX = COURSE_LEN * 100;
 
   return (
     <div className="space-y-4 py-2">
@@ -224,7 +244,6 @@ export default function DuckyDerbyPage() {
 
       {/* ---- Race track ---- */}
       <div className="overflow-hidden rounded-2xl shadow-lg">
-        {/* top grass bank + banners */}
         <div className="relative flex items-center gap-2 overflow-hidden px-3 py-2" style={{ background: '#5bbf3a', minHeight: 42 }}>
           {banners.length === 0
             ? <span className="text-xs font-semibold text-white/70">Ducky Derby</span>
@@ -232,26 +251,27 @@ export default function DuckyDerbyPage() {
               <span key={b.ord} className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-emerald-700 shadow">{b.text}</span>
             ))}
         </div>
-        {/* mud strip */}
         <div style={{ background: '#6b4a2a', height: 12 }} />
 
-        {/* water */}
+        {/* water (clips everything to this rectangle) */}
         <div className="relative overflow-hidden" style={{ background: water, height: WATER_H }}>
-          {/* cartoon wave layers */}
-          <div className="absolute inset-x-0" style={{ top: '24%', height: 30, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: 0.55, animation: 'ddwave 7s linear infinite' }} />
-          <div className="absolute inset-x-0" style={{ top: '52%', height: 30, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
-          <div className="absolute inset-x-0" style={{ top: '76%', height: 30, backgroundImage: waveBg(shade(water, 38)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
+          <div className="absolute inset-x-0" style={{ top: '22%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: 0.55, animation: 'ddwave 7s linear infinite' }} />
+          <div className="absolute inset-x-0" style={{ top: '50%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
+          <div className="absolute inset-x-0" style={{ top: '74%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
 
-          {/* start line (dashed) */}
-          <div className="absolute top-0 bottom-0" style={{ left: '5%', borderLeft: '3px dashed rgba(255,255,255,0.85)', zIndex: 1 }} />
-          {/* finish line (chequered, slight tilt) */}
+          {/* start line (dashed) — scrolls off to the left */}
+          <div
+            ref={startRef}
+            className="absolute top-0"
+            style={{ left: atBetting ? `${bettingStartX}%` : undefined, height: WATER_H, borderLeft: '3px dashed rgba(255,255,255,0.9)', zIndex: 2 }}
+          />
+          {/* finish line (chequered) — scrolls in from the right */}
           <div
             ref={finishRef}
             className="absolute top-0"
             style={{
-              left: `${LEADER_X + COURSE_K}%`, width: 16, height: WATER_H,
+              left: atBetting ? `${bettingFinishX}%` : undefined, width: 16, height: WATER_H, zIndex: 3,
               background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
-              transform: 'rotate(-9deg)', transformOrigin: 'center', zIndex: 2,
             }}
           />
 
@@ -260,11 +280,7 @@ export default function DuckyDerbyPage() {
               key={d.ord}
               ref={(el) => { laneRefs.current[d.ord] = el; }}
               className="absolute"
-              style={{
-                top: i * LANE_GAP,
-                left: atBetting ? `${LEADER_X + stagger(i)}%` : undefined,
-                zIndex: 10 + i,
-              }}
+              style={{ top: laneTop(i), left: atBetting ? `${stagger(i)}%` : undefined, zIndex: 10 + i }}
             >
               {bubbles[d.ord] && (
                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-800 shadow">
@@ -274,13 +290,12 @@ export default function DuckyDerbyPage() {
               )}
               <div ref={(el) => { spriteRefs.current[d.ord] = el; }}
                 className={phase === 'racing' ? '' : 'animate-[ddbob_2.4s_ease-in-out_infinite]'}>
-                <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} size={DUCK_W} />
+                <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={DUCK_W} h={DUCK_H} />
               </div>
             </div>
           ))}
         </div>
 
-        {/* mud strip + bottom grass */}
         <div style={{ background: '#6b4a2a', height: 12 }} />
         <div style={{ background: '#5bbf3a', height: 16 }} />
       </div>
@@ -304,7 +319,7 @@ export default function DuckyDerbyPage() {
                       pickedOrd === d.ord ? 'border-amber-500 bg-amber-50' : 'border-neutral-200 bg-white'
                     }`}
                   >
-                    <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} size={40} />
+                    <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={42} h={36} />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">{d.name}</span>
                     <span className="shrink-0 rounded-md bg-neutral-900 px-2 py-1 text-xs font-bold text-white">
                       {oddsLabel(d.odds_num, d.odds_den)}
