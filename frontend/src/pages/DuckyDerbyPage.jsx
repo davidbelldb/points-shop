@@ -35,6 +35,13 @@ function waveBg(col) {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='30'><path d='M0 18 Q45 5 90 18 T180 18 V30 H0 Z' fill='${col}'/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
+// Cartoon grass: a repeating band of spiky blades, anchored at the bottom of the tile.
+function grassBg(col) {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='22'>` +
+    `<path d='M0 22 H96 V12 L88 1 L80 12 L72 3 L64 12 L56 2 L48 12 L40 4 L32 12 L24 1 L16 12 L8 3 L0 12 Z' fill='${col}'/>` +
+    `</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
 
 function DuckSprite({ ord, duckColour, billColour, w, h }) {
   const [broken, setBroken] = useState(false);
@@ -275,6 +282,8 @@ export default function DuckyDerbyPage() {
       <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
         {/* far bank: grass + mud — above the water/start line, below the ducks */}
         <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
+        {/* cartoon grass tufts fringing the far bank */}
+        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 5, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
 
         {/* cartoon wave layers */}
@@ -328,6 +337,8 @@ export default function DuckyDerbyPage() {
 
         {/* near bank: bottom grass — IN FRONT of the ducks */}
         <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: grass, zIndex: 30 }} />
+        {/* cartoon grass tufts poking up off the near bank */}
+        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 30, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
 
         {/* start line (dashed) — a marking ON the water, so the ducks swim over it */}
         <div
