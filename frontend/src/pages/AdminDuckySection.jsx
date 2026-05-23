@@ -11,6 +11,8 @@ export default function AdminDuckySection() {
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
   const [water, setWater] = useState('');
+  const [grass, setGrass] = useState('');
+  const [mud, setMud] = useState('');
   const [count, setCount] = useState(10);
 
   async function load() {
@@ -18,6 +20,8 @@ export default function AdminDuckySection() {
       const c = await api.admin.getDucky();
       setCfg(c);
       setWater(c.water_colour ?? '');
+      setGrass(c.grass_colour ?? '');
+      setMud(c.mud_colour ?? '');
       setCount(c.race_duck_count ?? 10);
     } catch (e) { setError(e.message); }
   }
@@ -36,7 +40,11 @@ export default function AdminDuckySection() {
 
   function saveConfig() {
     if (!HEX_RE.test(water)) { setError('Water colour must be a hex like #4aa3c7'); return; }
-    run(() => api.admin.updateDucky({ water_colour: water, race_duck_count: Number(count) }));
+    if (!HEX_RE.test(grass)) { setError('Grass colour must be a hex like #5bbf3a'); return; }
+    if (!HEX_RE.test(mud)) { setError('Mud colour must be a hex like #6b4a2a'); return; }
+    run(() => api.admin.updateDucky({
+      water_colour: water, grass_colour: grass, mud_colour: mud, race_duck_count: Number(count),
+    }));
   }
 
   if (!cfg) {
@@ -58,16 +66,12 @@ export default function AdminDuckySection() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="grid grid-cols-2 gap-3">
+        <ColourInput label="Water colour" value={water} setValue={setWater} swatch={water} />
+        <ColourInput label="Grass colour" value={grass} setValue={setGrass} swatch={grass} />
+        <ColourInput label="Mud colour" value={mud} setValue={setMud} swatch={mud} />
         <div>
-          <p className="text-xs font-medium text-neutral-700">Water colour</p>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="inline-block h-7 w-7 shrink-0 rounded border border-neutral-300" style={{ background: cfg.water_colour }} />
-            <input className={inputCls + ' font-mono'} value={water} onChange={(e) => setWater(e.target.value)} placeholder="#4aa3c7" />
-          </div>
-        </div>
-        <div>
-          <p className="text-xs font-medium text-neutral-700">Ducks per race</p>
-          <select className={inputCls + ' mt-1'} value={count} onChange={(e) => setCount(Number(e.target.value))}>
+          <span className="text-[11px] text-neutral-500">Ducks per race</span>
+          <select className={inputCls + ' mt-0.5'} value={count} onChange={(e) => setCount(Number(e.target.value))}>
             {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((nn) => <option key={nn} value={nn}>{nn}</option>)}
           </select>
         </div>

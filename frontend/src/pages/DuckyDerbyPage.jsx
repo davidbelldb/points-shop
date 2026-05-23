@@ -48,7 +48,7 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
       </div>
     );
   }
-  return <img src={`/duck_${ord}.png`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
+  return <img src={`/duck_${ord}.png?v=2`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
 /* A cartoon banner held up by two black poles — white cloth, black uppercase text. */
@@ -253,6 +253,8 @@ export default function DuckyDerbyPage() {
   }
 
   const water = config?.water_colour || '#4aa3c7';
+  const grass = config?.grass_colour || '#5bbf3a';
+  const mud = config?.mud_colour || '#6b4a2a';
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
 
@@ -271,9 +273,9 @@ export default function DuckyDerbyPage() {
 
       {/* ---- Race track (single layered container) ---- */}
       <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
-        {/* far bank: grass + mud (behind the ducks) */}
-        <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: '#5bbf3a', zIndex: 1 }} />
-        <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: '#6b4a2a', zIndex: 1 }} />
+        {/* far bank: grass + mud — above the water/start line, below the ducks */}
+        <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
+        <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
 
         {/* cartoon wave layers */}
         <div className="absolute inset-x-0" style={{ top: WATER_TOP + 20, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: 0.55, animation: 'ddwave 7s linear infinite' }} />
@@ -286,7 +288,7 @@ export default function DuckyDerbyPage() {
             key={b.ord}
             ref={(el) => { bannerRefs.current[b.ord] = el; }}
             className="absolute"
-            style={{ top: 6, left: atBetting ? `${b.wx * 100}%` : undefined, zIndex: 2 }}
+            style={{ top: 6, left: atBetting ? `${b.wx * 100}%` : undefined, zIndex: 7 }}
           >
             <PoleBanner text={b.text} />
           </div>
@@ -298,7 +300,7 @@ export default function DuckyDerbyPage() {
           className="absolute"
           style={{
             top: WATER_TOP - 8, left: atBetting ? `${COURSE_LEN * 100}%` : undefined,
-            width: 16, height: TRACK_H - WATER_TOP + 8, zIndex: 3,
+            width: 16, height: TRACK_H - WATER_TOP + 8, zIndex: 2,
             background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
           }}
         />
@@ -309,7 +311,7 @@ export default function DuckyDerbyPage() {
             key={d.ord}
             ref={(el) => { laneRefs.current[d.ord] = el; }}
             className="absolute"
-            style={{ top: laneTop(i), left: atBetting ? '0%' : undefined, zIndex: 5 + i }}
+            style={{ top: laneTop(i), left: atBetting ? '0%' : undefined, zIndex: 10 + i }}
           >
             {bubbles[d.ord] && (
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-800 shadow">
@@ -325,7 +327,7 @@ export default function DuckyDerbyPage() {
         ))}
 
         {/* near bank: bottom grass — IN FRONT of the ducks */}
-        <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: '#5bbf3a', zIndex: 20 }} />
+        <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: grass, zIndex: 30 }} />
 
         {/* start line (dashed) — a marking ON the water, so the ducks swim over it */}
         <div

@@ -173,15 +173,17 @@ export default async function duckyRoutes(fastify) {
   fastify.patch('/api/admin/games/ducky', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
     const p = req.body ?? {};
-    if ('water_colour' in p && (typeof p.water_colour !== 'string' || !HEX_RE.test(p.water_colour))) {
-      return reply.code(400).send({ error: 'water_colour must be a hex colour' });
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour']) {
+      if (k in p && (typeof p[k] !== 'string' || !HEX_RE.test(p[k]))) {
+        return reply.code(400).send({ error: `${k} must be a hex colour` });
+      }
     }
     if ('race_duck_count' in p && (!Number.isInteger(p.race_duck_count) || p.race_duck_count < 2 || p.race_duck_count > 10)) {
       return reply.code(400).send({ error: 'race_duck_count must be 2-10' });
     }
     const updates = [];
     const values = [];
-    for (const k of ['water_colour', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days']) {
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days']) {
       if (k in p) { values.push(p[k]); updates.push(`${k} = $${values.length}`); }
     }
     if (updates.length) {
