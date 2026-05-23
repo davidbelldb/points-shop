@@ -41,28 +41,33 @@ async function getDuckyConfig() {
   return cfg;
 }
 
-// Generate 0-2 whirlpools at moving-progress fractions, durations included in finishMs.
+// 0-2 whirlpools at moving-progress fractions. Each is an OSCILLATION: the duck
+// idles in a slow circular drift for `loops` full loops; the time is baked into finishMs.
 function makeWhirlpools() {
   const r = Math.random();
-  const count = r < 0.32 ? 0 : r < 0.82 ? 1 : 2;
+  const count = r < 0.34 ? 0 : r < 0.82 ? 1 : 2;
   const pools = [];
-  let lastAt = 0.15;
+  let lastAt = 0.16;
   for (let i = 0; i < count; i++) {
     const at = lastAt + 0.08 + Math.random() * (0.62 - lastAt);
-    if (at > 0.85) break;
-    pools.push({ at: Math.round(at * 1000) / 1000, durationMs: 900 + Math.floor(Math.random() * 900) });
-    lastAt = at + 0.12;
+    if (at > 0.84) break;
+    pools.push({
+      at: Math.round(at * 1000) / 1000,
+      durationMs: 1500 + Math.floor(Math.random() * 1700),
+      loops: 1 + Math.floor(Math.random() * 3), // 1-3 oscillations
+    });
+    lastAt = at + 0.13;
   }
   return pools;
 }
 
 export default async function duckyRoutes(fastify) {
-  // Public config (also used by the homepage embed later).
   fastify.get('/api/games/ducky/config', async () => {
     return await getDuckyConfig();
   });
 
-  // Create a fresh lineup — races all active ducks (up to race_duck_count).
+  // Create a lineup — races all active ducks (up to race_duck_count), fractional odds
+  // shuffled on, secret uniform-random winner + timings.
   fastify.post('/api/games/ducky/lineup', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
     const { rows: cfgRows } = await query(`SELECT * FROM ducky_config WHERE id = 1`);
@@ -72,18 +77,17 @@ export default async function duckyRoutes(fastify) {
 
     const n = Math.max(2, Math.min(cfg.race_duck_count || 10, 10, allDucks.length));
     const racers = shuffle(allDucks).slice(0, n);
-    // Odds pool: every duck's odds value shuffled and assigned regardless of speed.
-    const oddsPool = shuffle(allDucks.map((d) => Number(d.odds)));
+    const oddsPool = shuffle(allDucks.map((d) => ({ num: d.odds_num, den: d.odds_den })));
     const lineup = racers.map((d, i) => ({
       ord: d.ord,
       name: d.name,
       duck_colour: d.duck_colour,
       bill_colour: d.bill_colour,
-      odds: oddsPool[i % oddsPool.length],
+      odds_num: oddsPool[i % oddsPool.length].num,
+      odds_den: oddsPool[i % oddsPool.length].den,
     }));
 
     const winner = lineup[Math.floor(Math.random() * lineup.length)];
-    // Winner ~15-16.5s; others a modest spread behind (smooth, not extreme).
     const winMs = 15000 + Math.floor(Math.random() * 1500);
     const finishMs = {};
     const whirlpools = {};
@@ -102,7 +106,6 @@ export default async function duckyRoutes(fastify) {
     return { lineup_id: rows[0].id, ducks: lineup, balance: await getBalance(meId) };
   });
 
-  // Place the bet and resolve the race.
   fastify.post('/api/games/ducky/race', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
     const { lineup_id, picked_ord, stake } = req.body ?? {};
@@ -128,7 +131,9 @@ export default async function duckyRoutes(fastify) {
     if (stakeN > balance) return reply.code(400).send({ error: 'Stake exceeds your balance' });
 
     const won = race.winner_ord === picked.ord;
-    const payout = won ? Math.round(stakeN * Number(picked.odds)) : 0;
+    // Fractional odds: total return = stake * (num/den + 1).
+    const mult = picked.odds_num / picked.odds_den + 1;
+    const payout = won ? Math.round(stakeN * mult) : 0;
 
     await adjustPoints(meId, -stakeN, `ducky:stake-${race.id}`);
     if (won) await adjustPoints(meId, payout, `ducky:win-${race.id}`);
@@ -145,7 +150,8 @@ export default async function duckyRoutes(fastify) {
       whirlpools: race.whirlpools,
       ducks: lineup,
       picked_ord: picked.ord,
-      odds: Number(picked.odds),
+      odds_num: picked.odds_num,
+      odds_den: picked.odds_den,
       stake: stakeN,
       won,
       payout,
@@ -195,12 +201,14 @@ export default async function duckyRoutes(fastify) {
         return reply.code(400).send({ error: `${k} must be a hex colour` });
       }
     }
-    if ('odds' in p && (typeof p.odds !== 'number' || p.odds <= 0 || p.odds > 999)) {
-      return reply.code(400).send({ error: 'odds must be a positive number' });
+    for (const k of ['odds_num', 'odds_den']) {
+      if (k in p && (!Number.isInteger(p[k]) || p[k] < 1 || p[k] > 999)) {
+        return reply.code(400).send({ error: `${k} must be a whole number 1-999` });
+      }
     }
     const updates = [];
     const values = [];
-    for (const k of ['name', 'duck_colour', 'bill_colour', 'odds', 'active']) {
+    for (const k of ['name', 'duck_colour', 'bill_colour', 'odds_num', 'odds_den', 'active']) {
       if (k in p) { values.push(p[k]); updates.push(`${k} = $${values.length}`); }
     }
     if (updates.length) {

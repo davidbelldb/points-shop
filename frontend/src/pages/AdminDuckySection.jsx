@@ -61,14 +61,14 @@ export default function AdminDuckySection() {
         <div>
           <p className="text-xs font-medium text-neutral-700">Water colour</p>
           <div className="mt-1 flex items-center gap-2">
-            <span className="inline-block h-6 w-6 rounded border border-neutral-300" style={{ background: cfg.water_colour }} />
+            <span className="inline-block h-7 w-7 shrink-0 rounded border border-neutral-300" style={{ background: cfg.water_colour }} />
             <input className={inputCls + ' font-mono'} value={water} onChange={(e) => setWater(e.target.value)} placeholder="#4aa3c7" />
           </div>
         </div>
         <div>
           <p className="text-xs font-medium text-neutral-700">Ducks per race</p>
           <select className={inputCls + ' mt-1'} value={count} onChange={(e) => setCount(Number(e.target.value))}>
-            {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+            {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((nn) => <option key={nn} value={nn}>{nn}</option>)}
           </select>
         </div>
       </div>
@@ -108,47 +108,67 @@ export default function AdminDuckySection() {
   );
 }
 
+function ColourInput({ label, value, setValue, swatch }) {
+  return (
+    <label className="block">
+      <span className="text-[11px] text-neutral-500">{label}</span>
+      <div className="mt-0.5 flex items-center gap-1.5">
+        <span className="inline-block h-7 w-7 shrink-0 rounded border border-neutral-300" style={{ background: swatch }} />
+        <input className={inputCls + ' font-mono'} value={value} onChange={(e) => setValue(e.target.value)} placeholder="#ffd23f" />
+      </div>
+    </label>
+  );
+}
+
 function DuckEditor({ duck, busy, onSave }) {
   const [name, setName] = useState(duck.name ?? '');
   const [duckC, setDuckC] = useState(duck.duck_colour ?? '');
   const [billC, setBillC] = useState(duck.bill_colour ?? '');
-  const [odds, setOdds] = useState(String(duck.odds ?? ''));
+  const [oNum, setONum] = useState(String(duck.odds_num ?? ''));
+  const [oDen, setODen] = useState(String(duck.odds_den ?? ''));
   useEffect(() => {
-    setName(duck.name ?? ''); setDuckC(duck.duck_colour ?? '');
-    setBillC(duck.bill_colour ?? ''); setOdds(String(duck.odds ?? ''));
-  }, [duck.name, duck.duck_colour, duck.bill_colour, duck.odds]);
+    setName(duck.name ?? '');
+    setDuckC(duck.duck_colour ?? '');
+    setBillC(duck.bill_colour ?? '');
+    setONum(String(duck.odds_num ?? ''));
+    setODen(String(duck.odds_den ?? ''));
+  }, [duck.name, duck.duck_colour, duck.bill_colour, duck.odds_num, duck.odds_den]);
 
   function save() {
-    const oddsN = parseFloat(odds);
+    const num = parseInt(oNum, 10);
+    const den = parseInt(oDen, 10);
     if (!HEX_RE.test(duckC) || !HEX_RE.test(billC)) return;
-    if (!(oddsN > 0)) return;
-    onSave({ name, duck_colour: duckC, bill_colour: billC, odds: oddsN });
+    if (!(num > 0) || !(den > 0)) return;
+    onSave({ name, duck_colour: duckC, bill_colour: billC, odds_num: num, odds_den: den });
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-2 space-y-1.5">
+    <div className="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-neutral-700">Duck {duck.ord}</span>
         <button
           onClick={() => onSave({ active: !duck.active })}
           disabled={busy}
-          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${duck.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+          className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${duck.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
         >
           {duck.active ? 'Racing' : 'Benched'}
         </button>
       </div>
       <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Duck name" />
-      <div className="flex gap-2">
-        <div className="flex flex-1 items-center gap-1.5">
-          <span className="inline-block h-6 w-6 shrink-0 rounded border border-neutral-300" style={{ background: duck.duck_colour }} />
-          <input className={inputCls + ' font-mono'} value={duckC} onChange={(e) => setDuckC(e.target.value)} placeholder="Body #" />
-        </div>
-        <div className="flex flex-1 items-center gap-1.5">
-          <span className="inline-block h-6 w-6 shrink-0 rounded border border-neutral-300" style={{ background: duck.bill_colour }} />
-          <input className={inputCls + ' font-mono'} value={billC} onChange={(e) => setBillC(e.target.value)} placeholder="Bill #" />
-        </div>
-        <input className={inputCls + ' w-16 text-center'} value={odds} onChange={(e) => setOdds(e.target.value)} placeholder="Odds" />
-        <button onClick={save} disabled={busy} className="shrink-0 rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">
+      <div className="grid grid-cols-2 gap-2">
+        <ColourInput label="Body colour" value={duckC} setValue={setDuckC} swatch={duck.duck_colour} />
+        <ColourInput label="Bill colour" value={billC} setValue={setBillC} swatch={duck.bill_colour} />
+      </div>
+      <div className="flex items-end gap-2">
+        <label className="block">
+          <span className="text-[11px] text-neutral-500">Odds (e.g. 10/1)</span>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <input className={inputCls + ' w-14 text-center'} value={oNum} onChange={(e) => setONum(e.target.value)} placeholder="10" />
+            <span className="font-bold text-neutral-500">/</span>
+            <input className={inputCls + ' w-14 text-center'} value={oDen} onChange={(e) => setODen(e.target.value)} placeholder="1" />
+          </div>
+        </label>
+        <button onClick={save} disabled={busy} className="ml-auto rounded-md bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-30">
           Save
         </button>
       </div>
@@ -167,7 +187,7 @@ function TextRowEditor({ row, label, busy, onSave }) {
         <button
           onClick={() => onSave({ active: !row.active })}
           disabled={busy}
-          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${row.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+          className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${row.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
         >
           {row.active ? 'Active' : 'Inactive'}
         </button>
