@@ -11,8 +11,22 @@ const TMDB_GENRES = {
   10765: 'Sci-Fi & Fantasy', 10766: 'Soap', 10767: 'Talk', 10768: 'War & Politics',
 };
 
+// The "partner" is simply the other account (this app has exactly two users).
+async function getPartner(accountId) {
+  const { rows } = await query(
+    `SELECT id, name FROM accounts WHERE id <> $1 ORDER BY created_at ASC LIMIT 1`,
+    [accountId],
+  );
+  return rows[0] || null;
+}
+
+async function getAccountName(accountId) {
+  const { rows } = await query(`SELECT name FROM accounts WHERE id = $1`, [accountId]);
+  return rows[0]?.name || 'Someone';
+}
+
 export default async function rewatchRoutes(fastify) {
-  // List the calling account's rewatch items.
+  // The calling account's watch list.
   fastify.get('/api/rewatch', async (req) => {
     const meId = getEffectiveAccountId(req);
     const { rows } = await query(
@@ -24,18 +38,30 @@ export default async function rewatchRoutes(fastify) {
     return rows;
   });
 
-  // TMDB type-ahead proxy — keeps the API key server-side.
+  // Who the "invite" flag targets — the other account's name.
+  fastify.get('/api/rewatch/partner', async (req) => {
+    const meId = getEffectiveAccountId(req);
+    const partner = await getPartner(meId);
+    return partner || { id: null, name: 'them' };
+  });
+
+  // TMDB type-ahead proxy — supports both v3 key and v4 token.
   fastify.get('/api/rewatch/search', async (req) => {
     const q = (req.query?.q || '').trim();
-    const key = process.env.TMDB_API_KEY;
-    if (!key) return { configured: false, results: [] };
+    const key = (process.env.TMDB_API_KEY || '').trim();
+    if (!key) return { configured: false, results: [], error: 'TMDB_API_KEY not set' };
     if (q.length < 2) return { configured: true, results: [] };
     try {
-      const url = `https://api.themoviedb.org/3/search/multi?api_key=${key}&include_adult=false&query=${encodeURIComponent(q)}`;
-      const res = await fetch(url);
+      const isV4Token = key.startsWith('eyJ');
+      const base = 'https://api.themoviedb.org/3/search/multi';
+      const url = isV4Token
+        ? `${base}?include_adult=false&query=${encodeURIComponent(q)}`
+        : `${base}?api_key=${encodeURIComponent(key)}&include_adult=false&query=${encodeURIComponent(q)}`;
+      const res = await fetch(url, isV4Token ? { headers: { Authorization: `Bearer ${key}` } } : undefined);
       if (!res.ok) {
-        fastify.log.warn({ status: res.status }, 'tmdb search non-ok');
-        return { configured: true, results: [] };
+        const body = await res.text().catch(() => '');
+        fastify.log.warn({ status: res.status, body: body.slice(0, 200) }, 'tmdb search non-ok');
+        return { configured: true, results: [], error: `TMDB HTTP ${res.status}` };
       }
       const data = await res.json();
       const results = (data.results || [])
@@ -53,7 +79,7 @@ export default async function rewatchRoutes(fastify) {
       return { configured: true, results };
     } catch (e) {
       fastify.log.error({ err: e }, 'tmdb search failed');
-      return { configured: true, results: [] };
+      return { configured: true, results: [], error: `request failed: ${e?.message || e}` };
     }
   });
 
@@ -70,12 +96,14 @@ export default async function rewatchRoutes(fastify) {
     const genres = Array.isArray(b.genres) ? b.genres.filter((g) => typeof g === 'string').slice(0, 12) : [];
     const score = (typeof b.tmdb_score === 'number' && b.tmdb_score >= 0 && b.tmdb_score <= 10) ? b.tmdb_score : null;
     const mediaType = (b.media_type === 'movie' || b.media_type === 'tv') ? b.media_type : null;
+    const seenBefore = b.seen_before !== false; // default true (a rewatch)
+    const invitePartner = !!b.invite_partner;
 
     const { rows } = await query(
       `INSERT INTO rewatch_items
          (account_id, tmdb_id, media_type, title, poster_url, genres, tmdb_score,
-          watch_month, watch_year, priority, invite_david)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          watch_month, watch_year, priority, invite_partner, seen_before)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
       [
         meId,
@@ -88,22 +116,48 @@ export default async function rewatchRoutes(fastify) {
         month,
         year,
         priority,
-        !!b.invite_david,
+        invitePartner,
+        seenBefore,
       ],
     );
-    return rows[0];
+    const item = rows[0];
+
+    // Notify the partner if invited.
+    if (invitePartner) {
+      try {
+        const partner = await getPartner(meId);
+        if (partner) {
+          const myName = await getAccountName(meId);
+          await query(
+            `INSERT INTO notifications (account_id, type, title, body, link_url)
+             VALUES ($1, 'watch_invite', $2, $3, '/rewatch')`,
+            [partner.id, 'Watch list invite', `${myName} wants to watch "${item.title}" with you`],
+          );
+        }
+      } catch (e) {
+        fastify.log.error({ err: e }, 'watch invite notification failed');
+      }
+    }
+    return item;
   });
 
-  // Update an item (watched toggle, priority, invite flag).
+  // Update an item.
   fastify.patch('/api/rewatch/:id', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
     const patch = req.body ?? {};
     const updates = [];
     const values = [];
     if ('watched' in patch) { values.push(!!patch.watched); updates.push(`watched = $${values.length}`); }
-    if ('invite_david' in patch) { values.push(!!patch.invite_david); updates.push(`invite_david = $${values.length}`); }
+    if ('seen_before' in patch) { values.push(!!patch.seen_before); updates.push(`seen_before = $${values.length}`); }
+    if ('invite_partner' in patch) { values.push(!!patch.invite_partner); updates.push(`invite_partner = $${values.length}`); }
     if ('priority' in patch && Number.isInteger(patch.priority) && patch.priority >= 1 && patch.priority <= 5) {
       values.push(patch.priority); updates.push(`priority = $${values.length}`);
+    }
+    if ('watch_month' in patch && Number.isInteger(patch.watch_month) && patch.watch_month >= 1 && patch.watch_month <= 12) {
+      values.push(patch.watch_month); updates.push(`watch_month = $${values.length}`);
+    }
+    if ('watch_year' in patch && Number.isInteger(patch.watch_year)) {
+      values.push(patch.watch_year); updates.push(`watch_year = $${values.length}`);
     }
     if (!updates.length) return reply.code(400).send({ error: 'nothing to update' });
     values.push(req.params.id, meId);

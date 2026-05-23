@@ -84,6 +84,7 @@ export const api = {
   stbEnd:     (payload) => request('/games/shut-the-box/end', { method: 'POST', body: JSON.stringify(payload) }),
   getStbConfig: () => request('/games/shut-the-box/config'),
   rewatchList: () => request('/rewatch'),
+  rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
   addRewatch: (data) => request('/rewatch', { method: 'POST', body: JSON.stringify(data) }),
   updateRewatch: (id, patch) => request(`/rewatch/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),

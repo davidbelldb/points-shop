@@ -10,6 +10,11 @@ const YEARS = [NOW.getFullYear(), NOW.getFullYear() + 1, NOW.getFullYear() + 2];
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none';
 
+function possessive(name) {
+  if (!name) return 'My';
+  return name.endsWith('s') ? `${name}'` : `${name}'s`;
+}
+
 /* ---- Poster placeholder for free-text entries with no artwork ---- */
 function PosterFallback() {
   return (
@@ -22,7 +27,6 @@ function PosterFallback() {
   );
 }
 
-/* ---- Star priority picker ---- */
 function PriorityPicker({ value, onChange }) {
   return (
     <div className="flex gap-1">
@@ -42,11 +46,100 @@ function PriorityPicker({ value, onChange }) {
   );
 }
 
+/* ---- One poster card ---- */
+function ItemCard({ it, busy, onToggleWatched, onRemove }) {
+  return (
+    <div className={`overflow-hidden rounded-xl border border-neutral-200 bg-white ${it.watched ? 'opacity-60' : ''}`}>
+      <div className="relative aspect-[2/3] bg-neutral-900">
+        {it.poster_url ? (
+          <img src={it.poster_url} alt={it.title} className="h-full w-full object-cover" />
+        ) : (
+          <PosterFallback />
+        )}
+        <span className="absolute left-1.5 top-1.5 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+          P{it.priority}
+        </span>
+        {it.invite_partner && (
+          <span className="absolute right-1.5 top-1.5 rounded bg-teal-300 px-1.5 py-0.5 text-[10px] font-bold text-teal-900">
+            Invite
+          </span>
+        )}
+        {it.watched && (
+          <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            Watched
+          </span>
+        )}
+      </div>
+      <div className="space-y-1 p-2">
+        <p className="truncate text-sm font-medium" title={it.title}>{it.title}</p>
+        <p className="text-[11px] text-neutral-500">
+          {it.watch_month ? `${MONTHS[it.watch_month - 1]} ` : ''}{it.watch_year || ''}
+          {it.tmdb_score ? ` · ${Number(it.tmdb_score).toFixed(1)}` : ''}
+        </p>
+        {it.genres?.length > 0 && (
+          <p className="truncate text-[11px] text-neutral-400">{it.genres.join(', ')}</p>
+        )}
+        <div className="flex gap-1 pt-1">
+          <button
+            onClick={() => onToggleWatched(it)}
+            disabled={busy}
+            className="flex-1 rounded-md bg-neutral-100 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-40"
+          >
+            {it.watched ? 'To watch' : 'Watched'}
+          </button>
+          <button
+            onClick={() => onRemove(it)}
+            disabled={busy}
+            aria-label="Remove"
+            className="rounded-md border border-neutral-200 px-2 py-1 text-[11px] text-neutral-400 hover:border-red-300 hover:text-red-600 disabled:opacity-40"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- A list section (To rewatch / To watch) with its own sort ---- */
+function Section({ heading, items, sort, setSort, emptyText, busy, onToggleWatched, onRemove }) {
+  const sorted = useMemo(() => {
+    const arr = [...items];
+    if (sort === 'az') {
+      arr.sort((a, b) => a.title.localeCompare(b.title));
+    } else {
+      arr.sort((a, b) => (b.priority - a.priority) || (new Date(b.created_at) - new Date(a.created_at)));
+    }
+    return arr;
+  }, [items, sort]);
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">{heading} <span className="text-sm font-normal text-neutral-400">({items.length})</span></h2>
+        <select className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs" value={sort} onChange={(e) => setSort(e.target.value)}>
+          <option value="priority">Priority</option>
+          <option value="az">A-Z</option>
+        </select>
+      </div>
+      {sorted.length === 0 ? (
+        <p className="text-sm text-neutral-400">{emptyText}</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {sorted.map((it) => (
+            <ItemCard key={it.id} it={it} busy={busy} onToggleWatched={onToggleWatched} onRemove={onRemove} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function RewatchListPage() {
   const { account } = useBasket();
-  const ownerName = account?.name || 'My';
-  const title = ownerName.endsWith('s') ? `${ownerName}' Rewatch List` : `${ownerName}'s Rewatch List`;
+  const title = `${possessive(account?.name)} watch list`;
 
+  const [partnerName, setPartnerName] = useState('them');
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -56,26 +149,32 @@ export default function RewatchListPage() {
   const [searchResults, setSearchResults] = useState([]);
   const [tmdbConfigured, setTmdbConfigured] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [picked, setPicked] = useState(null); // a chosen search result, or { title } for free-text
+  const [picked, setPicked] = useState(null);
   const [month, setMonth] = useState(NOW.getMonth() + 1);
   const [year, setYear] = useState(NOW.getFullYear());
   const [priority, setPriority] = useState(3);
-  const [inviteDavid, setInviteDavid] = useState(false);
+  const [seenBefore, setSeenBefore] = useState(true);
+  const [invitePartner, setInvitePartner] = useState(false);
   const searchTimer = useRef(null);
 
-  /* ---- filter state ---- */
+  /* ---- filter + sort state ---- */
   const [genreFilter, setGenreFilter] = useState('');
   const [minScore, setMinScore] = useState(0);
+  const [rewatchSort, setRewatchSort] = useState('priority');
+  const [watchSort, setWatchSort] = useState('priority');
 
   async function load() {
     try { setItems(await api.rewatchList()); }
     catch (e) { setError(e.message); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.rewatchPartner().then((p) => p?.name && setPartnerName(p.name)).catch(() => {});
+  }, []);
 
   /* ---- debounced TMDB search ---- */
   useEffect(() => {
-    if (picked) return; // don't search once something is chosen
+    if (picked) return;
     if (searchTimer.current) clearTimeout(searchTimer.current);
     const q = searchText.trim();
     if (q.length < 2) { setSearchResults([]); return; }
@@ -111,7 +210,8 @@ export default function RewatchListPage() {
     setMonth(NOW.getMonth() + 1);
     setYear(NOW.getFullYear());
     setPriority(3);
-    setInviteDavid(false);
+    setSeenBefore(true);
+    setInvitePartner(false);
   }
 
   async function addItem() {
@@ -128,7 +228,8 @@ export default function RewatchListPage() {
         watch_month: month,
         watch_year: year,
         priority,
-        invite_david: inviteDavid,
+        seen_before: seenBefore,
+        invite_partner: invitePartner,
       });
       resetForm();
       await load();
@@ -151,7 +252,6 @@ export default function RewatchListPage() {
     finally { setBusy(false); }
   }
 
-  /* ---- derived: genre options + filtered list ---- */
   const allGenres = useMemo(() => {
     const s = new Set();
     (items || []).forEach((it) => (it.genres || []).forEach((g) => s.add(g)));
@@ -165,6 +265,9 @@ export default function RewatchListPage() {
       return true;
     });
   }, [items, genreFilter, minScore]);
+
+  const rewatchItems = useMemo(() => filtered.filter((it) => it.seen_before), [filtered]);
+  const watchItems = useMemo(() => filtered.filter((it) => !it.seen_before), [filtered]);
 
   return (
     <div className="space-y-5 py-2">
@@ -258,8 +361,12 @@ export default function RewatchListPage() {
               <PriorityPicker value={priority} onChange={setPriority} />
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={inviteDavid} onChange={(e) => setInviteDavid(e.target.checked)} className="h-4 w-4" />
-              Invite David?
+              <input type="checkbox" checked={seenBefore} onChange={(e) => setSeenBefore(e.target.checked)} className="h-4 w-4" />
+              I&apos;ve seen it before
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={invitePartner} onChange={(e) => setInvitePartner(e.target.checked)} className="h-4 w-4" />
+              Invite {partnerName}?
             </label>
             <button
               onClick={addItem}
@@ -272,7 +379,7 @@ export default function RewatchListPage() {
         )}
       </section>
 
-      {/* ---- Filters ---- */}
+      {/* ---- Global filters ---- */}
       {items && items.length > 0 && (
         <div className="flex gap-2">
           <select className={inputCls} value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)}>
@@ -286,67 +393,33 @@ export default function RewatchListPage() {
         </div>
       )}
 
-      {/* ---- Grid ---- */}
       {items === null ? (
         <p className="text-sm text-neutral-500">Loading...</p>
-      ) : filtered.length === 0 ? (
-        <p className="text-sm text-neutral-500">
-          {items.length === 0 ? 'Nothing on the list yet. Add something above!' : 'Nothing matches those filters.'}
-        </p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-neutral-500">Nothing on the list yet. Add something above!</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {filtered.map((it) => (
-            <div key={it.id} className={`overflow-hidden rounded-xl border border-neutral-200 bg-white ${it.watched ? 'opacity-60' : ''}`}>
-              <div className="relative aspect-[2/3] bg-neutral-900">
-                {it.poster_url ? (
-                  <img src={it.poster_url} alt={it.title} className="h-full w-full object-cover" />
-                ) : (
-                  <PosterFallback />
-                )}
-                <span className="absolute left-1.5 top-1.5 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                  P{it.priority}
-                </span>
-                {it.invite_david && (
-                  <span className="absolute right-1.5 top-1.5 rounded bg-teal-300 px-1.5 py-0.5 text-[10px] font-bold text-teal-900">
-                    +David
-                  </span>
-                )}
-                {it.watched && (
-                  <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    Watched
-                  </span>
-                )}
-              </div>
-              <div className="space-y-1 p-2">
-                <p className="truncate text-sm font-medium" title={it.title}>{it.title}</p>
-                <p className="text-[11px] text-neutral-500">
-                  {it.watch_month ? `${MONTHS[it.watch_month - 1]} ` : ''}{it.watch_year || ''}
-                  {it.tmdb_score ? ` · ${Number(it.tmdb_score).toFixed(1)}` : ''}
-                </p>
-                {it.genres?.length > 0 && (
-                  <p className="truncate text-[11px] text-neutral-400">{it.genres.join(', ')}</p>
-                )}
-                <div className="flex gap-1 pt-1">
-                  <button
-                    onClick={() => toggleWatched(it)}
-                    disabled={busy}
-                    className="flex-1 rounded-md bg-neutral-100 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-40"
-                  >
-                    {it.watched ? 'To watch' : 'Watched'}
-                  </button>
-                  <button
-                    onClick={() => remove(it)}
-                    disabled={busy}
-                    aria-label="Remove"
-                    className="rounded-md border border-neutral-200 px-2 py-1 text-[11px] text-neutral-400 hover:border-red-300 hover:text-red-600 disabled:opacity-40"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          <Section
+            heading="To rewatch"
+            items={rewatchItems}
+            sort={rewatchSort}
+            setSort={setRewatchSort}
+            emptyText="Nothing to rewatch matches those filters."
+            busy={busy}
+            onToggleWatched={toggleWatched}
+            onRemove={remove}
+          />
+          <Section
+            heading="To watch"
+            items={watchItems}
+            sort={watchSort}
+            setSort={setWatchSort}
+            emptyText="Nothing new to watch matches those filters."
+            busy={busy}
+            onToggleWatched={toggleWatched}
+            onRemove={remove}
+          />
+        </>
       )}
     </div>
   );

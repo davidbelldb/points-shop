@@ -99,8 +99,8 @@ export default function AccountPage() {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-medium">{account.name}&apos;s rewatch list</p>
-            <p className="text-xs text-neutral-500">2026 rewatch list, innit.</p>
+            <p className="text-sm font-medium">{account.name}&apos;s watch list</p>
+            <p className="text-xs text-neutral-500">2026 watch list, innit.</p>
           </div>
         </div>
         <span className="text-neutral-400">{'\u2192'}</span>
