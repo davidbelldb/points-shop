@@ -83,6 +83,10 @@ export const api = {
   stbStart:   () => request('/games/shut-the-box/start', { method: 'POST' }),
   stbEnd:     (payload) => request('/games/shut-the-box/end', { method: 'POST', body: JSON.stringify(payload) }),
   getStbConfig: () => request('/games/shut-the-box/config'),
+  duckyConfig: () => request('/games/ducky/config'),
+  duckyLineup: () => request('/games/ducky/lineup', { method: 'POST' }),
+  duckyRace: (lineup_id, picked_ord, stake) =>
+    request('/games/ducky/race', { method: 'POST', body: JSON.stringify({ lineup_id, picked_ord, stake }) }),
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),

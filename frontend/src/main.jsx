@@ -19,6 +19,7 @@ import GiftsweeperPage from './pages/GiftsweeperPage.jsx';
 import RewardsPage from './pages/RewardsPage.jsx';
 import WheelOfMisfortunePage from './pages/WheelOfMisfortunePage.jsx';
 import ShutTheBoxPage from './pages/ShutTheBoxPage.jsx';
+import DuckyDerbyPage from './pages/DuckyDerbyPage.jsx';
 import RewatchListPage from './pages/RewatchListPage.jsx';
 import RewatchDetailPage from './pages/RewatchDetailPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
@@ -70,6 +71,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="games/giftsweeper" element={<GiftsweeperPage />} />
               <Route path="games/wheel-of-misfortune" element={<WheelOfMisfortunePage />} />
               <Route path="games/shut-the-box" element={<ShutTheBoxPage />} />
+              <Route path="games/ducky" element={<DuckyDerbyPage />} />
               <Route path="account/orders" element={<OrdersListPage />} />
               <Route path="account/points" element={<PointsHistoryPage />} />
               <Route path="account/rewards" element={<RewardsPage />} />
