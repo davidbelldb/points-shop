@@ -88,6 +88,10 @@ export const api = {
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
   rewatchGet: (id) => request(`/rewatch/${id}`),
   rewatchSeason: (id, n) => request(`/rewatch/${id}/season/${n}`),
+  rewatchInvites: () => request('/rewatch/invites'),
+  acceptRewatchInvite: (id, seenBefore) =>
+    request(`/rewatch/invites/${id}/accept`, { method: 'POST', body: JSON.stringify({ seen_before: seenBefore }) }),
+  declineRewatchInvite: (id) => request(`/rewatch/invites/${id}/decline`, { method: 'POST' }),
   addRewatch: (data) => request('/rewatch', { method: 'POST', body: JSON.stringify(data) }),
   updateRewatch: (id, patch) => request(`/rewatch/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteRewatch: (id) => request(`/rewatch/${id}`, { method: 'DELETE' }),

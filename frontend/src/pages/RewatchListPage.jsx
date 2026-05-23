@@ -145,6 +145,9 @@ export default function RewatchListPage() {
 
   const [partnerName, setPartnerName] = useState('them');
   const [items, setItems] = useState(null);
+  const [invites, setInvites] = useState([]);
+  const [respondTo, setRespondTo] = useState(null); // invite being responded to
+  const [respondSeen, setRespondSeen] = useState(true);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -171,10 +174,37 @@ export default function RewatchListPage() {
     try { setItems(await api.rewatchList()); }
     catch (e) { setError(e.message); }
   }
+  async function loadInvites() {
+    try { setInvites(await api.rewatchInvites()); }
+    catch { /* non-fatal */ }
+  }
   useEffect(() => {
     load();
+    loadInvites();
     api.rewatchPartner().then((p) => p?.name && setPartnerName(p.name)).catch(() => {});
   }, []);
+
+  async function acceptInvite() {
+    if (!respondTo) return;
+    setBusy(true); setError(null);
+    try {
+      await api.acceptRewatchInvite(respondTo.id, respondSeen);
+      setRespondTo(null);
+      await load();
+      await loadInvites();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+  async function declineInvite() {
+    if (!respondTo) return;
+    setBusy(true); setError(null);
+    try {
+      await api.declineRewatchInvite(respondTo.id);
+      setRespondTo(null);
+      await loadInvites();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
 
   /* ---- debounced TMDB search ---- */
   useEffect(() => {
@@ -282,6 +312,31 @@ export default function RewatchListPage() {
       </div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      {/* ---- Pending invites ---- */}
+      {invites.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-base font-semibold">Invites <span className="text-sm font-normal text-neutral-400">({invites.length})</span></h2>
+          <div className="space-y-2">
+            {invites.map((inv) => (
+              <button
+                key={inv.id}
+                onClick={() => { setRespondTo(inv); setRespondSeen(true); }}
+                className="flex w-full items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 p-2 text-left transition hover:shadow-sm"
+              >
+                <div className="h-16 w-11 shrink-0 overflow-hidden rounded bg-neutral-100">
+                  {inv.poster_url ? <img src={inv.poster_url} alt="" className="h-full w-full object-cover" /> : <PosterFallback />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-teal-900">{inv.title}</p>
+                  <p className="text-xs text-teal-700">{inv.from_name} wants to watch this with you</p>
+                </div>
+                <span className="shrink-0 rounded-lg bg-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-900">Respond</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ---- Add form ---- */}
       <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
@@ -425,6 +480,63 @@ export default function RewatchListPage() {
           />
         </>
       )}
+
+      {respondTo && (
+        <InviteRespondModal
+          invite={respondTo}
+          seen={respondSeen}
+          setSeen={setRespondSeen}
+          busy={busy}
+          onAccept={acceptInvite}
+          onDecline={declineInvite}
+          onClose={() => setRespondTo(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function InviteRespondModal({ invite, seen, setSeen, busy, onAccept, onDecline, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <p className="text-center text-xs font-semibold uppercase tracking-wider text-neutral-500">
+          {invite.from_name} invited you
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <div className="h-24 w-16 shrink-0 overflow-hidden rounded bg-neutral-100">
+            {invite.poster_url ? <img src={invite.poster_url} alt="" className="h-full w-full object-cover" /> : <PosterFallback />}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{invite.title}</p>
+            <p className="text-xs text-neutral-500">Priority {invite.priority}</p>
+            {invite.genres?.length > 0 && <p className="truncate text-xs text-neutral-400">{invite.genres.join(', ')}</p>}
+          </div>
+        </div>
+        <label className="mt-4 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={seen} onChange={(e) => setSeen(e.target.checked)} className="h-4 w-4" />
+          I&apos;ve seen it before
+        </label>
+        <p className="mt-1 text-xs text-neutral-400">
+          {seen ? 'It will be added to your "To rewatch" section.' : 'It will be added to your "To watch" section.'}
+        </p>
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onDecline}
+            disabled={busy}
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-semibold text-neutral-600 transition hover:border-red-300 hover:text-red-600 disabled:opacity-40"
+          >
+            Decline
+          </button>
+          <button
+            onClick={onAccept}
+            disabled={busy}
+            className="flex-1 rounded-xl bg-teal-300 py-2.5 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40"
+          >
+            Accept
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

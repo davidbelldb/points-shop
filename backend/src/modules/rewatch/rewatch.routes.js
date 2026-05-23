@@ -204,12 +204,18 @@ export default async function rewatchRoutes(fastify) {
     );
     const item = rows[0];
 
-    // Notify the partner if invited.
+    // Create a pending invite + notify the partner if invited.
     if (invitePartner) {
       try {
         const partner = await getPartner(meId);
         if (partner) {
           const myName = await getAccountName(meId);
+          await query(
+            `INSERT INTO rewatch_invites
+               (from_account_id, to_account_id, tmdb_id, media_type, title, poster_url, genres, tmdb_score, priority)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            [meId, partner.id, item.tmdb_id, item.media_type, item.title, item.poster_url, item.genres, item.tmdb_score, item.priority],
+          );
           await query(
             `INSERT INTO notifications (account_id, type, title, body, link_url)
              VALUES ($1, 'watch_invite', $2, $3, '/rewatch')`,
@@ -217,10 +223,56 @@ export default async function rewatchRoutes(fastify) {
           );
         }
       } catch (e) {
-        fastify.log.error({ err: e }, 'watch invite notification failed');
+        fastify.log.error({ err: e }, 'watch invite creation failed');
       }
     }
     return item;
+  });
+
+  // Pending invites addressed to the calling account.
+  fastify.get('/api/rewatch/invites', async (req) => {
+    const meId = getEffectiveAccountId(req);
+    const { rows } = await query(
+      `SELECT i.*, a.name AS from_name
+         FROM rewatch_invites i
+         JOIN accounts a ON a.id = i.from_account_id
+        WHERE i.to_account_id = $1 AND i.status = 'pending'
+        ORDER BY i.created_at DESC`,
+      [meId],
+    );
+    return rows;
+  });
+
+  // Accept an invite — copies the title onto the invitee's list.
+  fastify.post('/api/rewatch/invites/:id/accept', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    const seenBefore = (req.body?.seen_before) !== false; // default true
+    const { rows } = await query(
+      `SELECT * FROM rewatch_invites WHERE id = $1 AND to_account_id = $2 AND status = 'pending'`,
+      [req.params.id, meId],
+    );
+    const inv = rows[0];
+    if (!inv) return reply.code(404).send({ error: 'invite not found' });
+    await query(
+      `INSERT INTO rewatch_items
+         (account_id, tmdb_id, media_type, title, poster_url, genres, tmdb_score, priority, seen_before)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [meId, inv.tmdb_id, inv.media_type, inv.title, inv.poster_url, inv.genres, inv.tmdb_score, inv.priority, seenBefore],
+    );
+    await query(`UPDATE rewatch_invites SET status = 'accepted' WHERE id = $1`, [inv.id]);
+    return { ok: true };
+  });
+
+  // Decline an invite.
+  fastify.post('/api/rewatch/invites/:id/decline', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    const r = await query(
+      `UPDATE rewatch_invites SET status = 'declined'
+        WHERE id = $1 AND to_account_id = $2 AND status = 'pending' RETURNING id`,
+      [req.params.id, meId],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: 'invite not found' });
+    return { ok: true };
   });
 
   // Update an item.
