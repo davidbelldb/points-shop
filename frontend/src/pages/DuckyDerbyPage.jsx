@@ -18,7 +18,6 @@ const WATER_TOP = GRASS_TOP + MUD_H;
 const TOP_OVERLAP = 16;     // top duck pokes up over the far bank
 const GRASS_BOTTOM = 22;    // near bank — sits IN FRONT of the ducks
 const BOTTOM_TUCK = 12;     // last duck tucks behind the near bank
-const BANNER_COLOURS = ['#e0533a', '#3a86c8', '#e0a23a', '#5aa84a', '#9b59b6', '#e07b39'];
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function oddsLabel(num, den) { return `${num}/${den}`; }
@@ -52,14 +51,14 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
   return <img src={`/duck_${ord}.png`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
-/* A cartoon banner held up by two poles. */
-function PoleBanner({ text, colour }) {
+/* A cartoon banner held up by two black poles — white cloth, black uppercase text. */
+function PoleBanner({ text }) {
   return (
     <div className="relative">
-      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 48, background: '#7a5230', borderRadius: 2 }} />
-      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 48, background: '#7a5230', borderRadius: 2 }} />
-      <div className="relative rounded-md px-3 py-1 text-center text-[11px] font-extrabold text-white shadow-md"
-        style={{ background: colour, border: '2px solid rgba(255,255,255,0.6)' }}>
+      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 48, background: '#1a1a1a', borderRadius: 2 }} />
+      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 48, background: '#1a1a1a', borderRadius: 2 }} />
+      <div className="relative whitespace-nowrap rounded-md bg-white px-3 py-1 text-center text-[11px] font-extrabold uppercase text-black shadow-md"
+        style={{ border: '2px solid #1a1a1a' }}>
         {text}
       </div>
     </div>
@@ -147,7 +146,6 @@ export default function DuckyDerbyPage() {
     const k = active.length;
     return active.map((b, i) => ({
       ...b,
-      colour: BANNER_COLOURS[i % BANNER_COLOURS.length],
       wx: 0.9 + (COURSE_LEN - 1.2) * ((i + 0.4) / Math.max(1, k)) + (Math.random() - 0.5) * 0.25,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,7 +288,7 @@ export default function DuckyDerbyPage() {
             className="absolute"
             style={{ top: 6, left: atBetting ? `${b.wx * 100}%` : undefined, zIndex: 2 }}
           >
-            <PoleBanner text={b.text} colour={b.colour} />
+            <PoleBanner text={b.text} />
           </div>
         ))}
 
@@ -329,11 +327,11 @@ export default function DuckyDerbyPage() {
         {/* near bank: bottom grass — IN FRONT of the ducks */}
         <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: '#5bbf3a', zIndex: 20 }} />
 
-        {/* start line (dashed) — in front of the ducks */}
+        {/* start line (dashed) — a marking ON the water, so the ducks swim over it */}
         <div
           ref={startRef}
           className="absolute"
-          style={{ top: WATER_TOP - 8, left: atBetting ? `${START_WX * 100}%` : undefined, height: TRACK_H - WATER_TOP + 8, borderLeft: '3px dashed rgba(255,255,255,0.95)', zIndex: 30 }}
+          style={{ top: WATER_TOP - 8, left: atBetting ? `${START_WX * 100}%` : undefined, height: TRACK_H - WATER_TOP + 8, borderLeft: '3px dashed rgba(255,255,255,0.95)', zIndex: 2 }}
         />
       </div>
 
