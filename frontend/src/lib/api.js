@@ -177,6 +177,11 @@ export const api = {
     updateStbTableColour: (ord, patch) => request(`/admin/shut-the-box/table-colours/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateStbDicePalette: (ord, patch) => request(`/admin/shut-the-box/dice-palettes/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateStbTileMessage: (ord, patch) => request(`/admin/shut-the-box/tile-messages/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    getDucky: () => request('/admin/games/ducky'),
+    updateDucky: (patch) => request('/admin/games/ducky', { method: 'PATCH', body: JSON.stringify(patch) }),
+    updateDuckyDuck: (ord, patch) => request(`/admin/games/ducky/ducks/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    updateDuckyBanner: (ord, patch) => request(`/admin/games/ducky/banners/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    updateDuckyPhrase: (ord, patch) => request(`/admin/games/ducky/phrases/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     upload: uploadFile,
   },
 };
