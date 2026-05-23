@@ -50,28 +50,32 @@ function PriorityPicker({ value, onChange }) {
 function ItemCard({ it, busy, onToggleWatched, onRemove }) {
   return (
     <div className={`overflow-hidden rounded-xl border border-neutral-200 bg-white ${it.watched ? 'opacity-60' : ''}`}>
-      <div className="relative aspect-[2/3] bg-neutral-900">
-        {it.poster_url ? (
-          <img src={it.poster_url} alt={it.title} className="h-full w-full object-cover" />
-        ) : (
-          <PosterFallback />
-        )}
-        <span className="absolute left-1.5 top-1.5 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-          P{it.priority}
-        </span>
-        {it.invite_partner && (
-          <span className="absolute right-1.5 top-1.5 rounded bg-teal-300 px-1.5 py-0.5 text-[10px] font-bold text-teal-900">
-            Invite
+      <Link to={`/rewatch/${it.id}`} className="block">
+        <div className="relative aspect-[2/3] bg-neutral-900">
+          {it.poster_url ? (
+            <img src={it.poster_url} alt={it.title} className="h-full w-full object-cover" />
+          ) : (
+            <PosterFallback />
+          )}
+          <span className="absolute left-1.5 top-1.5 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+            P{it.priority}
           </span>
-        )}
-        {it.watched && (
-          <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
-            Watched
-          </span>
-        )}
-      </div>
+          {it.invite_partner && (
+            <span className="absolute right-1.5 top-1.5 rounded bg-teal-300 px-1.5 py-0.5 text-[10px] font-bold text-teal-900">
+              Invite
+            </span>
+          )}
+          {it.watched && (
+            <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              Watched
+            </span>
+          )}
+        </div>
+      </Link>
       <div className="space-y-1 p-2">
-        <p className="truncate text-sm font-medium" title={it.title}>{it.title}</p>
+        <Link to={`/rewatch/${it.id}`} className="block">
+          <p className="truncate text-sm font-medium" title={it.title}>{it.title}</p>
+        </Link>
         <p className="text-[11px] text-neutral-500">
           {it.watch_month ? `${MONTHS[it.watch_month - 1]} ` : ''}{it.watch_year || ''}
           {it.tmdb_score ? ` · ${Number(it.tmdb_score).toFixed(1)}` : ''}

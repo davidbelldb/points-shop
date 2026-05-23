@@ -86,6 +86,8 @@ export const api = {
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
+  rewatchGet: (id) => request(`/rewatch/${id}`),
+  rewatchSeason: (id, n) => request(`/rewatch/${id}/season/${n}`),
   addRewatch: (data) => request('/rewatch', { method: 'POST', body: JSON.stringify(data) }),
   updateRewatch: (id, patch) => request(`/rewatch/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteRewatch: (id) => request(`/rewatch/${id}`, { method: 'DELETE' }),

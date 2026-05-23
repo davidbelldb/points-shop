@@ -25,6 +25,25 @@ async function getAccountName(accountId) {
   return rows[0]?.name || 'Someone';
 }
 
+// Generic TMDB GET — supports both v3 key and v4 token. Returns parsed JSON or null.
+async function tmdbFetch(path, params = {}) {
+  const key = (process.env.TMDB_API_KEY || '').trim();
+  if (!key) return null;
+  try {
+    const isV4 = key.startsWith('eyJ');
+    const qs = new URLSearchParams(params);
+    if (!isV4) qs.set('api_key', key);
+    const res = await fetch(
+      `https://api.themoviedb.org/3${path}?${qs.toString()}`,
+      isV4 ? { headers: { Authorization: `Bearer ${key}` } } : undefined,
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export default async function rewatchRoutes(fastify) {
   // The calling account's watch list.
   fastify.get('/api/rewatch', async (req) => {
@@ -83,6 +102,69 @@ export default async function rewatchRoutes(fastify) {
     }
   });
 
+  // Single item + TMDB details (overview, cast, season summaries).
+  fastify.get('/api/rewatch/:id', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    const { rows } = await query(
+      `SELECT * FROM rewatch_items WHERE id = $1 AND account_id = $2`,
+      [req.params.id, meId],
+    );
+    const item = rows[0];
+    if (!item) return reply.code(404).send({ error: 'not found' });
+
+    let tmdb = null;
+    if (item.tmdb_id && (item.media_type === 'movie' || item.media_type === 'tv')) {
+      const data = await tmdbFetch(`/${item.media_type}/${item.tmdb_id}`, { append_to_response: 'credits' });
+      if (data) {
+        tmdb = {
+          overview: data.overview || '',
+          runtime: data.runtime || (Array.isArray(data.episode_run_time) ? data.episode_run_time[0] : null) || null,
+          cast: (data.credits?.cast || []).slice(0, 18).map((c) => ({
+            name: c.name,
+            character: c.character || '',
+            profile_url: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null,
+          })),
+          seasons: item.media_type === 'tv'
+            ? (data.seasons || [])
+                .filter((s) => s.season_number > 0)
+                .map((s) => ({
+                  season_number: s.season_number,
+                  name: s.name,
+                  episode_count: s.episode_count,
+                  air_date: s.air_date,
+                }))
+            : [],
+        };
+      }
+    }
+    return { item, tmdb };
+  });
+
+  // Episodes for one season of a TV item.
+  fastify.get('/api/rewatch/:id/season/:n', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    const { rows } = await query(
+      `SELECT tmdb_id, media_type FROM rewatch_items WHERE id = $1 AND account_id = $2`,
+      [req.params.id, meId],
+    );
+    const item = rows[0];
+    if (!item || item.media_type !== 'tv' || !item.tmdb_id) {
+      return reply.code(404).send({ error: 'not a TV item' });
+    }
+    const n = Number(req.params.n);
+    const data = await tmdbFetch(`/tv/${item.tmdb_id}/season/${n}`);
+    if (!data) return { episodes: [] };
+    return {
+      episodes: (data.episodes || []).map((e) => ({
+        episode_number: e.episode_number,
+        name: e.name,
+        overview: e.overview || '',
+        air_date: e.air_date,
+        runtime: e.runtime || null,
+      })),
+    };
+  });
+
   // Add an item.
   fastify.post('/api/rewatch', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
@@ -131,7 +213,7 @@ export default async function rewatchRoutes(fastify) {
           await query(
             `INSERT INTO notifications (account_id, type, title, body, link_url)
              VALUES ($1, 'watch_invite', $2, $3, '/rewatch')`,
-            [partner.id, 'Watch list invite', `${myName} wants to watch "${item.title}" with you`],
+            [partner.id, 'Watch list invite', `${myName} wants to watch ${item.title} with you`],
           );
         }
       } catch (e) {

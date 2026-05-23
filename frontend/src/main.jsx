@@ -20,6 +20,7 @@ import RewardsPage from './pages/RewardsPage.jsx';
 import WheelOfMisfortunePage from './pages/WheelOfMisfortunePage.jsx';
 import ShutTheBoxPage from './pages/ShutTheBoxPage.jsx';
 import RewatchListPage from './pages/RewatchListPage.jsx';
+import RewatchDetailPage from './pages/RewatchDetailPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
@@ -73,6 +74,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="account/points" element={<PointsHistoryPage />} />
               <Route path="account/rewards" element={<RewardsPage />} />
               <Route path="rewatch" element={<RewatchListPage />} />
+              <Route path="rewatch/:id" element={<RewatchDetailPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>
