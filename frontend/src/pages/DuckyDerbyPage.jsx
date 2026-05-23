@@ -3,19 +3,18 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 
-/* --- side-scroller camera model ---
- * The course is COURSE_LEN screen-widths long. Each duck has a world-X = progress*COURSE_LEN.
- * The camera follows the leader, keeping it at ANCHOR once it has moved in from the left.
- * screen% of a world-X = (worldX - camX) * 100.  camX is clamped so the course start shows
- * the ducks on the LEFT and the finish line ends near the right edge. */
-const COURSE_LEN = 2.5;   // screen-widths
-const ANCHOR = 0.4;       // where the leader settles, in screen-widths
-const SPREAD = 235;       // % screen per unit of progress difference (pack tightness)
-const DUCK_W = 78;
-const DUCK_H = 66;
-const LANE_GAP = 17;
-const TOP_PAD = 30;       // room above the top duck for its speech bubble
-const BOTTOM_PAD = 12;
+/* Side-scroller camera: course is COURSE_LEN screen-widths long, camera follows the leader.
+ * camX is clamped so the start shows ducks on the LEFT and the finish settles at END_X (in
+ * from the right edge, so a finished duck stays fully visible — no clipping/"shrink"). */
+const COURSE_LEN = 2.5;
+const ANCHOR = 0.4;        // leader screen position mid-race (screen-widths)
+const END_X = 0.68;        // leader/finish screen position at the end
+const SPREAD = 235;        // % screen per unit of progress difference
+const DUCK_W = 70;
+const DUCK_H = 60;
+const LANE_GAP = 15;
+const TOP_PAD = 26;
+const BOTTOM_PAD = 10;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function oddsLabel(num, den) { return `${num}/${den}`; }
@@ -40,7 +39,7 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
     return (
       <div className="relative" style={{ width: w, height: h }}>
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ width: w * 0.82, height: w * 0.64, background: duckColour }}>
+          style={{ width: w * 0.82, height: w * 0.62, background: duckColour }}>
           <span className="absolute" style={{ right: -w * 0.13, top: '42%', width: w * 0.26, height: w * 0.16, background: billColour, borderRadius: '0 50% 50% 0' }} />
         </div>
       </div>
@@ -49,7 +48,6 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
   return <img src={`/duck_${ord}.png`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
-/* Walk a duck's whirlpool timeline -> { m: progress 0-1, whirl: null | {frac, loops} } */
 function duckState(elapsed, finishMs, whirlpools) {
   const list = whirlpools || [];
   const whirlTotal = list.reduce((s, w) => s + w.durationMs, 0);
@@ -121,7 +119,6 @@ export default function DuckyDerbyPage() {
     ducks.forEach((d, i) => { map[d.ord] = i; });
     return map;
   }, [ducks]);
-  const stagger = (i) => (n - 1 - i) * 1.4;
   const laneTop = (i) => TOP_PAD + i * LANE_GAP;
 
   /* ---- rAF race animation ---- */
@@ -136,14 +133,14 @@ export default function DuckyDerbyPage() {
       }));
       const leaderM = states.reduce((mx, s) => Math.max(mx, s.m), 0);
       const leaderWorldX = leaderM * COURSE_LEN;
-      const camX = clamp(leaderWorldX - ANCHOR, 0, COURSE_LEN - 0.95);
+      const camX = clamp(leaderWorldX - ANCHOR, 0, COURSE_LEN - END_X);
       const leaderScreen = (leaderWorldX - camX) * 100;
 
       for (const s of states) {
         const i = laneIndex[s.d.ord] ?? 0;
         const lane = laneRefs.current[s.d.ord];
         if (lane) {
-          lane.style.left = `${leaderScreen - (leaderM - s.m) * SPREAD + stagger(i)}%`;
+          lane.style.left = `${leaderScreen - (leaderM - s.m) * SPREAD}%`;
           if (s.whirl) {
             const ang = s.whirl.frac * s.whirl.loops * Math.PI * 2;
             lane.style.transform = `translate(${Math.cos(ang) * 16}px, ${Math.sin(ang) * 12}px)`;
@@ -158,7 +155,7 @@ export default function DuckyDerbyPage() {
       if (startRef.current) startRef.current.style.left = `${(0 - camX) * 100}%`;
 
       const maxMs = Math.max(...Object.values(result.finish_ms));
-      if (elapsed < maxMs + 500) raf = requestAnimationFrame(tick);
+      if (elapsed < maxMs + 600) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -187,7 +184,7 @@ export default function DuckyDerbyPage() {
 
   const stakeN = parseInt(stake, 10);
   const stakeValid = Number.isInteger(stakeN) && stakeN > 0 && stakeN <= balance;
-  const pickedDuck = lineup?.ducks.find((d) => d.ord === pickedOrd) || null;
+  const pickedDuck = ducks.find((d) => d.ord === pickedOrd) || null;
   const potential = pickedDuck && stakeValid
     ? Math.round(stakeN * oddsMult(pickedDuck.odds_num, pickedDuck.odds_den)) : 0;
 
@@ -199,11 +196,11 @@ export default function DuckyDerbyPage() {
       setResult(res);
       setBalance(res.balance);
       setPhase('racing');
-      const winnerMs = res.finish_ms[res.winner_ord] || 15000;
+      const maxMs = Math.max(...Object.values(res.finish_ms));
       resultTimer.current = setTimeout(() => {
         setPhase('result');
         if (refreshBasket) refreshBasket();
-      }, winnerMs + 700);
+      }, maxMs + 800);
     } catch (e) {
       setError(e.message);
     } finally { setBusy(false); }
@@ -225,12 +222,9 @@ export default function DuckyDerbyPage() {
   const banners = (config?.banners || []).filter((b) => b.active && b.text.trim());
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
-  // betting-phase static positions
-  const bettingStartX = 0;
-  const bettingFinishX = COURSE_LEN * 100;
 
   return (
-    <div className="space-y-4 py-2">
+    <div className="space-y-4 py-2 pb-32">
       <style>{`@keyframes ddbob{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
         @keyframes ddwave{from{background-position-x:0}to{background-position-x:-180px}}`}</style>
 
@@ -253,24 +247,17 @@ export default function DuckyDerbyPage() {
         </div>
         <div style={{ background: '#6b4a2a', height: 12 }} />
 
-        {/* water (clips everything to this rectangle) */}
         <div className="relative overflow-hidden" style={{ background: water, height: WATER_H }}>
           <div className="absolute inset-x-0" style={{ top: '22%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: 0.55, animation: 'ddwave 7s linear infinite' }} />
           <div className="absolute inset-x-0" style={{ top: '50%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
           <div className="absolute inset-x-0" style={{ top: '74%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
 
-          {/* start line (dashed) — scrolls off to the left */}
-          <div
-            ref={startRef}
-            className="absolute top-0"
-            style={{ left: atBetting ? `${bettingStartX}%` : undefined, height: WATER_H, borderLeft: '3px dashed rgba(255,255,255,0.9)', zIndex: 2 }}
-          />
-          {/* finish line (chequered) — scrolls in from the right */}
+          {/* finish line — behind the ducks */}
           <div
             ref={finishRef}
             className="absolute top-0"
             style={{
-              left: atBetting ? `${bettingFinishX}%` : undefined, width: 16, height: WATER_H, zIndex: 3,
+              left: atBetting ? `${COURSE_LEN * 100}%` : undefined, width: 16, height: WATER_H, zIndex: 3,
               background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
             }}
           />
@@ -280,7 +267,7 @@ export default function DuckyDerbyPage() {
               key={d.ord}
               ref={(el) => { laneRefs.current[d.ord] = el; }}
               className="absolute"
-              style={{ top: laneTop(i), left: atBetting ? `${stagger(i)}%` : undefined, zIndex: 10 + i }}
+              style={{ top: laneTop(i), left: atBetting ? '0%' : undefined, zIndex: 10 + i }}
             >
               {bubbles[d.ord] && (
                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-800 shadow">
@@ -294,71 +281,72 @@ export default function DuckyDerbyPage() {
               </div>
             </div>
           ))}
+
+          {/* start line — in FRONT of the ducks */}
+          <div
+            ref={startRef}
+            className="absolute top-0"
+            style={{ left: atBetting ? '0%' : undefined, height: WATER_H, borderLeft: '3px dashed rgba(255,255,255,0.95)', zIndex: 25 }}
+          />
         </div>
 
         <div style={{ background: '#6b4a2a', height: 12 }} />
         <div style={{ background: '#5bbf3a', height: 16 }} />
       </div>
 
-      {/* ---- Betting panel ---- */}
-      {phase === 'betting' && (
-        noFunds ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800">
-            You need points to place a bet. Win some elsewhere, then come back to the Derby!
+      {/* ---- Odds list (2 per row) ---- */}
+      <div>
+        <p className="mb-1.5 text-sm font-semibold">Pick your duck</p>
+        <div className="grid grid-cols-2 gap-2">
+          {ducks.map((d) => (
+            <button
+              key={d.ord}
+              onClick={atBetting ? () => setPickedOrd(d.ord) : undefined}
+              className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
+                pickedOrd === d.ord ? 'border-amber-500 bg-amber-50' : 'border-neutral-200 bg-white'
+              } ${atBetting ? '' : 'cursor-default'}`}
+            >
+              <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={38} h={32} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium">{d.name}</p>
+                <p className="text-[11px] font-bold text-neutral-500">{oddsLabel(d.odds_num, d.odds_den)}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ---- Bottom-anchored bet bar ---- */}
+      <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t border-neutral-200 bg-white p-3 shadow-[0_-4px_14px_rgba(0,0,0,0.08)]">
+        {noFunds ? (
+          <p className="py-1 text-center text-sm font-medium text-amber-800">
+            You need points to place a bet — win some elsewhere first!
+          </p>
+        ) : phase === 'betting' ? (
+          <div className="flex items-end gap-2">
+            <label className="flex-1">
+              <span className="text-[11px] text-neutral-500">Stake (max {balance})</span>
+              <input
+                type="number" inputMode="numeric" min={1} max={balance}
+                value={stake} onChange={(e) => setStake(e.target.value)}
+                className="mt-0.5 block w-full rounded-md border border-neutral-200 px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none"
+                placeholder="Points"
+              />
+            </label>
+            <button
+              onClick={placeBet}
+              disabled={!pickedOrd || !stakeValid || busy}
+              className="shrink-0 rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-500 active:scale-95 disabled:opacity-40"
+            >
+              {pickedDuck && stakeValid ? `Race to win ${potential}` : 'Place bet & race'}
+            </button>
           </div>
         ) : (
-          <>
-            <div>
-              <p className="mb-1 text-sm font-semibold">Pick your duck</p>
-              <div className="space-y-2">
-                {ducks.map((d) => (
-                  <button
-                    key={d.ord}
-                    onClick={() => setPickedOrd(d.ord)}
-                    className={`flex w-full items-center gap-3 rounded-xl border p-2 text-left transition ${
-                      pickedOrd === d.ord ? 'border-amber-500 bg-amber-50' : 'border-neutral-200 bg-white'
-                    }`}
-                  >
-                    <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={42} h={36} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{d.name}</span>
-                    <span className="shrink-0 rounded-md bg-neutral-900 px-2 py-1 text-xs font-bold text-white">
-                      {oddsLabel(d.odds_num, d.odds_den)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-3">
-              <label className="block text-sm">
-                <span className="text-xs text-neutral-500">Your stake (max {balance})</span>
-                <input
-                  type="number" inputMode="numeric" min={1} max={balance}
-                  value={stake} onChange={(e) => setStake(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-neutral-200 px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none"
-                  placeholder="How many points?"
-                />
-              </label>
-              {pickedDuck && stakeValid && (
-                <p className="text-xs text-neutral-600">
-                  If <strong>{pickedDuck.name}</strong> ({oddsLabel(pickedDuck.odds_num, pickedDuck.odds_den)}) wins you get back{' '}
-                  <strong className="text-emerald-700">{potential} pts</strong>.
-                </p>
-              )}
-              <button
-                onClick={placeBet}
-                disabled={!pickedOrd || !stakeValid || busy}
-                className="w-full rounded-xl bg-amber-400 py-2.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-500 active:scale-95 disabled:opacity-40"
-              >
-                {busy ? '...' : 'Place bet & race!'}
-              </button>
-            </div>
-          </>
-        )
-      )}
-
-      {phase === 'racing' && (
-        <p className="text-center text-sm font-medium text-neutral-500">They&apos;re off! 🦆</p>
-      )}
+          <button disabled className="w-full rounded-xl bg-neutral-200 py-2.5 text-sm font-semibold text-neutral-500">
+            Race in progress…
+          </button>
+        )}
+      </div>
 
       {/* ---- Result modal ---- */}
       {phase === 'result' && result && (
