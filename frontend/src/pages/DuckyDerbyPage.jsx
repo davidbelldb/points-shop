@@ -3,18 +3,22 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 
-/* Side-scroller camera: course is COURSE_LEN screen-widths long, camera follows the leader.
- * camX is clamped so the start shows ducks on the LEFT and the finish settles at END_X (in
- * from the right edge, so a finished duck stays fully visible — no clipping/"shrink"). */
+/* Side-scroller camera: course is COURSE_LEN screen-widths long; camera follows the leader. */
 const COURSE_LEN = 2.5;
-const ANCHOR = 0.4;        // leader screen position mid-race (screen-widths)
-const END_X = 0.68;        // leader/finish screen position at the end
-const SPREAD = 235;        // % screen per unit of progress difference
+const ANCHOR = 0.4;
+const END_X = 0.68;
+const SPREAD = 235;
+const START_WX = 0.26;      // start line sits a little ahead of the ducks
 const DUCK_W = 70;
 const DUCK_H = 60;
 const LANE_GAP = 15;
-const TOP_PAD = 26;
-const BOTTOM_PAD = 10;
+const GRASS_TOP = 58;       // ~30% taller — room for pole banners
+const MUD_H = 12;
+const WATER_TOP = GRASS_TOP + MUD_H;
+const TOP_OVERLAP = 16;     // top duck pokes up over the far bank
+const GRASS_BOTTOM = 22;    // near bank — sits IN FRONT of the ducks
+const BOTTOM_TUCK = 12;     // last duck tucks behind the near bank
+const BANNER_COLOURS = ['#e0533a', '#3a86c8', '#e0a23a', '#5aa84a', '#9b59b6', '#e07b39'];
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function oddsLabel(num, den) { return `${num}/${den}`; }
@@ -46,6 +50,20 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
     );
   }
   return <img src={`/duck_${ord}.png`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
+}
+
+/* A cartoon banner held up by two poles. */
+function PoleBanner({ text, colour }) {
+  return (
+    <div className="relative">
+      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 48, background: '#7a5230', borderRadius: 2 }} />
+      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 48, background: '#7a5230', borderRadius: 2 }} />
+      <div className="relative rounded-md px-3 py-1 text-center text-[11px] font-extrabold text-white shadow-md"
+        style={{ background: colour, border: '2px solid rgba(255,255,255,0.6)' }}>
+        {text}
+      </div>
+    </div>
+  );
 }
 
 function duckState(elapsed, finishMs, whirlpools) {
@@ -80,6 +98,7 @@ export default function DuckyDerbyPage() {
 
   const laneRefs = useRef({});
   const spriteRefs = useRef({});
+  const bannerRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
   const resultTimer = useRef(null);
@@ -113,13 +132,26 @@ export default function DuckyDerbyPage() {
 
   const ducks = (result?.ducks) || lineup?.ducks || [];
   const n = ducks.length || 1;
-  const WATER_H = TOP_PAD + (n - 1) * LANE_GAP + DUCK_H + BOTTOM_PAD;
   const laneIndex = useMemo(() => {
     const map = {};
     ducks.forEach((d, i) => { map[d.ord] = i; });
     return map;
   }, [ducks]);
-  const laneTop = (i) => TOP_PAD + i * LANE_GAP;
+  const laneTop = (i) => WATER_TOP - TOP_OVERLAP + i * LANE_GAP;
+  const lastDuckBottom = WATER_TOP - TOP_OVERLAP + (n - 1) * LANE_GAP + DUCK_H;
+  const TRACK_H = lastDuckBottom - BOTTOM_TUCK + GRASS_BOTTOM;
+
+  /* banners placed along the course (fresh positions each race) */
+  const bannerLayout = useMemo(() => {
+    const active = (config?.banners || []).filter((b) => b.active && b.text.trim());
+    const k = active.length;
+    return active.map((b, i) => ({
+      ...b,
+      colour: BANNER_COLOURS[i % BANNER_COLOURS.length],
+      wx: 0.9 + (COURSE_LEN - 1.2) * ((i + 0.4) / Math.max(1, k)) + (Math.random() - 0.5) * 0.25,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, lineup]);
 
   /* ---- rAF race animation ---- */
   useEffect(() => {
@@ -152,14 +184,18 @@ export default function DuckyDerbyPage() {
         if (sprite) sprite.style.transform = `rotate(${Math.sin(elapsed / 320 + i) * 6}deg)`;
       }
       if (finishRef.current) finishRef.current.style.left = `${(COURSE_LEN - camX) * 100}%`;
-      if (startRef.current) startRef.current.style.left = `${(0 - camX) * 100}%`;
+      if (startRef.current) startRef.current.style.left = `${(START_WX - camX) * 100}%`;
+      for (const b of bannerLayout) {
+        const el = bannerRefs.current[b.ord];
+        if (el) el.style.left = `${(b.wx - camX) * 100}%`;
+      }
 
       const maxMs = Math.max(...Object.values(result.finish_ms));
       if (elapsed < maxMs + 600) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase, result, laneIndex, n]);
+  }, [phase, result, laneIndex, n, bannerLayout]);
 
   /* ---- speech bubbles ---- */
   const activePhrases = useMemo(
@@ -219,7 +255,6 @@ export default function DuckyDerbyPage() {
   }
 
   const water = config?.water_colour || '#4aa3c7';
-  const banners = (config?.banners || []).filter((b) => b.active && b.text.trim());
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
 
@@ -236,62 +271,70 @@ export default function DuckyDerbyPage() {
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      {/* ---- Race track ---- */}
-      <div className="overflow-hidden rounded-2xl shadow-lg">
-        <div className="relative flex items-center gap-2 overflow-hidden px-3 py-2" style={{ background: '#5bbf3a', minHeight: 42 }}>
-          {banners.length === 0
-            ? <span className="text-xs font-semibold text-white/70">Ducky Derby</span>
-            : banners.map((b) => (
-              <span key={b.ord} className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-emerald-700 shadow">{b.text}</span>
-            ))}
-        </div>
-        <div style={{ background: '#6b4a2a', height: 12 }} />
+      {/* ---- Race track (single layered container) ---- */}
+      <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
+        {/* far bank: grass + mud (behind the ducks) */}
+        <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: '#5bbf3a', zIndex: 1 }} />
+        <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: '#6b4a2a', zIndex: 1 }} />
 
-        <div className="relative overflow-hidden" style={{ background: water, height: WATER_H }}>
-          <div className="absolute inset-x-0" style={{ top: '22%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: 0.55, animation: 'ddwave 7s linear infinite' }} />
-          <div className="absolute inset-x-0" style={{ top: '50%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
-          <div className="absolute inset-x-0" style={{ top: '74%', height: 30, zIndex: 0, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
+        {/* cartoon wave layers */}
+        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 20, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: 0.55, animation: 'ddwave 7s linear infinite' }} />
+        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 80, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
+        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 140, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
 
-          {/* finish line — behind the ducks */}
+        {/* pole banners — placed along the course, scroll in from the right */}
+        {bannerLayout.map((b) => (
           <div
-            ref={finishRef}
-            className="absolute top-0"
-            style={{
-              left: atBetting ? `${COURSE_LEN * 100}%` : undefined, width: 16, height: WATER_H, zIndex: 3,
-              background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
-            }}
-          />
+            key={b.ord}
+            ref={(el) => { bannerRefs.current[b.ord] = el; }}
+            className="absolute"
+            style={{ top: 6, left: atBetting ? `${b.wx * 100}%` : undefined, zIndex: 2 }}
+          >
+            <PoleBanner text={b.text} colour={b.colour} />
+          </div>
+        ))}
 
-          {ducks.map((d, i) => (
-            <div
-              key={d.ord}
-              ref={(el) => { laneRefs.current[d.ord] = el; }}
-              className="absolute"
-              style={{ top: laneTop(i), left: atBetting ? '0%' : undefined, zIndex: 10 + i }}
-            >
-              {bubbles[d.ord] && (
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-800 shadow">
-                  {bubbles[d.ord]}
-                  <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
-                </div>
-              )}
-              <div ref={(el) => { spriteRefs.current[d.ord] = el; }}
-                className={phase === 'racing' ? '' : 'animate-[ddbob_2.4s_ease-in-out_infinite]'}>
-                <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={DUCK_W} h={DUCK_H} />
+        {/* finish line (behind the ducks) */}
+        <div
+          ref={finishRef}
+          className="absolute"
+          style={{
+            top: WATER_TOP - 8, left: atBetting ? `${COURSE_LEN * 100}%` : undefined,
+            width: 16, height: TRACK_H - WATER_TOP + 8, zIndex: 3,
+            background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
+          }}
+        />
+
+        {/* ducks */}
+        {ducks.map((d, i) => (
+          <div
+            key={d.ord}
+            ref={(el) => { laneRefs.current[d.ord] = el; }}
+            className="absolute"
+            style={{ top: laneTop(i), left: atBetting ? '0%' : undefined, zIndex: 5 + i }}
+          >
+            {bubbles[d.ord] && (
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-800 shadow">
+                {bubbles[d.ord]}
+                <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
               </div>
+            )}
+            <div ref={(el) => { spriteRefs.current[d.ord] = el; }}
+              className={phase === 'racing' ? '' : 'animate-[ddbob_2.4s_ease-in-out_infinite]'}>
+              <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={DUCK_W} h={DUCK_H} />
             </div>
-          ))}
+          </div>
+        ))}
 
-          {/* start line — in FRONT of the ducks */}
-          <div
-            ref={startRef}
-            className="absolute top-0"
-            style={{ left: atBetting ? '0%' : undefined, height: WATER_H, borderLeft: '3px dashed rgba(255,255,255,0.95)', zIndex: 25 }}
-          />
-        </div>
+        {/* near bank: bottom grass — IN FRONT of the ducks */}
+        <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: '#5bbf3a', zIndex: 20 }} />
 
-        <div style={{ background: '#6b4a2a', height: 12 }} />
-        <div style={{ background: '#5bbf3a', height: 16 }} />
+        {/* start line (dashed) — in front of the ducks */}
+        <div
+          ref={startRef}
+          className="absolute"
+          style={{ top: WATER_TOP - 8, left: atBetting ? `${START_WX * 100}%` : undefined, height: TRACK_H - WATER_TOP + 8, borderLeft: '3px dashed rgba(255,255,255,0.95)', zIndex: 30 }}
+        />
       </div>
 
       {/* ---- Odds list (2 per row) ---- */}
