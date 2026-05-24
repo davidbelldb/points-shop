@@ -15,6 +15,7 @@ export default function AdminDuckySection() {
   const [mud, setMud] = useState('');
   const [buoy, setBuoy] = useState('');
   const [count, setCount] = useState(10);
+  const [buoyCount, setBuoyCount] = useState(4);
 
   async function load() {
     try {
@@ -25,6 +26,7 @@ export default function AdminDuckySection() {
       setMud(c.mud_colour ?? '');
       setBuoy(c.buoy_colour ?? '');
       setCount(c.race_duck_count ?? 10);
+      setBuoyCount(c.buoy_count ?? 4);
     } catch (e) { setError(e.message); }
   }
   useEffect(() => { load(); }, []);
@@ -47,7 +49,7 @@ export default function AdminDuckySection() {
     if (!HEX_RE.test(buoy)) { setError('Buoy colour must be a hex like #e0322e'); return; }
     run(() => api.admin.updateDucky({
       water_colour: water, grass_colour: grass, mud_colour: mud, buoy_colour: buoy,
-      race_duck_count: Number(count),
+      race_duck_count: Number(count), buoy_count: Number(buoyCount),
     }));
   }
 
@@ -78,6 +80,14 @@ export default function AdminDuckySection() {
           <span className="text-[11px] text-neutral-500">Ducks per race</span>
           <select className={inputCls + ' mt-0.5'} value={count} onChange={(e) => setCount(Number(e.target.value))}>
             {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((nn) => <option key={nn} value={nn}>{nn}</option>)}
+          </select>
+        </div>
+        <div>
+          <span className="text-[11px] text-neutral-500">Buoys per race</span>
+          <select className={inputCls + ' mt-0.5'} value={buoyCount} onChange={(e) => setBuoyCount(Number(e.target.value))}>
+            {[0, 1, 2, 3, 4, 5, 6, 8, 10, 12].map((nn) => (
+              <option key={nn} value={nn}>{nn === 0 ? 'Off' : nn}</option>
+            ))}
           </select>
         </div>
       </div>

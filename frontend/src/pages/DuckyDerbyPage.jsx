@@ -55,7 +55,7 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
       </div>
     );
   }
-  return <img src={`/duck_${ord}.png?v=3`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
+  return <img src={`/duck_${ord}.png?v=4`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
 /* A tattered, hand-painted cloth flag held up by two black poles. The poles tuck
@@ -325,8 +325,8 @@ export default function DuckyDerbyPage() {
           buoys.push({
             key: `b${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 24,
             colour: o.colour || '#e0322e',
-            dur: 3 + Math.random() * 2.6,
-            delay: (o.fromTop ? 0 : -2) - Math.random() * 1.8,
+            dur: 6 + Math.random() * 3,
+            delay: (o.fromTop ? 0 : -3) - Math.random() * 2.5,
           });
         } else if (o.kind === 'pad') {
           pads.push({ key: `p${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 30 });
@@ -616,7 +616,7 @@ export default function DuckyDerbyPage() {
         @keyframes ddcount{0%{transform:scale(1.9);opacity:0}35%{opacity:1}100%{transform:scale(1);opacity:.95}}
         @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}
-        @keyframes ddbuoy{0%,100%{transform:translateY(-20px)}50%{transform:translateY(20px)}}
+        @keyframes ddbuoy{0%,100%{transform:translateY(-9px)}50%{transform:translateY(9px)}}
         @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}`}</style>
 
       <div className="flex items-center justify-between">

@@ -101,6 +101,21 @@ export default async function duckyRoutes(fastify) {
       ? fieldOrds[Math.floor(Math.random() * fieldOrds.length)].ord
       : null;
 
+    // buoys — admin-set count spread across the mid-field (0 turns them off).
+    const buoyCount = Math.max(0, Math.min(Number(cfg.buoy_count ?? 4) || 0, 12));
+    const buoyField = lineup.filter((d) => d.ord !== winner.ord && d.ord !== chaserOrd);
+    const buoyByOrd = {};
+    for (let i = 0; i < buoyCount && buoyField.length; i++) {
+      const d = buoyField[Math.floor(Math.random() * buoyField.length)];
+      (buoyByOrd[d.ord] = buoyByOrd[d.ord] || []).push({
+        kind: 'buoy',
+        at: Math.round((0.18 + Math.random() * 0.62) * 1000) / 1000,
+        durationMs: 500 + Math.floor(Math.random() * 700),
+        colour: buoyColour,
+        fromTop: Math.random() < 0.5,
+      });
+    }
+
     const finishMs = {};
     const whirlpools = {}; // per-duck obstacle list (whirlpools + buoys + lily pads), sorted by `at`
     for (const d of lineup) {
@@ -112,30 +127,18 @@ export default async function duckyRoutes(fastify) {
       else base = winMs + 700 + Math.floor(Math.random() * 3200);
 
       const whirls = makeWhirlpools().map((w) => ({ ...w, kind: 'whirl' }));
-      // buoys + lily pads only for the mid-field — never the winner or the chaser.
-      const buoys = [];
+      // buoys assigned above; lily pads are per-duck — never the winner or the chaser.
+      const buoys = buoyByOrd[d.ord] || [];
       const pads = [];
-      if (!isWinner && !isChaser) {
-        const bc = Math.random() < 0.35 ? 1 : 0;
-        for (let i = 0; i < bc; i++) {
-          buoys.push({
-            kind: 'buoy',
-            at: Math.round((0.18 + Math.random() * 0.62) * 1000) / 1000,
-            durationMs: 500 + Math.floor(Math.random() * 700),
-            colour: buoyColour,
-            fromTop: Math.random() < 0.5,
+      if (!isWinner && !isChaser && Math.random() < 0.5) {
+        const pc = Math.random() < 0.3 ? 2 : 1;
+        for (let i = 0; i < pc; i++) {
+          pads.push({
+            kind: 'pad',
+            at: Math.round((0.2 + Math.random() * 0.56) * 1000) / 1000,
+            boost: 0.06,    // progress gained in the leap
+            boostMs: 480,   // a short, fast burst, the visible speed-up
           });
-        }
-        if (Math.random() < 0.5) {
-          const pc = Math.random() < 0.3 ? 2 : 1;
-          for (let i = 0; i < pc; i++) {
-            pads.push({
-              kind: 'pad',
-              at: Math.round((0.2 + Math.random() * 0.56) * 1000) / 1000,
-              boost: 0.06,    // progress gained in the leap
-              boostMs: 480,   // a short, fast burst — the visible speed-up
-            });
-          }
         }
       }
 
@@ -239,9 +242,12 @@ export default async function duckyRoutes(fastify) {
     if ('race_duck_count' in p && (!Number.isInteger(p.race_duck_count) || p.race_duck_count < 2 || p.race_duck_count > 10)) {
       return reply.code(400).send({ error: 'race_duck_count must be 2-10' });
     }
+    if ('buoy_count' in p && (!Number.isInteger(p.buoy_count) || p.buoy_count < 0 || p.buoy_count > 12)) {
+      return reply.code(400).send({ error: 'buoy_count must be 0-12' });
+    }
     const updates = [];
     const values = [];
-    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days']) {
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'buoy_count', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days']) {
       if (k in p) { values.push(p[k]); updates.push(`${k} = $${values.length}`); }
     }
     if (updates.length) {
