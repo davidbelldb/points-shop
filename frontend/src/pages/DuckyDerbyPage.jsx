@@ -545,11 +545,11 @@ export default function DuckyDerbyPage() {
       </div>
 
       {/* ---- Live commentary ticker ---- */}
-      <div className="relative h-9 overflow-hidden rounded-xl bg-neutral-900">
+      <div className="relative h-9 overflow-hidden rounded-xl border border-teal-400 bg-teal-50">
         {commentary.map((ln, idx) => (
           <div
             key={ln.id}
-            className="absolute inset-0 flex items-center justify-center px-3 text-center text-[13px] font-semibold text-white"
+            className="absolute inset-0 flex items-center justify-center px-3 text-center text-[13px] font-semibold text-black"
             style={{ animation: `${idx === commentary.length - 1 ? 'ddtickerIn' : 'ddtickerOut'} 0.5s ease forwards` }}
           >
             {ln.text}
@@ -615,6 +615,15 @@ export default function DuckyDerbyPage() {
       {phase === 'result' && result && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="-mt-1 mb-1 flex justify-center">
+              <DuckSprite
+                ord={result.winner_ord}
+                duckColour={ducks.find((d) => d.ord === result.winner_ord)?.duck_colour}
+                billColour={ducks.find((d) => d.ord === result.winner_ord)?.bill_colour}
+                w={104}
+                h={92}
+              />
+            </div>
             <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
               {result.won ? 'You won!' : 'Bad luck'}
             </p>
