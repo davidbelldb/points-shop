@@ -628,8 +628,19 @@ export default function DuckyDerbyPage() {
 
       {/* ---- Race track (single layered container) ---- */}
       <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
-       {/* zoom layer — scales up for a photo-finish slow-mo */}
-       <div className="absolute inset-0" style={{ transformOrigin: '62% 52%', transition: 'transform 0.5s ease', transform: zoom ? 'scale(1.6)' : 'scale(1)' }}>
+       {/* zoom layer — scales up for a photo-finish slow-mo.
+           will-change keeps it permanently composited so it doesn't flash on
+           transition start/end. */}
+       <div
+         className="absolute inset-0"
+         style={{
+           transformOrigin: '62% 52%',
+           transition: 'transform 0.5s ease',
+           transform: zoom ? 'scale(1.6)' : 'scale(1)',
+           willChange: 'transform',
+           backfaceVisibility: 'hidden',
+         }}
+       >
         {/* far bank: grass + mud — above the water/start line, below the ducks */}
         <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
