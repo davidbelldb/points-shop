@@ -58,16 +58,64 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
   return <img src={`/duck_${ord}.png?v=2`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
-/* A cartoon banner held up by two black poles — white cloth, black uppercase text. */
+/* A cartoon banner held up by two black poles. The poles sit at zIndex 6 — behind
+   the grass tuft fringe (zIndex 7) — so their bases tuck into the grass. The cloth
+   sits at zIndex 8, on top of the grass. */
 function PoleBanner({ text }) {
   return (
     <div className="relative">
-      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 48, background: '#1a1a1a', borderRadius: 2 }} />
-      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 48, background: '#1a1a1a', borderRadius: 2 }} />
+      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: 6 }} />
+      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: 6 }} />
       <div className="relative whitespace-nowrap rounded-md bg-white px-3 py-1 text-center text-[11px] font-extrabold uppercase text-black shadow-md"
-        style={{ border: '2px solid #1a1a1a' }}>
+        style={{ border: '2px solid #1a1a1a', zIndex: 8 }}>
         {text}
       </div>
+    </div>
+  );
+}
+
+/* A plain background "decoy" duck — yellow, can't be bet on, just adds river life. */
+function DecoyDuck({ w }) {
+  const h = w * 0.8;
+  return (
+    <div className="relative" style={{ width: w, height: h }}>
+      <div className="absolute rounded-full" style={{ left: 0, bottom: 0, width: w * 0.8, height: h * 0.6, background: '#ffd23f' }} />
+      <div className="absolute rounded-full" style={{ right: 0, top: 0, width: w * 0.44, height: w * 0.44, background: '#ffd23f' }}>
+        <span className="absolute rounded-full" style={{ width: w * 0.07, height: w * 0.07, top: '32%', left: '34%', background: '#1a1a1a' }} />
+        <span className="absolute" style={{ right: -w * 0.16, top: '46%', width: w * 0.24, height: w * 0.13, background: '#f59e0b', borderRadius: '0 50% 50% 0' }} />
+      </div>
+    </div>
+  );
+}
+
+/* A burst of falling confetti — pure CSS, clipped by the track's overflow-hidden. */
+function Confetti() {
+  const pieces = useMemo(() => {
+    const cols = ['#ffd23f', '#ff5d8f', '#4aa3c7', '#5bbf3a', '#ff8c42', '#a878ff', '#ffffff'];
+    return Array.from({ length: 60 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      col: cols[i % cols.length],
+      delay: Math.random() * 1.2,
+      dur: 1.9 + Math.random() * 1.8,
+      size: 6 + Math.random() * 6,
+      drift: (Math.random() - 0.5) * 90,
+    }));
+  }, []);
+  return (
+    <div className="pointer-events-none absolute inset-0" style={{ zIndex: 35 }}>
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="absolute"
+          style={{
+            left: `${p.left}%`, top: -24, width: p.size, height: p.size * 0.55,
+            background: p.col, borderRadius: 1,
+            animation: `ddconfetti ${p.dur}s linear ${p.delay}s infinite`,
+            ['--drift']: `${p.drift}px`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -101,10 +149,13 @@ export default function DuckyDerbyPage() {
   const [bubbles, setBubbles] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [countText, setCountText] = useState('3');
+  const [confetti, setConfetti] = useState(false);
 
   const laneRefs = useRef({});
   const spriteRefs = useRef({});
   const bannerRefs = useRef({});
+  const decoyRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
   const resultTimer = useRef(null);
@@ -123,6 +174,7 @@ export default function DuckyDerbyPage() {
       setStake('');
       setResult(null);
       setBubbles({});
+      setConfetti(false);
       setPhase('betting');
     } catch (e) {
       setError(e.message);
@@ -157,6 +209,24 @@ export default function DuckyDerbyPage() {
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, lineup]);
+
+  /* background decoy ducks — a crowd of plain yellow ducks you can't bet on */
+  const decoys = useMemo(() => {
+    const count = 8 + Math.floor(Math.random() * 5); // 8-12
+    const yLo = WATER_TOP - 6;
+    const yHi = Math.max(yLo + 12, TRACK_H - GRASS_BOTTOM - 34);
+    const baseSpeed = COURSE_LEN / 26000; // world-x per ms
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      y: yLo + Math.random() * (yHi - yLo),
+      wx0: -0.15 + Math.random() * (COURSE_LEN + 0.15),
+      speed: baseSpeed * (0.5 + Math.random() * 0.9),
+      w: 42 + Math.random() * 16,
+      bobDur: 2 + Math.random() * 1.6,
+      bobDelay: -Math.random() * 3,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineup, TRACK_H]);
 
   /* ---- rAF race animation ---- */
   useEffect(() => {
@@ -194,13 +264,21 @@ export default function DuckyDerbyPage() {
         const el = bannerRefs.current[b.ord];
         if (el) el.style.left = `${(b.wx - camX) * 100}%`;
       }
+      const span = COURSE_LEN + 0.6;
+      for (const dc of decoys) {
+        const el = decoyRefs.current[dc.id];
+        if (!el) continue;
+        let wx = (dc.wx0 + dc.speed * elapsed + 0.3) % span;
+        if (wx < 0) wx += span;
+        el.style.left = `${(wx - 0.3 - camX) * 100}%`;
+      }
 
       const maxMs = Math.max(...Object.values(result.finish_ms));
       if (elapsed < maxMs + 600) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase, result, laneIndex, n, bannerLayout]);
+  }, [phase, result, laneIndex, n, bannerLayout, decoys]);
 
   /* ---- speech bubbles ---- */
   const activePhrases = useMemo(
@@ -223,6 +301,31 @@ export default function DuckyDerbyPage() {
     return () => timers.forEach(clearTimeout);
   }, [phase, result, activePhrases]);
 
+  /* ---- 3-2-1-GO! countdown, then the race starts ---- */
+  useEffect(() => {
+    if (phase !== 'countdown') return;
+    const seq = ['3', '2', '1', 'GO!'];
+    const timers = seq.slice(1).map((t, i) =>
+      setTimeout(() => setCountText(t), (i + 1) * 800),
+    );
+    timers.push(setTimeout(() => setPhase('racing'), seq.length * 800));
+    return () => timers.forEach(clearTimeout);
+  }, [phase]);
+
+  /* ---- race finish: confetti as the winner crosses, result modal at the end ---- */
+  useEffect(() => {
+    if (phase !== 'racing' || !result) return;
+    const maxMs = Math.max(...Object.values(result.finish_ms));
+    const winMs = result.finish_ms[result.winner_ord];
+    const confettiTimer = setTimeout(() => setConfetti(true), winMs);
+    resultTimer.current = setTimeout(() => {
+      setPhase('result');
+      if (refreshBasket) refreshBasket();
+    }, maxMs + 800);
+    return () => { clearTimeout(confettiTimer); clearTimeout(resultTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, result]);
+
   const stakeN = parseInt(stake, 10);
   const stakeValid = Number.isInteger(stakeN) && stakeN > 0 && stakeN <= balance;
   const pickedDuck = ducks.find((d) => d.ord === pickedOrd) || null;
@@ -236,12 +339,8 @@ export default function DuckyDerbyPage() {
       const res = await api.duckyRace(lineup.lineup_id, pickedOrd, stakeN);
       setResult(res);
       setBalance(res.balance);
-      setPhase('racing');
-      const maxMs = Math.max(...Object.values(res.finish_ms));
-      resultTimer.current = setTimeout(() => {
-        setPhase('result');
-        if (refreshBasket) refreshBasket();
-      }, maxMs + 800);
+      setCountText('3');
+      setPhase('countdown');
     } catch (e) {
       setError(e.message);
     } finally { setBusy(false); }
@@ -264,11 +363,15 @@ export default function DuckyDerbyPage() {
   const mud = config?.mud_colour || '#6b4a2a';
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
+  const preRace = phase === 'betting' || phase === 'countdown';
 
   return (
     <div className="space-y-4 py-2 pb-32">
       <style>{`@keyframes ddbob{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
-        @keyframes ddwave{from{background-position-x:0}to{background-position-x:-180px}}`}</style>
+        @keyframes ddwave{from{background-position-x:0}to{background-position-x:-180px}}
+        @keyframes dddrift{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+        @keyframes ddconfetti{0%{transform:translate(0,-24px) rotate(0);opacity:1}100%{transform:translate(var(--drift),640px) rotate(720deg);opacity:1}}
+        @keyframes ddcount{0%{transform:scale(1.9);opacity:0}35%{opacity:1}100%{transform:scale(1);opacity:.95}}`}</style>
 
       <div className="flex items-center justify-between">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
@@ -282,8 +385,8 @@ export default function DuckyDerbyPage() {
       <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
         {/* far bank: grass + mud — above the water/start line, below the ducks */}
         <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
-        {/* cartoon grass tufts fringing the far bank */}
-        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 5, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
+        {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
+        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
 
         {/* cartoon wave layers */}
@@ -291,13 +394,14 @@ export default function DuckyDerbyPage() {
         <div className="absolute inset-x-0" style={{ top: WATER_TOP + 80, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
         <div className="absolute inset-x-0" style={{ top: WATER_TOP + 140, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
 
-        {/* pole banners — placed along the course, scroll in from the right */}
+        {/* pole banners — placed along the course, scroll in from the right.
+            No zIndex on the wrapper, so the poles (6) / cloth (8) layer around the grass (7). */}
         {bannerLayout.map((b) => (
           <div
             key={b.ord}
             ref={(el) => { bannerRefs.current[b.ord] = el; }}
             className="absolute"
-            style={{ top: 6, left: atBetting ? `${b.wx * 100}%` : undefined, zIndex: 7 }}
+            style={{ top: 6, left: preRace ? `${b.wx * 100}%` : undefined }}
           >
             <PoleBanner text={b.text} />
           </div>
@@ -308,11 +412,25 @@ export default function DuckyDerbyPage() {
           ref={finishRef}
           className="absolute"
           style={{
-            top: WATER_TOP - 8, left: atBetting ? `${COURSE_LEN * 100}%` : undefined,
+            top: WATER_TOP - 8, left: preRace ? `${COURSE_LEN * 100}%` : undefined,
             width: 16, height: TRACK_H - WATER_TOP + 8, zIndex: 2,
             background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
           }}
         />
+
+        {/* background decoy ducks — plain yellow, not bettable, zIndex 9 (behind racers) */}
+        {decoys.map((dc) => (
+          <div
+            key={dc.id}
+            ref={(el) => { decoyRefs.current[dc.id] = el; }}
+            className="absolute"
+            style={{ top: dc.y, left: preRace ? `${dc.wx0 * 100}%` : undefined, zIndex: 9, opacity: 0.92 }}
+          >
+            <div style={{ animation: `dddrift ${dc.bobDur}s ease-in-out ${dc.bobDelay}s infinite` }}>
+              <DecoyDuck w={dc.w} />
+            </div>
+          </div>
+        ))}
 
         {/* ducks */}
         {ducks.map((d, i) => (
@@ -320,7 +438,7 @@ export default function DuckyDerbyPage() {
             key={d.ord}
             ref={(el) => { laneRefs.current[d.ord] = el; }}
             className="absolute"
-            style={{ top: laneTop(i), left: atBetting ? '0%' : undefined, zIndex: 10 + i }}
+            style={{ top: laneTop(i), left: preRace ? '0%' : undefined, zIndex: 10 + i }}
           >
             {bubbles[d.ord] && (
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-800 shadow">
@@ -344,8 +462,24 @@ export default function DuckyDerbyPage() {
         <div
           ref={startRef}
           className="absolute"
-          style={{ top: WATER_TOP - 8, left: atBetting ? `${START_WX * 100}%` : undefined, height: TRACK_H - WATER_TOP + 8, borderLeft: '3px dashed rgba(255,255,255,0.95)', zIndex: 2 }}
+          style={{ top: WATER_TOP - 8, left: preRace ? `${START_WX * 100}%` : undefined, height: TRACK_H - WATER_TOP + 8, borderLeft: '3px dashed rgba(255,255,255,0.95)', zIndex: 2 }}
         />
+
+        {/* confetti — falls from when the winner crosses the line */}
+        {confetti && <Confetti />}
+
+        {/* 3-2-1-GO! countdown overlay */}
+        {phase === 'countdown' && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 38 }}>
+            <span
+              key={countText}
+              className="text-6xl font-extrabold italic text-white"
+              style={{ animation: 'ddcount 0.8s ease-out', textShadow: '0 3px 12px rgba(0,0,0,0.5)' }}
+            >
+              {countText}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ---- Odds list (2 per row) ---- */}

@@ -88,7 +88,7 @@ export default async function duckyRoutes(fastify) {
     }));
 
     const winner = lineup[Math.floor(Math.random() * lineup.length)];
-    const winMs = 15000 + Math.floor(Math.random() * 1500);
+    const winMs = 25000 + Math.floor(Math.random() * 1500);
     const finishMs = {};
     const whirlpools = {};
     for (const d of lineup) {
@@ -241,7 +241,7 @@ export default async function duckyRoutes(fastify) {
 
   fastify.patch('/api/admin/games/ducky/banners/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await updateRowTable('ducky_banners', 6, Number(req.params.ord), req.body ?? {}, reply);
+    return await updateRowTable('ducky_banners', 12, Number(req.params.ord), req.body ?? {}, reply);
   });
 
   fastify.patch('/api/admin/games/ducky/phrases/:ord', async (req, reply) => {
