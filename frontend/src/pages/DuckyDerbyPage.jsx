@@ -234,7 +234,7 @@ export default function DuckyDerbyPage() {
   const [error, setError] = useState(null);
   const [countText, setCountText] = useState('3');
   const [confetti, setConfetti] = useState(false);
-  const [zoom, setZoom] = useState(false);
+  const [photoFlash, setPhotoFlash] = useState(false);
   const [commentary, setCommentary] = useState([]);
 
   const laneRefs = useRef({});
@@ -263,7 +263,7 @@ export default function DuckyDerbyPage() {
       setResult(null);
       setBubbles({});
       setConfetti(false);
-      setZoom(false);
+      setPhotoFlash(false);
       sinkRef.current = null;
       // clear any leftover sink animation from the previous race's sprites
       Object.values(spriteRefs.current).forEach((el) => {
@@ -336,7 +336,7 @@ export default function DuckyDerbyPage() {
     return { buoys, pads };
   }, [result]);
 
-  /* photo finish — if the top two finish within a whisker, a slow-mo zoom kicks in */
+  /* photo finish — if the top two finish within a whisker, slow-mo + a camera flash kick in */
   const photo = useMemo(() => {
     if (!result) return null;
     const sink = result.sink;
@@ -460,14 +460,14 @@ export default function DuckyDerbyPage() {
     return () => timers.forEach(clearTimeout);
   }, [phase]);
 
-  /* ---- race finish: confetti, photo-finish zoom, result modal ---- */
+  /* ---- race finish: confetti, photo-finish flash, result modal ---- */
   useEffect(() => {
     if (phase !== 'racing' || !result || !photo) return;
     const timers = [];
     timers.push(setTimeout(() => setConfetti(true), Math.max(0, raceToReal(photo.winMs, photo))));
     if (photo.isPhoto) {
-      timers.push(setTimeout(() => setZoom(true), Math.max(0, photo.slowFrom)));
-      timers.push(setTimeout(() => setZoom(false), Math.max(0, photo.realSlowTo)));
+      timers.push(setTimeout(() => setPhotoFlash(true), Math.max(0, photo.slowFrom)));
+      timers.push(setTimeout(() => setPhotoFlash(false), Math.max(0, photo.realSlowTo)));
     }
     resultTimer.current = setTimeout(() => {
       setPhase('result');
@@ -616,7 +616,8 @@ export default function DuckyDerbyPage() {
         @keyframes ddcount{0%{transform:scale(1.9);opacity:0}35%{opacity:1}100%{transform:scale(1);opacity:.95}}
         @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}
-        @keyframes ddbuoy{0%,100%{transform:translateY(-20px)}50%{transform:translateY(20px)}}`}</style>
+        @keyframes ddbuoy{0%,100%{transform:translateY(-20px)}50%{transform:translateY(20px)}}
+        @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}`}</style>
 
       <div className="flex items-center justify-between">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
@@ -628,19 +629,8 @@ export default function DuckyDerbyPage() {
 
       {/* ---- Race track (single layered container) ---- */}
       <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
-       {/* zoom layer — scales up for a photo-finish slow-mo.
-           will-change keeps it permanently composited so it doesn't flash on
-           transition start/end. */}
-       <div
-         className="absolute inset-0"
-         style={{
-           transformOrigin: '62% 52%',
-           transition: 'transform 0.5s ease',
-           transform: zoom ? 'scale(1.6)' : 'scale(1)',
-           willChange: 'transform',
-           backfaceVisibility: 'hidden',
-         }}
-       >
+       {/* scene layer */}
+       <div className="absolute inset-0">
         {/* far bank: grass + mud — above the water/start line, below the ducks */}
         <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
@@ -753,6 +743,14 @@ export default function DuckyDerbyPage() {
               {countText}
             </span>
           </div>
+        )}
+
+        {/* photo-finish camera flash */}
+        {photoFlash && (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: '#ffffff', zIndex: 39, animation: 'ddflash 1.5s ease-out forwards' }}
+          />
         )}
        </div>
       </div>
