@@ -8,7 +8,7 @@ const COURSE_LEN = 2.5;
 const ANCHOR = 0.4;
 const END_X = 0.68;
 const SPREAD = 235;
-const START_WX = 0.26;      // start line sits a little ahead of the ducks
+const START_WX = 0.2;       // start line sits a little ahead of the ducks (nudged left)
 const DUCK_W = 70;
 const DUCK_H = 60;
 const LANE_GAP = 15;
@@ -55,21 +55,62 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
       </div>
     );
   }
-  return <img src={`/duck_${ord}.png?v=2`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
+  return <img src={`/duck_${ord}.png?v=3`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
-/* A cartoon banner held up by two black poles. The poles sit at zIndex 6 — behind
-   the grass tuft fringe (zIndex 7) — so their bases tuck into the grass. The cloth
-   sits at zIndex 8, on top of the grass. */
-function PoleBanner({ text }) {
+/* A tattered, hand-painted cloth flag held up by two black poles. The poles tuck
+   behind the grass tuft fringe; the cloth sits on top. zIndexes depend on whether
+   the banner is planted on the top bank or the bottom bank. */
+const BANNER_TATTER =
+  'polygon(0% 6%, 8% 0%, 30% 7%, 52% 1%, 73% 7%, 93% 0%, 100% 9%, 96% 30%, 100% 52%, 95% 73%, 100% 92%, 92% 100%, 72% 94%, 50% 100%, 27% 94%, 8% 100%, 0% 90%, 5% 70%, 0% 50%, 5% 27%)';
+const BANNER_FONT = "'Bradley Hand', 'Segoe Print', 'Marker Felt', 'Comic Sans MS', cursive";
+
+function PoleBanner({ text, colour, placement }) {
+  const bottom = placement === 'bottom';
+  const poleZ = bottom ? 31 : 6;
+  const clothZ = bottom ? 34 : 8;
   return (
     <div className="relative">
-      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: 6 }} />
-      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: 6 }} />
-      <div className="relative whitespace-nowrap rounded-md bg-white px-3 py-1 text-center text-[11px] font-extrabold uppercase text-black shadow-md"
-        style={{ border: '2px solid #1a1a1a', zIndex: 8 }}>
-        {text}
+      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: poleZ }} />
+      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: poleZ }} />
+      <div className="relative" style={{ zIndex: clothZ }}>
+        {/* dark backing — shows as a tattered outline behind the cloth */}
+        <div className="absolute inset-0" style={{ background: '#1a1a1a', clipPath: BANNER_TATTER }} />
+        <div
+          className="relative whitespace-nowrap px-3.5 py-1 text-center text-[13px] font-bold uppercase"
+          style={{
+            margin: 2,
+            background: '#fbfaf2',
+            color: colour || '#1f2937',
+            clipPath: BANNER_TATTER,
+            fontFamily: BANNER_FONT,
+            letterSpacing: '0.03em',
+          }}
+        >
+          {text}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/* A floating buoy — a coloured semicircle that bobs up and down the river. */
+function Buoy({ colour }) {
+  return (
+    <div style={{ width: 30, height: 18, position: 'relative' }}>
+      <div style={{ position: 'absolute', left: '50%', top: -5, marginLeft: -1.5, width: 3, height: 7, background: 'rgba(0,0,0,0.45)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: colour, borderRadius: '15px 15px 4px 4px', border: '2px solid rgba(0,0,0,0.28)' }} />
+      <div style={{ position: 'absolute', left: 2, right: 2, top: '54%', height: 4, background: 'rgba(255,255,255,0.92)' }} />
+    </div>
+  );
+}
+
+/* A lily pad — a green disc with a little flower; crossing one gives a speed boost. */
+function LilyPad() {
+  return (
+    <div style={{ width: 38, height: 20, borderRadius: '50%', background: '#3a9d4a', boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.18)', position: 'relative' }}>
+      <div style={{ position: 'absolute', left: '22%', top: '22%', width: 9, height: 9, borderRadius: '50%', background: '#ff8fc3' }} />
+      <div style={{ position: 'absolute', left: '27%', top: '32%', width: 3, height: 3, borderRadius: '50%', background: '#ffe27a' }} />
     </div>
   );
 }
@@ -106,36 +147,53 @@ function Confetti() {
   );
 }
 
-function duckState(elapsed, finishMs, whirlpools) {
-  const list = whirlpools || [];
-  const whirlTotal = list.reduce((s, w) => s + w.durationMs, 0);
-  const movingMs = Math.max(1, finishMs - whirlTotal);
+/* obstacles: merged, at-sorted list of pauses — whirlpools (kind 'whirl') and
+   buoy bumps (kind 'buoy'). Each pause's durationMs is baked into finishMs. */
+function duckState(elapsed, finishMs, obstacles) {
+  const list = obstacles || [];
+  const total = list.reduce((s, o) => s + o.durationMs, 0);
+  const movingMs = Math.max(1, finishMs - total);
   let rem = elapsed;
   let lastAt = 0;
-  for (const wp of list) {
-    const segMs = (wp.at - lastAt) * movingMs;
-    if (rem < segMs) return { m: lastAt + rem / movingMs, whirl: null };
+  for (const ob of list) {
+    const segMs = (ob.at - lastAt) * movingMs;
+    if (rem < segMs) return { m: lastAt + rem / movingMs, pause: null };
     rem -= segMs;
-    if (rem < wp.durationMs) return { m: wp.at, whirl: { frac: rem / wp.durationMs, loops: wp.loops } };
-    rem -= wp.durationMs;
-    lastAt = wp.at;
+    if (rem < ob.durationMs) {
+      return { m: ob.at, pause: { kind: ob.kind || 'whirl', frac: rem / ob.durationMs, loops: ob.loops || 0 } };
+    }
+    rem -= ob.durationMs;
+    lastAt = ob.at;
   }
-  return { m: Math.min(1, lastAt + rem / movingMs), whirl: null };
+  return { m: Math.min(1, lastAt + rem / movingMs), pause: null };
 }
 
 /* Inverse of duckState: the elapsed ms at which a duck first reaches progress targetM. */
-function progressToTime(targetM, finishMs, whirlpools) {
-  const list = whirlpools || [];
-  const whirlTotal = list.reduce((s, w) => s + w.durationMs, 0);
-  const movingMs = Math.max(1, finishMs - whirlTotal);
+function progressToTime(targetM, finishMs, obstacles) {
+  const list = obstacles || [];
+  const total = list.reduce((s, o) => s + o.durationMs, 0);
+  const movingMs = Math.max(1, finishMs - total);
   let t = 0;
   let lastAt = 0;
-  for (const wp of list) {
-    if (targetM <= wp.at) return t + (targetM - lastAt) * movingMs;
-    t += (wp.at - lastAt) * movingMs + wp.durationMs;
-    lastAt = wp.at;
+  for (const ob of list) {
+    if (targetM <= ob.at) return t + (targetM - lastAt) * movingMs;
+    t += (ob.at - lastAt) * movingMs + ob.durationMs;
+    lastAt = ob.at;
   }
   return t + (targetM - lastAt) * movingMs;
+}
+
+/* Photo-finish slow-mo: map real elapsed <-> race time. Outside the slow window
+   the two are identical; inside it, race time advances at photo.SLOW speed. */
+function realToRace(real, photo) {
+  if (!photo || !photo.isPhoto || real <= photo.slowFrom) return real;
+  if (real >= photo.realSlowTo) return photo.slowTo + (real - photo.realSlowTo);
+  return photo.slowFrom + (real - photo.slowFrom) * photo.SLOW;
+}
+function raceToReal(raceT, photo) {
+  if (!photo || !photo.isPhoto || raceT <= photo.slowFrom) return raceT;
+  if (raceT >= photo.slowTo) return photo.realSlowTo + (raceT - photo.slowTo);
+  return photo.slowFrom + (raceT - photo.slowFrom) / photo.SLOW;
 }
 
 export default function DuckyDerbyPage() {
@@ -152,11 +210,14 @@ export default function DuckyDerbyPage() {
   const [error, setError] = useState(null);
   const [countText, setCountText] = useState('3');
   const [confetti, setConfetti] = useState(false);
-  const [commentary, setCommentary] = useState([{ id: 0, text: 'Pick a duck and place your bet!' }]);
+  const [zoom, setZoom] = useState(false);
+  const [commentary, setCommentary] = useState([]);
 
   const laneRefs = useRef({});
   const spriteRefs = useRef({});
   const bannerRefs = useRef({});
+  const buoyRefs = useRef({});
+  const padRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
   const resultTimer = useRef(null);
@@ -178,13 +239,14 @@ export default function DuckyDerbyPage() {
       setResult(null);
       setBubbles({});
       setConfetti(false);
+      setZoom(false);
       sinkRef.current = null;
       // clear any leftover sink animation from the previous race's sprites
       Object.values(spriteRefs.current).forEach((el) => {
         if (el) { el.style.opacity = '1'; el.style.transform = ''; }
       });
       commentaryId.current = 0;
-      setCommentary([{ id: 0, text: 'Pick a duck and place your bet!' }]);
+      setCommentary([]);
       setPhase('betting');
     } catch (e) {
       setError(e.message);
@@ -209,25 +271,79 @@ export default function DuckyDerbyPage() {
   const lastDuckBottom = WATER_TOP - TOP_OVERLAP + (n - 1) * LANE_GAP + DUCK_H;
   const TRACK_H = lastDuckBottom - BOTTOM_TUCK + GRASS_BOTTOM;
 
-  /* banners placed along the course (fresh positions each race) */
+  /* banners — spread evenly start-to-end; top and bottom banks spaced independently */
   const bannerLayout = useMemo(() => {
     const active = (config?.banners || []).filter((b) => b.active && b.text.trim());
-    const k = active.length;
-    return active.map((b, i) => ({
-      ...b,
-      wx: 0.9 + (COURSE_LEN - 1.2) * ((i + 0.4) / Math.max(1, k)) + (Math.random() - 0.5) * 0.25,
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, lineup]);
+    const spread = (group) => {
+      const k = group.length;
+      const lo = 0.36;
+      const hi = COURSE_LEN - 0.16;
+      return group.map((b, i) => ({
+        ...b,
+        wx: k <= 1 ? (lo + hi) / 2 : lo + (hi - lo) * (i / (k - 1)),
+      }));
+    };
+    return [
+      ...spread(active.filter((b) => (b.placement || 'top') === 'top')),
+      ...spread(active.filter((b) => (b.placement || 'top') === 'bottom')),
+    ];
+  }, [config]);
+
+  /* buoys + lily pads laid out along the course, in each duck's lane */
+  const courseObjects = useMemo(() => {
+    if (!result) return { buoys: [], pads: [] };
+    const buoys = [];
+    const pads = [];
+    result.ducks.forEach((d, i) => {
+      const laneY = WATER_TOP - TOP_OVERLAP + i * LANE_GAP;
+      (result.whirlpools?.[d.ord] || []).forEach((o, k) => {
+        if (o.kind === 'buoy') {
+          buoys.push({
+            key: `b${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 24,
+            colour: o.colour || '#e0322e',
+            dur: 3 + Math.random() * 2.6,
+            delay: (o.fromTop ? 0 : -2) - Math.random() * 1.8,
+          });
+        }
+      });
+      (result.lilypads?.[d.ord] || []).forEach((p, k) => {
+        pads.push({ key: `p${d.ord}-${k}`, wx: p.at * COURSE_LEN, y: laneY + 30 });
+      });
+    });
+    return { buoys, pads };
+  }, [result]);
+
+  /* photo finish — if the top two finish within a whisker, a slow-mo zoom kicks in */
+  const photo = useMemo(() => {
+    if (!result) return null;
+    const sink = result.sink;
+    const vals = Object.entries(result.finish_ms)
+      .filter(([ord]) => !sink || Number(ord) !== sink.ord)
+      .map((e) => e[1]).sort((a, b) => a - b);
+    const winMs = vals[0];
+    const secondMs = vals[1] ?? winMs;
+    const maxMs = vals[vals.length - 1];
+    const isPhoto = vals.length >= 2 && secondMs - winMs <= 650;
+    const SLOW = 0.4;
+    const slowFrom = winMs - 1200;
+    const slowTo = secondMs + 250;
+    const realSlowTo = slowFrom + (slowTo - slowFrom) / SLOW;
+    return {
+      isPhoto, SLOW, slowFrom, slowTo, winMs, secondMs, maxMs, realSlowTo,
+      raceEndMs: isPhoto ? slowTo + 700 : maxMs + 600,
+      realEndMs: isPhoto ? realSlowTo + 900 : maxMs + 800,
+    };
+  }, [result]);
 
   /* ---- rAF race animation ---- */
   useEffect(() => {
-    if (phase !== 'racing' || !result) return;
+    if (phase !== 'racing' || !result || !photo) return;
     const t0 = performance.now();
     let raf;
+    const sink = result.sink;
     const tick = (now) => {
-      const elapsed = now - t0;
-      const sink = result.sink;
+      const realElapsed = now - t0;
+      const elapsed = realToRace(realElapsed, photo); // race time (slowed near a photo finish)
       const states = result.ducks.map((d) => {
         const st = { d, ...duckState(elapsed, result.finish_ms[d.ord], result.whirlpools?.[d.ord]) };
         if (sink && d.ord === sink.ord && st.m > sink.at) st.m = sink.at;
@@ -245,22 +361,33 @@ export default function DuckyDerbyPage() {
         const sinking = sink && s.d.ord === sink.ord && s.m >= sink.at;
         if (lane) {
           lane.style.left = `${leaderScreen - (leaderM - s.m) * SPREAD}%`;
-          if (s.whirl && !sinking) {
-            const ang = s.whirl.frac * s.whirl.loops * Math.PI * 2;
-            lane.style.transform = `translate(${Math.cos(ang) * 16}px, ${Math.sin(ang) * 12}px)`;
+          if (s.pause && !sinking) {
+            if (s.pause.kind === 'buoy') {
+              lane.style.transform = `translate(${Math.sin(s.pause.frac * Math.PI * 9) * 3}px, 0)`;
+            } else {
+              const ang = s.pause.frac * s.pause.loops * Math.PI * 2;
+              lane.style.transform = `translate(${Math.cos(ang) * 16}px, ${Math.sin(ang) * 12}px)`;
+            }
           } else {
             lane.style.transform = 'translate(0, 0)';
           }
         }
         if (sinking) {
-          if (sinkRef.current == null) sinkRef.current = elapsed;
-          const sp = clamp((elapsed - sinkRef.current) / 1100, 0, 1);
+          if (sinkRef.current == null) sinkRef.current = realElapsed;
+          const sp = clamp((realElapsed - sinkRef.current) / 1100, 0, 1);
           if (sprite) {
             sprite.style.transform = `translateY(${sp * 42}px) rotate(${sp * 28}deg)`;
             sprite.style.opacity = `${1 - sp}`;
           }
         } else if (sprite) {
-          sprite.style.transform = `rotate(${Math.sin(elapsed / 320 + i) * 6}deg)`;
+          // lily-pad lunge — a quick horizontal stretch crossing a pad
+          let lunge = 0;
+          for (const p of (result.lilypads?.[s.d.ord] || [])) {
+            const dd = s.m - p.at;
+            if (dd > -0.015 && dd < 0.07) lunge = Math.max(lunge, 1 - Math.abs(dd - 0.025) / 0.06);
+          }
+          const rot = Math.sin(elapsed / 320 + i) * 6;
+          sprite.style.transform = `rotate(${rot}deg) scaleX(${(1 + 0.22 * lunge).toFixed(3)})`;
         }
       }
       if (finishRef.current) finishRef.current.style.left = `${(COURSE_LEN - camX) * 100}%`;
@@ -269,15 +396,20 @@ export default function DuckyDerbyPage() {
         const el = bannerRefs.current[b.ord];
         if (el) el.style.left = `${(b.wx - camX) * 100}%`;
       }
+      for (const b of courseObjects.buoys) {
+        const el = buoyRefs.current[b.key];
+        if (el) el.style.left = `${(b.wx - camX) * 100}%`;
+      }
+      for (const p of courseObjects.pads) {
+        const el = padRefs.current[p.key];
+        if (el) el.style.left = `${(p.wx - camX) * 100}%`;
+      }
 
-      const maxMs = Math.max(...Object.entries(result.finish_ms)
-        .filter(([ord]) => !sink || Number(ord) !== sink.ord)
-        .map((e) => e[1]));
-      if (elapsed < maxMs + 600) raf = requestAnimationFrame(tick);
+      if (elapsed < photo.raceEndMs) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase, result, laneIndex, n, bannerLayout]);
+  }, [phase, result, laneIndex, n, bannerLayout, courseObjects, photo]);
 
   /* ---- speech bubbles ---- */
   const activePhrases = useMemo(
@@ -311,54 +443,74 @@ export default function DuckyDerbyPage() {
     return () => timers.forEach(clearTimeout);
   }, [phase]);
 
-  /* ---- race finish: confetti as the winner crosses, result modal at the end ---- */
+  /* ---- race finish: confetti, photo-finish zoom, result modal ---- */
   useEffect(() => {
-    if (phase !== 'racing' || !result) return;
-    const sink = result.sink;
-    const maxMs = Math.max(...Object.entries(result.finish_ms)
-      .filter(([ord]) => !sink || Number(ord) !== sink.ord)
-      .map((e) => e[1]));
-    const winMs = result.finish_ms[result.winner_ord];
-    const confettiTimer = setTimeout(() => setConfetti(true), winMs);
+    if (phase !== 'racing' || !result || !photo) return;
+    const timers = [];
+    timers.push(setTimeout(() => setConfetti(true), Math.max(0, raceToReal(photo.winMs, photo))));
+    if (photo.isPhoto) {
+      timers.push(setTimeout(() => setZoom(true), Math.max(0, photo.slowFrom)));
+      timers.push(setTimeout(() => setZoom(false), Math.max(0, photo.realSlowTo)));
+    }
     resultTimer.current = setTimeout(() => {
       setPhase('result');
       if (refreshBasket) refreshBasket();
-    }, maxMs + 800);
-    return () => { clearTimeout(confettiTimer); clearTimeout(resultTimer.current); };
+    }, photo.realEndMs);
+    timers.push(resultTimer.current);
+    return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, result]);
 
   /* ---- live race commentary ---- */
   useEffect(() => {
-    if (phase !== 'racing' || !result) return;
+    if (phase !== 'racing' || !result || !photo) return;
     const names = {};
     result.ducks.forEach((d) => { names[d.ord] = d.name; });
     const sink = result.sink;
-    const winMs = result.finish_ms[result.winner_ord];
+    const winMs = photo.winMs;
     const schedule = [{ t: 250, text: "And they're off!" }];
 
-    // whirlpool callouts — a few, spread out
-    const wpEvents = [];
+    // whirlpool + buoy callouts — a few, spread out
+    const hitEvents = [];
     for (const d of result.ducks) {
       if (sink && d.ord === sink.ord) continue;
       const F = result.finish_ms[d.ord];
-      const wps = result.whirlpools?.[d.ord] || [];
-      for (const wp of wps) {
-        const t = progressToTime(wp.at, F, wps);
-        if (t > 2000 && t < winMs - 3000) wpEvents.push({ t, ord: d.ord });
+      const obs = result.whirlpools?.[d.ord] || [];
+      for (const o of obs) {
+        const t = progressToTime(o.at, F, obs);
+        if (t > 2000 && t < winMs - 3000) {
+          hitEvents.push({
+            t,
+            text: o.kind === 'buoy'
+              ? `${names[d.ord]} clatters into a buoy!`
+              : `${names[d.ord]} hits the rapids!`,
+          });
+        }
       }
     }
-    wpEvents.sort((a, b) => a.t - b.t);
-    let lastWp = -9999;
-    let wpCount = 0;
-    for (const e of wpEvents) {
-      if (wpCount >= 3) break;
-      if (e.t - lastWp > 4000) {
-        schedule.push({ t: e.t, text: `${names[e.ord]} hits the rapids!` });
-        lastWp = e.t;
-        wpCount += 1;
+    hitEvents.sort((a, b) => a.t - b.t);
+    let lastHit = -9999;
+    let hitCount = 0;
+    for (const e of hitEvents) {
+      if (hitCount >= 4) break;
+      if (e.t - lastHit > 3400) { schedule.push(e); lastHit = e.t; hitCount += 1; }
+    }
+
+    // lily-pad callouts (up to 2)
+    const padEvents = [];
+    for (const d of result.ducks) {
+      if (sink && d.ord === sink.ord) continue;
+      const F = result.finish_ms[d.ord];
+      const obs = result.whirlpools?.[d.ord] || [];
+      for (const p of (result.lilypads?.[d.ord] || [])) {
+        const t = progressToTime(p.at, F, obs);
+        if (t > 2500 && t < winMs - 3000) {
+          padEvents.push({ t, text: `${names[d.ord]} catches a lily pad and surges!` });
+        }
       }
     }
+    padEvents.sort((a, b) => a.t - b.t);
+    padEvents.slice(0, 2).forEach((e) => schedule.push(e));
 
     // sink callout
     if (sink) {
@@ -368,24 +520,24 @@ export default function DuckyDerbyPage() {
 
     schedule.push({ t: winMs * 0.42, text: "It's neck and neck out there!" });
     schedule.push({ t: winMs - 3400, text: 'Into the final stretch!' });
-    schedule.push({ t: winMs - 150, text: `${names[result.winner_ord]} romps home to take it!` });
+    if (photo.isPhoto) {
+      schedule.push({ t: winMs - 600, text: 'Photo finish — too close to call!' });
+      schedule.push({ t: winMs + 60, text: `${names[result.winner_ord]} edges it on the line!` });
+    } else {
+      schedule.push({ t: winMs - 150, text: `${names[result.winner_ord]} romps home to take it!` });
+    }
 
-    // generic filler lines between the beats
-    const fillers = [
-      "It's a cracking pace out there!",
-      '{duck} is really digging in!',
-      'The crowd is on its feet!',
-      '{duck} fancies this one!',
-      "They're bunched up tight!",
-      'What a contest, folks!',
-      "{duck} won't let this slip!",
-      'Pure drama on the water!',
-    ];
-    let fi = Math.floor(Math.random() * fillers.length);
-    for (let t = 3400; t < winMs - 4200; t += 3500) {
-      const rnd = result.ducks[Math.floor(Math.random() * result.ducks.length)];
-      schedule.push({ t, text: fillers[fi % fillers.length].replace('{duck}', names[rnd.ord]) });
-      fi += 1;
+    // admin-editable filler lines between the beats
+    const fillers = (config?.commentary || [])
+      .filter((c) => c.active && c.text.trim())
+      .map((c) => c.text);
+    if (fillers.length) {
+      let fi = Math.floor(Math.random() * fillers.length);
+      for (let t = 3400; t < winMs - 4200; t += 3600) {
+        const rnd = result.ducks[Math.floor(Math.random() * result.ducks.length)];
+        schedule.push({ t, text: fillers[fi % fillers.length].replace(/\{duck\}/g, names[rnd.ord]) });
+        fi += 1;
+      }
     }
 
     schedule.sort((a, b) => a.t - b.t);
@@ -397,9 +549,36 @@ export default function DuckyDerbyPage() {
       commentaryId.current += 1;
       const id = commentaryId.current;
       setCommentary((prev) => [...prev, { id, text: ev.text }].slice(-2));
-    }, Math.max(0, ev.t)));
+    }, Math.max(0, raceToReal(ev.t, photo))));
     return () => timers.forEach(clearTimeout);
-  }, [phase, result]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, result, config]);
+
+  /* ---- pre-race commentary cycle (during betting) ---- */
+  useEffect(() => {
+    if (phase !== 'betting' || !lineup) return;
+    const ds = lineup.ducks || [];
+    let a = 'a duck';
+    let b = 'another duck';
+    if (ds.length >= 2) {
+      const sh = [...ds].sort(() => Math.random() - 0.5);
+      a = sh[0].name;
+      b = sh[1].name;
+    }
+    const lines = [
+      'Welcome along to the Ducky Derby!',
+      'It looks like it could be a bread bath out there today',
+      "We're hearing there's been some drama...",
+      `${a} has allegedly been violating ${b}`,
+      'Anyway — pick yourself a duck and place your bet',
+    ];
+    const timers = lines.map((text, i) => setTimeout(() => {
+      commentaryId.current += 1;
+      const id = commentaryId.current;
+      setCommentary((prev) => [...prev, { id, text }].slice(-2));
+    }, i * 2500));
+    return () => timers.forEach(clearTimeout);
+  }, [phase, lineup]);
 
   const stakeN = parseInt(stake, 10);
   const stakeValid = Number.isInteger(stakeN) && stakeN > 0 && stakeN <= balance;
@@ -447,7 +626,8 @@ export default function DuckyDerbyPage() {
         @keyframes ddconfetti{0%{transform:translate(0,-24px) rotate(0);opacity:1}100%{transform:translate(var(--drift),640px) rotate(720deg);opacity:1}}
         @keyframes ddcount{0%{transform:scale(1.9);opacity:0}35%{opacity:1}100%{transform:scale(1);opacity:.95}}
         @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
-        @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}`}</style>
+        @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}
+        @keyframes ddbuoy{0%,100%{transform:translateY(-20px)}50%{transform:translateY(20px)}}`}</style>
 
       <div className="flex items-center justify-between">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
@@ -459,6 +639,8 @@ export default function DuckyDerbyPage() {
 
       {/* ---- Race track (single layered container) ---- */}
       <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
+       {/* zoom layer — scales up for a photo-finish slow-mo */}
+       <div className="absolute inset-0" style={{ transformOrigin: '62% 52%', transition: 'transform 0.5s ease', transform: zoom ? 'scale(1.6)' : 'scale(1)' }}>
         {/* far bank: grass + mud — above the water/start line, below the ducks */}
         <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
@@ -470,18 +652,20 @@ export default function DuckyDerbyPage() {
         <div className="absolute inset-x-0" style={{ top: WATER_TOP + 80, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
         <div className="absolute inset-x-0" style={{ top: WATER_TOP + 140, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
 
-        {/* pole banners — placed along the course, scroll in from the right.
-            No zIndex on the wrapper, so the poles (6) / cloth (8) layer around the grass (7). */}
-        {bannerLayout.map((b) => (
-          <div
-            key={b.ord}
-            ref={(el) => { bannerRefs.current[b.ord] = el; }}
-            className="absolute"
-            style={{ top: 6, left: preRace ? `${b.wx * 100}%` : undefined }}
-          >
-            <PoleBanner text={b.text} />
-          </div>
-        ))}
+        {/* pole banners — top or bottom bank, spread evenly along the course */}
+        {bannerLayout.map((b) => {
+          const isBottom = (b.placement || 'top') === 'bottom';
+          return (
+            <div
+              key={b.ord}
+              ref={(el) => { bannerRefs.current[b.ord] = el; }}
+              className="absolute"
+              style={{ top: isBottom ? TRACK_H - GRASS_BOTTOM - 41 : 6, left: preRace ? `${b.wx * 100}%` : undefined }}
+            >
+              <PoleBanner text={b.text} colour={b.colour} placement={b.placement} />
+            </div>
+          );
+        })}
 
         {/* finish line (behind the ducks) */}
         <div
@@ -493,6 +677,30 @@ export default function DuckyDerbyPage() {
             background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
           }}
         />
+
+        {/* lily pads — speed-boost spots, behind the ducks */}
+        {courseObjects.pads.map((p) => (
+          <div
+            key={p.key}
+            ref={(el) => { padRefs.current[p.key] = el; }}
+            className="absolute"
+            style={{ top: p.y, left: preRace ? `${p.wx * 100}%` : undefined, zIndex: 7 }}
+          >
+            <LilyPad />
+          </div>
+        ))}
+
+        {/* buoys — floating obstacles that bob up and down the river */}
+        {courseObjects.buoys.map((b) => (
+          <div
+            key={b.key}
+            ref={(el) => { buoyRefs.current[b.key] = el; }}
+            className="absolute"
+            style={{ top: b.y, left: preRace ? `${b.wx * 100}%` : undefined, zIndex: 9, animation: `ddbuoy ${b.dur}s ease-in-out ${b.delay}s infinite` }}
+          >
+            <Buoy colour={b.colour} />
+          </div>
+        ))}
 
         {/* ducks */}
         {ducks.map((d, i) => (
@@ -508,8 +716,11 @@ export default function DuckyDerbyPage() {
                 <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
               </div>
             )}
-            <div ref={(el) => { spriteRefs.current[d.ord] = el; }}
-              className={phase === 'racing' ? '' : 'animate-[ddbob_2.4s_ease-in-out_infinite]'}>
+            <div
+              ref={(el) => { spriteRefs.current[d.ord] = el; }}
+              className={phase === 'racing' ? '' : 'animate-[ddbob_2.4s_ease-in-out_infinite]'}
+              style={{ animationDelay: `${(-((i * 0.7) % 2.4)).toFixed(2)}s` }}
+            >
               <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={DUCK_W} h={DUCK_H} />
             </div>
           </div>
@@ -517,8 +728,9 @@ export default function DuckyDerbyPage() {
 
         {/* near bank: bottom grass — IN FRONT of the ducks */}
         <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: grass, zIndex: 30 }} />
-        {/* cartoon grass tufts poking up off the near bank */}
-        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 30, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
+        {/* cartoon grass tufts poking up off the near bank — zIndex 33 so bottom-bank
+            banner poles (zIndex 31) tuck behind */}
+        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 33, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
 
         {/* start line (dashed) — a marking ON the water, so the ducks swim over it */}
         <div
@@ -542,6 +754,7 @@ export default function DuckyDerbyPage() {
             </span>
           </div>
         )}
+       </div>
       </div>
 
       {/* ---- Live commentary ticker ---- */}
@@ -637,7 +850,7 @@ export default function DuckyDerbyPage() {
                 if (result.won) return `${winner?.name} romped home — and that was your duck!`;
                 if (result.sink && result.sink.ord === result.picked_ord)
                   return `${winner?.name} won it. ${mine?.name} drowned, which is a shame.`;
-                return `${winner?.name} won it. Your duck ${mine?.name} didn't have the legs.`;
+                return `${winner?.name} won it. Your duck ${mine?.name} just didn't have the legs.`;
               })()}
             </div>
             <p className="mt-3 text-center text-sm text-neutral-600">

@@ -92,9 +92,10 @@ export default function AdminDuckySection() {
       <hr className="border-neutral-200" />
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Bank banners (top of river)</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Bank banners</p>
+        <p className="text-[11px] text-neutral-400">Active banners are spread evenly along the course; top and bottom banks are spaced independently.</p>
         {(cfg.banners || []).map((b) => (
-          <TextRowEditor key={b.ord} row={b} label={`Banner ${b.ord}`} busy={busy}
+          <BannerRowEditor key={b.ord} row={b} label={`Banner ${b.ord}`} busy={busy}
             onSave={(patch) => run(() => api.admin.updateDuckyBanner(b.ord, patch))} />
         ))}
       </div>
@@ -108,7 +109,64 @@ export default function AdminDuckySection() {
             onSave={(patch) => run(() => api.admin.updateDuckyPhrase(p.ord, patch))} />
         ))}
       </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Race commentary</p>
+        <p className="text-[11px] text-neutral-400">Filler lines shown between the scripted beats — {'{duck}'} is replaced with a random racer name.</p>
+        {(cfg.commentary || []).map((c) => (
+          <TextRowEditor key={c.ord} row={c} label={`Line ${c.ord}`} busy={busy}
+            onSave={(patch) => run(() => api.admin.updateDuckyCommentary(c.ord, patch))} />
+        ))}
+      </div>
     </section>
+  );
+}
+
+function BannerRowEditor({ row, label, busy, onSave }) {
+  const [text, setText] = useState(row.text ?? '');
+  const [placement, setPlacement] = useState(row.placement ?? 'top');
+  const [colour, setColour] = useState(row.colour ?? '#1f2937');
+  useEffect(() => {
+    setText(row.text ?? '');
+    setPlacement(row.placement ?? 'top');
+    setColour(row.colour ?? '#1f2937');
+  }, [row.text, row.placement, row.colour]);
+  const dirty = text !== (row.text ?? '')
+    || placement !== (row.placement ?? 'top')
+    || colour !== (row.colour ?? '#1f2937');
+
+  function save() {
+    if (!HEX_RE.test(colour)) return;
+    onSave({ text, placement, colour });
+  }
+
+  return (
+    <div className="space-y-1.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-neutral-700">{label}</span>
+        <button
+          onClick={() => onSave({ active: !row.active })}
+          disabled={busy}
+          className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${row.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {row.active ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+      <input className={inputCls} value={text} onChange={(e) => setText(e.target.value)} placeholder="Banner text" />
+      <div className="flex items-center gap-2">
+        <select className={inputCls + ' flex-1'} value={placement} onChange={(e) => setPlacement(e.target.value)}>
+          <option value="top">Top bank</option>
+          <option value="bottom">Bottom bank</option>
+        </select>
+        <span className="inline-block h-8 w-8 shrink-0 rounded border border-neutral-300" style={{ background: colour }} />
+        <input className={inputCls + ' w-24 font-mono'} value={colour} onChange={(e) => setColour(e.target.value)} placeholder="#1f2937" />
+        <button onClick={save} disabled={busy || !dirty} className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-30">
+          Save
+        </button>
+      </div>
+    </div>
   );
 }
 
