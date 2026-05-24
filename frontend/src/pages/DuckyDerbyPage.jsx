@@ -93,7 +93,6 @@ function Buoy({ colour }) {
     <div style={{ width: 30, height: 18, position: 'relative' }}>
       <div style={{ position: 'absolute', left: '50%', top: -5, marginLeft: -1.5, width: 3, height: 7, background: 'rgba(0,0,0,0.45)' }} />
       <div style={{ position: 'absolute', inset: 0, background: colour, borderRadius: '15px 15px 4px 4px', border: '2px solid rgba(0,0,0,0.28)' }} />
-      <div style={{ position: 'absolute', left: 2, right: 2, top: '54%', height: 4, background: 'rgba(255,255,255,0.92)' }} />
     </div>
   );
 }
