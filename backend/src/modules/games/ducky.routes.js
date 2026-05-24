@@ -37,10 +37,12 @@ async function getDuckyConfig() {
   const { rows: banners } = await query(`SELECT ord, text, active, placement, colour FROM ducky_banners ORDER BY ord`);
   const { rows: phrases } = await query(`SELECT ord, text, active FROM ducky_phrases ORDER BY ord`);
   const { rows: commentary } = await query(`SELECT ord, text, active FROM ducky_commentary ORDER BY ord`);
+  const { rows: intro } = await query(`SELECT ord, text, active FROM ducky_intro ORDER BY ord`);
   cfg.ducks = ducks;
   cfg.banners = banners;
   cfg.phrases = phrases;
   cfg.commentary = commentary;
+  cfg.intro = intro;
   return cfg;
 }
 
@@ -325,5 +327,10 @@ export default async function duckyRoutes(fastify) {
   fastify.patch('/api/admin/games/ducky/commentary/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
     return await updateRowTable('ducky_commentary', 16, Number(req.params.ord), req.body ?? {}, reply);
+  });
+
+  fastify.patch('/api/admin/games/ducky/intro/:ord', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    return await updateRowTable('ducky_intro', 8, Number(req.params.ord), req.body ?? {}, reply);
   });
 }

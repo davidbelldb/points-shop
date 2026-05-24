@@ -183,6 +183,7 @@ export const api = {
     updateDuckyBanner: (ord, patch) => request(`/admin/games/ducky/banners/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateDuckyPhrase: (ord, patch) => request(`/admin/games/ducky/phrases/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateDuckyCommentary: (ord, patch) => request(`/admin/games/ducky/commentary/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    updateDuckyIntro: (ord, patch) => request(`/admin/games/ducky/intro/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     upload: uploadFile,
   },
 };

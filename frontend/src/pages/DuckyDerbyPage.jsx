@@ -63,9 +63,8 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
    the banner is planted on the top bank or the bottom bank. */
 const BANNER_TATTER =
   'polygon(0% 6%, 8% 0%, 30% 7%, 52% 1%, 73% 7%, 93% 0%, 100% 9%, 96% 30%, 100% 52%, 95% 73%, 100% 92%, 92% 100%, 72% 94%, 50% 100%, 27% 94%, 8% 100%, 0% 90%, 5% 70%, 0% 50%, 5% 27%)';
-const BANNER_FONT = "'Bradley Hand', 'Segoe Print', 'Marker Felt', 'Comic Sans MS', cursive";
 
-function PoleBanner({ text, colour, placement }) {
+function PoleBanner({ text, placement }) {
   const bottom = placement === 'bottom';
   const poleZ = bottom ? 31 : 6;
   const clothZ = bottom ? 34 : 8;
@@ -77,15 +76,8 @@ function PoleBanner({ text, colour, placement }) {
         {/* dark backing — shows as a tattered outline behind the cloth */}
         <div className="absolute inset-0" style={{ background: '#1a1a1a', clipPath: BANNER_TATTER }} />
         <div
-          className="relative whitespace-nowrap px-3.5 py-1 text-center text-[13px] font-bold uppercase"
-          style={{
-            margin: 2,
-            background: '#fbfaf2',
-            color: colour || '#1f2937',
-            clipPath: BANNER_TATTER,
-            fontFamily: BANNER_FONT,
-            letterSpacing: '0.03em',
-          }}
+          className="relative whitespace-nowrap px-3.5 py-1 text-center text-[12px] font-extrabold uppercase text-black"
+          style={{ margin: 2, background: '#ffffff', clipPath: BANNER_TATTER }}
         >
           {text}
         </div>
@@ -554,31 +546,24 @@ export default function DuckyDerbyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, result, config]);
 
-  /* ---- pre-race commentary cycle (during betting) ---- */
+  /* ---- pre-race intro commentary cycle (admin-editable, during betting) ---- */
   useEffect(() => {
     if (phase !== 'betting' || !lineup) return;
     const ds = lineup.ducks || [];
-    let a = 'a duck';
-    let b = 'another duck';
-    if (ds.length >= 2) {
-      const sh = [...ds].sort(() => Math.random() - 0.5);
-      a = sh[0].name;
-      b = sh[1].name;
-    }
-    const lines = [
-      'Welcome along to the Ducky Derby!',
-      'It looks like it could be a bread bath out there today',
-      "We're hearing there's been some drama...",
-      `${a} has allegedly been violating ${b}`,
-      'Anyway — pick yourself a duck and place your bet',
-    ];
+    const sh = [...ds].sort(() => Math.random() - 0.5);
+    const a = sh[0]?.name || 'a duck';
+    const b = sh[1]?.name || 'another duck';
+    const lines = (config?.intro || [])
+      .filter((r) => r.active && r.text.trim())
+      .map((r) => r.text.replace(/\{duck2\}/g, b).replace(/\{duck\}/g, a));
+    if (!lines.length) return;
     const timers = lines.map((text, i) => setTimeout(() => {
       commentaryId.current += 1;
       const id = commentaryId.current;
       setCommentary((prev) => [...prev, { id, text }].slice(-2));
     }, i * 2500));
     return () => timers.forEach(clearTimeout);
-  }, [phase, lineup]);
+  }, [phase, lineup, config]);
 
   const stakeN = parseInt(stake, 10);
   const stakeValid = Number.isInteger(stakeN) && stakeN > 0 && stakeN <= balance;
@@ -662,7 +647,7 @@ export default function DuckyDerbyPage() {
               className="absolute"
               style={{ top: isBottom ? TRACK_H - GRASS_BOTTOM - 41 : 6, left: preRace ? `${b.wx * 100}%` : undefined }}
             >
-              <PoleBanner text={b.text} colour={b.colour} placement={b.placement} />
+              <PoleBanner text={b.text} placement={b.placement} />
             </div>
           );
         })}

@@ -120,6 +120,17 @@ export default function AdminDuckySection() {
             onSave={(patch) => run(() => api.admin.updateDuckyCommentary(c.ord, patch))} />
         ))}
       </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Pre-race intro</p>
+        <p className="text-[11px] text-neutral-400">Plays in order before each race — {'{duck}'} and {'{duck2}'} become two different racer names.</p>
+        {(cfg.intro || []).map((c) => (
+          <TextRowEditor key={c.ord} row={c} label={`Intro ${c.ord}`} busy={busy}
+            onSave={(patch) => run(() => api.admin.updateDuckyIntro(c.ord, patch))} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -127,20 +138,11 @@ export default function AdminDuckySection() {
 function BannerRowEditor({ row, label, busy, onSave }) {
   const [text, setText] = useState(row.text ?? '');
   const [placement, setPlacement] = useState(row.placement ?? 'top');
-  const [colour, setColour] = useState(row.colour ?? '#1f2937');
   useEffect(() => {
     setText(row.text ?? '');
     setPlacement(row.placement ?? 'top');
-    setColour(row.colour ?? '#1f2937');
-  }, [row.text, row.placement, row.colour]);
-  const dirty = text !== (row.text ?? '')
-    || placement !== (row.placement ?? 'top')
-    || colour !== (row.colour ?? '#1f2937');
-
-  function save() {
-    if (!HEX_RE.test(colour)) return;
-    onSave({ text, placement, colour });
-  }
+  }, [row.text, row.placement]);
+  const dirty = text !== (row.text ?? '') || placement !== (row.placement ?? 'top');
 
   return (
     <div className="space-y-1.5 rounded-lg border border-neutral-200 bg-neutral-50 p-2">
@@ -160,9 +162,7 @@ function BannerRowEditor({ row, label, busy, onSave }) {
           <option value="top">Top bank</option>
           <option value="bottom">Bottom bank</option>
         </select>
-        <span className="inline-block h-8 w-8 shrink-0 rounded border border-neutral-300" style={{ background: colour }} />
-        <input className={inputCls + ' w-24 font-mono'} value={colour} onChange={(e) => setColour(e.target.value)} placeholder="#1f2937" />
-        <button onClick={save} disabled={busy || !dirty} className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-30">
+        <button onClick={() => onSave({ text, placement })} disabled={busy || !dirty} className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-30">
           Save
         </button>
       </div>
