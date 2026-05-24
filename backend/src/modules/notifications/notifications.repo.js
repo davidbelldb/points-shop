@@ -32,3 +32,19 @@ export async function deleteNotification(id, accountId) {
 export async function deleteAllNotifications(accountId) {
   await query(`DELETE FROM notifications WHERE account_id = $1`, [accountId]);
 }
+
+export async function savePushSubscription(accountId, sub) {
+  await query(
+    `INSERT INTO push_subscriptions (account_id, endpoint, p256dh, auth)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (endpoint) DO UPDATE
+       SET account_id = EXCLUDED.account_id,
+           p256dh = EXCLUDED.p256dh,
+           auth = EXCLUDED.auth`,
+    [accountId, sub.endpoint, sub.keys.p256dh, sub.keys.auth],
+  );
+}
+
+export async function deletePushSubscription(endpoint) {
+  await query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
+}

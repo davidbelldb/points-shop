@@ -1,5 +1,6 @@
 import { query } from '../../db.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { sendPush } from '../notifications/push.js';
 
 // TMDB genre id -> name (movie + TV genres combined; ids are stable).
 const TMDB_GENRES = {
@@ -221,6 +222,11 @@ export default async function rewatchRoutes(fastify) {
              VALUES ($1, 'watch_invite', $2, $3, '/rewatch')`,
             [partner.id, 'Watch list invite', `${myName} wants to watch ${item.title} with you`],
           );
+          sendPush(partner.id, {
+            title: 'Watch list invite',
+            body: `${myName} wants to watch ${item.title} with you`,
+            url: '/rewatch',
+          });
         }
       } catch (e) {
         fastify.log.error({ err: e }, 'watch invite creation failed');

@@ -1,5 +1,6 @@
 import { query } from '../../db.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { sendPush } from '../notifications/push.js';
 
 async function findGiver(reward) {
   if (reward.source_type === 'giftsweeper' && reward.source_id) {
@@ -54,15 +55,16 @@ export default async function rewardsRoutes(fastify) {
       const meName = meInfo.rows[0]?.name ?? 'They';
       const itemLabel = reward.product_name || reward.text_label || 'a reward';
       const isProduct = !!reward.product_id;
+      const claimTitle = isProduct ? 'Reward to deliver' : 'Forfeit to perform';
+      const claimBody = isProduct
+        ? `${meName} claimed: ${itemLabel}`
+        : `${meName} redeemed forfeit: ${itemLabel}`;
       await query(
         `INSERT INTO notifications (account_id, type, title, body, link_url)
          VALUES ($1, 'reward_claim', $2, $3, '/account')`,
-        [
-          giverId,
-          isProduct ? 'Reward to deliver' : 'Forfeit to perform',
-          isProduct ? `${meName} claimed: ${itemLabel}` : `${meName} redeemed forfeit: ${itemLabel}`,
-        ],
+        [giverId, claimTitle, claimBody],
       );
+      sendPush(giverId, { title: claimTitle, body: claimBody, url: '/account' });
     }
     return { ok: true };
   });

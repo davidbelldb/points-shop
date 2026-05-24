@@ -1,5 +1,6 @@
 import { pool } from '../../db.js';
 import { calculateDiscount } from '../discounts/discounts.repo.js';
+import { sendPush } from '../notifications/push.js';
 
 export class HttpError extends Error {
   constructor(statusCode, message) { super(message); this.statusCode = statusCode; }
@@ -216,6 +217,7 @@ export async function updateOrderStatus(id, status, reason = null) {
        VALUES ($1, 'order_status', $2, $3, $4)`,
       [order.account_id, `Order #${refShort}: ${statusLabel}`, finalReason, `/order/${id}`],
     );
+    sendPush(order.account_id, { title: `Order #${refShort}: ${statusLabel}`, body: finalReason, url: `/order/${id}` });
     await client.query('COMMIT');
     return { id: order.id, status: order.status };
   } catch (err) {

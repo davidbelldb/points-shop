@@ -1,4 +1,5 @@
 import { query } from '../../db.js';
+import { sendPush } from '../notifications/push.js';
 
 export async function findOtherUser(accountId) {
   const { rows } = await query(
@@ -54,6 +55,7 @@ export async function sendMessage(senderId, recipientId, body) {
      VALUES ($1, 'message', $2, $3, '/messages')`,
     [recipientId, `New message from ${senderName}`, preview],
   );
+  sendPush(recipientId, { title: `New message from ${senderName}`, body: preview, url: '/messages' });
 
   return rows[0];
 }

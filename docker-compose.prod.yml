@@ -38,6 +38,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       MEDIA_DIR: /app/media
       TMDB_API_KEY: ${TMDB_API_KEY}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@sneakypoints.com}
     volumes:
       - media:/app/media
     networks:

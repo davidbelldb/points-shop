@@ -1,5 +1,6 @@
 import { pool, query } from '../../db.js';
 import { getDefaultAccountId } from '../accounts/accounts.repo.js';
+import { sendPush } from '../notifications/push.js';
 
 const PRODUCT_FIELDS = ['name', 'sku', 'description', 'price_points', 'thumbnail_url', 'is_active'];
 const ACCOUNT_FIELDS = ['name', 'email', 'photo_url'];
@@ -174,6 +175,7 @@ export async function adjustPoints(delta, reason, accountId = null) {
        VALUES ($1, 'points_adjust', $2, $3)`,
       [targetId, `${sign}${delta} pts`, reason],
     );
+    sendPush(targetId, { title: `${sign}${delta} pts`, body: reason, url: '/account' });
     await client.query('COMMIT');
     return newBalance;
   } catch (err) {

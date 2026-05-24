@@ -5,6 +5,7 @@ import {
   getActiveMatch, getLatestFinishedMatch, getMatchById, createMatch, updateMatch,
   creditPoints,
 } from './games.repo.js';
+import { sendPush } from '../notifications/push.js';
 
 const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const WINNER_BONUS = 12;
@@ -27,6 +28,7 @@ async function notify(accountId, title, body) {
      VALUES ($1, 'game_turn', $2, $3, '/games/tic-tac-face')`,
     [accountId, title, body],
   );
+  sendPush(accountId, { title, body, url: '/games/tic-tac-face' });
 }
 
 function shape(game, meId) {

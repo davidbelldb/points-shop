@@ -1,7 +1,9 @@
 import {
   listNotifications, unreadCount, markAllRead, deleteNotification, deleteAllNotifications,
+  savePushSubscription, deletePushSubscription,
 } from './notifications.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { config } from '../../config.js';
 
 export default async function notificationsRoutes(fastify) {
   fastify.get('/api/notifications', async (req) => {
@@ -22,6 +24,25 @@ export default async function notificationsRoutes(fastify) {
 
   fastify.delete('/api/notifications', async (req) => {
     await deleteAllNotifications(getEffectiveAccountId(req));
+    return { ok: true };
+  });
+
+  // --- Web push ---
+  fastify.get('/api/notifications/vapid-key', async () => ({ key: config.vapid.publicKey }));
+
+  fastify.post('/api/notifications/subscribe', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const sub = req.body;
+    if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
+      return reply.code(400).send({ error: 'invalid subscription' });
+    }
+    await savePushSubscription(accountId, sub);
+    return { ok: true };
+  });
+
+  fastify.post('/api/notifications/unsubscribe', async (req) => {
+    const endpoint = req.body?.endpoint;
+    if (endpoint) await deletePushSubscription(endpoint);
     return { ok: true };
   });
 }

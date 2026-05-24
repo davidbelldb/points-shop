@@ -5,6 +5,7 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { formatLedgerReason } from '../lib/formatters.js';
 import GameRewardsCard from '../components/GameRewardsCard.jsx';
+import PushToggle from '../components/PushToggle.jsx';
 
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
@@ -149,6 +150,8 @@ export default function AccountPage() {
 
         {error && <p className="text-sm text-red-600">{error}</p>}
       </section>
+
+      <PushToggle />
 
       <UpdatesSection notifications={notifications?.items ?? []} onDismiss={dismissNotification} onClearAll={clearAllNotifications} />
       <OrdersSection title="Current orders"  bucket="open"  orders={openOrders}  />

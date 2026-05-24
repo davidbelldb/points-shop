@@ -12,4 +12,9 @@ export const config = {
   },
   logLevel: process.env.LOG_LEVEL ?? 'info',
   mediaDir: process.env.MEDIA_DIR ?? path.resolve(process.cwd(), '..', 'media'),
+  vapid: {
+    publicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+    privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+    subject: process.env.VAPID_SUBJECT ?? 'mailto:admin@sneakypoints.com',
+  },
 };

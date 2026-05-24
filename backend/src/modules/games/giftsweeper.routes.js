@@ -5,6 +5,7 @@ import {
   getActiveGsMatch, createGsMatch, updateGsMatch,
   listGsItems, deleteGsItemsForOwner, deleteGsItemById, insertGsItem,
 } from './giftsweeper.repo.js';
+import { sendPush } from '../notifications/push.js';
 
 const DEFAULT_ROWS = 6, DEFAULT_COLS = 6, DEFAULT_COST = 1, MIN_ITEMS = 3;
 
@@ -44,6 +45,7 @@ async function notifyGs(accountId, title, body) {
      VALUES ($1, 'gs_turn', $2, $3, '/games/giftsweeper')`,
     [accountId, title, body],
   );
+  sendPush(accountId, { title, body, url: '/games/giftsweeper' });
 }
 async function getBalance(accountId) {
   const r = await query(`SELECT points_balance FROM accounts WHERE id = $1`, [accountId]);

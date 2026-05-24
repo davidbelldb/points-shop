@@ -1,0 +1,13 @@
+{
+  "name": "Sneaky Points",
+  "short_name": "Sneaky Points",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fffbeb",
+  "theme_color": "#fffbeb",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

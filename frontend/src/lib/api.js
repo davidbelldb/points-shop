@@ -115,6 +115,10 @@ export const api = {
   getNotifications: () => request('/notifications'),
   markNotificationsRead: () => request('/notifications/mark-read', { method: 'POST' }),
   dismissNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  getVapidKey: () => request('/notifications/vapid-key'),
+  savePushSubscription: (sub) => request('/notifications/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
+  removePushSubscription: (endpoint) =>
+    request('/notifications/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) }),
   getActiveSurvey: () => request('/surveys/active'),
   submitSurveyResponse: (surveyId, answers) =>
     request(`/surveys/${surveyId}/responses`, { method: 'POST', body: JSON.stringify({ answers }) }),
