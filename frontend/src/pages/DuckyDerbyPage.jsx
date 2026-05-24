@@ -66,8 +66,9 @@ const BANNER_TATTER =
 
 function PoleBanner({ text, placement }) {
   const bottom = placement === 'bottom';
-  const poleZ = bottom ? 31 : 6;
-  const clothZ = bottom ? 34 : 8;
+  // bottom banners sit in front of the near bank; top banners tuck behind the grass fringe
+  const poleZ = bottom ? 36 : 6;
+  const clothZ = bottom ? 37 : 8;
   return (
     <div className="relative">
       <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: poleZ }} />
@@ -139,40 +140,71 @@ function Confetti() {
   );
 }
 
-/* obstacles: merged, at-sorted list of pauses — whirlpools (kind 'whirl') and
-   buoy bumps (kind 'buoy'). Each pause's durationMs is baked into finishMs. */
+/* obstacles: merged, at-sorted list — whirlpools ('whirl'), buoy bumps ('buoy')
+   and lily-pad leaps ('pad'). Pause durations and pad leaps are baked into finishMs.
+   A pad makes the duck cover `boost` progress in a short `boostMs` — a visible sprint. */
+function obstacleTotals(list) {
+  let pauseTotal = 0;
+  let boostMsTotal = 0;
+  let boostProg = 0;
+  for (const o of list) {
+    if (o.kind === 'pad') { boostMsTotal += o.boostMs; boostProg += o.boost; }
+    else pauseTotal += o.durationMs;
+  }
+  return { pauseTotal, boostMsTotal, boostProg };
+}
+
 function duckState(elapsed, finishMs, obstacles) {
   const list = obstacles || [];
-  const total = list.reduce((s, o) => s + o.durationMs, 0);
-  const movingMs = Math.max(1, finishMs - total);
+  const { pauseTotal, boostMsTotal, boostProg } = obstacleTotals(list);
+  const movingMs = Math.max(1, finishMs - pauseTotal - boostMsTotal);
+  const rate = Math.max(1 - boostProg, 0.01) / movingMs; // normal-speed progress per ms
   let rem = elapsed;
   let lastAt = 0;
   for (const ob of list) {
-    const segMs = (ob.at - lastAt) * movingMs;
-    if (rem < segMs) return { m: lastAt + rem / movingMs, pause: null };
+    const segMs = Math.max(0, ob.at - lastAt) / rate;
+    if (rem < segMs) return { m: lastAt + rem * rate, pause: null };
     rem -= segMs;
-    if (rem < ob.durationMs) {
-      return { m: ob.at, pause: { kind: ob.kind || 'whirl', frac: rem / ob.durationMs, loops: ob.loops || 0 } };
+    if (ob.kind === 'pad') {
+      if (rem < ob.boostMs) {
+        return { m: Math.min(1, ob.at + (rem / ob.boostMs) * ob.boost), pause: { kind: 'pad', frac: rem / ob.boostMs } };
+      }
+      rem -= ob.boostMs;
+      lastAt = ob.at + ob.boost;
+    } else {
+      if (rem < ob.durationMs) {
+        return { m: ob.at, pause: { kind: ob.kind || 'whirl', frac: rem / ob.durationMs, loops: ob.loops || 0 } };
+      }
+      rem -= ob.durationMs;
+      lastAt = ob.at;
     }
-    rem -= ob.durationMs;
-    lastAt = ob.at;
   }
-  return { m: Math.min(1, lastAt + rem / movingMs), pause: null };
+  return { m: Math.min(1, lastAt + rem * rate), pause: null };
 }
 
 /* Inverse of duckState: the elapsed ms at which a duck first reaches progress targetM. */
 function progressToTime(targetM, finishMs, obstacles) {
   const list = obstacles || [];
-  const total = list.reduce((s, o) => s + o.durationMs, 0);
-  const movingMs = Math.max(1, finishMs - total);
+  const { pauseTotal, boostMsTotal, boostProg } = obstacleTotals(list);
+  const movingMs = Math.max(1, finishMs - pauseTotal - boostMsTotal);
+  const rate = Math.max(1 - boostProg, 0.01) / movingMs;
   let t = 0;
   let lastAt = 0;
   for (const ob of list) {
-    if (targetM <= ob.at) return t + (targetM - lastAt) * movingMs;
-    t += (ob.at - lastAt) * movingMs + ob.durationMs;
-    lastAt = ob.at;
+    if (targetM <= ob.at) return t + Math.max(0, targetM - lastAt) / rate;
+    t += Math.max(0, ob.at - lastAt) / rate;
+    if (ob.kind === 'pad') { t += ob.boostMs; lastAt = ob.at + ob.boost; }
+    else { t += ob.durationMs; lastAt = ob.at; }
   }
-  return t + (targetM - lastAt) * movingMs;
+  return t + Math.max(0, targetM - lastAt) / rate;
+}
+
+/* Substitute {duck}/{duck2}/... tokens — each occurrence resolves to a different racer. */
+function fillDuckTokens(text, ducks) {
+  if (!ducks || !ducks.length) return text;
+  const pool = [...ducks].sort(() => Math.random() - 0.5);
+  let i = 0;
+  return String(text).replace(/\{duck\d*\}/g, () => pool[(i++) % pool.length].name);
 }
 
 /* Photo-finish slow-mo: map real elapsed <-> race time. Outside the slow window
@@ -296,10 +328,9 @@ export default function DuckyDerbyPage() {
             dur: 3 + Math.random() * 2.6,
             delay: (o.fromTop ? 0 : -2) - Math.random() * 1.8,
           });
+        } else if (o.kind === 'pad') {
+          pads.push({ key: `p${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 30 });
         }
-      });
-      (result.lilypads?.[d.ord] || []).forEach((p, k) => {
-        pads.push({ key: `p${d.ord}-${k}`, wx: p.at * COURSE_LEN, y: laneY + 30 });
       });
     });
     return { buoys, pads };
@@ -353,13 +384,11 @@ export default function DuckyDerbyPage() {
         const sinking = sink && s.d.ord === sink.ord && s.m >= sink.at;
         if (lane) {
           lane.style.left = `${leaderScreen - (leaderM - s.m) * SPREAD}%`;
-          if (s.pause && !sinking) {
-            if (s.pause.kind === 'buoy') {
-              lane.style.transform = `translate(${Math.sin(s.pause.frac * Math.PI * 9) * 3}px, 0)`;
-            } else {
-              const ang = s.pause.frac * s.pause.loops * Math.PI * 2;
-              lane.style.transform = `translate(${Math.cos(ang) * 16}px, ${Math.sin(ang) * 12}px)`;
-            }
+          if (s.pause && !sinking && s.pause.kind === 'whirl') {
+            const ang = s.pause.frac * s.pause.loops * Math.PI * 2;
+            lane.style.transform = `translate(${Math.cos(ang) * 16}px, ${Math.sin(ang) * 12}px)`;
+          } else if (s.pause && !sinking && s.pause.kind === 'buoy') {
+            lane.style.transform = `translate(${Math.sin(s.pause.frac * Math.PI * 9) * 3}px, 0)`;
           } else {
             lane.style.transform = 'translate(0, 0)';
           }
@@ -372,14 +401,10 @@ export default function DuckyDerbyPage() {
             sprite.style.opacity = `${1 - sp}`;
           }
         } else if (sprite) {
-          // lily-pad lunge — a quick horizontal stretch crossing a pad
-          let lunge = 0;
-          for (const p of (result.lilypads?.[s.d.ord] || [])) {
-            const dd = s.m - p.at;
-            if (dd > -0.015 && dd < 0.07) lunge = Math.max(lunge, 1 - Math.abs(dd - 0.025) / 0.06);
-          }
+          // lily-pad leap — the duck stretches forward as it sprints
+          const surge = s.pause && s.pause.kind === 'pad' ? Math.sin(s.pause.frac * Math.PI) : 0;
           const rot = Math.sin(elapsed / 320 + i) * 6;
-          sprite.style.transform = `rotate(${rot}deg) scaleX(${(1 + 0.22 * lunge).toFixed(3)})`;
+          sprite.style.transform = `rotate(${rot}deg) scaleX(${(1 + 0.34 * surge).toFixed(3)})`;
         }
       }
       if (finishRef.current) finishRef.current.style.left = `${(COURSE_LEN - camX) * 100}%`;
@@ -462,7 +487,7 @@ export default function DuckyDerbyPage() {
     const winMs = photo.winMs;
     const schedule = [{ t: 250, text: "And they're off!" }];
 
-    // whirlpool + buoy callouts — a few, spread out
+    // whirlpool / buoy / lily-pad callouts — a few, spread out
     const hitEvents = [];
     for (const d of result.ducks) {
       if (sink && d.ord === sink.ord) continue;
@@ -471,12 +496,11 @@ export default function DuckyDerbyPage() {
       for (const o of obs) {
         const t = progressToTime(o.at, F, obs);
         if (t > 2000 && t < winMs - 3000) {
-          hitEvents.push({
-            t,
-            text: o.kind === 'buoy'
-              ? `${names[d.ord]} clatters into a buoy!`
-              : `${names[d.ord]} hits the rapids!`,
-          });
+          let text;
+          if (o.kind === 'buoy') text = `${names[d.ord]} clatters into a buoy!`;
+          else if (o.kind === 'pad') text = `${names[d.ord]} catches a lily pad and surges!`;
+          else text = `${names[d.ord]} hits the rapids!`;
+          hitEvents.push({ t, text });
         }
       }
     }
@@ -484,25 +508,9 @@ export default function DuckyDerbyPage() {
     let lastHit = -9999;
     let hitCount = 0;
     for (const e of hitEvents) {
-      if (hitCount >= 4) break;
-      if (e.t - lastHit > 3400) { schedule.push(e); lastHit = e.t; hitCount += 1; }
+      if (hitCount >= 5) break;
+      if (e.t - lastHit > 3000) { schedule.push(e); lastHit = e.t; hitCount += 1; }
     }
-
-    // lily-pad callouts (up to 2)
-    const padEvents = [];
-    for (const d of result.ducks) {
-      if (sink && d.ord === sink.ord) continue;
-      const F = result.finish_ms[d.ord];
-      const obs = result.whirlpools?.[d.ord] || [];
-      for (const p of (result.lilypads?.[d.ord] || [])) {
-        const t = progressToTime(p.at, F, obs);
-        if (t > 2500 && t < winMs - 3000) {
-          padEvents.push({ t, text: `${names[d.ord]} catches a lily pad and surges!` });
-        }
-      }
-    }
-    padEvents.sort((a, b) => a.t - b.t);
-    padEvents.slice(0, 2).forEach((e) => schedule.push(e));
 
     // sink callout
     if (sink) {
@@ -526,8 +534,7 @@ export default function DuckyDerbyPage() {
     if (fillers.length) {
       let fi = Math.floor(Math.random() * fillers.length);
       for (let t = 3400; t < winMs - 4200; t += 3600) {
-        const rnd = result.ducks[Math.floor(Math.random() * result.ducks.length)];
-        schedule.push({ t, text: fillers[fi % fillers.length].replace(/\{duck\}/g, names[rnd.ord]) });
+        schedule.push({ t, text: fillDuckTokens(fillers[fi % fillers.length], result.ducks) });
         fi += 1;
       }
     }
@@ -550,12 +557,9 @@ export default function DuckyDerbyPage() {
   useEffect(() => {
     if (phase !== 'betting' || !lineup) return;
     const ds = lineup.ducks || [];
-    const sh = [...ds].sort(() => Math.random() - 0.5);
-    const a = sh[0]?.name || 'a duck';
-    const b = sh[1]?.name || 'another duck';
     const lines = (config?.intro || [])
       .filter((r) => r.active && r.text.trim())
-      .map((r) => r.text.replace(/\{duck2\}/g, b).replace(/\{duck\}/g, a));
+      .map((r) => fillDuckTokens(r.text, ds));
     if (!lines.length) return;
     const timers = lines.map((text, i) => setTimeout(() => {
       commentaryId.current += 1;

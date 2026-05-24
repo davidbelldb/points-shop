@@ -13,6 +13,7 @@ export default function AdminDuckySection() {
   const [water, setWater] = useState('');
   const [grass, setGrass] = useState('');
   const [mud, setMud] = useState('');
+  const [buoy, setBuoy] = useState('');
   const [count, setCount] = useState(10);
 
   async function load() {
@@ -22,6 +23,7 @@ export default function AdminDuckySection() {
       setWater(c.water_colour ?? '');
       setGrass(c.grass_colour ?? '');
       setMud(c.mud_colour ?? '');
+      setBuoy(c.buoy_colour ?? '');
       setCount(c.race_duck_count ?? 10);
     } catch (e) { setError(e.message); }
   }
@@ -42,8 +44,10 @@ export default function AdminDuckySection() {
     if (!HEX_RE.test(water)) { setError('Water colour must be a hex like #4aa3c7'); return; }
     if (!HEX_RE.test(grass)) { setError('Grass colour must be a hex like #5bbf3a'); return; }
     if (!HEX_RE.test(mud)) { setError('Mud colour must be a hex like #6b4a2a'); return; }
+    if (!HEX_RE.test(buoy)) { setError('Buoy colour must be a hex like #e0322e'); return; }
     run(() => api.admin.updateDucky({
-      water_colour: water, grass_colour: grass, mud_colour: mud, race_duck_count: Number(count),
+      water_colour: water, grass_colour: grass, mud_colour: mud, buoy_colour: buoy,
+      race_duck_count: Number(count),
     }));
   }
 
@@ -69,6 +73,7 @@ export default function AdminDuckySection() {
         <ColourInput label="Water colour" value={water} setValue={setWater} swatch={water} />
         <ColourInput label="Grass colour" value={grass} setValue={setGrass} swatch={grass} />
         <ColourInput label="Mud colour" value={mud} setValue={setMud} swatch={mud} />
+        <ColourInput label="Buoy colour" value={buoy} setValue={setBuoy} swatch={buoy} />
         <div>
           <span className="text-[11px] text-neutral-500">Ducks per race</span>
           <select className={inputCls + ' mt-0.5'} value={count} onChange={(e) => setCount(Number(e.target.value))}>

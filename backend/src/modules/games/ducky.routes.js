@@ -2,7 +2,6 @@ import { query } from '../../db.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
-const BUOY_COLOURS = ['#e0322e', '#f4c020', '#39b54a']; // red, yellow, green
 
 async function getBalance(accountId) {
   const { rows } = await query(`SELECT points_balance FROM accounts WHERE id = $1`, [accountId]);
@@ -94,6 +93,7 @@ export default async function duckyRoutes(fastify) {
 
     const winner = lineup[Math.floor(Math.random() * lineup.length)];
     const winMs = 25000 + Math.floor(Math.random() * 1500);
+    const buoyColour = cfg.buoy_colour || '#e0322e';
 
     // ~40% of races crown a "chaser" who finishes on the winner's tail — a photo finish.
     const fieldOrds = lineup.filter((d) => d.ord !== winner.ord);
@@ -102,8 +102,7 @@ export default async function duckyRoutes(fastify) {
       : null;
 
     const finishMs = {};
-    const whirlpools = {}; // per-duck obstacle list (whirlpools + buoys), sorted by `at`
-    const lilypads = {};
+    const whirlpools = {}; // per-duck obstacle list (whirlpools + buoys + lily pads), sorted by `at`
     for (const d of lineup) {
       const isWinner = d.ord === winner.ord;
       const isChaser = d.ord === chaserOrd;
@@ -112,35 +111,39 @@ export default async function duckyRoutes(fastify) {
       else if (isChaser) base = winMs + 200 + Math.floor(Math.random() * 380);
       else base = winMs + 700 + Math.floor(Math.random() * 3200);
 
-      const obstacles = makeWhirlpools().map((w) => ({ ...w, kind: 'whirl' }));
+      const whirls = makeWhirlpools().map((w) => ({ ...w, kind: 'whirl' }));
       // buoys + lily pads only for the mid-field — never the winner or the chaser.
       const buoys = [];
       const pads = [];
       if (!isWinner && !isChaser) {
-        const bc = Math.random() < 0.6 ? (Math.random() < 0.4 ? 2 : 1) : 0;
+        const bc = Math.random() < 0.35 ? 1 : 0;
         for (let i = 0; i < bc; i++) {
           buoys.push({
             kind: 'buoy',
             at: Math.round((0.18 + Math.random() * 0.62) * 1000) / 1000,
             durationMs: 500 + Math.floor(Math.random() * 700),
-            colour: BUOY_COLOURS[Math.floor(Math.random() * BUOY_COLOURS.length)],
+            colour: buoyColour,
             fromTop: Math.random() < 0.5,
           });
         }
         if (Math.random() < 0.5) {
           const pc = Math.random() < 0.3 ? 2 : 1;
           for (let i = 0; i < pc; i++) {
-            pads.push({ at: Math.round((0.2 + Math.random() * 0.58) * 1000) / 1000 });
+            pads.push({
+              kind: 'pad',
+              at: Math.round((0.2 + Math.random() * 0.56) * 1000) / 1000,
+              boost: 0.06,    // progress gained in the leap
+              boostMs: 480,   // a short, fast burst — the visible speed-up
+            });
           }
         }
       }
 
       const buoyTotal = buoys.reduce((s, b) => s + b.durationMs, 0);
-      let F = base + buoyTotal - pads.length * 850;
+      let F = base + buoyTotal - pads.length * 900;
       if (!isWinner) F = Math.max(F, winMs + (isChaser ? 150 : 350));
       finishMs[d.ord] = F;
-      whirlpools[d.ord] = [...obstacles, ...buoys].sort((a, b) => a.at - b.at);
-      lilypads[d.ord] = pads;
+      whirlpools[d.ord] = [...whirls, ...buoys, ...pads].sort((a, b) => a.at - b.at);
     }
 
     // 50% chance one non-winning duck sinks partway through (never the winner/chaser).
@@ -153,9 +156,9 @@ export default async function duckyRoutes(fastify) {
     }
 
     const { rows } = await query(
-      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools, lilypads, sink_ord, sink_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools), JSON.stringify(lilypads), sinkOrd, sinkAt],
+      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools, sink_ord, sink_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools), sinkOrd, sinkAt],
     );
     return { lineup_id: rows[0].id, ducks: lineup, balance: await getBalance(meId) };
   });
@@ -202,7 +205,6 @@ export default async function duckyRoutes(fastify) {
       winner_ord: race.winner_ord,
       finish_ms: race.finish_ms,
       whirlpools: race.whirlpools,
-      lilypads: race.lilypads || {},
       sink: race.sink_ord != null ? { ord: race.sink_ord, at: Number(race.sink_at) } : null,
       ducks: lineup,
       picked_ord: picked.ord,
@@ -229,7 +231,7 @@ export default async function duckyRoutes(fastify) {
   fastify.patch('/api/admin/games/ducky', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
     const p = req.body ?? {};
-    for (const k of ['water_colour', 'grass_colour', 'mud_colour']) {
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour']) {
       if (k in p && (typeof p[k] !== 'string' || !HEX_RE.test(p[k]))) {
         return reply.code(400).send({ error: `${k} must be a hex colour` });
       }
@@ -239,7 +241,7 @@ export default async function duckyRoutes(fastify) {
     }
     const updates = [];
     const values = [];
-    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days']) {
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days']) {
       if (k in p) { values.push(p[k]); updates.push(`${k} = $${values.length}`); }
     }
     if (updates.length) {
