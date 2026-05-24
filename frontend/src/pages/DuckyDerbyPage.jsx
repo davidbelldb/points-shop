@@ -74,20 +74,6 @@ function PoleBanner({ text }) {
   );
 }
 
-/* A plain background "decoy" duck — yellow, can't be bet on, just adds river life. */
-function DecoyDuck({ w }) {
-  const h = w * 0.8;
-  return (
-    <div className="relative" style={{ width: w, height: h }}>
-      <div className="absolute rounded-full" style={{ left: 0, bottom: 0, width: w * 0.8, height: h * 0.6, background: '#ffd23f' }} />
-      <div className="absolute rounded-full" style={{ right: 0, top: 0, width: w * 0.44, height: w * 0.44, background: '#ffd23f' }}>
-        <span className="absolute rounded-full" style={{ width: w * 0.07, height: w * 0.07, top: '32%', left: '34%', background: '#1a1a1a' }} />
-        <span className="absolute" style={{ right: -w * 0.16, top: '46%', width: w * 0.24, height: w * 0.13, background: '#f59e0b', borderRadius: '0 50% 50% 0' }} />
-      </div>
-    </div>
-  );
-}
-
 /* A burst of falling confetti — pure CSS, clipped by the track's overflow-hidden. */
 function Confetti() {
   const pieces = useMemo(() => {
@@ -137,6 +123,21 @@ function duckState(elapsed, finishMs, whirlpools) {
   return { m: Math.min(1, lastAt + rem / movingMs), whirl: null };
 }
 
+/* Inverse of duckState: the elapsed ms at which a duck first reaches progress targetM. */
+function progressToTime(targetM, finishMs, whirlpools) {
+  const list = whirlpools || [];
+  const whirlTotal = list.reduce((s, w) => s + w.durationMs, 0);
+  const movingMs = Math.max(1, finishMs - whirlTotal);
+  let t = 0;
+  let lastAt = 0;
+  for (const wp of list) {
+    if (targetM <= wp.at) return t + (targetM - lastAt) * movingMs;
+    t += (wp.at - lastAt) * movingMs + wp.durationMs;
+    lastAt = wp.at;
+  }
+  return t + (targetM - lastAt) * movingMs;
+}
+
 export default function DuckyDerbyPage() {
   const { refresh: refreshBasket } = useBasket();
   const [phase, setPhase] = useState('loading');
@@ -151,14 +152,16 @@ export default function DuckyDerbyPage() {
   const [error, setError] = useState(null);
   const [countText, setCountText] = useState('3');
   const [confetti, setConfetti] = useState(false);
+  const [commentary, setCommentary] = useState([{ id: 0, text: 'Pick a duck and place your bet!' }]);
 
   const laneRefs = useRef({});
   const spriteRefs = useRef({});
   const bannerRefs = useRef({});
-  const decoyRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
   const resultTimer = useRef(null);
+  const sinkRef = useRef(null);
+  const commentaryId = useRef(0);
 
   async function newLineup() {
     setBusy(true); setError(null);
@@ -175,6 +178,13 @@ export default function DuckyDerbyPage() {
       setResult(null);
       setBubbles({});
       setConfetti(false);
+      sinkRef.current = null;
+      // clear any leftover sink animation from the previous race's sprites
+      Object.values(spriteRefs.current).forEach((el) => {
+        if (el) { el.style.opacity = '1'; el.style.transform = ''; }
+      });
+      commentaryId.current = 0;
+      setCommentary([{ id: 0, text: 'Pick a duck and place your bet!' }]);
       setPhase('betting');
     } catch (e) {
       setError(e.message);
@@ -210,24 +220,6 @@ export default function DuckyDerbyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, lineup]);
 
-  /* background decoy ducks — a crowd of plain yellow ducks you can't bet on */
-  const decoys = useMemo(() => {
-    const count = 8 + Math.floor(Math.random() * 5); // 8-12
-    const yLo = WATER_TOP - 6;
-    const yHi = Math.max(yLo + 12, TRACK_H - GRASS_BOTTOM - 34);
-    const baseSpeed = COURSE_LEN / 26000; // world-x per ms
-    return Array.from({ length: count }, (_, i) => ({
-      id: i,
-      y: yLo + Math.random() * (yHi - yLo),
-      wx0: -0.15 + Math.random() * (COURSE_LEN + 0.15),
-      speed: baseSpeed * (0.5 + Math.random() * 0.9),
-      w: 42 + Math.random() * 16,
-      bobDur: 2 + Math.random() * 1.6,
-      bobDelay: -Math.random() * 3,
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineup, TRACK_H]);
-
   /* ---- rAF race animation ---- */
   useEffect(() => {
     if (phase !== 'racing' || !result) return;
@@ -235,9 +227,12 @@ export default function DuckyDerbyPage() {
     let raf;
     const tick = (now) => {
       const elapsed = now - t0;
-      const states = result.ducks.map((d) => ({
-        d, ...duckState(elapsed, result.finish_ms[d.ord], result.whirlpools?.[d.ord]),
-      }));
+      const sink = result.sink;
+      const states = result.ducks.map((d) => {
+        const st = { d, ...duckState(elapsed, result.finish_ms[d.ord], result.whirlpools?.[d.ord]) };
+        if (sink && d.ord === sink.ord && st.m > sink.at) st.m = sink.at;
+        return st;
+      });
       const leaderM = states.reduce((mx, s) => Math.max(mx, s.m), 0);
       const leaderWorldX = leaderM * COURSE_LEN;
       const camX = clamp(leaderWorldX - ANCHOR, 0, COURSE_LEN - END_X);
@@ -246,17 +241,27 @@ export default function DuckyDerbyPage() {
       for (const s of states) {
         const i = laneIndex[s.d.ord] ?? 0;
         const lane = laneRefs.current[s.d.ord];
+        const sprite = spriteRefs.current[s.d.ord];
+        const sinking = sink && s.d.ord === sink.ord && s.m >= sink.at;
         if (lane) {
           lane.style.left = `${leaderScreen - (leaderM - s.m) * SPREAD}%`;
-          if (s.whirl) {
+          if (s.whirl && !sinking) {
             const ang = s.whirl.frac * s.whirl.loops * Math.PI * 2;
             lane.style.transform = `translate(${Math.cos(ang) * 16}px, ${Math.sin(ang) * 12}px)`;
           } else {
             lane.style.transform = 'translate(0, 0)';
           }
         }
-        const sprite = spriteRefs.current[s.d.ord];
-        if (sprite) sprite.style.transform = `rotate(${Math.sin(elapsed / 320 + i) * 6}deg)`;
+        if (sinking) {
+          if (sinkRef.current == null) sinkRef.current = elapsed;
+          const sp = clamp((elapsed - sinkRef.current) / 1100, 0, 1);
+          if (sprite) {
+            sprite.style.transform = `translateY(${sp * 42}px) rotate(${sp * 28}deg)`;
+            sprite.style.opacity = `${1 - sp}`;
+          }
+        } else if (sprite) {
+          sprite.style.transform = `rotate(${Math.sin(elapsed / 320 + i) * 6}deg)`;
+        }
       }
       if (finishRef.current) finishRef.current.style.left = `${(COURSE_LEN - camX) * 100}%`;
       if (startRef.current) startRef.current.style.left = `${(START_WX - camX) * 100}%`;
@@ -264,21 +269,15 @@ export default function DuckyDerbyPage() {
         const el = bannerRefs.current[b.ord];
         if (el) el.style.left = `${(b.wx - camX) * 100}%`;
       }
-      const span = COURSE_LEN + 0.6;
-      for (const dc of decoys) {
-        const el = decoyRefs.current[dc.id];
-        if (!el) continue;
-        let wx = (dc.wx0 + dc.speed * elapsed + 0.3) % span;
-        if (wx < 0) wx += span;
-        el.style.left = `${(wx - 0.3 - camX) * 100}%`;
-      }
 
-      const maxMs = Math.max(...Object.values(result.finish_ms));
+      const maxMs = Math.max(...Object.entries(result.finish_ms)
+        .filter(([ord]) => !sink || Number(ord) !== sink.ord)
+        .map((e) => e[1]));
       if (elapsed < maxMs + 600) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase, result, laneIndex, n, bannerLayout, decoys]);
+  }, [phase, result, laneIndex, n, bannerLayout]);
 
   /* ---- speech bubbles ---- */
   const activePhrases = useMemo(
@@ -315,7 +314,10 @@ export default function DuckyDerbyPage() {
   /* ---- race finish: confetti as the winner crosses, result modal at the end ---- */
   useEffect(() => {
     if (phase !== 'racing' || !result) return;
-    const maxMs = Math.max(...Object.values(result.finish_ms));
+    const sink = result.sink;
+    const maxMs = Math.max(...Object.entries(result.finish_ms)
+      .filter(([ord]) => !sink || Number(ord) !== sink.ord)
+      .map((e) => e[1]));
     const winMs = result.finish_ms[result.winner_ord];
     const confettiTimer = setTimeout(() => setConfetti(true), winMs);
     resultTimer.current = setTimeout(() => {
@@ -324,6 +326,79 @@ export default function DuckyDerbyPage() {
     }, maxMs + 800);
     return () => { clearTimeout(confettiTimer); clearTimeout(resultTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, result]);
+
+  /* ---- live race commentary ---- */
+  useEffect(() => {
+    if (phase !== 'racing' || !result) return;
+    const names = {};
+    result.ducks.forEach((d) => { names[d.ord] = d.name; });
+    const sink = result.sink;
+    const winMs = result.finish_ms[result.winner_ord];
+    const schedule = [{ t: 250, text: "And they're off!" }];
+
+    // whirlpool callouts — a few, spread out
+    const wpEvents = [];
+    for (const d of result.ducks) {
+      if (sink && d.ord === sink.ord) continue;
+      const F = result.finish_ms[d.ord];
+      const wps = result.whirlpools?.[d.ord] || [];
+      for (const wp of wps) {
+        const t = progressToTime(wp.at, F, wps);
+        if (t > 2000 && t < winMs - 3000) wpEvents.push({ t, ord: d.ord });
+      }
+    }
+    wpEvents.sort((a, b) => a.t - b.t);
+    let lastWp = -9999;
+    let wpCount = 0;
+    for (const e of wpEvents) {
+      if (wpCount >= 3) break;
+      if (e.t - lastWp > 4000) {
+        schedule.push({ t: e.t, text: `${names[e.ord]} hits the rapids!` });
+        lastWp = e.t;
+        wpCount += 1;
+      }
+    }
+
+    // sink callout
+    if (sink) {
+      const st = progressToTime(sink.at, result.finish_ms[sink.ord], result.whirlpools?.[sink.ord] || []);
+      schedule.push({ t: st, text: `Disaster — ${names[sink.ord]} has gone under!` });
+    }
+
+    schedule.push({ t: winMs * 0.42, text: "It's neck and neck out there!" });
+    schedule.push({ t: winMs - 3400, text: 'Into the final stretch!' });
+    schedule.push({ t: winMs - 150, text: `${names[result.winner_ord]} romps home to take it!` });
+
+    // generic filler lines between the beats
+    const fillers = [
+      "It's a cracking pace out there!",
+      '{duck} is really digging in!',
+      'The crowd is on its feet!',
+      '{duck} fancies this one!',
+      "They're bunched up tight!",
+      'What a contest, folks!',
+      "{duck} won't let this slip!",
+      'Pure drama on the water!',
+    ];
+    let fi = Math.floor(Math.random() * fillers.length);
+    for (let t = 3400; t < winMs - 4200; t += 3500) {
+      const rnd = result.ducks[Math.floor(Math.random() * result.ducks.length)];
+      schedule.push({ t, text: fillers[fi % fillers.length].replace('{duck}', names[rnd.ord]) });
+      fi += 1;
+    }
+
+    schedule.sort((a, b) => a.t - b.t);
+    for (let i = 1; i < schedule.length; i++) {
+      if (schedule[i].t - schedule[i - 1].t < 1400) schedule[i].t = schedule[i - 1].t + 1400;
+    }
+
+    const timers = schedule.map((ev) => setTimeout(() => {
+      commentaryId.current += 1;
+      const id = commentaryId.current;
+      setCommentary((prev) => [...prev, { id, text: ev.text }].slice(-2));
+    }, Math.max(0, ev.t)));
+    return () => timers.forEach(clearTimeout);
   }, [phase, result]);
 
   const stakeN = parseInt(stake, 10);
@@ -369,9 +444,10 @@ export default function DuckyDerbyPage() {
     <div className="space-y-4 py-2 pb-32">
       <style>{`@keyframes ddbob{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
         @keyframes ddwave{from{background-position-x:0}to{background-position-x:-180px}}
-        @keyframes dddrift{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
         @keyframes ddconfetti{0%{transform:translate(0,-24px) rotate(0);opacity:1}100%{transform:translate(var(--drift),640px) rotate(720deg);opacity:1}}
-        @keyframes ddcount{0%{transform:scale(1.9);opacity:0}35%{opacity:1}100%{transform:scale(1);opacity:.95}}`}</style>
+        @keyframes ddcount{0%{transform:scale(1.9);opacity:0}35%{opacity:1}100%{transform:scale(1);opacity:.95}}
+        @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
+        @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}`}</style>
 
       <div className="flex items-center justify-between">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
@@ -417,20 +493,6 @@ export default function DuckyDerbyPage() {
             background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
           }}
         />
-
-        {/* background decoy ducks — plain yellow, not bettable, zIndex 9 (behind racers) */}
-        {decoys.map((dc) => (
-          <div
-            key={dc.id}
-            ref={(el) => { decoyRefs.current[dc.id] = el; }}
-            className="absolute"
-            style={{ top: dc.y, left: preRace ? `${dc.wx0 * 100}%` : undefined, zIndex: 9, opacity: 0.92 }}
-          >
-            <div style={{ animation: `dddrift ${dc.bobDur}s ease-in-out ${dc.bobDelay}s infinite` }}>
-              <DecoyDuck w={dc.w} />
-            </div>
-          </div>
-        ))}
 
         {/* ducks */}
         {ducks.map((d, i) => (
@@ -480,6 +542,19 @@ export default function DuckyDerbyPage() {
             </span>
           </div>
         )}
+      </div>
+
+      {/* ---- Live commentary ticker ---- */}
+      <div className="relative h-9 overflow-hidden rounded-xl bg-neutral-900">
+        {commentary.map((ln, idx) => (
+          <div
+            key={ln.id}
+            className="absolute inset-0 flex items-center justify-center px-3 text-center text-[13px] font-semibold text-white"
+            style={{ animation: `${idx === commentary.length - 1 ? 'ddtickerIn' : 'ddtickerOut'} 0.5s ease forwards` }}
+          >
+            {ln.text}
+          </div>
+        ))}
       </div>
 
       {/* ---- Odds list (2 per row) ---- */}
@@ -550,9 +625,10 @@ export default function DuckyDerbyPage() {
               {(() => {
                 const winner = ducks.find((d) => d.ord === result.winner_ord);
                 const mine = ducks.find((d) => d.ord === result.picked_ord);
-                return result.won
-                  ? `${winner?.name} romped home — and that was your duck!`
-                  : `${winner?.name} won it. Your duck ${mine?.name} didn't have the legs.`;
+                if (result.won) return `${winner?.name} romped home — and that was your duck!`;
+                if (result.sink && result.sink.ord === result.picked_ord)
+                  return `${winner?.name} won it. ${mine?.name} drowned, which is a shame.`;
+                return `${winner?.name} won it. Your duck ${mine?.name} didn't have the legs.`;
               })()}
             </div>
             <p className="mt-3 text-center text-sm text-neutral-600">

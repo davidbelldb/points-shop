@@ -98,10 +98,19 @@ export default async function duckyRoutes(fastify) {
       whirlpools[d.ord] = makeWhirlpools();
     }
 
+    // 50% chance one non-winning duck sinks partway through (never the winner).
+    let sinkOrd = null;
+    let sinkAt = null;
+    if (lineup.length >= 3 && Math.random() < 0.5) {
+      const others = lineup.filter((d) => d.ord !== winner.ord);
+      sinkOrd = others[Math.floor(Math.random() * others.length)].ord;
+      sinkAt = Math.round((0.35 + Math.random() * 0.4) * 1000) / 1000; // 0.35-0.75
+    }
+
     const { rows } = await query(
-      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools)],
+      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools, sink_ord, sink_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools), sinkOrd, sinkAt],
     );
     return { lineup_id: rows[0].id, ducks: lineup, balance: await getBalance(meId) };
   });
@@ -148,6 +157,7 @@ export default async function duckyRoutes(fastify) {
       winner_ord: race.winner_ord,
       finish_ms: race.finish_ms,
       whirlpools: race.whirlpools,
+      sink: race.sink_ord != null ? { ord: race.sink_ord, at: Number(race.sink_at) } : null,
       ducks: lineup,
       picked_ord: picked.ord,
       odds_num: picked.odds_num,
