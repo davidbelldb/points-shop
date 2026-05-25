@@ -9,11 +9,19 @@ export function daysUntil(dateStr) {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
-// Short countdown suffix for the ribbon — null once the day has passed.
-export function countdownLabel(dateStr) {
-  const d = daysUntil(dateStr);
-  if (d === null || d < 0) return null;
-  if (d === 0) return 'Today!';
-  if (d === 1) return 'Tomorrow!';
-  return `${d} days to go`;
+// Live countdown clock to midnight of the target date, formatted DD:HH:MM:SS.
+// Returns null when there is no date, an invalid date, or the date has arrived.
+export function countdownClock(dateStr) {
+  if (!dateStr) return null;
+  const target = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const ms = target.getTime() - Date.now();
+  if (ms <= 0) return null;
+  const total = Math.floor(ms / 1000);
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(days)}:${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 }

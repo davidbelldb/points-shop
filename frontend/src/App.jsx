@@ -1,10 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useBasket } from './lib/BasketContext.jsx';
 import { useAuth } from './lib/AuthContext.jsx';
 import { api } from './lib/api.js';
 import { useSettings } from './lib/SettingsContext.jsx';
 import SurveyBanner from './components/SurveyBanner.jsx';
-import { countdownLabel } from './lib/countdown.js';
+import { countdownClock } from './lib/countdown.js';
 
 function AvatarFallback() {
   return (
@@ -13,6 +14,18 @@ function AvatarFallback() {
       <path d="M4 21a8 8 0 0 1 16 0" />
     </svg>
   );
+}
+
+// Live DD:HH:MM:SS countdown clock — ticks every second, hides once the day arrives.
+function CountdownClock({ date }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const clock = countdownClock(date);
+  if (!clock) return null;
+  return <span className="shrink-0 font-mono tabular-nums">{clock}</span>;
 }
 
 export default function App() {
@@ -34,7 +47,6 @@ export default function App() {
 
   const isHome = location.pathname === '/';
   const bannerOn = settings.banner_enabled === 'true' && (settings.banner_text || '').trim();
-  const countdown = countdownLabel(settings.banner_countdown_date);
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
@@ -102,8 +114,9 @@ export default function App() {
       </header>
       {isHome && bannerOn && (
         <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
-          <div className="mx-auto max-w-md px-3 py-1.5 text-center text-xs font-semibold tracking-wide">
-            {countdown ? `${settings.banner_text} — ${countdown}` : settings.banner_text}
+          <div className="mx-auto flex max-w-md items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide">
+            <span className="truncate">{settings.banner_text}</span>
+            <CountdownClock date={settings.banner_countdown_date} />
           </div>
         </div>
       )}
