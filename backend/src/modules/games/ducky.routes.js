@@ -135,7 +135,7 @@ export default async function duckyRoutes(fastify) {
         f.runs += 1;
         const place = d.ord === r.sink_ord ? 0 : (placeByOrd[d.ord] || 0);
         if (place === 1) f.wins += 1;
-        if (f.recent.length < 6) f.recent.push(place);
+        if (f.recent.length < 5) f.recent.push(place);
       }
     }
     return form;
