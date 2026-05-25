@@ -28,6 +28,7 @@ import wheelRoutes from './modules/wheel/wheel.routes.js';
 import stbRoutes from './modules/games/stb.routes.js';
 import duckyRoutes from './modules/games/ducky.routes.js';
 import rewatchRoutes from './modules/rewatch/rewatch.routes.js';
+import audioRoutes from './modules/audio/audio.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
@@ -99,6 +100,7 @@ await fastify.register(wheelRoutes);
 await fastify.register(stbRoutes);
 await fastify.register(duckyRoutes);
 await fastify.register(rewatchRoutes);
+await fastify.register(audioRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 

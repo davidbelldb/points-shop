@@ -21,10 +21,15 @@ const MEDIA_DIR = config.mediaDir;
 
 const ALLOWED_IMAGE = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const ALLOWED_VIDEO = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+const ALLOWED_AUDIO = new Set([
+  'audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/aac',
+  'audio/wav', 'audio/x-wav', 'audio/webm', 'audio/ogg',
+]);
 
 function classifyMimetype(mimetype) {
   if (ALLOWED_IMAGE.has(mimetype)) return 'image';
   if (ALLOWED_VIDEO.has(mimetype)) return 'video';
+  if (ALLOWED_AUDIO.has(mimetype)) return 'audio';
   return null;
 }
 

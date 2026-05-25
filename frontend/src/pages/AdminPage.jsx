@@ -5,6 +5,7 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import AdminOrdersSection from './AdminOrdersSection.jsx';
 import AdminImpersonateSection from './AdminImpersonateSection.jsx';
 import AdminHeroSlides from './AdminHeroSlides.jsx';
+import AdminAudioSection from './AdminAudioSection.jsx';
 import AdminGamesSection from './AdminGamesSection.jsx';
 import AdminWheelSection from './AdminWheelSection.jsx';
 import AdminShutTheBoxSection from './AdminShutTheBoxSection.jsx';
@@ -44,6 +45,7 @@ export default function AdminPage() {
 
       <AdminImpersonateSection />
       <BrandingSection settings={settings} onChanged={refreshSettings} />
+      <AdminAudioSection />
       <AdminHeroSlides />
       <AccountSection  account={account}   onChanged={refresh} />
 
