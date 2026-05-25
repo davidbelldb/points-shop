@@ -70,6 +70,28 @@ export default async function duckyRoutes(fastify) {
     return await getDuckyConfig();
   });
 
+  // Per-duck recent form (W/L from past races) for the home form-guide table.
+  fastify.get('/api/games/ducky/form', async () => {
+    const { rows } = await query(
+      `SELECT winner_ord, lineup FROM ducky_races
+        WHERE raced_at IS NOT NULL
+        ORDER BY raced_at DESC LIMIT 80`,
+    );
+    const form = {};
+    for (let ord = 1; ord <= 10; ord += 1) form[ord] = { runs: 0, wins: 0, recent: [] };
+    for (const r of rows) {
+      for (const d of r.lineup || []) {
+        const f = form[d.ord];
+        if (!f) continue;
+        f.runs += 1;
+        const won = r.winner_ord === d.ord;
+        if (won) f.wins += 1;
+        if (f.recent.length < 6) f.recent.push(won ? 'W' : 'L');
+      }
+    }
+    return form;
+  });
+
   // Create a lineup — races all active ducks (up to race_duck_count), fractional odds
   // shuffled on, secret uniform-random winner + timings.
   fastify.post('/api/games/ducky/lineup', async (req, reply) => {

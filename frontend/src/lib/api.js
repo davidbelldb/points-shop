@@ -88,6 +88,7 @@ export const api = {
   duckyLineup: () => request('/games/ducky/lineup', { method: 'POST' }),
   duckyRace: (lineup_id, picked_ord, stake) =>
     request('/games/ducky/race', { method: 'POST', body: JSON.stringify({ lineup_id, picked_ord, stake }) }),
+  duckyForm: () => request('/games/ducky/form'),
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),

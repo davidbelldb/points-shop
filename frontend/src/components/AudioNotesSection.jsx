@@ -79,7 +79,7 @@ function AudioCard({ note }) {
               <span
                 key={i}
                 className="flex-1 rounded-full"
-                style={{ height: h, background: i / bars.length <= progress ? '#f59e0b' : '#e5e5e5' }}
+                style={{ height: h, background: i / bars.length <= progress ? '#ed70bd' : '#e5e5e5' }}
               />
             ))}
           </div>

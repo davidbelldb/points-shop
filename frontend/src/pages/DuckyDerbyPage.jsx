@@ -55,7 +55,7 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
       </div>
     );
   }
-  return <img src={`/duck_${ord}.png?v=5`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
+  return <img src={`/duck_${ord}.png?v=6`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
 /* A tattered, hand-painted cloth flag held up by two black poles. The poles tuck
@@ -219,6 +219,57 @@ function raceToReal(raceT, photo) {
   return photo.slowFrom + (raceT - photo.slowFrom) / photo.SLOW;
 }
 
+/* Form guide — each racer's recent W/L record, shown under the odds list. */
+function FormGuide({ ducks, form }) {
+  if (!form || ducks.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-1.5 text-sm font-semibold">Form guide</p>
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="bg-neutral-50 text-[10px] uppercase tracking-wide text-neutral-400">
+              <th className="px-3 py-2 font-semibold">Duck</th>
+              <th className="px-2 py-2 font-semibold">Odds</th>
+              <th className="px-3 py-2 text-right font-semibold">Recent form</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ducks.map((d, i) => {
+              const f = form[d.ord] || { runs: 0, wins: 0, recent: [] };
+              const recent = [...f.recent].reverse();
+              return (
+                <tr key={d.ord} className={i > 0 ? 'border-t border-neutral-100' : ''}>
+                  <td className="px-3 py-2 font-medium text-neutral-800">{d.name}</td>
+                  <td className="px-2 py-2 font-bold text-neutral-500">{oddsLabel(d.odds_num, d.odds_den)}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center justify-end gap-1">
+                      {recent.length === 0 ? (
+                        <span className="text-neutral-400">No runs yet</span>
+                      ) : (
+                        recent.map((r, k) => (
+                          <span
+                            key={k}
+                            className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                              r === 'W' ? 'bg-emerald-500 text-white' : 'bg-neutral-200 text-neutral-500'
+                            }`}
+                          >
+                            {r}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function DuckyDerbyPage() {
   const { refresh: refreshBasket } = useBasket();
   const [phase, setPhase] = useState('loading');
@@ -235,6 +286,7 @@ export default function DuckyDerbyPage() {
   const [confetti, setConfetti] = useState(false);
   const [photoFlash, setPhotoFlash] = useState(false);
   const [commentary, setCommentary] = useState([]);
+  const [form, setForm] = useState(null);
 
   const laneRefs = useRef({});
   const spriteRefs = useRef({});
@@ -250,12 +302,14 @@ export default function DuckyDerbyPage() {
   async function newLineup() {
     setBusy(true); setError(null);
     try {
-      const [cfg, lu] = await Promise.all([
+      const [cfg, lu, formData] = await Promise.all([
         config ? Promise.resolve(config) : api.duckyConfig(),
         api.duckyLineup(),
+        api.duckyForm().catch(() => null),
       ]);
       if (!config) setConfig(cfg);
       setLineup(lu);
+      setForm(formData);
       setBalance(lu.balance ?? 0);
       setPickedOrd(null);
       setStake('');
@@ -788,6 +842,8 @@ export default function DuckyDerbyPage() {
           ))}
         </div>
       </div>
+
+      <FormGuide ducks={ducks} form={form} />
 
       {/* ---- Bottom-anchored bet bar ---- */}
       <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t border-neutral-200 bg-white p-3 shadow-[0_-4px_14px_rgba(0,0,0,0.08)]">
