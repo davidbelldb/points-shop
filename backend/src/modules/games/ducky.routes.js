@@ -28,6 +28,23 @@ function shuffle(arr) {
   return a;
 }
 
+// Weighted winner draw — each duck's chance is its fractional-odds implied
+// probability (den / (num + den)). Favourites win more; longshots still can.
+function pickWinner(lineup) {
+  const weights = lineup.map((d) => {
+    const num = d.odds_num > 0 ? d.odds_num : 1;
+    const den = d.odds_den > 0 ? d.odds_den : 1;
+    return den / (num + den);
+  });
+  const total = weights.reduce((s, w) => s + w, 0) || 1;
+  let r = Math.random() * total;
+  for (let i = 0; i < lineup.length; i += 1) {
+    r -= weights[i];
+    if (r <= 0) return lineup[i];
+  }
+  return lineup[lineup.length - 1];
+}
+
 async function getDuckyConfig() {
   const { rows: cfgRows } = await query(`SELECT * FROM ducky_config WHERE id = 1`);
   const cfg = cfgRows[0] || null;
@@ -92,8 +109,8 @@ export default async function duckyRoutes(fastify) {
     return form;
   });
 
-  // Create a lineup — races all active ducks (up to race_duck_count), fractional odds
-  // shuffled on, secret uniform-random winner + timings.
+  // Create a lineup — races a random subset of active ducks (up to race_duck_count),
+  // each with its own odds; secret odds-weighted winner + timings.
   fastify.post('/api/games/ducky/lineup', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
     const { rows: cfgRows } = await query(`SELECT * FROM ducky_config WHERE id = 1`);
@@ -103,17 +120,18 @@ export default async function duckyRoutes(fastify) {
 
     const n = Math.max(2, Math.min(cfg.race_duck_count || 10, 10, allDucks.length));
     const racers = shuffle(allDucks).slice(0, n);
-    const oddsPool = shuffle(allDucks.map((d) => ({ num: d.odds_num, den: d.odds_den })));
-    const lineup = racers.map((d, i) => ({
+    // each duck keeps its own admin-set odds, so its form means something
+    const lineup = racers.map((d) => ({
       ord: d.ord,
       name: d.name,
       duck_colour: d.duck_colour,
       bill_colour: d.bill_colour,
-      odds_num: oddsPool[i % oddsPool.length].num,
-      odds_den: oddsPool[i % oddsPool.length].den,
+      odds_num: d.odds_num,
+      odds_den: d.odds_den,
     }));
 
-    const winner = lineup[Math.floor(Math.random() * lineup.length)];
+    // winner is drawn weighted by the odds — favourites win more often
+    const winner = pickWinner(lineup);
     const winMs = 25000 + Math.floor(Math.random() * 1500);
     const buoyColour = cfg.buoy_colour || '#e0322e';
 
