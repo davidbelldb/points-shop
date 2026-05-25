@@ -248,7 +248,12 @@ function FormGuide({ ducks, form }) {
               const recent = [...f.recent].reverse();
               return (
                 <tr key={d.ord} className={i > 0 ? 'border-t border-neutral-100' : ''}>
-                  <td className="px-3 py-2 font-medium text-neutral-800">{d.name}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={28} h={24} />
+                      <span className="font-medium text-neutral-800">{d.name}</span>
+                    </div>
+                  </td>
                   <td className="px-2 py-2 font-bold text-neutral-500">{oddsLabel(d.odds_num, d.odds_den)}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap items-center justify-end gap-1">
