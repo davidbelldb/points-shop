@@ -45,6 +45,28 @@ function pickWinner(lineup) {
   return lineup[lineup.length - 1];
 }
 
+// A favourite-to-longshot spread of fractional odds, one per duck.
+const ODDS_POOL = [[1, 1], [3, 2], [2, 1], [5, 2], [3, 1], [4, 1], [6, 1], [8, 1], [12, 1], [20, 1]];
+const ODDS_REROLL_MS = 36 * 60 * 60 * 1000; // re-roll roughly every day and a half
+
+// Every ~1.5 days, rotate the odds across the ducks so form keeps shifting on
+// its own — runs lazily on the next lineup request, no cron needed.
+async function maybeRerollOdds() {
+  const { rows } = await query(`SELECT odds_updated_at FROM ducky_config WHERE id = 1`);
+  const last = rows[0]?.odds_updated_at;
+  if (last && Date.now() - new Date(last).getTime() < ODDS_REROLL_MS) return;
+  const { rows: ducks } = await query(`SELECT ord FROM ducky_ducks ORDER BY ord`);
+  const pool = shuffle(ODDS_POOL);
+  for (let i = 0; i < ducks.length; i += 1) {
+    const [num, den] = pool[i % pool.length];
+    await query(
+      `UPDATE ducky_ducks SET odds_num = $1, odds_den = $2, updated_at = NOW() WHERE ord = $3`,
+      [num, den, ducks[i].ord],
+    );
+  }
+  await query(`UPDATE ducky_config SET odds_updated_at = NOW() WHERE id = 1`);
+}
+
 async function getDuckyConfig() {
   const { rows: cfgRows } = await query(`SELECT * FROM ducky_config WHERE id = 1`);
   const cfg = cfgRows[0] || null;
@@ -87,23 +109,33 @@ export default async function duckyRoutes(fastify) {
     return await getDuckyConfig();
   });
 
-  // Per-duck recent form (W/L from past races) for the home form-guide table.
+  // Per-duck recent finishing positions for the form-guide table.
+  // recent[] holds placings: 1 = won, 2..n = placed, 0 = DNF (sank).
   fastify.get('/api/games/ducky/form', async () => {
     const { rows } = await query(
-      `SELECT winner_ord, lineup FROM ducky_races
+      `SELECT lineup, finish_ms, sink_ord FROM ducky_races
         WHERE raced_at IS NOT NULL
         ORDER BY raced_at DESC LIMIT 80`,
     );
     const form = {};
     for (let ord = 1; ord <= 10; ord += 1) form[ord] = { runs: 0, wins: 0, recent: [] };
     for (const r of rows) {
-      for (const d of r.lineup || []) {
+      const lineup = r.lineup || [];
+      const finish = r.finish_ms || {};
+      // rank the finishers by time; the sunk duck (if any) is a DNF
+      const ranked = lineup
+        .filter((d) => d.ord !== r.sink_ord)
+        .map((d) => ({ ord: d.ord, ms: Number(finish[d.ord] ?? Number.MAX_SAFE_INTEGER) }))
+        .sort((a, b) => a.ms - b.ms);
+      const placeByOrd = {};
+      ranked.forEach((x, i) => { placeByOrd[x.ord] = i + 1; });
+      for (const d of lineup) {
         const f = form[d.ord];
         if (!f) continue;
         f.runs += 1;
-        const won = r.winner_ord === d.ord;
-        if (won) f.wins += 1;
-        if (f.recent.length < 6) f.recent.push(won ? 'W' : 'L');
+        const place = d.ord === r.sink_ord ? 0 : (placeByOrd[d.ord] || 0);
+        if (place === 1) f.wins += 1;
+        if (f.recent.length < 6) f.recent.push(place);
       }
     }
     return form;
@@ -113,6 +145,7 @@ export default async function duckyRoutes(fastify) {
   // each with its own odds; secret odds-weighted winner + timings.
   fastify.post('/api/games/ducky/lineup', async (req, reply) => {
     const meId = getEffectiveAccountId(req);
+    await maybeRerollOdds().catch(() => {}); // never let a re-roll hiccup block a race
     const { rows: cfgRows } = await query(`SELECT * FROM ducky_config WHERE id = 1`);
     const cfg = cfgRows[0] || { race_duck_count: 10 };
     const { rows: allDucks } = await query(`SELECT * FROM ducky_ducks WHERE active = TRUE ORDER BY ord`);

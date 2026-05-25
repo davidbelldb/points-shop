@@ -219,7 +219,15 @@ function raceToReal(raceT, photo) {
   return photo.slowFrom + (raceT - photo.slowFrom) / photo.SLOW;
 }
 
-/* Form guide — each racer's recent W/L record, shown under the odds list. */
+/* Pill colour for a finishing position — gold 1st, emerald podium, pink DNF. */
+function placeClass(p) {
+  if (p === 0) return 'bg-pink-200 text-pink-700';   // DNF (sank)
+  if (p === 1) return 'bg-amber-400 text-amber-950'; // winner
+  if (p <= 3) return 'bg-emerald-500 text-white';    // podium
+  return 'bg-neutral-200 text-neutral-600';
+}
+
+/* Form guide — each racer's recent finishing positions, shown under the odds list. */
 function FormGuide({ ducks, form }) {
   if (!form || ducks.length === 0) return null;
   return (
@@ -243,18 +251,16 @@ function FormGuide({ ducks, form }) {
                   <td className="px-3 py-2 font-medium text-neutral-800">{d.name}</td>
                   <td className="px-2 py-2 font-bold text-neutral-500">{oddsLabel(d.odds_num, d.odds_den)}</td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex flex-wrap items-center justify-end gap-1">
                       {recent.length === 0 ? (
                         <span className="text-neutral-400">No runs yet</span>
                       ) : (
-                        recent.map((r, k) => (
+                        recent.map((p, k) => (
                           <span
                             key={k}
-                            className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                              r === 'W' ? 'bg-emerald-500 text-white' : 'bg-neutral-200 text-neutral-500'
-                            }`}
+                            className={`flex h-5 items-center justify-center rounded-md px-1.5 text-[10px] font-bold ${placeClass(p)}`}
                           >
-                            {r}
+                            {p === 0 ? 'DNF' : p}
                           </span>
                         ))
                       )}
