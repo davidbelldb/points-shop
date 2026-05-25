@@ -263,9 +263,9 @@ function FormGuide({ ducks, form }) {
                         recent.map((p, k) => (
                           <span
                             key={k}
-                            className={`flex h-5 items-center justify-center rounded-md px-1.5 text-[10px] font-bold ${placeClass(p)}`}
+                            className={`flex h-5 w-6 items-center justify-center rounded-md text-[10px] font-bold ${placeClass(p)}`}
                           >
-                            {p === 0 ? 'DNF' : p}
+                            {p === 0 ? 'D' : p}
                           </span>
                         ))
                       )}
