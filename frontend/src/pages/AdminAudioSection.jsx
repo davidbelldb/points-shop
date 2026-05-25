@@ -178,7 +178,7 @@ function NewNoteForm({ busy, setBusy, onCreated }) {
       <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Note name (shown on the card)" />
       <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-neutral-300 px-3 py-2 text-center text-xs text-neutral-500 hover:border-amber-500">
         {audioUrl ? 'Replace audio file' : 'Upload audio file'}
-        <input type="file" accept="audio/*" className="hidden" onChange={upload} />
+        <input type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.webm,.mp4" className="hidden" onChange={upload} />
       </label>
       {audioUrl && <audio src={audioUrl} controls preload="none" className="w-full" />}
       {err && <p className="text-xs text-red-600">{err}</p>}
