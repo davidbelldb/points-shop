@@ -6,7 +6,7 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
-  const title = data.title || 'Sneaky Points';
+  const title = data.title || 'Sneaky Stuff';
   const options = {
     body: data.body || '',
     icon: '/icon-512.png',

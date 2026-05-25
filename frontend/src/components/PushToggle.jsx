@@ -26,8 +26,7 @@ export default function PushToggle() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!supported) { setState('unsupported'); return; }
-      if (isIOS() && !isStandalone()) { setState('needs-install'); return; }
+      if (!supported || (isIOS() && !isStandalone())) { setState('unsupported'); return; }
       if (Notification.permission === 'denied') { setState('blocked'); return; }
       try {
         const reg = await navigator.serviceWorker.ready;
@@ -88,7 +87,7 @@ export default function PushToggle() {
           <p className="text-xs text-neutral-500">
             {state === 'on'
               ? 'On — this device gets pushed updates.'
-              : 'Get a push for new messages, your turn in a game, and order updates.'}
+              : "Get a push for when it's your turn in a game, sneaky watchlist invites, order updates, new messages, and more."}
           </p>
         </div>
         {state === 'on' && (
@@ -110,19 +109,17 @@ export default function PushToggle() {
           </button>
         )}
       </div>
-      {state === 'needs-install' && (
-        <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
-          To get notifications on iPhone, add this site to your Home Screen first: tap Share in
-          Safari, then &quot;Add to Home Screen&quot;. Open it from that icon and this option appears.
-        </p>
-      )}
       {state === 'blocked' && (
         <p className="rounded-lg bg-red-50 p-2 text-xs text-red-700">
           Notifications are blocked. Turn them on for this site in your device settings, then reload.
         </p>
       )}
       {state === 'unsupported' && (
-        <p className="text-xs text-neutral-500">This device does not support push notifications.</p>
+        <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+          This device does not support push notifications. To get push notifications on your iPhone
+          15 Pro, tap the share icon, swipe up, and select &quot;Add to Home Screen&quot;. From there
+          you can open it as a regular app and enable notifications.
+        </p>
       )}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </section>
