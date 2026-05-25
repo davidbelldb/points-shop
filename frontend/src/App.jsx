@@ -4,6 +4,7 @@ import { useAuth } from './lib/AuthContext.jsx';
 import { api } from './lib/api.js';
 import { useSettings } from './lib/SettingsContext.jsx';
 import SurveyBanner from './components/SurveyBanner.jsx';
+import { countdownLabel } from './lib/countdown.js';
 
 function AvatarFallback() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
 
   const isHome = location.pathname === '/';
   const bannerOn = settings.banner_enabled === 'true' && (settings.banner_text || '').trim();
+  const countdown = countdownLabel(settings.banner_countdown_date);
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
@@ -101,7 +103,7 @@ export default function App() {
       {isHome && bannerOn && (
         <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
           <div className="mx-auto max-w-md px-3 py-1.5 text-center text-xs font-semibold tracking-wide">
-            {settings.banner_text}
+            {countdown ? `${settings.banner_text} — ${countdown}` : settings.banner_text}
           </div>
         </div>
       )}

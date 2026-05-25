@@ -82,6 +82,7 @@ function BrandingSection({ settings, onChanged }) {
   const [bannerText, setBannerText] = useState('');
   const [bannerBg, setBannerBg] = useState('#0b8476');
   const [bannerFg, setBannerFg] = useState('#ffffff');
+  const [countdownDate, setCountdownDate] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -94,7 +95,8 @@ function BrandingSection({ settings, onChanged }) {
     setBannerText(settings.banner_text ?? '');
     setBannerBg(settings.banner_bg_colour ?? '#0b8476');
     setBannerFg(settings.banner_text_colour ?? '#ffffff');
-  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle, settings.banner_text, settings.banner_bg_colour, settings.banner_text_colour]);
+    setCountdownDate(settings.banner_countdown_date ?? '');
+  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle, settings.banner_text, settings.banner_bg_colour, settings.banner_text_colour, settings.banner_countdown_date]);
 
   async function toggleBanner() {
     setBusy(true); setError(null);
@@ -135,6 +137,7 @@ function BrandingSection({ settings, onChanged }) {
         banner_text: bannerText,
         banner_bg_colour: bannerBg,
         banner_text_colour: bannerFg,
+        banner_countdown_date: countdownDate,
       });
       await onChanged();
     } catch (err) { setError(err.message); }
@@ -198,6 +201,30 @@ function BrandingSection({ settings, onChanged }) {
           </div>
         </Field>
       </div>
+
+      <Field label="Sneaky countdown date">
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            className={inputCls}
+            value={countdownDate}
+            onChange={(e) => setCountdownDate(e.target.value)}
+          />
+          {countdownDate && (
+            <button
+              type="button"
+              onClick={() => setCountdownDate('')}
+              className="shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </Field>
+      <p className="text-xs text-neutral-500">
+        Sets a countdown in the banner (e.g. &quot;12 days to go&quot;). On the day itself, confetti
+        falls over the home and account pages. Leave blank for no countdown.
+      </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button onClick={saveText} disabled={busy} className="w-full rounded-md bg-amber-600 py-2 text-sm font-semibold text-amber-900 disabled:opacity-40">

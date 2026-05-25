@@ -6,6 +6,8 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
 import WheelHomeSection from '../components/WheelHomeSection.jsx';
 import ShutTheBoxHomeSection from '../components/ShutTheBoxHomeSection.jsx';
+import Confetti from '../components/Confetti.jsx';
+import { daysUntil } from '../lib/countdown.js';
 
 // Replace the {name} token with the account's name so the admin can write e.g.
 // "Welcome back {name}" and it follows a rename from Katie -> Kate automatically.
@@ -42,6 +44,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
+      {daysUntil(settings.banner_countdown_date) === 0 && <Confetti />}
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
           {applyNameToken(settings.hero_title ?? 'Welcome to Sneaky Points', account?.name)}

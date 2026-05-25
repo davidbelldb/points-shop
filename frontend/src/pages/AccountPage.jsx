@@ -6,6 +6,9 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import { formatLedgerReason } from '../lib/formatters.js';
 import GameRewardsCard from '../components/GameRewardsCard.jsx';
 import PushToggle from '../components/PushToggle.jsx';
+import Confetti from '../components/Confetti.jsx';
+import { useSettings } from '../lib/SettingsContext.jsx';
+import { daysUntil } from '../lib/countdown.js';
 
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
@@ -13,6 +16,7 @@ const inputCls =
 export default function AccountPage() {
   const { account, refresh, notifications, markNotificationsRead, dismissNotification, clearAllNotifications } = useBasket();
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const [editing, setEditing] = useState(false);
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
@@ -57,6 +61,7 @@ export default function AccountPage() {
 
   return (
     <div className="space-y-5">
+      {daysUntil(settings.banner_countdown_date) === 0 && <Confetti />}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Your account</h1>
         <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
