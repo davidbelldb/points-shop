@@ -86,7 +86,7 @@ export default function MenuDrawer({ open, onClose }) {
         className={`absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <span className="text-base font-semibold">Menu</span>
+          <span className="text-base font-semibold">Sneaky Menu</span>
           <button onClick={onClose} className="rounded-full p-1 text-neutral-500 hover:bg-neutral-100" aria-label="Close menu">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="6" y1="6" x2="18" y2="18" />
