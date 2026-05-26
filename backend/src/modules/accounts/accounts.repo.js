@@ -1,13 +1,13 @@
 import { query } from '../../db.js';
 
 const SINGLE_ACCOUNT_ID = '00000000-0000-0000-0000-000000000001';
-const SELF_EDITABLE = ['name', 'email', 'photo_url'];
+const SELF_EDITABLE = ['name', 'email', 'photo_url', 'theme'];
 
 export function getDefaultAccountId() { return SINGLE_ACCOUNT_ID; }
 
 export async function getAccount(accountId) {
   const { rows } = await query(
-    `SELECT id, name, email, photo_url, points_balance, username, role, created_at, updated_at
+    `SELECT id, name, email, photo_url, points_balance, username, role, theme, created_at, updated_at
        FROM accounts WHERE id = $1`,
     [accountId],
   );

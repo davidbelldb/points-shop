@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle.jsx';
+
+const ICON_COLOUR = '#ed70bd';
 
 function HomeIcon() {
   return (
@@ -46,13 +48,21 @@ function UserIcon() {
 }
 
 function Item({ to, label, icon, onClose }) {
+  const location = useLocation();
+  const active = to === '/'
+    ? location.pathname === '/'
+    : location.pathname === to || location.pathname.startsWith(`${to}/`);
   return (
     <Link
       to={to}
       onClick={onClose}
-      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-800 hover:bg-neutral-100"
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+        active ? 'bg-amber-100 text-amber-900' : 'text-neutral-800 hover:bg-neutral-100'
+      }`}
     >
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-100 text-neutral-700">{icon}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-100" style={{ color: ICON_COLOUR }}>
+        {icon}
+      </span>
       {label}
     </Link>
   );
@@ -84,15 +94,19 @@ export default function MenuDrawer({ open, onClose }) {
             </svg>
           </button>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-2">
-          <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
-          <Item to="/games" label="Sneaky Games" icon={<GameIcon />} onClose={onClose} />
-          <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
-          <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
-          <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />
+        <nav className="flex flex-1 flex-col overflow-y-auto p-2">
+          <div className="space-y-1">
+            <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
+            <Item to="/games" label="Sneaky Games" icon={<GameIcon />} onClose={onClose} />
+            <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
+            <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
+          </div>
+          <div className="mt-auto pt-2">
+            <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />
+          </div>
         </nav>
         <div className="border-t border-neutral-200 p-2">
-          <ThemeToggle />
+          <ThemeToggle iconColor={ICON_COLOUR} />
         </div>
       </aside>
     </div>

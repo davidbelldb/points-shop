@@ -8,7 +8,7 @@ export default async function accountsRoutes(fastify) {
   fastify.patch('/api/account', async (req, reply) => {
     const b = req.body ?? {};
     const patch = {};
-    for (const k of ['name', 'email', 'photo_url']) if (k in b) patch[k] = b[k];
+    for (const k of ['name', 'email', 'photo_url', 'theme']) if (k in b) patch[k] = b[k];
     if (Object.keys(patch).length === 0) {
       return reply.code(400).send({ error: 'No editable fields provided' });
     }

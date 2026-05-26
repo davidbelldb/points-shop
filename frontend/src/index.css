@@ -20,43 +20,55 @@ body { -webkit-tap-highlight-color: transparent; }
 html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
 
 /* ---------- Dark mode ----------
-   Toggled by adding `class="dark"` to <html>.
-   We redefine the neutral + amber (themed teal) palette variables so every
-   utility that reads them flips together. White is left as #ffffff so
-   text-white on coloured buttons stays white; surface backgrounds (bg-white,
-   bg-white/80 etc.) are overridden explicitly to a dark grey. */
+   Toggled by adding `class="dark"` to <html>. We flip the neutrals via
+   --color vars; the saturated teal accents (amber-400..600) stay the same
+   so buttons keep their colour. We override the soft teal tints and the
+   teal text shades explicitly so light-tinted cards flip dark and dark
+   teal text becomes light teal. */
 html.dark { color-scheme: dark; }
-html.dark body { background-color: #0f0f0f; }
+html.dark body { background-color: #1f1f1e; }
 
 html.dark {
-  --color-neutral-50:  #0f0f0f;
-  --color-neutral-100: #1c1c1c;
-  --color-neutral-200: #2a2a2a;
-  --color-neutral-300: #3a3a3a;
-  --color-neutral-400: #555555;
-  --color-neutral-500: #888888;
-  --color-neutral-600: #b0b0b0;
-  --color-neutral-700: #d4d4d4;
-  --color-neutral-800: #ededed;
-  --color-neutral-900: #fafafa;
+  --color-neutral-50:  #1f1f1e;
+  --color-neutral-100: #2a2a28;
+  --color-neutral-200: #34342f;
+  --color-neutral-300: #4a4a44;
+  --color-neutral-400: #6b6b65;
+  --color-neutral-500: #8e8e88;
+  --color-neutral-600: #b0b0aa;
+  --color-neutral-700: #d4d4cf;
+  --color-neutral-800: #ededea;
+  --color-neutral-900: #fafaf7;
   --color-neutral-950: #ffffff;
-
-  --color-amber-50:  #14302a;
-  --color-amber-100: #1d4039;
-  --color-amber-200: #2a5a4f;
-  --color-amber-300: #3b7766;
-  --color-amber-400: #5fc4b1;
-  --color-amber-500: #7adfcf;
-  --color-amber-600: #93dec9;
-  --color-amber-700: #b3e9d9;
-  --color-amber-800: #d3f3e9;
-  --color-amber-900: #ecfaf5;
 }
 
-html.dark .bg-white { background-color: #1c1c1c !important; }
-html.dark .bg-white\/80 { background-color: rgba(28, 28, 28, 0.85) !important; }
-html.dark .bg-white\/95 { background-color: rgba(28, 28, 28, 0.95) !important; }
+html.dark .bg-white { background-color: #2a2a28 !important; }
+html.dark .bg-white\/80 { background-color: rgba(42, 42, 40, 0.85) !important; }
+html.dark .bg-white\/95 { background-color: rgba(42, 42, 40, 0.95) !important; }
 
+/* Soft teal tints — used as card backgrounds. Flip to dark teal in dark mode. */
+html.dark .bg-amber-50  { background-color: #14302a !important; }
+html.dark .bg-amber-100 { background-color: #1d4039 !important; }
+html.dark .bg-amber-200 { background-color: #2a5a4f !important; }
+
+/* Teal text — usable as light-teal text on the dark page. */
+html.dark .text-amber-700 { color: #b3e9d9 !important; }
+html.dark .text-amber-800 { color: #d3f3e9 !important; }
+html.dark .text-amber-900 { color: #ecfaf5 !important; }
+
+/* But on a teal-accent bg, text-amber-900 / text-white needs to be DARK to read.
+   Both modes — fixes the count badge + every teal button. */
+.bg-amber-400.text-white,
+.bg-amber-500.text-white,
+.bg-amber-600.text-white,
+.bg-amber-400.text-amber-900,
+.bg-amber-500.text-amber-900,
+.bg-amber-600.text-amber-900,
+.bg-amber-400.text-amber-950,
+.bg-amber-500.text-amber-950,
+.bg-amber-600.text-amber-950 { color: #0a2a23 !important; }
+
+/* Soft accent backgrounds — pinks, reds, emerald. */
 html.dark .bg-pink-50   { background-color: #3a1a2c !important; }
 html.dark .bg-pink-100  { background-color: #4d2238 !important; }
 html.dark .bg-pink-200  { background-color: #6b3252 !important; }
@@ -67,4 +79,15 @@ html.dark .text-pink-700     { color: #f9a8d4 !important; }
 html.dark .text-emerald-700  { color: #6ee7b7 !important; }
 html.dark .border-red-200    { border-color: #5a2222 !important; }
 html.dark .border-amber-200  { border-color: #2a5a4f !important; }
+
+/* The teal-* palette (used by GameRewardsCard etc.) — flip soft tints to dark,
+   keep saturated 300/400 buttons readable, and lift text shades for dark bg. */
+html.dark .bg-teal-50  { background-color: #14302a !important; }
+html.dark .bg-teal-100 { background-color: #1d4039 !important; }
+html.dark .bg-teal-200 { background-color: #2a5a4f !important; }
+html.dark .bg-teal-300 { background-color: #3b7766 !important; }
+html.dark .text-teal-700 { color: #b3e9d9 !important; }
+html.dark .text-teal-800 { color: #d3f3e9 !important; }
+html.dark .text-teal-900 { color: #ecfaf5 !important; }
+html.dark .border-teal-200 { border-color: #2a5a4f !important; }
 

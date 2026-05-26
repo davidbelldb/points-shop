@@ -4,6 +4,7 @@ import { useBasket } from './lib/BasketContext.jsx';
 import { useAuth } from './lib/AuthContext.jsx';
 import { api } from './lib/api.js';
 import { useSettings } from './lib/SettingsContext.jsx';
+import { useTheme } from './lib/ThemeContext.jsx';
 import SurveyBanner from './components/SurveyBanner.jsx';
 import MenuDrawer from './components/MenuDrawer.jsx';
 import { countdownClock } from './lib/countdown.js';
@@ -34,7 +35,14 @@ export default function App() {
   const showFloater = !location.pathname.startsWith('/admin');
   const { account, basket, notifications } = useBasket();
   const { user, refresh: refreshAuth } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Sync the theme from the currently-loaded account, so each user gets their own.
+  useEffect(() => {
+    if (account?.theme && account.theme !== theme) setTheme(account.theme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.theme]);
 
   async function stopImpersonate() {
     try { await api.admin.stopImpersonate(); await refreshAuth(); window.location.href = '/admin'; }

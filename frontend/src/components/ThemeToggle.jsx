@@ -1,4 +1,5 @@
 import { useTheme } from '../lib/ThemeContext.jsx';
+import { api } from '../lib/api.js';
 
 function MoonIcon() {
   return (
@@ -16,22 +17,35 @@ function SunIcon() {
   );
 }
 
-export default function ThemeToggle() {
-  const { theme, toggle } = useTheme();
+export default function ThemeToggle({ iconColor }) {
+  const { theme, setTheme } = useTheme();
   const isDark = theme === 'dark';
+
+  async function onClick() {
+    const next = isDark ? 'light' : 'dark';
+    setTheme(next);
+    try { await api.updateAccount({ theme: next }); } catch { /* ignore — local still applies */ }
+  }
+
   return (
     <button
-      onClick={toggle}
+      onClick={onClick}
       className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-100"
     >
       <span className="flex items-center gap-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-100 text-neutral-700">
+        <span
+          className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-100"
+          style={{ color: iconColor || '#525252' }}
+        >
           {isDark ? <SunIcon /> : <MoonIcon />}
         </span>
         {isDark ? 'Light mode' : 'Dark mode'}
       </span>
       <span className={`relative inline-block h-5 w-9 rounded-full transition-colors ${isDark ? 'bg-amber-500' : 'bg-neutral-300'}`}>
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isDark ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+        <span
+          className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform"
+          style={{ transform: isDark ? 'translateX(18px)' : 'translateX(2px)' }}
+        />
       </span>
     </button>
   );
