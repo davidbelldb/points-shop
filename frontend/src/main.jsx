@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import App from './App.jsx';
 import HomePage from './pages/HomePage.jsx';
+import GamesPage from './pages/GamesPage.jsx';
 import ProductPage from './pages/ProductPage.jsx';
 import BasketPage from './pages/BasketPage.jsx';
 import OrderConfirmationPage from './pages/OrderConfirmationPage.jsx';
@@ -25,6 +26,7 @@ import RewatchDetailPage from './pages/RewatchDetailPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
+import { ThemeProvider } from './lib/ThemeContext.jsx';
 import './index.css';
 
 // Register the service worker (needed for web push notifications).
@@ -53,8 +55,9 @@ function RequireAuth({ children }) {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <SettingsProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <SettingsProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route
@@ -73,6 +76,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="order/:id" element={<OrderConfirmationPage />} />
               <Route path="account" element={<AccountPage />} />
               <Route path="messages" element={<MessagesPage />} />
+              <Route path="games" element={<GamesPage />} />
               <Route path="games/truth-or-dare" element={<TruthOrDarePage />} />
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />
               <Route path="games/giftsweeper" element={<GiftsweeperPage />} />
@@ -88,8 +92,9 @@ createRoot(document.getElementById('root')).render(
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>
           </Routes>
-        </SettingsProvider>
-      </AuthProvider>
+          </SettingsProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </StrictMode>
 );

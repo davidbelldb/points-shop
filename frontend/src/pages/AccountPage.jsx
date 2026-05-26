@@ -6,6 +6,7 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import { formatLedgerReason } from '../lib/formatters.js';
 import GameRewardsCard from '../components/GameRewardsCard.jsx';
 import PushToggle from '../components/PushToggle.jsx';
+import ThemeToggle from '../components/ThemeToggle.jsx';
 import Confetti from '../components/Confetti.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import { daysUntil } from '../lib/countdown.js';
@@ -157,6 +158,10 @@ export default function AccountPage() {
       </section>
 
       <PushToggle />
+
+      <section className="rounded-2xl border border-neutral-200 bg-white p-2">
+        <ThemeToggle />
+      </section>
 
       <UpdatesSection notifications={notifications?.items ?? []} onDismiss={dismissNotification} onClearAll={clearAllNotifications} />
       <OrdersSection title="Current orders"  bucket="open"  orders={openOrders}  />

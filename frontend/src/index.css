@@ -18,3 +18,53 @@ body { -webkit-tap-highlight-color: transparent; }
 
 
 html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+
+/* ---------- Dark mode ----------
+   Toggled by adding `class="dark"` to <html>.
+   We redefine the neutral + amber (themed teal) palette variables so every
+   utility that reads them flips together. White is left as #ffffff so
+   text-white on coloured buttons stays white; surface backgrounds (bg-white,
+   bg-white/80 etc.) are overridden explicitly to a dark grey. */
+html.dark { color-scheme: dark; }
+html.dark body { background-color: #0f0f0f; }
+
+html.dark {
+  --color-neutral-50:  #0f0f0f;
+  --color-neutral-100: #1c1c1c;
+  --color-neutral-200: #2a2a2a;
+  --color-neutral-300: #3a3a3a;
+  --color-neutral-400: #555555;
+  --color-neutral-500: #888888;
+  --color-neutral-600: #b0b0b0;
+  --color-neutral-700: #d4d4d4;
+  --color-neutral-800: #ededed;
+  --color-neutral-900: #fafafa;
+  --color-neutral-950: #ffffff;
+
+  --color-amber-50:  #14302a;
+  --color-amber-100: #1d4039;
+  --color-amber-200: #2a5a4f;
+  --color-amber-300: #3b7766;
+  --color-amber-400: #5fc4b1;
+  --color-amber-500: #7adfcf;
+  --color-amber-600: #93dec9;
+  --color-amber-700: #b3e9d9;
+  --color-amber-800: #d3f3e9;
+  --color-amber-900: #ecfaf5;
+}
+
+html.dark .bg-white { background-color: #1c1c1c !important; }
+html.dark .bg-white\/80 { background-color: rgba(28, 28, 28, 0.85) !important; }
+html.dark .bg-white\/95 { background-color: rgba(28, 28, 28, 0.95) !important; }
+
+html.dark .bg-pink-50   { background-color: #3a1a2c !important; }
+html.dark .bg-pink-100  { background-color: #4d2238 !important; }
+html.dark .bg-pink-200  { background-color: #6b3252 !important; }
+html.dark .bg-red-50    { background-color: #3a1818 !important; }
+html.dark .bg-emerald-50 { background-color: #143d2a !important; }
+html.dark .text-red-700      { color: #fca5a5 !important; }
+html.dark .text-pink-700     { color: #f9a8d4 !important; }
+html.dark .text-emerald-700  { color: #6ee7b7 !important; }
+html.dark .border-red-200    { border-color: #5a2222 !important; }
+html.dark .border-amber-200  { border-color: #2a5a4f !important; }
+

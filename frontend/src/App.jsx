@@ -5,6 +5,7 @@ import { useAuth } from './lib/AuthContext.jsx';
 import { api } from './lib/api.js';
 import { useSettings } from './lib/SettingsContext.jsx';
 import SurveyBanner from './components/SurveyBanner.jsx';
+import MenuDrawer from './components/MenuDrawer.jsx';
 import { countdownClock } from './lib/countdown.js';
 
 function AvatarFallback() {
@@ -33,6 +34,7 @@ export default function App() {
   const showFloater = !location.pathname.startsWith('/admin');
   const { account, basket, notifications } = useBasket();
   const { user, refresh: refreshAuth } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function stopImpersonate() {
     try { await api.admin.stopImpersonate(); await refreshAuth(); window.location.href = '/admin'; }
@@ -60,12 +62,25 @@ export default function App() {
       )}
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between gap-2 px-3 py-3">
-          <Link to="/" className="flex min-w-0 items-center gap-2">
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
-            ) : null}
-            <span className="truncate text-lg font-semibold tracking-tight">{shopName}</span>
-          </Link>
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <Link to="/" className="flex min-w-0 items-center gap-2">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
+              ) : null}
+              <span className="truncate text-lg font-semibold tracking-tight">{shopName}</span>
+            </Link>
+          </div>
 
           <div className="flex shrink-0 items-center gap-2">
             <Link
@@ -112,6 +127,7 @@ export default function App() {
           </div>
         </div>
       </header>
+      <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       {isHome && bannerOn && (
         <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
           <div className="mx-auto flex max-w-md items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide">
