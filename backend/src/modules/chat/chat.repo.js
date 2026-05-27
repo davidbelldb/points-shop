@@ -56,7 +56,14 @@ export async function editMessage(messageId, accountId, body) {
   return rows[0];
 }
 
+// Map of reaction key → emoji used in notification copy. Keep in sync with
+// the frontend's render map and the routes-level ALLOWED_REACTIONS whitelist.
+const REACTION_EMOJI = { heart: '💜' };
+
 // Set or clear a single reaction on a message. Either participant may react.
+// When a NEW reaction is applied to the OTHER person's message, the sender
+// gets an in-app notification + web-push. Clearing a reaction does not
+// notify, and reacting to your own message does not notify (no one to tell).
 export async function setReaction(messageId, accountId, reaction) {
   const value = reaction ? String(reaction) : null;
   const { rows } = await query(
@@ -72,7 +79,27 @@ export async function setReaction(messageId, accountId, reaction) {
     err.statusCode = 404;
     throw err;
   }
-  return rows[0];
+  const updated = rows[0];
+
+  // Notify only on add-or-change to a non-null reaction, and only when the
+  // reactor isn't the original message sender (you don't notify yourself).
+  if (value && accountId !== updated.sender_id) {
+    const reactorRes = await query(`SELECT name FROM accounts WHERE id = $1`, [accountId]);
+    const reactorName = reactorRes.rows[0]?.name ?? 'Someone';
+    const emoji = REACTION_EMOJI[value] ?? '👍';
+    const bodyText = updated.body ?? '';
+    const preview = bodyText.length > 80 ? bodyText.slice(0, 77) + '...' : bodyText;
+    const title = `${reactorName} reacted ${emoji}`;
+
+    await query(
+      `INSERT INTO notifications (account_id, type, title, body, link_url)
+       VALUES ($1, 'message', $2, $3, '/messages')`,
+      [updated.sender_id, title, preview],
+    );
+    sendPush(updated.sender_id, { title, body: preview, url: '/messages' });
+  }
+
+  return updated;
 }
 
 export async function sendMessage(senderId, recipientId, body) {

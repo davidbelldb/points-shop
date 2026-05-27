@@ -290,10 +290,6 @@ export default function MessagesPage() {
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
-
-        <p className="px-1 pt-1 text-[11px] text-neutral-400">
-          Double-tap any message to {'💜'}. Tap your own to edit.
-        </p>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
