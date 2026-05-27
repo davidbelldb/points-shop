@@ -64,6 +64,16 @@ export const api = {
   getStory: (id) => request(`/stories/${id}`),
   createStory: (data) => request('/stories', { method: 'POST', body: JSON.stringify(data) }),
   deleteStory: (id) => request(`/stories/${id}`, { method: 'DELETE' }),
+  listReels: () => request('/reels'),
+  getReel: (id) => request(`/reels/${id}`),
+  createReel: (data) => request('/reels', { method: 'POST', body: JSON.stringify(data) }),
+  updateReel: (id, patch) =>
+    request(`/reels/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteReel: (id) => request(`/reels/${id}`, { method: 'DELETE' }),
+  addStoryToReel: (reelId, storyId) =>
+    request(`/reels/${reelId}/stories`, { method: 'POST', body: JSON.stringify({ story_id: storyId }) }),
+  removeStoryFromReel: (reelId, storyId) =>
+    request(`/reels/${reelId}/stories/${storyId}`, { method: 'DELETE' }),
   getSettings: () => request('/settings'),
   listProducts: () => request('/products'),
   getProduct: (id) => request(`/products/${id}`),

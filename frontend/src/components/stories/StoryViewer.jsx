@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
+import AddToReelModal from './AddToReelModal.jsx';
 
 /* Full-screen story player. Renders one story at a time from a flat queue,
    auto-advances after 5s (image) or the video's duration (video). Tap right
@@ -9,12 +10,17 @@ import { api } from '../../lib/api.js';
 const IMG_DURATION_MS = 5000;
 const QUICK_EMOJIS = ['💜', '😍', '😂', '🔥', '😮'];
 
-export default function StoryViewer({ stories, initialIndex = 0, onClose }) {
+export default function StoryViewer({ stories: initialStories, initialIndex = 0, onClose, onStoryDeleted }) {
+  // Local copy of the queue so we can drop a story after deletion without
+  // requiring the parent to re-supply the prop. Parent gets a callback so
+  // its own list (strip / archive) can refresh in parallel.
+  const [stories, setStories] = useState(initialStories);
   const [idx, setIdx] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [sentToast, setSentToast] = useState(null); // 'Sent 💜' etc.
+  const [reelModalOpen, setReelModalOpen] = useState(false);
   const videoRef = useRef(null);
   const startedAtRef = useRef(Date.now());
 
@@ -28,6 +34,25 @@ export default function StoryViewer({ stories, initialIndex = 0, onClose }) {
   function rewind() {
     setReply('');
     if (idx > 0) setIdx(idx - 1);
+  }
+
+  // Either participant can delete any story (shared-content semantics).
+  // After delete, drop the story from the local queue and either advance
+  // to the next one or close if it was the last.
+  async function handleDelete() {
+    if (!story) return;
+    if (!confirm('Delete this story? It will be removed from the live feed, the archive, and any highlight reels.')) return;
+    try {
+      await api.deleteStory(story.id);
+      onStoryDeleted?.();
+      const nextQueue = stories.filter((s) => s.id !== story.id);
+      if (nextQueue.length === 0) { onClose(); return; }
+      setStories(nextQueue);
+      setIdx((curr) => Math.min(curr, nextQueue.length - 1));
+    } catch (e) {
+      setSentToast(`Delete failed: ${e.message}`);
+      setTimeout(() => setSentToast(null), 2500);
+    }
   }
 
   // Progress bar driver — runs whether the story is an image (timer-based)
@@ -119,11 +144,34 @@ export default function StoryViewer({ stories, initialIndex = 0, onClose }) {
             <p className="text-[11px] text-white/70 leading-tight">{relativeTime(story.created_at)}</p>
           </div>
         </div>
-        <button onClick={onClose} aria-label="Close" className="p-1 text-white/80">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setReelModalOpen(true)}
+            aria-label="Save to highlight"
+            className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+          <button
+            onClick={handleDelete}
+            aria-label="Delete story"
+            className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" /><path d="M14 11v6" />
+              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+          <button onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-white/80 hover:bg-white/10">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Media */}
@@ -196,6 +244,17 @@ export default function StoryViewer({ stories, initialIndex = 0, onClose }) {
           <p className="text-center text-xs text-white/80">{sentToast}</p>
         )}
       </div>
+
+      {reelModalOpen && story && (
+        <AddToReelModal
+          storyId={story.id}
+          onClose={() => setReelModalOpen(false)}
+          onDone={() => {
+            setSentToast('Saved to highlight');
+            setTimeout(() => setSentToast(null), 1400);
+          }}
+        />
+      )}
     </div>
   );
 }

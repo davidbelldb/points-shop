@@ -1,6 +1,10 @@
 import {
   listActive, listArchive, getStory, createStory, deleteStory,
 } from './stories.repo.js';
+import {
+  listReels, getReel, createReel, updateReel, deleteReel,
+  addStoryToReel, removeStoryFromReel,
+} from './reels.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
 export default async function storiesRoutes(fastify) {
@@ -33,6 +37,51 @@ export default async function storiesRoutes(fastify) {
   fastify.delete('/api/stories/:id', async (req) => {
     const accountId = getEffectiveAccountId(req);
     await deleteStory(req.params.id, accountId);
+    return { ok: true };
+  });
+
+  /* ----- Highlight reels ----- */
+  fastify.get('/api/reels', async () => listReels());
+
+  fastify.get('/api/reels/:id', async (req, reply) => {
+    const r = await getReel(req.params.id);
+    if (!r) return reply.code(404).send({ error: 'not found' });
+    return r;
+  });
+
+  fastify.post('/api/reels', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    try {
+      return reply.code(201).send(await createReel(accountId, req.body ?? {}));
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  fastify.patch('/api/reels/:id', async (req, reply) => {
+    try {
+      const r = await updateReel(req.params.id, req.body ?? {});
+      if (!r) return reply.code(404).send({ error: 'not found' });
+      return r;
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  fastify.delete('/api/reels/:id', async (req) => {
+    await deleteReel(req.params.id);
+    return { ok: true };
+  });
+
+  fastify.post('/api/reels/:id/stories', async (req, reply) => {
+    const { story_id } = req.body ?? {};
+    if (!story_id) return reply.code(400).send({ error: 'story_id required' });
+    await addStoryToReel(req.params.id, story_id);
+    return { ok: true };
+  });
+
+  fastify.delete('/api/reels/:id/stories/:storyId', async (req) => {
+    await removeStoryFromReel(req.params.id, req.params.storyId);
     return { ok: true };
   });
 }
