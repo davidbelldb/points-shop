@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import StoryViewer from '../components/stories/StoryViewer.jsx';
 
 /* ============================================================
    Date helpers — small, dependency-free, all local-TZ aware.
@@ -252,6 +253,9 @@ export default function CalendarPage() {
         ))}
       </section>
 
+      {/* Story highlights (archived stories that fell within this month) */}
+      <HighlightsSection focusDate={focusDate} selectedDay={selectedDay} />
+
       {/* Floating create button */}
       <button
         onClick={() => setEditing('new')}
@@ -275,6 +279,97 @@ export default function CalendarPage() {
         />
       )}
     </div>
+  );
+}
+
+/* ============================================================
+   Highlights — archived stories grouped by the day they were posted.
+   Pulls /api/stories/archive scoped to the visible month, and if a day
+   is selected, filters down to that day.
+   ============================================================ */
+function HighlightsSection({ focusDate, selectedDay }) {
+  const [stories, setStories] = useState(null);
+  const [viewer, setViewer] = useState(null);
+
+  // Refetch when month changes; one query per month is plenty for the volumes here.
+  useEffect(() => {
+    const from = startOfMonth(focusDate).toISOString();
+    const to   = endOfMonthExclusive(focusDate).toISOString();
+    let cancelled = false;
+    api.listArchiveStories(from, to)
+      .then((data) => { if (!cancelled) setStories(data); })
+      .catch(() => { if (!cancelled) setStories([]); });
+    return () => { cancelled = true; };
+  }, [focusDate]);
+
+  const filtered = useMemo(() => {
+    if (!stories) return [];
+    if (selectedDay) {
+      return stories.filter((s) => sameDay(new Date(s.created_at), selectedDay));
+    }
+    return stories;
+  }, [stories, selectedDay]);
+
+  // Group day-by-day for the visual rhythm.
+  const dayGroups = useMemo(() => {
+    const map = new Map();
+    for (const s of filtered) {
+      const k = dayKey(new Date(s.created_at));
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(s);
+    }
+    return Array.from(map.entries()).map(([k, arr]) => ({ k, date: new Date(arr[0].created_at), stories: arr }));
+  }, [filtered]);
+
+  if (stories === null) return null;
+  if (stories.length === 0) return null;
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800">Sneaky Highlights</h2>
+        <Link to="/feed" className="text-xs font-semibold text-amber-700">All highlights</Link>
+      </div>
+      {dayGroups.length === 0 && (
+        <p className="text-xs text-neutral-500">No stories archived on this day.</p>
+      )}
+      {dayGroups.map((g) => (
+        <div key={g.k} className="space-y-1">
+          <p className="text-[11px] font-semibold text-neutral-500">
+            {g.date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+            <span className="ml-2 font-normal text-neutral-400">{g.stories.length}</span>
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {g.stories.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => {
+                  const queue = g.stories.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                  setViewer({ stories: queue, index: queue.findIndex((x) => x.id === s.id) });
+                }}
+                className="relative aspect-square overflow-hidden rounded-lg bg-neutral-100"
+              >
+                {s.media_type === 'video' ? (
+                  <>
+                    <video src={s.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+                    <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">▶</span>
+                  </>
+                ) : (
+                  <img src={s.media_url} alt="" className="h-full w-full object-cover" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      {viewer && (
+        <StoryViewer
+          stories={viewer.stories}
+          initialIndex={Math.max(0, viewer.index)}
+          onClose={() => setViewer(null)}
+        />
+      )}
+    </section>
   );
 }
 

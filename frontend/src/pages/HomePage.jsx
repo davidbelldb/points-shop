@@ -9,6 +9,7 @@ import ShutTheBoxHomeSection from '../components/ShutTheBoxHomeSection.jsx';
 import Confetti from '../components/Confetti.jsx';
 import AudioNotesSection from '../components/AudioNotesSection.jsx';
 import CalendarUpcomingSection from '../components/CalendarUpcomingSection.jsx';
+import StoriesStrip from '../components/stories/StoriesStrip.jsx';
 import { daysUntil } from '../lib/countdown.js';
 
 // Replace the {name} token with the account's name so the admin can write e.g.
@@ -47,6 +48,7 @@ export default function HomePage() {
   return (
     <div className="space-y-5">
       {daysUntil(settings.banner_countdown_date) === 0 && <Confetti />}
+      <StoriesStrip />
       <CalendarUpcomingSection />
       <AudioNotesSection />
       <div className="text-center">

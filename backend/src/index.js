@@ -30,6 +30,7 @@ import duckyRoutes from './modules/games/ducky.routes.js';
 import rewatchRoutes from './modules/rewatch/rewatch.routes.js';
 import audioRoutes from './modules/audio/audio.routes.js';
 import calendarRoutes from './modules/calendar/calendar.routes.js';
+import storiesRoutes from './modules/stories/stories.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
@@ -103,6 +104,7 @@ await fastify.register(duckyRoutes);
 await fastify.register(rewatchRoutes);
 await fastify.register(audioRoutes);
 await fastify.register(calendarRoutes);
+await fastify.register(storiesRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 

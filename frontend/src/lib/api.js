@@ -35,7 +35,8 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me'),
   getMessages: () => request('/messages'),
-  sendMessage: (body) => request('/messages', { method: 'POST', body: JSON.stringify({ body }) }),
+  sendMessage: (body, replyToStoryId = null) =>
+    request('/messages', { method: 'POST', body: JSON.stringify({ body, reply_to_story_id: replyToStoryId }) }),
   markMessagesRead: () => request('/messages/mark-read', { method: 'POST' }),
   deleteMessage: (id) => request(`/messages/${id}`, { method: 'DELETE' }),
   editMessage: (id, body) =>
@@ -53,6 +54,16 @@ export const api = {
     request(`/calendar/events/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteCalendarEvent: (id) =>
     request(`/calendar/events/${id}`, { method: 'DELETE' }),
+  listActiveStories: () => request('/stories/active'),
+  listArchiveStories: (fromIso, toIso) => {
+    const qs = (fromIso && toIso)
+      ? `?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`
+      : '';
+    return request(`/stories/archive${qs}`);
+  },
+  getStory: (id) => request(`/stories/${id}`),
+  createStory: (data) => request('/stories', { method: 'POST', body: JSON.stringify(data) }),
+  deleteStory: (id) => request(`/stories/${id}`, { method: 'DELETE' }),
   getSettings: () => request('/settings'),
   listProducts: () => request('/products'),
   getProduct: (id) => request(`/products/${id}`),

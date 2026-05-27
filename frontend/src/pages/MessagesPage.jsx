@@ -24,6 +24,37 @@ function Avatar({ url, name, size = 'md' }) {
   );
 }
 
+/* Small thumbnail + caption rendered above a message body when the message
+   was sent as a reply to a story. Mirrors WhatsApp/IG quote-preview layout. */
+function StoryReplyPreview({ m }) {
+  if (!m.story_media_url) {
+    return (
+      <p className="mb-1 rounded-md bg-white/30 px-2 py-1 text-[11px] italic text-neutral-700">
+        Replied to a story (no longer available)
+      </p>
+    );
+  }
+  return (
+    <div className="mb-2 flex items-center gap-2 rounded-md bg-white/40 p-1.5 text-xs">
+      <span className="h-10 w-10 shrink-0 overflow-hidden rounded">
+        {m.story_media_type === 'video' ? (
+          <video src={m.story_media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+        ) : (
+          <img src={m.story_media_url} alt="" className="h-full w-full object-cover" />
+        )}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+          Replied to {m.story_author_name ?? 'a story'}
+        </p>
+        {m.story_caption && (
+          <p className="line-clamp-1 text-[11px] text-neutral-700">{m.story_caption}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function timeLabel(iso) {
   const d = new Date(iso);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -78,6 +109,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       onClick={handleClick}
       className={`group relative max-w-[78%] cursor-pointer select-none rounded-2xl px-3 py-2 ${tone}`}
     >
+      {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} />}
       {isEditing ? (
         <div className="space-y-2">
           <textarea
