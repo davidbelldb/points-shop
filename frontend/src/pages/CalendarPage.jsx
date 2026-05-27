@@ -328,7 +328,7 @@ function HighlightsSection({ focusDate, selectedDay }) {
     <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800">Sneaky Highlights</h2>
-        <Link to="/feed" className="text-xs font-semibold text-amber-700">All highlights</Link>
+        <Link to="/stories" className="text-xs font-semibold text-amber-700">All highlights</Link>
       </div>
       {dayGroups.length === 0 && (
         <p className="text-xs text-neutral-500">No stories archived on this day.</p>
@@ -411,9 +411,6 @@ function EventCard({ ev, onClick }) {
           )}
           {ev.gifts && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">{'🎁'} Gifts</span>
-          )}
-          {ev.snack_list?.length > 0 && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{'🍿'} {ev.snack_list.length}</span>
           )}
           {ev.location && (
             <span className="line-clamp-1 text-neutral-500">• {ev.location}</span>

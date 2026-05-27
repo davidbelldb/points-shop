@@ -116,7 +116,7 @@ export default function SneakyFeedPage() {
   return (
     <div className="space-y-5 pb-24">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Sneaky Feed</h1>
+        <h1 className="text-xl font-semibold">Sneaky Stories</h1>
         <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
       </div>
 

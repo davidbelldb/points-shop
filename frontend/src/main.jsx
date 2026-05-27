@@ -91,7 +91,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="rewatch" element={<RewatchListPage />} />
               <Route path="rewatch/:id" element={<RewatchDetailPage />} />
               <Route path="calendar" element={<CalendarPage />} />
-              <Route path="feed" element={<SneakyFeedPage />} />
+              <Route path="stories" element={<SneakyFeedPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>

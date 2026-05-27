@@ -113,7 +113,7 @@ export default function MenuDrawer({ open, onClose }) {
         <nav className="flex flex-1 flex-col overflow-y-auto p-2 pt-3">
           <div className="space-y-1">
             <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
-            <Item to="/feed" label="Sneaky Feed" icon={<FeedIcon />} onClose={onClose} />
+            <Item to="/stories" label="Sneaky Stories" icon={<FeedIcon />} onClose={onClose} />
             <Item to="/games" label="Sneaky Games" icon={<GameIcon />} onClose={onClose} />
             <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
             <Item to="/calendar" label="Sneaky Calendar" icon={<CalendarIcon />} onClose={onClose} />
