@@ -85,6 +85,7 @@ function BrandingSection({ settings, onChanged }) {
   const [bannerBg, setBannerBg] = useState('#0b8476');
   const [bannerFg, setBannerFg] = useState('#ffffff');
   const [countdownDate, setCountdownDate] = useState('');
+  const [countdownTime, setCountdownTime] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -98,7 +99,8 @@ function BrandingSection({ settings, onChanged }) {
     setBannerBg(settings.banner_bg_colour ?? '#0b8476');
     setBannerFg(settings.banner_text_colour ?? '#ffffff');
     setCountdownDate(settings.banner_countdown_date ?? '');
-  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle, settings.banner_text, settings.banner_bg_colour, settings.banner_text_colour, settings.banner_countdown_date]);
+    setCountdownTime(settings.banner_countdown_time ?? '');
+  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle, settings.banner_text, settings.banner_bg_colour, settings.banner_text_colour, settings.banner_countdown_date, settings.banner_countdown_time]);
 
   async function toggleBanner() {
     setBusy(true); setError(null);
@@ -140,6 +142,7 @@ function BrandingSection({ settings, onChanged }) {
         banner_bg_colour: bannerBg,
         banner_text_colour: bannerFg,
         banner_countdown_date: countdownDate,
+        banner_countdown_time: countdownTime,
       });
       await onChanged();
     } catch (err) { setError(err.message); }
@@ -204,18 +207,26 @@ function BrandingSection({ settings, onChanged }) {
         </Field>
       </div>
 
-      <Field label="Sneaky countdown date">
-        <div className="flex items-center gap-2">
+      <Field label="Sneaky countdown date & time">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="date"
-            className={inputCls}
+            className={inputCls + ' min-w-[150px] flex-1'}
             value={countdownDate}
             onChange={(e) => setCountdownDate(e.target.value)}
           />
-          {countdownDate && (
+          <input
+            type="time"
+            className={inputCls + ' w-[110px]'}
+            value={countdownTime}
+            onChange={(e) => setCountdownTime(e.target.value)}
+            disabled={!countdownDate}
+            aria-label="Countdown target time"
+          />
+          {(countdownDate || countdownTime) && (
             <button
               type="button"
-              onClick={() => setCountdownDate('')}
+              onClick={() => { setCountdownDate(''); setCountdownTime(''); }}
               className="shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600"
             >
               Clear
@@ -224,8 +235,9 @@ function BrandingSection({ settings, onChanged }) {
         </div>
       </Field>
       <p className="text-xs text-neutral-500">
-        Sets a countdown in the banner (e.g. &quot;12 days to go&quot;). On the day itself, confetti
-        falls over the home and account pages. Leave blank for no countdown.
+        Sets a countdown in the banner (e.g. &quot;12 days to go&quot;). The live clock counts down to the
+        date at the time you set — leave time blank to default to midnight. On the day itself,
+        confetti falls over the home and account pages. Leave both blank for no countdown.
       </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

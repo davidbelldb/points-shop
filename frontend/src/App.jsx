@@ -18,14 +18,14 @@ function AvatarFallback() {
   );
 }
 
-// Live DD:HH:MM:SS countdown clock — ticks every second, hides once the day arrives.
-function CountdownClock({ date }) {
+// Live DD:HH:MM:SS countdown clock — ticks every second, hides once the moment arrives.
+function CountdownClock({ date, time }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, []);
-  const clock = countdownClock(date);
+  const clock = countdownClock(date, time);
   if (!clock) return null;
   return <span className="shrink-0 font-mono tabular-nums">{clock}</span>;
 }
@@ -140,7 +140,7 @@ export default function App() {
         <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
           <div className="mx-auto flex max-w-md items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide">
             <span className="truncate">{settings.banner_text}</span>
-            <CountdownClock date={settings.banner_countdown_date} />
+            <CountdownClock date={settings.banner_countdown_date} time={settings.banner_countdown_time} />
           </div>
         </div>
       )}

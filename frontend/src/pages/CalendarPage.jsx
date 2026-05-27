@@ -414,7 +414,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Sneaky Sunday Roast"
+              placeholder="e.g. Sneaky Cinema Trip"
               className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
             />
           </div>
@@ -450,18 +450,18 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. The sofa"
+              placeholder="e.g. David's Flat"
               className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <label className="flex items-center justify-between rounded-xl bg-pink-50 px-3 py-2 text-sm font-medium text-pink-800">
-              <span>{'✨'} Show & Tell</span>
+              <span>Show & Tell</span>
               <input type="checkbox" checked={showAndTell} onChange={(e) => setShowAndTell(e.target.checked)} className="h-4 w-4" />
             </label>
             <label className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
-              <span>{'🎁'} Gifts</span>
+              <span>Gifts</span>
               <input type="checkbox" checked={gifts} onChange={(e) => setGifts(e.target.checked)} className="h-4 w-4" />
             </label>
           </div>
@@ -472,14 +472,14 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              placeholder="Notes, plans, the meaning of life..."
+              placeholder="Where we goin', what we doin'?"
               className="mt-1 block w-full resize-none rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-neutral-500">{'🍿'} Snack list</label>
+              <label className="text-xs font-semibold text-neutral-500">Snack list</label>
               <button
                 type="button"
                 onClick={() => setSnackList((list) => [...list, ''])}
@@ -497,7 +497,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
                   <input
                     value={s}
                     onChange={(e) => setSnackList((list) => list.map((v, i) => (i === idx ? e.target.value : v)))}
-                    placeholder="e.g. Mini Magnums"
+                    placeholder="e.g. Sweet Chilli Sensations"
                     className="block flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
                   />
                   <button
