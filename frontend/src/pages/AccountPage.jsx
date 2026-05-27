@@ -212,7 +212,7 @@ function AdjustmentsSection({ adjustments }) {
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Recently awarded points</h2>
+        <h2 className="text-base font-semibold">Recent sneaky transactions</h2>
         <Link to="/account/points" className="text-xs font-medium text-amber-700">See all</Link>
       </div>
       {adjustments === null ? (

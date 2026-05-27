@@ -824,7 +824,7 @@ export default function DuckyDerbyPage() {
         {commentary.map((ln, idx) => (
           <div
             key={ln.id}
-            className="absolute inset-0 flex items-center justify-center px-3 text-center text-[13px] font-semibold text-black"
+            className="absolute inset-0 flex items-center justify-center px-3 text-center text-[13px] font-semibold text-neutral-900"
             style={{ animation: `${idx === commentary.length - 1 ? 'ddtickerIn' : 'ddtickerOut'} 0.5s ease forwards` }}
           >
             {ln.text}

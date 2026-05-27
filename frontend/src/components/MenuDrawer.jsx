@@ -76,8 +76,14 @@ export default function MenuDrawer({ open, onClose }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  // Drawer slides out BELOW the sticky nav bar so the nav remains visible.
+  // Header is `py-3` (24px) around a 32px content row + 1px border ≈ 57px.
   return (
-    <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
+    <div
+      className={`fixed left-0 right-0 bottom-0 z-40 ${open ? '' : 'pointer-events-none'}`}
+      style={{ top: '57px' }}
+      aria-hidden={!open}
+    >
       <div
         onClick={onClose}
         className={`absolute inset-0 bg-black/50 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`}
@@ -85,16 +91,7 @@ export default function MenuDrawer({ open, onClose }) {
       <aside
         className={`absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <span className="text-base font-semibold">Sneaky Menu</span>
-          <button onClick={onClose} className="rounded-full p-1 text-neutral-500 hover:bg-neutral-100" aria-label="Close menu">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="6" y1="6" x2="18" y2="18" />
-              <line x1="18" y1="6" x2="6" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <nav className="flex flex-1 flex-col overflow-y-auto p-2">
+        <nav className="flex flex-1 flex-col overflow-y-auto p-2 pt-3">
           <div className="space-y-1">
             <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
             <Item to="/games" label="Sneaky Games" icon={<GameIcon />} onClose={onClose} />

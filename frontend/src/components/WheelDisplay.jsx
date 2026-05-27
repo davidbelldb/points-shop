@@ -212,8 +212,8 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
         <button
           onClick={spin}
           disabled={spinning || quotaExhausted}
-          className="absolute left-1/2 top-1/2 z-[2] flex aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#d3f3ea] font-extrabold tracking-wider text-teal-900 shadow-md ring-[3px] ring-white transition hover:brightness-95 active:scale-95"
-          style={{ fontSize: 'clamp(0.7rem, 3.5vw, 1.1rem)' }}
+          className="absolute left-1/2 top-1/2 z-[2] flex aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#d3f3ea] font-extrabold tracking-wider shadow-md ring-[3px] ring-white transition hover:brightness-95 active:scale-95"
+          style={{ fontSize: 'clamp(0.7rem, 3.5vw, 1.1rem)', color: '#0a2a23' }}
           aria-label="Spin the wheel"
         >
           {spinning ? 'Weee!' : (quotaExhausted ? 'WAIT' : spinLabel)}

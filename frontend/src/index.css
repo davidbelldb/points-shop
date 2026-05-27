@@ -56,8 +56,9 @@ html.dark .text-amber-700 { color: #b3e9d9 !important; }
 html.dark .text-amber-800 { color: #d3f3e9 !important; }
 html.dark .text-amber-900 { color: #ecfaf5 !important; }
 
-/* But on a teal-accent bg, text-amber-900 / text-white needs to be DARK to read.
-   Both modes — fixes the count badge + every teal button. */
+/* On saturated teal accent backgrounds (buttons, the count badge, etc.),
+   text must be DARK to read. Light mode rule first, then a more-specific
+   dark-mode rule so it beats the global `html.dark .text-amber-900` override. */
 .bg-amber-400.text-white,
 .bg-amber-500.text-white,
 .bg-amber-600.text-white,
@@ -68,6 +69,25 @@ html.dark .text-amber-900 { color: #ecfaf5 !important; }
 .bg-amber-500.text-amber-950,
 .bg-amber-600.text-amber-950 { color: #0a2a23 !important; }
 
+html.dark .bg-amber-400.text-white,
+html.dark .bg-amber-500.text-white,
+html.dark .bg-amber-600.text-white,
+html.dark .bg-amber-400.text-amber-900,
+html.dark .bg-amber-500.text-amber-900,
+html.dark .bg-amber-600.text-amber-900 { color: #0a2a23 !important; }
+
+/* Nuclear-strength override using #root to guarantee specificity wins,
+   even if the generated utility ordering shifts under Tailwind v4 layers. */
+html.dark #root .bg-amber-400.text-white,
+html.dark #root .bg-amber-500.text-white,
+html.dark #root .bg-amber-600.text-white,
+html.dark #root .bg-amber-400.text-amber-900,
+html.dark #root .bg-amber-500.text-amber-900,
+html.dark #root .bg-amber-600.text-amber-900,
+html.dark #root .bg-amber-400.text-amber-950,
+html.dark #root .bg-amber-500.text-amber-950,
+html.dark #root .bg-amber-600.text-amber-950 { color: #0a2a23 !important; }
+
 /* Soft accent backgrounds — pinks, reds, emerald. */
 html.dark .bg-pink-50   { background-color: #3a1a2c !important; }
 html.dark .bg-pink-100  { background-color: #4d2238 !important; }
@@ -76,7 +96,15 @@ html.dark .bg-red-50    { background-color: #3a1818 !important; }
 html.dark .bg-emerald-50 { background-color: #143d2a !important; }
 html.dark .text-red-700      { color: #fca5a5 !important; }
 html.dark .text-pink-700     { color: #f9a8d4 !important; }
+html.dark .text-pink-800     { color: #fbcfe8 !important; }
+html.dark .text-pink-900     { color: #ffffff !important; }
 html.dark .text-emerald-700  { color: #6ee7b7 !important; }
+
+/* Nuclear-strength override for pink chat bubbles — guarantees white text
+   on the dark-pink-flipped bubble background in dark mode. */
+html.dark #root .text-pink-700 { color: #ffffff !important; }
+html.dark #root .text-pink-800 { color: #ffffff !important; }
+html.dark #root .text-pink-900 { color: #ffffff !important; }
 html.dark .border-red-200    { border-color: #5a2222 !important; }
 html.dark .border-amber-200  { border-color: #2a5a4f !important; }
 
