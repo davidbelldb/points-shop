@@ -18,6 +18,7 @@ export async function findOtherUser(accountId) {
 export async function listMessages(accountId, otherId, limit = 200) {
   const { rows } = await query(
     `SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
+            m.edited_at, m.reaction,
             s.username AS sender_username,
             s.name     AS sender_name,
             s.photo_url AS sender_photo
@@ -32,6 +33,48 @@ export async function listMessages(accountId, otherId, limit = 200) {
   return rows;
 }
 
+// Edit a message's body. Only the original sender may edit. Sets edited_at.
+export async function editMessage(messageId, accountId, body) {
+  const trimmed = (body ?? '').trim();
+  if (!trimmed) {
+    const err = new Error('Message body required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const { rows } = await query(
+    `UPDATE chat_messages
+        SET body = $1, edited_at = NOW()
+      WHERE id = $2 AND sender_id = $3
+      RETURNING id, sender_id, recipient_id, body, read_at, created_at, edited_at, reaction`,
+    [trimmed, messageId, accountId],
+  );
+  if (rows.length === 0) {
+    const err = new Error('Message not found or not yours');
+    err.statusCode = 404;
+    throw err;
+  }
+  return rows[0];
+}
+
+// Set or clear a single reaction on a message. Either participant may react.
+export async function setReaction(messageId, accountId, reaction) {
+  const value = reaction ? String(reaction) : null;
+  const { rows } = await query(
+    `UPDATE chat_messages
+        SET reaction = $1
+      WHERE id = $2
+        AND (sender_id = $3 OR recipient_id = $3)
+      RETURNING id, sender_id, recipient_id, body, read_at, created_at, edited_at, reaction`,
+    [value, messageId, accountId],
+  );
+  if (rows.length === 0) {
+    const err = new Error('Message not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return rows[0];
+}
+
 export async function sendMessage(senderId, recipientId, body) {
   const trimmed = body.trim();
   if (!trimmed) {
@@ -42,7 +85,7 @@ export async function sendMessage(senderId, recipientId, body) {
   const { rows } = await query(
     `INSERT INTO chat_messages (sender_id, recipient_id, body)
      VALUES ($1, $2, $3)
-     RETURNING id, sender_id, recipient_id, body, created_at, read_at`,
+     RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction`,
     [senderId, recipientId, trimmed],
   );
 

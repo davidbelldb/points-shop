@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 
 const POLL_MS = 5000;
+const DOUBLE_TAP_MS = 240;
 
 function Avatar({ url, name, size = 'md' }) {
   const cls = size === 'lg' ? 'h-12 w-12' : 'h-9 w-9';
@@ -40,6 +41,103 @@ function dayLabel(iso) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+/* One chat bubble — handles its own tap/double-tap discrimination.
+   - double-tap (any bubble): toggles the purple-heart reaction
+   - single-tap (your own bubble): opens edit mode
+   - single-tap on the other person's bubble: ignored
+   The X (delete) and the edit pencil stop propagation so they don't fire taps. */
+function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onToggleHeart }) {
+  const tapTimer = useRef(null);
+  const [draft, setDraft] = useState(m.body);
+
+  useEffect(() => { if (isEditing) setDraft(m.body); }, [isEditing, m.body]);
+  useEffect(() => () => { if (tapTimer.current) clearTimeout(tapTimer.current); }, []);
+
+  function handleClick(e) {
+    if (isEditing) return; // taps go to the input while editing
+    // Ignore taps on internal action buttons.
+    if (e.target.closest('[data-bubble-action]')) return;
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current);
+      tapTimer.current = null;
+      onToggleHeart();
+    } else {
+      tapTimer.current = setTimeout(() => {
+        tapTimer.current = null;
+        if (mine) onStartEdit();
+      }, DOUBLE_TAP_MS);
+    }
+  }
+
+  const tone = mine
+    ? 'rounded-br-sm bg-amber-100 text-amber-900'
+    : 'rounded-bl-sm bg-pink-100 text-pink-900';
+
+  return (
+    <div
+      onClick={handleClick}
+      className={`group relative max-w-[78%] cursor-pointer select-none rounded-2xl px-3 py-2 ${tone}`}
+    >
+      {isEditing ? (
+        <div className="space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            autoFocus
+            rows={2}
+            className="block w-full resize-none rounded-md border border-amber-200 bg-white/70 px-2 py-1 text-sm text-neutral-900 focus:outline-none"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="flex justify-end gap-2 text-xs font-semibold">
+            <button
+              data-bubble-action
+              onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
+              className="rounded-md px-2 py-1 text-neutral-600 hover:bg-white/40"
+            >
+              Cancel
+            </button>
+            <button
+              data-bubble-action
+              disabled={!draft.trim() || draft === m.body}
+              onClick={(e) => { e.stopPropagation(); onSaveEdit(draft); }}
+              className="rounded-md bg-amber-600 px-2 py-1 text-amber-900 disabled:opacity-40"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.body}</p>
+          <p className="mt-1 text-[10px] opacity-50">
+            {m.edited_at && <span>edited {'·'} </span>}
+            {timeLabel(m.created_at)}
+          </p>
+          {mine && (
+            <button
+              data-bubble-action
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-white/40 text-amber-900 group-hover:flex"
+              aria-label="Delete"
+            >
+              {'×'}
+            </button>
+          )}
+          {m.reaction === 'heart' && (
+            <span
+              className={`pointer-events-none absolute -bottom-2 ${mine ? 'left-1' : 'right-1'} text-base leading-none`}
+              style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
+              aria-label="Purple heart reaction"
+            >
+              {'💜'}
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function MessagesPage() {
   const { user } = useAuth();
   const { refresh: refreshBasket } = useBasket();
@@ -47,6 +145,7 @@ export default function MessagesPage() {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const bottomRef = useRef(null);
   const lastCountRef = useRef(0);
 
@@ -101,6 +200,30 @@ export default function MessagesPage() {
     catch (e) { setError(e.message); }
   }
 
+  async function saveEdit(id, body) {
+    try {
+      await api.editMessage(id, body);
+      setEditingId(null);
+      await refresh(false);
+    } catch (e) { setError(e.message); }
+  }
+
+  // Optimistically flip the reaction locally, then sync with the server.
+  async function toggleHeart(id) {
+    const current = data.messages.find((x) => x.id === id);
+    if (!current) return;
+    const next = current.reaction === 'heart' ? null : 'heart';
+    setData((prev) => ({
+      ...prev,
+      messages: prev.messages.map((m) => (m.id === id ? { ...m, reaction: next } : m)),
+    }));
+    try { await api.setMessageReaction(id, next); }
+    catch (e) {
+      setError(e.message);
+      await refresh(false); // re-sync on failure
+    }
+  }
+
   let lastDay = null;
 
   return (
@@ -126,7 +249,7 @@ export default function MessagesPage() {
         )}
 
         {data.other && data.messages.length === 0 && (
-          <p className="text-sm text-neutral-500">It's looking a bit bare {'\u2014'} like your backside.</p>
+          <p className="text-sm text-neutral-500">It's looking a bit bare {'—'} like your backside.</p>
         )}
 
         {data.messages.length > 0 && (
@@ -145,23 +268,16 @@ export default function MessagesPage() {
                   )}
                   <div className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
                     {!mine && <Avatar url={m.sender_photo} name={m.sender_name} />}
-                    <div className={`group relative max-w-[78%] rounded-2xl px-3 py-2 ${
-                      mine
-                        ? 'rounded-br-sm bg-amber-100 text-amber-900'
-                        : 'rounded-bl-sm bg-pink-100 text-pink-900'
-                    }`}>
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.body}</p>
-                      <p className="mt-1 text-[10px] opacity-50">{timeLabel(m.created_at)}</p>
-                      {mine && (
-                        <button
-                          onClick={() => remove(m.id)}
-                          className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-white/40 text-amber-900 group-hover:flex"
-                          aria-label="Delete"
-                        >
-                          {'\u00d7'}
-                        </button>
-                      )}
-                    </div>
+                    <MessageBubble
+                      m={m}
+                      mine={mine}
+                      isEditing={editingId === m.id}
+                      onStartEdit={() => setEditingId(m.id)}
+                      onCancelEdit={() => setEditingId(null)}
+                      onSaveEdit={(body) => saveEdit(m.id, body)}
+                      onDelete={() => remove(m.id)}
+                      onToggleHeart={() => toggleHeart(m.id)}
+                    />
                   </div>
                 </li>
               );
@@ -174,6 +290,10 @@ export default function MessagesPage() {
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
+
+        <p className="px-1 pt-1 text-[11px] text-neutral-400">
+          Double-tap any message to {'💜'}. Tap your own to edit.
+        </p>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">

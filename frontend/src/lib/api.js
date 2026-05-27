@@ -38,6 +38,10 @@ export const api = {
   sendMessage: (body) => request('/messages', { method: 'POST', body: JSON.stringify({ body }) }),
   markMessagesRead: () => request('/messages/mark-read', { method: 'POST' }),
   deleteMessage: (id) => request(`/messages/${id}`, { method: 'DELETE' }),
+  editMessage: (id, body) =>
+    request(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  setMessageReaction: (id, reaction) =>
+    request(`/messages/${id}/reaction`, { method: 'PUT', body: JSON.stringify({ reaction }) }),
   getSettings: () => request('/settings'),
   listProducts: () => request('/products'),
   getProduct: (id) => request(`/products/${id}`),
