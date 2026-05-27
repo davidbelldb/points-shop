@@ -48,7 +48,6 @@ export default function HomePage() {
   return (
     <div className="space-y-5">
       {daysUntil(settings.banner_countdown_date) === 0 && <Confetti />}
-      <CalendarUpcomingSection />
       <AudioNotesSection />
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
@@ -76,6 +75,8 @@ export default function HomePage() {
           <HeroCarousel slides={gameSlides} />
         </div>
       )}
+
+      <CalendarUpcomingSection />
 
       <WheelHomeSection />
 
