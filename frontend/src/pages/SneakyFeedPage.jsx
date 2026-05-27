@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import StoryRing from '../components/stories/StoryRing.jsx';
 import StoryViewer from '../components/stories/StoryViewer.jsx';
 import StoryUploader from '../components/stories/StoryUploader.jsx';
+import ReelManager from '../components/stories/ReelManager.jsx';
 
 /* Sneaky Feed — the home base for all story content.
    1. "+ Add story" button up top (moved off the home page).
@@ -56,6 +57,7 @@ export default function SneakyFeedPage() {
   const [error, setError] = useState(null);
   const [uploaderOpen, setUploaderOpen] = useState(false);
   const [viewer, setViewer] = useState(null); // { stories, index } | null
+  const [managingReelId, setManagingReelId] = useState(null);
 
   async function refresh() {
     try {
@@ -103,13 +105,9 @@ export default function SneakyFeedPage() {
     setViewer({ stories: activeQueue, index: activeQueue.findIndex((s) => s.id === target.id) });
   }
 
-  async function openReel(reelId) {
-    try {
-      const reel = await api.getReel(reelId);
-      if (!reel?.stories?.length) return;
-      setViewer({ stories: reel.stories, index: 0 });
-    } catch (e) { setError(e.message); }
-  }
+  // Tapping a reel opens the manager, which has rename / delete / remove
+  // story controls. The manager owns the StoryViewer for "Play all" itself.
+  function openReel(reelId) { setManagingReelId(reelId); }
 
   const monthBuckets = useMemo(() => groupByMonth(archive ?? []), [archive]);
 
@@ -218,6 +216,14 @@ export default function SneakyFeedPage() {
 
       {uploaderOpen && (
         <StoryUploader onClose={() => setUploaderOpen(false)} onPosted={refresh} />
+      )}
+
+      {managingReelId && (
+        <ReelManager
+          reelId={managingReelId}
+          onClose={() => { setManagingReelId(null); refresh(); }}
+          onChanged={refresh}
+        />
       )}
     </div>
   );
