@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import StoryViewer from '../components/stories/StoryViewer.jsx';
+import { EVENT_ICONS, EventIcon, EVENT_ICON_COLOR } from '../lib/eventIcons.jsx';
 
 /* ============================================================
    Date helpers — small, dependency-free, all local-TZ aware.
@@ -376,31 +377,22 @@ function HighlightsSection({ focusDate, selectedDay }) {
 /* ============================================================
    Event card.
    ============================================================ */
-function CalendarIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8"  y1="2" x2="8"  y2="6" />
-      <line x1="3"  y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
 function EventCard({ ev, onClick }) {
   // Cards alternate by flag — gifts → pink, show-and-tell → teal accent, plain → teal-50.
   const pink = ev.gifts;
   const tone = pink
     ? 'bg-pink-50 border-pink-200'
     : 'bg-amber-50 border-amber-200';
-  const iconTone = pink ? 'text-pink-700' : 'text-amber-700';
   return (
     <button
       onClick={onClick}
       className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition hover:shadow-sm active:scale-[0.99] ${tone}`}
     >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/70 ${iconTone}`}>
-        <CalendarIcon />
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/70"
+        style={{ color: EVENT_ICON_COLOR }}
+      >
+        <EventIcon iconKey={ev.icon} size={20} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-sm font-semibold text-neutral-900">{ev.title}</p>
@@ -446,6 +438,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
   const [showAndTell, setShowAndTell] = useState(!!seed.show_and_tell);
   const [gifts, setGifts]           = useState(!!seed.gifts);
   const [snackList, setSnackList]   = useState(Array.isArray(seed.snack_list) ? seed.snack_list.slice() : []);
+  const [icon, setIcon]             = useState(seed.icon ?? 'calendar');
   const [busy, setBusy]   = useState(false);
   const [err, setErr]     = useState(null);
 
@@ -465,6 +458,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
         show_and_tell: showAndTell,
         gifts,
         snack_list:   snackList.map((s) => s.trim()).filter(Boolean),
+        icon,
       }, initial?.id);
     } catch (e) {
       setErr(e.message);
@@ -509,6 +503,30 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
               placeholder="e.g. Sneaky Cinema Trip"
               className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-neutral-500">Icon</label>
+            <div className="mt-1 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {EVENT_ICONS.map(({ key, label, Icon }) => {
+                const selected = icon === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setIcon(key)}
+                    aria-label={label}
+                    title={label}
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                      selected ? 'bg-pink-100 ring-2 ring-pink-400' : 'bg-neutral-100'
+                    }`}
+                    style={{ color: EVENT_ICON_COLOR }}
+                  >
+                    <Icon size={20} />
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <label className="flex items-center justify-between rounded-xl bg-neutral-100 px-3 py-2 text-sm font-medium">

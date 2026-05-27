@@ -1,23 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { EventIcon, EVENT_ICON_COLOR } from '../lib/eventIcons.jsx';
 
-/* Compact preview strip for the home page. Three thin cards, each with a
-   calendar glyph on the left and title/meta on the right. Tapping any card
-   takes you to /calendar (we'll wire deeper linking later when this lands
-   in the menu). Hidden entirely if there are no upcoming events, so we
-   don't carve dead space on the home page for a fresh account. */
-function CalendarGlyph() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8"  y1="2" x2="8"  y2="6" />
-      <line x1="3"  y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
+/* Compact preview strip for the home page. Three thin cards, each with the
+   event's chosen icon on the left and title/meta on the right. Tapping any
+   card takes you to /calendar. Hidden entirely if there are no upcoming
+   events, so we don't carve dead space on the home page for a fresh state. */
 function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -39,14 +28,16 @@ function UpcomingCard({ ev }) {
   // Pink if it's a gifts event, teal otherwise — keeps the page palette tight.
   const pink = ev.gifts;
   const tone = pink ? 'bg-pink-50 border-pink-200' : 'bg-amber-50 border-amber-200';
-  const iconTone = pink ? 'text-pink-700' : 'text-amber-700';
   return (
     <Link
       to="/calendar"
       className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition hover:shadow-sm active:scale-[0.99] ${tone}`}
     >
-      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/70 ${iconTone}`}>
-        <CalendarGlyph />
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/70"
+        style={{ color: EVENT_ICON_COLOR }}
+      >
+        <EventIcon iconKey={ev.icon} size={20} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-sm font-semibold text-neutral-900">{ev.title}</p>

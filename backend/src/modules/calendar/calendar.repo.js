@@ -3,7 +3,7 @@ import { query } from '../../db.js';
 const COLUMNS = `
   id, created_by, title, description, location,
   starts_at, ends_at, all_day, show_and_tell, gifts,
-  snack_list, created_at, updated_at
+  snack_list, icon, created_at, updated_at
 `;
 
 /* Events overlapping the [from, to) window, sorted by start time.
@@ -48,8 +48,8 @@ export async function createEvent(accountId, body) {
   const { rows } = await query(
     `INSERT INTO calendar_events
        (created_by, title, description, location,
-        starts_at, ends_at, all_day, show_and_tell, gifts, snack_list)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        starts_at, ends_at, all_day, show_and_tell, gifts, snack_list, icon)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING ${COLUMNS}`,
     [
       accountId,
@@ -62,6 +62,7 @@ export async function createEvent(accountId, body) {
       clean.show_and_tell,
       clean.gifts,
       JSON.stringify(clean.snack_list),
+      clean.icon,
     ],
   );
   return rows[0];
@@ -75,7 +76,7 @@ export async function updateEvent(id, body) {
   for (const key of [
     'title', 'description', 'location',
     'starts_at', 'ends_at', 'all_day',
-    'show_and_tell', 'gifts',
+    'show_and_tell', 'gifts', 'icon',
   ]) {
     if (key in patch) {
       fields.push(`${key} = $${i++}`);
@@ -139,6 +140,9 @@ function sanitize(data, partial) {
     out.snack_list = Array.isArray(data.snack_list)
       ? data.snack_list.map((s) => String(s ?? '').trim()).filter(Boolean)
       : [];
+  }
+  if (!partial || data.icon !== undefined) {
+    out.icon = data.icon ? String(data.icon).trim().slice(0, 32) : null;
   }
   return out;
 }
