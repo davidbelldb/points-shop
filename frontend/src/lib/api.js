@@ -42,6 +42,17 @@ export const api = {
     request(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
   setMessageReaction: (id, reaction) =>
     request(`/messages/${id}/reaction`, { method: 'PUT', body: JSON.stringify({ reaction }) }),
+  listCalendarEvents: (fromIso, toIso) =>
+    request(`/calendar/events?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`),
+  listCalendarUpcoming: (limit = 3) =>
+    request(`/calendar/upcoming?limit=${limit}`),
+  getCalendarEvent: (id) => request(`/calendar/events/${id}`),
+  createCalendarEvent: (data) =>
+    request('/calendar/events', { method: 'POST', body: JSON.stringify(data) }),
+  updateCalendarEvent: (id, patch) =>
+    request(`/calendar/events/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteCalendarEvent: (id) =>
+    request(`/calendar/events/${id}`, { method: 'DELETE' }),
   getSettings: () => request('/settings'),
   listProducts: () => request('/products'),
   getProduct: (id) => request(`/products/${id}`),
