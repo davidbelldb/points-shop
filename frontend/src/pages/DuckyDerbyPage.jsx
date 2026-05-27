@@ -856,8 +856,11 @@ export default function DuckyDerbyPage() {
 
       <FormGuide ducks={ducks} form={form} />
 
-      {/* ---- Bottom-anchored bet bar ---- */}
-      <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t border-neutral-200 bg-white p-3 shadow-[0_-4px_14px_rgba(0,0,0,0.08)]">
+      {/* ---- Bottom-anchored bet bar ----
+           Lift content above the iPhone home-indicator / curved corner zone:
+           - safe-area inset on supported browsers (iOS PWA), plus a 12px buffer
+           - generous fallback padding (pb-5) for everything else */}
+      <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t border-neutral-200 bg-white px-4 pt-3 pb-5 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
         {noFunds ? (
           <p className="py-1 text-center text-sm font-medium text-amber-800">
             You need points to place a bet — win some elsewhere first!
