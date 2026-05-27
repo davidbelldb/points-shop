@@ -62,6 +62,8 @@ export default function HomePage() {
 
       <HeroCarousel slides={topSlides} />
 
+      <CalendarUpcomingSection />
+
       {gameSlides.length > 0 && (
         <div className="space-y-3">
           <div>
@@ -75,8 +77,6 @@ export default function HomePage() {
           <HeroCarousel slides={gameSlides} />
         </div>
       )}
-
-      <CalendarUpcomingSection />
 
       <WheelHomeSection />
 
