@@ -48,6 +48,7 @@ export default function HomePage() {
   return (
     <div className="space-y-5">
       {daysUntil(settings.banner_countdown_date) === 0 && <Confetti />}
+      <StoriesStrip />
       <AudioNotesSection />
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
@@ -57,8 +58,6 @@ export default function HomePage() {
           {applyNameToken(settings.hero_subtitle ?? 'The shop of your dreams, funded by your nightmares.', account?.name)}
         </p>
       </div>
-
-      <StoriesStrip />
 
       <HeroCarousel slides={topSlides} />
 
