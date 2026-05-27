@@ -407,10 +407,10 @@ function EventCard({ ev, onClick }) {
         <p className="line-clamp-1 text-xs text-neutral-600">{formatEventDateLine(ev)}</p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
           {ev.show_and_tell && (
-            <span className="rounded-full bg-pink-200 px-2 py-0.5 text-pink-800">{'✨'} Show & Tell</span>
+            <span className="rounded-full bg-pink-200 px-2 py-0.5 text-pink-800">Show & Tell</span>
           )}
           {ev.gifts && (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">{'🎁'} Gifts</span>
+            <span className="rounded-full bg-pink-200 px-2 py-0.5 text-pink-800">Gifts</span>
           )}
           {ev.location && (
             <span className="line-clamp-1 text-neutral-500">• {ev.location}</span>
