@@ -84,7 +84,12 @@ export default function StoriesStrip() {
     setViewer({ stories: [s], index: 0 });
   }
 
-  const hasAnything = activeGroups.length > 0 || reels.length > 0 || archive.length > 0;
+  // Home page hides empty reels — creating a shell reel from the Stories
+  // page is the curation step, but until it has stories the home strip
+  // shouldn't carry a hollow circle.
+  const visibleReels = useMemo(() => reels.filter((r) => (r.story_count || 0) > 0), [reels]);
+
+  const hasAnything = activeGroups.length > 0 || visibleReels.length > 0 || archive.length > 0;
   if (!hasAnything) return null;
 
   return (
@@ -104,10 +109,11 @@ export default function StoriesStrip() {
             />
           ))}
 
-          {activeGroups.length > 0 && (reels.length > 0 || archive.length > 0) && <Divider />}
+          {activeGroups.length > 0 && (visibleReels.length > 0 || archive.length > 0) && <Divider />}
 
-          {/* Highlight reels — flat ring with the name underneath */}
-          {reels.map((r) => (
+          {/* Highlight reels — flat ring with the name underneath. Hidden
+              when a reel has zero stories (no cover image, no content). */}
+          {visibleReels.map((r) => (
             <StoryRing
               key={`reel-${r.id}`}
               thumbnailUrl={r.cover_url}
@@ -119,7 +125,7 @@ export default function StoriesStrip() {
             />
           ))}
 
-          {reels.length > 0 && archive.length > 0 && <Divider />}
+          {visibleReels.length > 0 && archive.length > 0 && <Divider />}
 
           {/* Archive vault — every past story as its own circle with date */}
           {archive.map((s) => (

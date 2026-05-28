@@ -141,7 +141,18 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   if (!story) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-black text-white"
+      style={{
+        // iOS PWAs treat `inset-0` as the safe-area viewport, so the bg
+        // doesn't reach the home-indicator zone and the page below peeks
+        // through. 100lvh (largest viewport) plus matching width forces the
+        // black background to cover the entire physical viewport, regardless
+        // of whether Safari's URL bar / home indicator is visible.
+        height: '100lvh',
+        width: '100vw',
+      }}
+    >
       {/* Progress bars */}
       <div className="flex gap-1 px-3 pt-3 supports-[padding:env(safe-area-inset-top)]:pt-[calc(env(safe-area-inset-top)+0.25rem)]">
         {stories.map((_, i) => (

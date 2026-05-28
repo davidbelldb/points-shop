@@ -58,6 +58,24 @@ export default function SneakyFeedPage() {
   const [uploaderOpen, setUploaderOpen] = useState(false);
   const [viewer, setViewer] = useState(null); // { stories, index } | null
   const [managingReelId, setManagingReelId] = useState(null);
+  // Inline "create empty reel" form — toggles open from the section header.
+  const [creatingReel, setCreatingReel] = useState(false);
+  const [newReelName, setNewReelName] = useState('');
+  const [newReelBusy, setNewReelBusy] = useState(false);
+  const [newReelErr, setNewReelErr] = useState(null);
+
+  async function createEmptyReel() {
+    const name = newReelName.trim();
+    if (!name || newReelBusy) return;
+    setNewReelBusy(true); setNewReelErr(null);
+    try {
+      await api.createReel({ name });
+      setNewReelName('');
+      setCreatingReel(false);
+      await refresh();
+    } catch (e) { setNewReelErr(e.message); }
+    finally { setNewReelBusy(false); }
+  }
 
   async function refresh() {
     try {
@@ -155,10 +173,46 @@ export default function SneakyFeedPage() {
         </section>
       )}
 
-      {/* Highlight reels */}
-      {reels && reels.length > 0 && (
-        <section className="space-y-2">
+      {/* Highlight reels — always visible so the "+ New reel" button is
+          reachable even when there are no reels yet. */}
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Highlight reels</h2>
+          <button
+            onClick={() => { setCreatingReel((v) => !v); setNewReelErr(null); }}
+            className="text-xs font-semibold text-amber-700"
+          >
+            {creatingReel ? 'Cancel' : '+ New reel'}
+          </button>
+        </div>
+
+        {creatingReel && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2">
+            <input
+              value={newReelName}
+              onChange={(e) => setNewReelName(e.target.value)}
+              placeholder="e.g. Childhood, Yosemite…"
+              maxLength={40}
+              autoFocus
+              className="block flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+              onKeyDown={(e) => { if (e.key === 'Enter') createEmptyReel(); }}
+            />
+            <button
+              onClick={createEmptyReel}
+              disabled={!newReelName.trim() || newReelBusy}
+              className="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-semibold text-amber-950 disabled:opacity-40"
+            >
+              Create
+            </button>
+          </div>
+        )}
+        {newReelErr && <p className="text-xs text-red-600">{newReelErr}</p>}
+
+        {reels && reels.length === 0 ? (
+          !creatingReel && (
+            <p className="text-xs text-neutral-400">No reels yet — create one above to start collecting moments.</p>
+          )
+        ) : (
           <div className="-mx-4 px-4">
             <div className="flex gap-3 overflow-x-auto pb-2">
               {reels.map((r) => (
@@ -174,8 +228,8 @@ export default function SneakyFeedPage() {
               ))}
             </div>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* Past stories archive */}
       <section className="space-y-2">
