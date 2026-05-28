@@ -3,7 +3,6 @@ import { api } from '../../lib/api.js';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import StoryRing from './StoryRing.jsx';
 import StoryViewer from './StoryViewer.jsx';
-import ReelManager from './ReelManager.jsx';
 
 /* Home-page strip — three sections, vertical dividers between them:
    1. ACTIVE stories (24h live) — at most two circles since the app only has
@@ -28,13 +27,14 @@ export default function StoriesStrip() {
   const [reels, setReels]     = useState([]);
   const [archive, setArchive] = useState([]);
   const [viewer, setViewer]   = useState(null); // { stories, index } | null
-  const [managingReelId, setManagingReelId] = useState(null);
 
   async function refresh() {
     try {
+      // Home strip shows EVERYONE'S published reels (David + Katie). The
+      // /stories management page is the per-account view.
       const [a, r, ar] = await Promise.all([
         api.listActiveStories(),
-        api.listReels(),
+        api.listReels({ scope: 'all' }),
         api.listArchiveStories(),
       ]);
       setActive(a);
@@ -83,6 +83,15 @@ export default function StoriesStrip() {
     // Archive plays as a single-card queue — keeps the date label honest.
     setViewer({ stories: [s], index: 0 });
   }
+  // Home strip just PLAYS reels (your own or the other person's). The
+  // manager lives on /stories where you can only see your own reels.
+  async function openReel(reelId) {
+    try {
+      const reel = await api.getReel(reelId);
+      if (!reel?.stories?.length) return;
+      setViewer({ stories: reel.stories, index: 0 });
+    } catch { /* swallow */ }
+  }
 
   // Home page hides empty reels — creating a shell reel from the Stories
   // page is the curation step, but until it has stories the home strip
@@ -123,7 +132,7 @@ export default function StoriesStrip() {
               glow={false}
               label={r.name}
               sublabel={`${r.story_count} stor${r.story_count === 1 ? 'y' : 'ies'}`}
-              onClick={() => setManagingReelId(r.id)}
+              onClick={() => openReel(r.id)}
             />
           ))}
 
@@ -149,14 +158,6 @@ export default function StoriesStrip() {
           initialIndex={viewer.index}
           onClose={() => { setViewer(null); refresh(); }}
           onStoryDeleted={refresh}
-        />
-      )}
-
-      {managingReelId && (
-        <ReelManager
-          reelId={managingReelId}
-          onClose={() => { setManagingReelId(null); refresh(); }}
-          onChanged={refresh}
         />
       )}
     </>

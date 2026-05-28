@@ -16,6 +16,7 @@ import {
   adjustPoints,
 } from './admin.repo.js';
 import { listAllOrders, updateOrderStatus } from '../orders/orders.repo.js';
+import { transcodeVideoIfNeeded } from '../media/transcode.js';
 
 const MEDIA_DIR = config.mediaDir;
 
@@ -66,7 +67,10 @@ export default async function adminRoutes(fastify) {
       await unlink(filepath).catch(() => {});
       throw err;
     }
-    return { url: `/media/${filename}`, type, mimetype: data.mimetype };
+    // Same H.264+AAC normalisation as /api/upload so admin-side uploads
+    // (product videos, hero slides, etc.) also play in every browser.
+    const out = await transcodeVideoIfNeeded(filepath, type);
+    return { url: `/media/${out.filename}`, type, mimetype: data.mimetype };
   });
 
   fastify.get('/api/admin/products', async () => listAllProducts());

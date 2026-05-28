@@ -4,8 +4,13 @@ import { query } from '../../db.js';
    Cover URL precedence:
      1. Custom uploaded cover_image_url (treated as an image)
      2. The story pinned via cover_story_id
-     3. The most-recently-added story in the reel (latest cover fallback) */
-export async function listReels() {
+     3. The most-recently-added story in the reel (latest cover fallback)
+   When `ownerAccountId` is supplied we only return reels created by that
+   account (the curation/edit view on /stories). Pass null for the shared
+   "everyone's published reels" view on the home strip. */
+export async function listReels(ownerAccountId = null) {
+  const filter = ownerAccountId ? 'WHERE r.created_by = $1' : '';
+  const params = ownerAccountId ? [ownerAccountId] : [];
   const { rows } = await query(
     `SELECT r.id, r.name, r.cover_story_id, r.cover_image_url,
             r.created_by, r.created_at, r.updated_at,
@@ -31,10 +36,18 @@ export async function listReels() {
        FROM story_reels r
        LEFT JOIN reel_stories rs ON rs.reel_id = r.id
        LEFT JOIN sneaky_stories cs ON cs.id = r.cover_story_id
+      ${filter}
       GROUP BY r.id, cs.media_url, cs.media_type
       ORDER BY MAX(rs.added_at) DESC NULLS LAST, r.created_at DESC`,
+    params,
   );
   return rows;
+}
+
+// Fetch a reel's owner (created_by) — used to gate mutation routes.
+export async function getReelOwner(id) {
+  const { rows } = await query(`SELECT created_by FROM story_reels WHERE id = $1`, [id]);
+  return rows[0]?.created_by ?? null;
 }
 
 /* Reel with its full ordered story list — used by the viewer when you tap

@@ -8,6 +8,7 @@ import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { randomUUID } from 'crypto';
 import { config } from '../../config.js';
+import { transcodeVideoIfNeeded } from './transcode.js';
 
 const MEDIA_DIR = config.mediaDir;
 
@@ -53,6 +54,15 @@ export default async function mediaRoutes(fastify) {
       await unlink(filepath).catch(() => {});
       throw err;
     }
-    return { url: `/media/${filename}`, type, mimetype: data.mimetype };
+    // Normalise videos to H.264+AAC MP4 so every browser can play them.
+    // Non-videos pass straight through. If transcode fails the original
+    // file is kept and we return its URL so the upload still succeeds.
+    const out = await transcodeVideoIfNeeded(filepath, type);
+    if (out.transcoded) {
+      req.log?.info({ from: filename, to: out.filename, bytes: out.bytes }, 'video transcoded');
+    } else if (out.error) {
+      req.log?.warn({ filename, err: out.error }, 'video transcode skipped');
+    }
+    return { url: `/media/${out.filename}`, type, mimetype: data.mimetype };
   });
 }
