@@ -10,20 +10,24 @@ const COLUMNS = `
 `;
 
 /* Stories with expires_at still in the future. Newest first. UI groups
-   client-side by author so each person gets one circle in the strip. */
+   client-side by author so each person gets one circle in the strip.
+   hidden_at filters out stories that have been removed from the feed but
+   kept in a highlight reel. */
 export async function listActive() {
   const { rows } = await query(
     `SELECT ${COLUMNS}
        FROM sneaky_stories s
        JOIN accounts a ON a.id = s.author_id
       WHERE s.expires_at > NOW()
+        AND s.hidden_at IS NULL
       ORDER BY s.created_at DESC`,
   );
   return rows;
 }
 
 /* Archived stories — expired. Optional date window for the calendar's
-   per-month view. Pass empty strings to fetch everything. */
+   per-month view. Pass empty strings to fetch everything. Excludes
+   stories that have been hidden from the feed (still in reels). */
 export async function listArchive(fromIso, toIso) {
   if (fromIso && toIso) {
     const { rows } = await query(
@@ -31,6 +35,7 @@ export async function listArchive(fromIso, toIso) {
          FROM sneaky_stories s
          JOIN accounts a ON a.id = s.author_id
         WHERE s.expires_at <= NOW()
+          AND s.hidden_at IS NULL
           AND s.created_at >= $1
           AND s.created_at <  $2
         ORDER BY s.created_at DESC`,
@@ -43,6 +48,7 @@ export async function listArchive(fromIso, toIso) {
        FROM sneaky_stories s
        JOIN accounts a ON a.id = s.author_id
       WHERE s.expires_at <= NOW()
+        AND s.hidden_at IS NULL
       ORDER BY s.created_at DESC`,
   );
   return rows;
@@ -79,9 +85,26 @@ export async function createStory(authorId, { media_url, media_type, caption, du
   return rows[0];
 }
 
+/* Smart delete: if the story is currently linked from any highlight reel
+   we soft-hide it (sets hidden_at) so it disappears from the live feed and
+   the archive vault but persists inside the reels it's been saved to. If
+   it isn't in any reel, we hard-delete the row (and CASCADE handles any
+   stray rows). When the LAST reel link is later removed (see
+   removeStoryFromReel) the row is auto-purged. */
 export async function deleteStory(id, accountId) {
-  // Either participant can delete — same shared-content semantics as the calendar.
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS n FROM reel_stories WHERE story_id = $1`,
+    [id],
+  );
+  if ((rows[0]?.n ?? 0) > 0) {
+    await query(
+      `UPDATE sneaky_stories SET hidden_at = COALESCE(hidden_at, NOW()) WHERE id = $1`,
+      [id],
+    );
+    return { mode: 'hidden' };
+  }
   await query(`DELETE FROM sneaky_stories WHERE id = $1`, [id]);
+  return { mode: 'deleted' };
 }
 
 function httpError(code, msg) {

@@ -159,6 +159,16 @@ export async function removeStoryFromReel(reelId, storyId) {
       WHERE r.id = $1 AND r.cover_story_id = $2`,
     [reelId, storyId],
   );
+  // Auto-purge soft-hidden stories that no longer live in any reel. Once
+  // their last reel link is gone, they're orphaned — drop the row and
+  // free the FK references via the existing CASCADE.
+  await query(
+    `DELETE FROM sneaky_stories s
+      WHERE s.id = $1
+        AND s.hidden_at IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM reel_stories rs WHERE rs.story_id = s.id)`,
+    [storyId],
+  );
 }
 
 function httpError(code, msg) {
