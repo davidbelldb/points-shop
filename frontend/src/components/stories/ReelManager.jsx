@@ -13,6 +13,36 @@ export default function ReelManager({ reelId, onClose, onChanged }) {
   const [busy, setBusy]         = useState(false);
   const [err, setErr]           = useState(null);
   const [viewerStart, setViewerStart] = useState(null); // null | story index to play from
+  const [coverBusy, setCoverBusy] = useState(false);
+
+  async function changeCover(evt) {
+    const input = evt.target;
+    const f = input?.files?.[0];
+    if (!f || coverBusy) return;
+    setCoverBusy(true); setErr(null);
+    try {
+      const { url, type } = await api.upload(f);
+      if (type !== 'image') throw new Error('Cover must be a photo.');
+      await api.updateReel(reelId, { cover_image_url: url });
+      await load();
+      onChanged?.();
+    } catch (err) { setErr(err.message); }
+    finally {
+      setCoverBusy(false);
+      if (input) input.value = '';
+    }
+  }
+
+  async function resetCover() {
+    if (coverBusy) return;
+    setCoverBusy(true); setErr(null);
+    try {
+      await api.updateReel(reelId, { cover_image_url: null });
+      await load();
+      onChanged?.();
+    } catch (e) { setErr(e.message); }
+    finally { setCoverBusy(false); }
+  }
 
   async function load() {
     try {
@@ -108,6 +138,40 @@ export default function ReelManager({ reelId, onClose, onChanged }) {
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {err && <p className="text-xs text-red-600">{err}</p>}
+
+          {/* Cover photo manager. Falls back through cover_image_url
+              (custom upload) → cover_story_id → latest story, with a
+              silhouette placeholder when the reel has nothing in it yet. */}
+          <div className="flex flex-col items-center gap-2 pb-2">
+            <label className="cursor-pointer">
+              <span className="block h-24 w-24 overflow-hidden rounded-full bg-neutral-200 shadow-sm ring-1 ring-neutral-300">
+                {reel.cover_url ? (
+                  reel.cover_media_type === 'video' ? (
+                    <video src={reel.cover_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+                  ) : (
+                    <img src={reel.cover_url} alt="" className="h-full w-full object-cover" />
+                  )
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-neutral-400">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="6" width="18" height="13" rx="2" />
+                      <circle cx="12" cy="13" r="3.5" />
+                      <path d="M8 6l1.5-2h5L16 6" />
+                    </svg>
+                  </span>
+                )}
+              </span>
+              <input type="file" accept="image/*" onChange={changeCover} className="hidden" />
+            </label>
+            <span className="text-xs font-semibold text-amber-700">
+              {coverBusy ? 'Uploading…' : 'Tap to change cover'}
+            </span>
+            {reel.cover_image_url && (
+              <button type="button" onClick={resetCover} disabled={coverBusy} className="text-[11px] text-neutral-500 underline disabled:opacity-40">
+                Use latest story as cover
+              </button>
+            )}
+          </div>
 
           <p className="text-xs text-neutral-500">
             {orderedStories.length} stor{orderedStories.length === 1 ? 'y' : 'ies'} in this reel

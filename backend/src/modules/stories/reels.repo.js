@@ -1,26 +1,33 @@
 import { query } from '../../db.js';
 
-/* Reels list — name, count, and a cover-image URL. Cover URL is the
-   explicit cover_story_id's media; if that's null (cover deleted or never
-   set), we fall back to the most-recently-added story in the reel. */
+/* Reels list — name, count, and a cover URL.
+   Cover URL precedence:
+     1. Custom uploaded cover_image_url (treated as an image)
+     2. The story pinned via cover_story_id
+     3. The most-recently-added story in the reel (latest cover fallback) */
 export async function listReels() {
   const { rows } = await query(
-    `SELECT r.id, r.name, r.cover_story_id, r.created_by, r.created_at, r.updated_at,
+    `SELECT r.id, r.name, r.cover_story_id, r.cover_image_url,
+            r.created_by, r.created_at, r.updated_at,
             COUNT(rs.story_id)::int AS story_count,
             COALESCE(
+              r.cover_image_url,
               cs.media_url,
               (SELECT s.media_url FROM reel_stories rs2
                  JOIN sneaky_stories s ON s.id = rs2.story_id
                 WHERE rs2.reel_id = r.id
                 ORDER BY rs2.added_at DESC LIMIT 1)
             ) AS cover_url,
-            COALESCE(
-              cs.media_type,
-              (SELECT s.media_type FROM reel_stories rs2
-                 JOIN sneaky_stories s ON s.id = rs2.story_id
-                WHERE rs2.reel_id = r.id
-                ORDER BY rs2.added_at DESC LIMIT 1)
-            ) AS cover_media_type
+            CASE
+              WHEN r.cover_image_url IS NOT NULL THEN 'image'
+              ELSE COALESCE(
+                cs.media_type,
+                (SELECT s.media_type FROM reel_stories rs2
+                   JOIN sneaky_stories s ON s.id = rs2.story_id
+                  WHERE rs2.reel_id = r.id
+                  ORDER BY rs2.added_at DESC LIMIT 1)
+              )
+            END AS cover_media_type
        FROM story_reels r
        LEFT JOIN reel_stories rs ON rs.reel_id = r.id
        LEFT JOIN sneaky_stories cs ON cs.id = r.cover_story_id
@@ -35,7 +42,7 @@ export async function listReels() {
    plays in chronological order. */
 export async function getReel(id) {
   const r = await query(
-    `SELECT id, name, cover_story_id, created_by, created_at, updated_at
+    `SELECT id, name, cover_story_id, cover_image_url, created_by, created_at, updated_at
        FROM story_reels WHERE id = $1`,
     [id],
   );
@@ -89,6 +96,9 @@ export async function updateReel(id, patch) {
   }
   if ('cover_story_id' in patch) {
     fields.push(`cover_story_id = $${i++}`); values.push(patch.cover_story_id || null);
+  }
+  if ('cover_image_url' in patch) {
+    fields.push(`cover_image_url = $${i++}`); values.push(patch.cover_image_url || null);
   }
   if (fields.length === 0) return null;
   fields.push(`updated_at = NOW()`);

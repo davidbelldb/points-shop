@@ -45,8 +45,17 @@ export default function StoryRing({
                 <line x1="8" y1="22" x2="16" y2="22" />
               </svg>
             </span>
-          ) : (
+          ) : thumbnailUrl ? (
             <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            // Silhouette fallback — used when a profile-photo-based ring has
+            // no photo set, so the circle still reads as a person.
+            <span className="flex h-full w-full items-center justify-center bg-neutral-200 text-neutral-400">
+              <svg width={Math.round(size * 0.5)} height={Math.round(size * 0.5)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 21a8 8 0 0 1 16 0" />
+              </svg>
+            </span>
           )}
         </span>
       </span>

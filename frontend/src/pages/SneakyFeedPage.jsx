@@ -160,8 +160,8 @@ export default function SneakyFeedPage() {
               {activeOrdered.map((g, idx) => (
                 <StoryRing
                   key={g.authorId}
-                  thumbnailUrl={g.latest.media_url}
-                  mediaType={g.latest.media_type}
+                  thumbnailUrl={g.latest.author_photo}
+                  mediaType="image"
                   glow
                   label={g.authorId === user?.id ? 'Your story' : g.authorName}
                   sublabel={g.all.length > 1 ? `${g.all.length} new` : null}

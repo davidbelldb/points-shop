@@ -96,12 +96,14 @@ export default function StoriesStrip() {
     <>
       <div className="-mx-4 px-4">
         <div className="flex items-start gap-3 overflow-x-auto pb-2">
-          {/* Active stories (max 2 — one circle per author) */}
+          {/* Active stories (max 2 — one circle per author). Per spec, the
+              circle shows the author's PROFILE photo (not the story media),
+              so David and Katie always recognise their own ring. */}
           {activeGroups.map((g, idx) => (
             <StoryRing
               key={`active-${g.authorId}`}
-              thumbnailUrl={g.latest.media_url}
-              mediaType={g.latest.media_type}
+              thumbnailUrl={g.latest.author_photo}
+              mediaType="image"
               glow
               label={g.authorId === user?.id ? 'Your story' : g.authorName}
               sublabel={g.all.length > 1 ? `${g.all.length} new` : null}
