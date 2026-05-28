@@ -17,6 +17,10 @@ export default function StoryUploader({ onClose, onPosted }) {
   const [seconds, setSeconds] = useState(DEFAULT_IMAGE_SECONDS);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  // Some iOS-recorded HEVC clips can't be decoded by the local <video>
+  // element even though they upload + play fine after server-side handling.
+  // We swap to a friendlier "ready to upload" tile when the element errors.
+  const [previewBroken, setPreviewBroken] = useState(false);
 
   // Best-effort local detection — used so the duration slider only shows
   // for image stories (videos/audio play for their natural length).
@@ -37,12 +41,22 @@ export default function StoryUploader({ onClose, onPosted }) {
     if (!f) return;
     setFile(f);
     setPreviewUrl(URL.createObjectURL(f));
+    setPreviewBroken(false);
   }
 
   function clearFile() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null); setPreviewUrl(null);
+    setPreviewBroken(false);
     if (fileRef.current) fileRef.current.value = '';
+  }
+
+  // Human-friendly file size for the fallback tile.
+  function prettySize(n) {
+    if (!Number.isFinite(n)) return '';
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+    return `${Math.round((n / (1024 * 1024)) * 10) / 10} MB`;
   }
 
   async function post() {
@@ -91,10 +105,22 @@ export default function StoryUploader({ onClose, onPosted }) {
               </svg>
               <span className="text-sm font-semibold">Photo, video, or voice note</span>
               <span className="text-xs text-neutral-500">Up to 50MB · 24 hours live</span>
+              {/* iOS Files greys out audio with only `audio/*`, and HEIC/MOV
+                  with only `image/*` and `video/*`. Spelling out the explicit
+                  mimetypes AND extensions covers all the iOS file-pickers. */}
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*,video/*,audio/*"
+                accept={[
+                  'image/*', 'video/*', 'audio/*',
+                  'image/heic', 'image/heif',
+                  'video/quicktime', 'video/mp4', 'video/x-m4v', 'video/webm',
+                  'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a',
+                  'audio/m4a', 'audio/aac', 'audio/x-aac',
+                  'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/webm',
+                  '.heic', '.heif', '.mov', '.mp4', '.m4v', '.webm', '.hevc',
+                  '.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga',
+                ].join(',')}
                 onChange={chooseFile}
                 className="hidden"
               />
@@ -103,7 +129,27 @@ export default function StoryUploader({ onClose, onPosted }) {
             <div className="space-y-2">
               <div className="aspect-[9/12] overflow-hidden rounded-2xl bg-black">
                 {fileKind === 'video' ? (
-                  <video src={previewUrl} className="h-full w-full object-contain" controls playsInline />
+                  previewBroken ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-white">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-white/80">
+                        <polygon points="23 7 16 12 23 17 23 7" />
+                        <rect x="1" y="5" width="15" height="14" rx="2" />
+                      </svg>
+                      <p className="text-sm font-semibold">Ready to upload</p>
+                      <p className="text-xs text-white/70">
+                        Your phone recorded this in a codec the browser can't preview here (usually HEVC).
+                      </p>
+                      <p className="text-[11px] text-white/50">{file.name} · {prettySize(file.size)}</p>
+                    </div>
+                  ) : (
+                    <video
+                      src={previewUrl}
+                      className="h-full w-full object-contain"
+                      controls
+                      playsInline
+                      onError={() => setPreviewBroken(true)}
+                    />
+                  )
                 ) : fileKind === 'audio' ? (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-white">
                     <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
