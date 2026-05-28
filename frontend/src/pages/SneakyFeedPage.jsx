@@ -208,7 +208,9 @@ export default function SneakyFeedPage() {
         )}
         {newReelErr && <p className="text-xs text-red-600">{newReelErr}</p>}
 
-        {reels && reels.length === 0 ? (
+        {reels === null ? (
+          <p className="text-xs text-neutral-400">Loading reels…</p>
+        ) : reels.length === 0 ? (
           !creatingReel && (
             <p className="text-xs text-neutral-400">No reels yet — create one above to start collecting moments.</p>
           )
