@@ -53,7 +53,7 @@ export default function AccountPage() {
     if (!file) return;
     setBusy(true); setError(null);
     try {
-      const { url } = await api.admin.upload(file);
+      const { url } = await api.upload(file);
       await api.updateAccount({ photo_url: url });
       await refresh();
     } catch (err) { setError(err.message); }

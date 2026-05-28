@@ -31,6 +31,7 @@ import rewatchRoutes from './modules/rewatch/rewatch.routes.js';
 import audioRoutes from './modules/audio/audio.routes.js';
 import calendarRoutes from './modules/calendar/calendar.routes.js';
 import storiesRoutes from './modules/stories/stories.routes.js';
+import mediaRoutes from './modules/media/media.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
@@ -105,6 +106,7 @@ await fastify.register(rewatchRoutes);
 await fastify.register(audioRoutes);
 await fastify.register(calendarRoutes);
 await fastify.register(storiesRoutes);
+await fastify.register(mediaRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 

@@ -19,23 +19,26 @@ import { listAllOrders, updateOrderStatus } from '../orders/orders.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
 
-const ALLOWED_IMAGE = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const ALLOWED_VIDEO = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
-const ALLOWED_AUDIO = new Set([
-  'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/m4a', 'audio/x-m4a',
-  'audio/aac', 'audio/x-aac', 'audio/wav', 'audio/x-wav', 'audio/wave',
-  'audio/webm', 'audio/ogg', 'audio/oga',
-]);
-const AUDIO_EXTS = new Set(['.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga']);
+const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif']);
+const VIDEO_EXTS = new Set(['.mp4', '.mov', '.m4v', '.webm', '.qt', '.hevc']);
+const AUDIO_EXTS = new Set(['.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga', '.webm']);
 
-function classifyMimetype(mimetype, filename) {
-  if (ALLOWED_IMAGE.has(mimetype)) return 'image';
-  if (ALLOWED_VIDEO.has(mimetype)) return 'video';
-  if (ALLOWED_AUDIO.has(mimetype)) return 'audio';
-  // Some browsers/OSes report a vague or missing mimetype for audio files
-  // (m4a especially) — trust an unambiguous audio file extension.
+// Permissive media-type classifier. iPhone records HEVC into .mov with
+// mimetype 'video/quicktime', but other browsers / OSes send vague or empty
+// mimetypes (especially for audio). We trust the high-level type/* prefix
+// AND fall back to file extension when the mimetype is missing or generic.
+function classifyMimetype(mimetype = '', filename = '') {
+  const mt = (mimetype || '').toLowerCase();
   const ext = (filename ? path.extname(filename) : '').toLowerCase();
+
+  if (mt.startsWith('image/')) return 'image';
+  if (mt.startsWith('video/')) return 'video';
+  if (mt.startsWith('audio/')) return 'audio';
+
+  if (IMAGE_EXTS.has(ext)) return 'image';
+  if (VIDEO_EXTS.has(ext)) return 'video';
   if (AUDIO_EXTS.has(ext)) return 'audio';
+
   return null;
 }
 

@@ -2,6 +2,7 @@ import { query } from '../../db.js';
 
 const COLUMNS = `
   s.id, s.author_id, s.media_url, s.media_type, s.caption,
+  s.duration_seconds,
   s.created_at, s.expires_at,
   a.name     AS author_name,
   a.username AS author_username,
@@ -58,16 +59,22 @@ export async function getStory(id) {
   return rows[0] ?? null;
 }
 
-export async function createStory(authorId, { media_url, media_type, caption }) {
+export async function createStory(authorId, { media_url, media_type, caption, duration_seconds }) {
   if (!media_url) throw httpError(400, 'media_url required');
-  if (!['image', 'video'].includes(media_type)) {
-    throw httpError(400, 'media_type must be image or video');
+  if (!['image', 'video', 'audio'].includes(media_type)) {
+    throw httpError(400, 'media_type must be image, video, or audio');
+  }
+  // Clamp duration to 1..60s; null means "use the client default".
+  let dur = null;
+  if (duration_seconds != null) {
+    const n = Number(duration_seconds);
+    if (Number.isFinite(n)) dur = Math.max(1, Math.min(60, Math.round(n)));
   }
   const { rows } = await query(
-    `INSERT INTO sneaky_stories (author_id, media_url, media_type, caption)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, author_id, media_url, media_type, caption, created_at, expires_at`,
-    [authorId, media_url, media_type, caption ? String(caption).trim() : null],
+    `INSERT INTO sneaky_stories (author_id, media_url, media_type, caption, duration_seconds)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, author_id, media_url, media_type, caption, duration_seconds, created_at, expires_at`,
+    [authorId, media_url, media_type, caption ? String(caption).trim() : null, dur],
   );
   return rows[0];
 }

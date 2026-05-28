@@ -29,7 +29,23 @@ async function uploadFile(file) {
   return res.json();
 }
 
+// Non-admin upload — same response shape, but on /api/upload so it bypasses
+// the Caddy basicauth on /api/admin/*. Use for any user-generated content
+// (stories, voice notes, profile photos).
+async function uploadFilePublic(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${BASE}/upload`, { credentials: 'include', method: 'POST', body: fd });
+  if (!res.ok) {
+    let message = res.statusText;
+    try { const b = await res.json(); if (b?.error) message = b.error; } catch {}
+    throw new Error(message || `Upload ${res.status}`);
+  }
+  return res.json();
+}
+
 export const api = {
+  upload: uploadFilePublic,
   login: (username, password) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),

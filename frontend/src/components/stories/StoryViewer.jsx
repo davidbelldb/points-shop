@@ -3,11 +3,12 @@ import { api } from '../../lib/api.js';
 import AddToReelModal from './AddToReelModal.jsx';
 
 /* Full-screen story player. Renders one story at a time from a flat queue,
-   auto-advances after 5s (image) or the video's duration (video). Tap right
-   half → next, tap left half → prev. Bottom strip has quick-emoji buttons
-   and a text reply — both POST to /api/messages with reply_to_story_id, so
-   replies land in Sneaky Chat threaded to the story they're about. */
-const IMG_DURATION_MS = 5000;
+   auto-advances after the story's duration_seconds (default 5s for images,
+   natural length for video/audio). Tap right half → next, tap left half →
+   prev. Bottom strip has quick-emoji buttons and a text reply — both POST
+   to /api/messages with reply_to_story_id, so replies land in Sneaky Chat
+   threaded to the story they're about. */
+const DEFAULT_IMG_DURATION_MS = 5000;
 const QUICK_EMOJIS = ['💜', '😍', '😂', '🔥', '😮'];
 
 export default function StoryViewer({ stories: initialStories, initialIndex = 0, onClose, onStoryDeleted }) {
@@ -22,9 +23,24 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   const [sentToast, setSentToast] = useState(null); // 'Sent 💜' etc.
   const [reelModalOpen, setReelModalOpen] = useState(false);
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const startedAtRef = useRef(Date.now());
 
   const story = stories[idx];
+
+  // Paint the body black + lock scroll while the viewer is mounted. Stops
+  // the home page (or Safari's URL-bar peek-through) bleeding behind the
+  // fixed full-screen container on iOS.
+  useEffect(() => {
+    const prevBg = document.body.style.backgroundColor;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.backgroundColor = '#000';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.backgroundColor = prevBg;
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
 
   function advance() {
     setReply('');
@@ -62,24 +78,31 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     setProgress(0);
     startedAtRef.current = Date.now();
 
-    if (story.media_type === 'video') {
-      const v = videoRef.current;
-      if (!v) return undefined;
+    // Video and audio both drive progress off their playback time.
+    if (story.media_type === 'video' || story.media_type === 'audio') {
+      const el = story.media_type === 'video' ? videoRef.current : audioRef.current;
+      if (!el) return undefined;
       function tick() {
-        if (v.duration > 0) setProgress(Math.min(1, v.currentTime / v.duration));
+        if (el.duration > 0) setProgress(Math.min(1, el.currentTime / el.duration));
       }
-      v.addEventListener('timeupdate', tick);
       const onEnd = () => advance();
-      v.addEventListener('ended', onEnd);
+      el.addEventListener('timeupdate', tick);
+      el.addEventListener('ended', onEnd);
+      // Some iOS PWA browsers won't autoplay until you nudge them; the
+      // play() call falls through silently if autoplay was already kicked.
+      const playPromise = el.play?.();
+      if (playPromise?.catch) playPromise.catch(() => {});
       return () => {
-        v.removeEventListener('timeupdate', tick);
-        v.removeEventListener('ended', onEnd);
+        el.removeEventListener('timeupdate', tick);
+        el.removeEventListener('ended', onEnd);
       };
     }
 
+    // Images: timer-based progress driven by the poster's chosen duration.
+    const ms = Math.max(1000, (story.duration_seconds || 0) * 1000) || DEFAULT_IMG_DURATION_MS;
     const interval = setInterval(() => {
       const elapsed = Date.now() - startedAtRef.current;
-      const next = Math.min(1, elapsed / IMG_DURATION_MS);
+      const next = Math.min(1, elapsed / ms);
       setProgress(next);
       if (next >= 1) {
         clearInterval(interval);
@@ -189,6 +212,27 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             playsInline
             controls={false}
           />
+        ) : story.media_type === 'audio' ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+            <span className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 p-1">
+              <span className="flex h-full w-full items-center justify-center rounded-full bg-black/40 text-white">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                  <line x1="8" y1="22" x2="16" y2="22" />
+                </svg>
+              </span>
+            </span>
+            <p className="text-sm text-white/80">Voice note from {story.author_name}</p>
+            <audio
+              ref={audioRef}
+              key={story.id}
+              src={story.media_url}
+              autoPlay
+              playsInline
+            />
+          </div>
         ) : (
           <img
             src={story.media_url}
