@@ -99,7 +99,11 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     }
 
     // Images: timer-based progress driven by the poster's chosen duration.
-    const ms = Math.max(1000, (story.duration_seconds || 0) * 1000) || DEFAULT_IMG_DURATION_MS;
+    // Pre-duration-column stories (and anything stored as null) fall back to
+    // the 5s default — without the fallback Math.max bumps them to 1s.
+    const ms = story.duration_seconds
+      ? Math.max(1000, story.duration_seconds * 1000)
+      : DEFAULT_IMG_DURATION_MS;
     const interval = setInterval(() => {
       const elapsed = Date.now() - startedAtRef.current;
       const next = Math.min(1, elapsed / ms);
@@ -144,12 +148,12 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     <div
       className="fixed inset-0 z-50 flex flex-col bg-black text-white"
       style={{
-        // iOS PWAs treat `inset-0` as the safe-area viewport, so the bg
-        // doesn't reach the home-indicator zone and the page below peeks
-        // through. 100lvh (largest viewport) plus matching width forces the
-        // black background to cover the entire physical viewport, regardless
-        // of whether Safari's URL bar / home indicator is visible.
-        height: '100lvh',
+        // 100dvh = the *currently visible* viewport (excluding Safari's URL
+        // bar when it's showing), so the reply controls always anchor to a
+        // tappable spot at the bottom of the screen. The body bg + scroll
+        // lock (the effect below) keeps the home page from peeking through
+        // any area the viewer doesn't cover.
+        height: '100dvh',
         width: '100vw',
       }}
     >
@@ -253,9 +257,13 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
         )}
 
         {story.caption && (
-          <p className="absolute inset-x-0 bottom-4 mx-auto max-w-md px-4 text-center text-sm font-medium drop-shadow-md">
-            {story.caption}
-          </p>
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4">
+            {/* Semi-transparent black banner so captions stay readable over
+                light images. backdrop-blur softens the edge a touch. */}
+            <span className="inline-block max-w-full rounded-lg bg-black/55 px-3 py-1.5 text-center text-sm font-medium text-white backdrop-blur-sm">
+              {story.caption}
+            </span>
+          </div>
         )}
       </div>
 
