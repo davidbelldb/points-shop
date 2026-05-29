@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import AddToReelModal from './AddToReelModal.jsx';
+import SliderSticker from './SliderSticker.jsx';
 
 /* Full-screen story player. Renders one story at a time from a flat queue,
    auto-advances after the story's duration_seconds (default 5s for images,
@@ -181,6 +182,22 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     setTimeout(() => {
       setBursts((prev) => prev.filter((b) => b.id !== burstId));
     }, 3700);
+  }
+
+  /* Slider response — fires when the recipient lets go of the handle.
+     We send the chosen emoji (or label) into chat as a story-threaded
+     reply, then pop the emoji burst for visible feedback. */
+  async function onSliderCommit(sticker, result) {
+    const emoji = result?.emoji;
+    const fallback = result?.value >= 50 ? (sticker.end_label || 'high') : (sticker.start_label || 'low');
+    const body = emoji ? `${emoji}` : `${fallback} (${Math.round(result.value)}%)`;
+    try {
+      await api.sendMessage(body, story.id);
+      if (emoji) spawnEmojiBurst(emoji);
+      else flashToast('Reply sent', 'sent');
+    } catch (e) {
+      flashToast(`Failed: ${e.message}`, 'error', 2200);
+    }
   }
 
   // Send a reply (emoji or text). Pops a centred animated confirmation so
@@ -386,6 +403,35 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             </span>
           </div>
         )}
+
+        {/* Sticker layer. The slider sticker uses a wrapper at the sticker's
+            (x%, y%) percent of the media area; pointer events inside the
+            slider are isolated from the tap-to-advance zones via z-20.
+            Author sees a static preview; the other person gets the
+            interactive slider that posts a chat reply on release. */}
+        {Array.isArray(story.stickers) && story.stickers.map((s, i) => {
+          if (!s || s.type !== 'slider') return null;
+          return (
+            <div
+              key={i}
+              data-story-controls
+              className="absolute z-20"
+              style={{
+                left: `${Number(s.x) || 50}%`,
+                top: `${Number(s.y) || 70}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SliderSticker
+                sticker={s}
+                mode={isMine ? 'preview' : 'viewer'}
+                onCommit={isMine ? undefined : (result) => onSliderCommit(s, result)}
+              />
+            </div>
+          );
+        })}
 
         {/* Emoji burst layer — 30 floating glyphs per reaction, rising to
             the top of the media area with random size/rotation/sway. */}

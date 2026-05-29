@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
+import SliderSticker from './SliderSticker.jsx';
+import SliderStickerConfig from './SliderStickerConfig.jsx';
 
 /* Modal sheet for adding a new story. iPhone's <input type="file"> with
    image/video/audio accept brings up the native picker — Photo Library,
@@ -21,6 +23,13 @@ export default function StoryUploader({ onClose, onPosted }) {
   // element even though they upload + play fine after server-side handling.
   // We swap to a friendlier "ready to upload" tile when the element errors.
   const [previewBroken, setPreviewBroken] = useState(false);
+  // Sticker editor state — for MVP we support a single slider sticker.
+  // Position is the centre point of the sticker, expressed as % of the
+  // preview container's width/height. Default sits low-centre.
+  const [sticker, setSticker] = useState(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const stageRef = useRef(null);
+  const dragRef = useRef(null);
 
   // Best-effort local detection — used so the duration slider only shows
   // for image stories (videos/audio play for their natural length).
@@ -59,6 +68,53 @@ export default function StoryUploader({ onClose, onPosted }) {
     return `${Math.round((n / (1024 * 1024)) * 10) / 10} MB`;
   }
 
+  /* Sticker drag — pointer-event based so it works on touch + mouse.
+     We capture the pointer, then translate every move into a delta on
+     the preview container's bounding box, clamping to a sensible
+     in-frame range so the sticker can't be dragged off-screen. */
+  function onStickerPointerDown(e) {
+    if (!stageRef.current || !sticker) return;
+    e.stopPropagation();
+    const rect = stageRef.current.getBoundingClientRect();
+    dragRef.current = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      originalX: sticker.x,
+      originalY: sticker.y,
+      width: rect.width,
+      height: rect.height,
+    };
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* noop */ }
+  }
+  function onStickerPointerMove(e) {
+    const d = dragRef.current;
+    if (!d) return;
+    e.stopPropagation();
+    const dx = ((e.clientX - d.startClientX) / d.width) * 100;
+    const dy = ((e.clientY - d.startClientY) / d.height) * 100;
+    setSticker((s) => s ? {
+      ...s,
+      x: Math.max(15, Math.min(85, d.originalX + dx)),
+      y: Math.max(12, Math.min(88, d.originalY + dy)),
+    } : s);
+  }
+  function onStickerPointerUp(e) {
+    if (dragRef.current) e.stopPropagation();
+    dragRef.current = null;
+  }
+
+  function addStickerWithDefaults() {
+    setSticker({
+      type: 'slider',
+      x: 50, y: 70,
+      prompt: '',
+      start_label: '',
+      end_label: '',
+      emoji_stages: ['💩', '🤡', '😎', '😍'],
+    });
+    setConfigOpen(true);
+  }
+
   async function post() {
     if (!file || busy) return;
     setBusy(true); setErr(null);
@@ -75,6 +131,7 @@ export default function StoryUploader({ onClose, onPosted }) {
         caption: caption.trim() || null,
       };
       if (type === 'image') payload.duration_seconds = seconds;
+      if (sticker) payload.stickers = [sticker];
       await api.createStory(payload);
       onPosted?.();
       onClose();
@@ -127,7 +184,7 @@ export default function StoryUploader({ onClose, onPosted }) {
             </label>
           ) : (
             <div className="space-y-2">
-              <div className="aspect-[9/12] overflow-hidden rounded-2xl bg-black">
+              <div ref={stageRef} className="relative aspect-[9/12] overflow-hidden rounded-2xl bg-black">
                 {fileKind === 'video' ? (
                   previewBroken ? (
                     <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-white">
@@ -164,10 +221,60 @@ export default function StoryUploader({ onClose, onPosted }) {
                 ) : (
                   <img src={previewUrl} alt="" className="h-full w-full object-contain" />
                 )}
+
+                {/* Sticker overlay — absolutely positioned at the sticker's
+                    (x%, y%). Pointer events bound here for drag-to-move. */}
+                {sticker && (
+                  <div
+                    className="absolute touch-none"
+                    style={{
+                      left: `${sticker.x}%`,
+                      top: `${sticker.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                      cursor: 'grab',
+                    }}
+                    onPointerDown={onStickerPointerDown}
+                    onPointerMove={onStickerPointerMove}
+                    onPointerUp={onStickerPointerUp}
+                    onPointerCancel={onStickerPointerUp}
+                    onClick={(e) => { e.stopPropagation(); setConfigOpen(true); }}
+                  >
+                    <SliderSticker sticker={sticker} mode="preview" />
+                  </div>
+                )}
               </div>
-              <button onClick={clearFile} className="text-xs text-neutral-500 underline">
-                Choose a different file
-              </button>
+
+              <div className="flex items-center justify-between gap-2">
+                <button onClick={clearFile} className="text-xs text-neutral-500 underline">
+                  Choose a different file
+                </button>
+                {!sticker ? (
+                  <button
+                    type="button"
+                    onClick={addStickerWithDefaults}
+                    className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800"
+                  >
+                    + Slider sticker
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfigOpen(true)}
+                      className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800"
+                    >
+                      Edit sticker
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSticker(null)}
+                      className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -207,6 +314,15 @@ export default function StoryUploader({ onClose, onPosted }) {
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
       </div>
+
+      {configOpen && sticker && (
+        <SliderStickerConfig
+          initial={sticker}
+          onCancel={() => setConfigOpen(false)}
+          onSave={(next) => { setSticker((prev) => ({ ...(prev ?? {}), ...next })); setConfigOpen(false); }}
+          onDelete={() => { setSticker(null); setConfigOpen(false); }}
+        />
+      )}
     </div>
   );
 }
