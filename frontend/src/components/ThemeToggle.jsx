@@ -8,15 +8,6 @@ function MoonIcon() {
     </svg>
   );
 }
-function SunIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-    </svg>
-  );
-}
-
 export default function ThemeToggle({ iconColor }) {
   const { theme, setTheme } = useTheme();
   const isDark = theme === 'dark';
@@ -31,15 +22,18 @@ export default function ThemeToggle({ iconColor }) {
     <button
       onClick={onClick}
       className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-100"
+      aria-pressed={isDark}
     >
       <span className="flex items-center gap-3">
         <span
           className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-100"
           style={{ color: iconColor || '#525252' }}
         >
-          {isDark ? <SunIcon /> : <MoonIcon />}
+          {/* Icon + label stay fixed regardless of mode — the only thing
+              that flips is the switch on the right (on in dark, off in light). */}
+          <MoonIcon />
         </span>
-        {isDark ? 'Light mode' : 'Dark mode'}
+        Dark mode
       </span>
       <span className={`relative inline-block h-5 w-9 rounded-full transition-colors ${isDark ? 'bg-amber-500' : 'bg-neutral-300'}`}>
         <span

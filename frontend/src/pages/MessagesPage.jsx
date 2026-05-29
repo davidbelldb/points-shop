@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
+import StoryViewer from '../components/stories/StoryViewer.jsx';
 
 const POLL_MS = 5000;
 const DOUBLE_TAP_MS = 240;
@@ -25,33 +26,50 @@ function Avatar({ url, name, size = 'md' }) {
 }
 
 /* Small thumbnail + caption rendered above a message body when the message
-   was sent as a reply to a story. Mirrors WhatsApp/IG quote-preview layout. */
-function StoryReplyPreview({ m }) {
+   was sent as a reply to a story. Mirrors WhatsApp/IG quote-preview layout.
+   Tap to open the story in the viewer. Colours inherit from the bubble's
+   text colour (mode-aware) with opacity, so the "REPLIED TO" label reads
+   well on both pink and amber bubbles in light and dark mode. */
+function StoryReplyPreview({ m, onClick }) {
   if (!m.story_media_url) {
     return (
-      <p className="mb-1 rounded-md bg-white/30 px-2 py-1 text-[11px] italic text-neutral-700">
+      <p className="mb-1 rounded-md bg-black/10 px-2 py-1 text-[11px] italic opacity-80">
         Replied to a story (no longer available)
       </p>
     );
   }
   return (
-    <div className="mb-2 flex items-center gap-2 rounded-md bg-white/40 p-1.5 text-xs">
+    <button
+      data-bubble-action
+      onClick={(e) => { e.stopPropagation(); onClick?.(m.reply_to_story_id); }}
+      className="mb-2 flex w-full items-center gap-2 rounded-md bg-black/10 p-1.5 text-left text-xs transition hover:bg-black/15"
+      aria-label="Open story"
+    >
       <span className="h-10 w-10 shrink-0 overflow-hidden rounded">
         {m.story_media_type === 'video' ? (
           <video src={m.story_media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+        ) : m.story_media_type === 'audio' ? (
+          <span className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 text-white">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+              <line x1="8" y1="22" x2="16" y2="22" />
+            </svg>
+          </span>
         ) : (
           <img src={m.story_media_url} alt="" className="h-full w-full object-cover" />
         )}
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+        <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
           Replied to {m.story_author_name ?? 'a story'}
         </p>
         {m.story_caption && (
-          <p className="line-clamp-1 text-[11px] text-neutral-700">{m.story_caption}</p>
+          <p className="line-clamp-1 text-[11px] opacity-80">{m.story_caption}</p>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -77,7 +95,7 @@ function dayLabel(iso) {
    - single-tap (your own bubble): opens edit mode
    - single-tap on the other person's bubble: ignored
    The X (delete) and the edit pencil stop propagation so they don't fire taps. */
-function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onToggleHeart }) {
+function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onToggleHeart, onOpenStory }) {
   const tapTimer = useRef(null);
   const [draft, setDraft] = useState(m.body);
 
@@ -109,7 +127,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       onClick={handleClick}
       className={`group relative max-w-[78%] cursor-pointer select-none rounded-2xl px-3 py-2 ${tone}`}
     >
-      {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} />}
+      {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {isEditing ? (
         <div className="space-y-2">
           <textarea
@@ -178,8 +196,20 @@ export default function MessagesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  // Story viewer state — when a user taps a quoted-story preview we fetch
+  // the full story and render it through the shared StoryViewer modal.
+  const [viewerStory, setViewerStory] = useState(null);
   const bottomRef = useRef(null);
   const lastCountRef = useRef(0);
+
+  async function openStoryById(storyId) {
+    if (!storyId) return;
+    try {
+      const s = await api.getStory(storyId);
+      if (s?.media_url) setViewerStory(s);
+      else setError('That story is no longer available.');
+    } catch (e) { setError(e.message); }
+  }
 
   async function refresh(markRead = true) {
     try {
@@ -304,6 +334,7 @@ export default function MessagesPage() {
                       m={m}
                       mine={mine}
                       isEditing={editingId === m.id}
+                      onOpenStory={openStoryById}
                       onStartEdit={() => setEditingId(m.id)}
                       onCancelEdit={() => setEditingId(null)}
                       onSaveEdit={(body) => saveEdit(m.id, body)}
@@ -345,6 +376,14 @@ export default function MessagesPage() {
           </form>
         </div>
       </div>
+
+      {viewerStory && (
+        <StoryViewer
+          stories={[viewerStory]}
+          initialIndex={0}
+          onClose={() => setViewerStory(null)}
+        />
+      )}
     </>
   );
 }

@@ -90,8 +90,18 @@ export async function createStory(authorId, { media_url, media_type, caption, du
    the archive vault but persists inside the reels it's been saved to. If
    it isn't in any reel, we hard-delete the row (and CASCADE handles any
    stray rows). When the LAST reel link is later removed (see
-   removeStoryFromReel) the row is auto-purged. */
+   removeStoryFromReel) the row is auto-purged.
+   Author-only: throws 403 if the caller isn't the story's original
+   author, and 404 if the story doesn't exist. */
 export async function deleteStory(id, accountId) {
+  const { rows: ownerRows } = await query(
+    `SELECT author_id FROM sneaky_stories WHERE id = $1`,
+    [id],
+  );
+  if (ownerRows.length === 0) throw httpError(404, 'not found');
+  if (ownerRows[0].author_id !== accountId) {
+    throw httpError(403, 'only the author can delete this story');
+  }
   const { rows } = await query(
     `SELECT COUNT(*)::int AS n FROM reel_stories WHERE story_id = $1`,
     [id],

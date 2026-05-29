@@ -1,17 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
+import { useAuth } from '../../lib/AuthContext.jsx';
 import AddToReelModal from './AddToReelModal.jsx';
 
 /* Full-screen story player. Renders one story at a time from a flat queue,
    auto-advances after the story's duration_seconds (default 5s for images,
    natural length for video/audio). Tap right half → next, tap left half →
-   prev. Bottom strip has quick-emoji buttons and a text reply — both POST
-   to /api/messages with reply_to_story_id, so replies land in Sneaky Chat
-   threaded to the story they're about. */
+   prev. Press-and-hold pauses; releasing resumes. Focusing the reply input
+   also pauses, so you can take longer than 5 seconds to type a reply.
+   Bottom strip has quick-emoji buttons and a text reply — both POST to
+   /api/messages with reply_to_story_id, so replies land in Sneaky Chat
+   threaded to the story they're about. The save-to-highlight (bookmark)
+   and delete (trash) icons only appear on stories the current user
+   authored — Katie can't manage David's stories and vice versa. */
 const DEFAULT_IMG_DURATION_MS = 5000;
 const QUICK_EMOJIS = ['💜', '😍', '😂', '🔥', '😮'];
+const LONG_PRESS_MS = 220;
 
 export default function StoryViewer({ stories: initialStories, initialIndex = 0, onClose, onStoryDeleted }) {
+  const { user } = useAuth();
   // Local copy of the queue so we can drop a story after deletion without
   // requiring the parent to re-supply the prop. Parent gets a callback so
   // its own list (strip / archive) can refresh in parallel.
@@ -20,13 +27,43 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   const [progress, setProgress] = useState(0);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
-  const [sentToast, setSentToast] = useState(null); // 'Sent 💜' etc.
+  const [sentToast, setSentToast] = useState(null); // { text, kind } | null
   const [reelModalOpen, setReelModalOpen] = useState(false);
+  // Pause sources combine — paused if either pressing or the reply input is focused.
+  const [pausedByPress, setPausedByPress] = useState(false);
+  const [pausedByReply, setPausedByReply] = useState(false);
+  const paused = pausedByPress || pausedByReply;
+
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const startedAtRef = useRef(Date.now());
+  const pausedAccumRef = useRef(0);
+  const pauseStartRef = useRef(null);
+  const pausedRef = useRef(false);
+  // Long-press / tap discrimination.
+  const holdTimerRef = useRef(null);
+  const wasHeldRef = useRef(false);
 
   const story = stories[idx];
+  const isMine = !!(story && user?.id && story.author_id === user.id);
+
+  // Keep the pause flag fresh in a ref so the timer interval (closed over
+  // its initial value) can early-return on pause.
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+
+  // Drive video/audio + accumulate paused-ms so progress maths stay sane.
+  useEffect(() => {
+    if (paused) {
+      pauseStartRef.current = Date.now();
+      try { videoRef.current?.pause(); } catch { /* noop */ }
+      try { audioRef.current?.pause(); } catch { /* noop */ }
+    } else if (pauseStartRef.current !== null) {
+      pausedAccumRef.current += Date.now() - pauseStartRef.current;
+      pauseStartRef.current = null;
+      try { videoRef.current?.play().catch(() => {}); } catch { /* noop */ }
+      try { audioRef.current?.play().catch(() => {}); } catch { /* noop */ }
+    }
+  }, [paused]);
 
   // Paint the body black + lock scroll while the viewer is mounted. Stops
   // the home page (or Safari's URL-bar peek-through) bleeding behind the
@@ -44,20 +81,21 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 
   function advance() {
     setReply('');
+    setPausedByReply(false);
     if (idx < stories.length - 1) setIdx(idx + 1);
     else onClose();
   }
   function rewind() {
     setReply('');
+    setPausedByReply(false);
     if (idx > 0) setIdx(idx - 1);
   }
 
-  // Either participant can delete any story (shared-content semantics).
-  // After delete, drop the story from the local queue and either advance
-  // to the next one or close if it was the last.
+  // Author-only delete — backend also enforces this; the UI hide stops the
+  // request being made in the first place.
   async function handleDelete() {
-    if (!story) return;
-    if (!confirm('Delete this story? It will be removed from the live feed, the archive, and any highlight reels.')) return;
+    if (!story || !isMine) return;
+    if (!confirm('Delete this story? It will be removed from the live feed and the archive (but stays in any highlight reels).')) return;
     try {
       await api.deleteStory(story.id);
       onStoryDeleted?.();
@@ -66,19 +104,19 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       setStories(nextQueue);
       setIdx((curr) => Math.min(curr, nextQueue.length - 1));
     } catch (e) {
-      setSentToast(`Delete failed: ${e.message}`);
-      setTimeout(() => setSentToast(null), 2500);
+      flashToast(`Delete failed: ${e.message}`, 'error', 2500);
     }
   }
 
-  // Progress bar driver — runs whether the story is an image (timer-based)
-  // or a video (synced to the video element's currentTime).
+  // Progress driver — runs once per story, reads pause state through the
+  // ref so toggling pause doesn't restart the underlying timer.
   useEffect(() => {
     if (!story) return undefined;
     setProgress(0);
     startedAtRef.current = Date.now();
+    pausedAccumRef.current = 0;
+    pauseStartRef.current = paused ? Date.now() : null;
 
-    // Video and audio both drive progress off their playback time.
     if (story.media_type === 'video' || story.media_type === 'audio') {
       const el = story.media_type === 'video' ? videoRef.current : audioRef.current;
       if (!el) return undefined;
@@ -88,10 +126,10 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       const onEnd = () => advance();
       el.addEventListener('timeupdate', tick);
       el.addEventListener('ended', onEnd);
-      // Some iOS PWA browsers won't autoplay until you nudge them; the
-      // play() call falls through silently if autoplay was already kicked.
       const playPromise = el.play?.();
       if (playPromise?.catch) playPromise.catch(() => {});
+      // Honour pause on initial mount if we somehow open paused.
+      if (paused) { try { el.pause(); } catch { /* noop */ } }
       return () => {
         el.removeEventListener('timeupdate', tick);
         el.removeEventListener('ended', onEnd);
@@ -99,13 +137,13 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     }
 
     // Images: timer-based progress driven by the poster's chosen duration.
-    // Pre-duration-column stories (and anything stored as null) fall back to
-    // the 5s default — without the fallback Math.max bumps them to 1s.
+    // Falls back to 5s for null durations (e.g. legacy rows).
     const ms = story.duration_seconds
       ? Math.max(1000, story.duration_seconds * 1000)
       : DEFAULT_IMG_DURATION_MS;
     const interval = setInterval(() => {
-      const elapsed = Date.now() - startedAtRef.current;
+      if (pausedRef.current) return; // skip ticks while paused
+      const elapsed = Date.now() - startedAtRef.current - pausedAccumRef.current;
       const next = Math.min(1, elapsed / ms);
       setProgress(next);
       if (next >= 1) {
@@ -117,8 +155,13 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, story?.id]);
 
-  // Send a reply (emoji or text). After success we don't auto-advance —
-  // matches IG behaviour. Show a small "Sent" toast for 1.2s.
+  function flashToast(text, kind = 'sent', ms = 1500) {
+    setSentToast({ text, kind });
+    setTimeout(() => setSentToast(null), ms);
+  }
+
+  // Send a reply (emoji or text). Pops a centred animated confirmation so
+  // the reaction visibly registers.
   async function send(text) {
     const trimmed = (text ?? '').trim();
     if (!trimmed || sending) return;
@@ -126,19 +169,45 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     try {
       await api.sendMessage(`${trimmed}`, story.id);
       setReply('');
-      setSentToast(trimmed.length <= 3 ? `Sent ${trimmed}` : 'Reply sent');
-      setTimeout(() => setSentToast(null), 1400);
+      setPausedByReply(false);
+      flashToast(trimmed.length <= 3 ? trimmed : 'Reply sent', 'sent');
     } catch (e) {
-      setSentToast(`Failed: ${e.message}`);
-      setTimeout(() => setSentToast(null), 2200);
+      flashToast(`Failed: ${e.message}`, 'error', 2200);
     } finally {
       setSending(false);
     }
   }
 
-  // Tap to navigate — but ignore taps that land on the reply controls.
+  /* ===== press / tap discrimination =====
+     Pointer down → start a hold timer. If the timer fires before pointer
+     up, treat as a long-press and pause. If pointer up happens first,
+     clear the timer and let the click handler advance/rewind. We track
+     wasHeldRef so the trailing click event after a long-press doesn't
+     also advance the story. */
+  function pressStart() {
+    wasHeldRef.current = false;
+    holdTimerRef.current = setTimeout(() => {
+      wasHeldRef.current = true;
+      setPausedByPress(true);
+    }, LONG_PRESS_MS);
+  }
+  function pressEnd() {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (wasHeldRef.current) {
+      setPausedByPress(false);
+      // wasHeldRef is reset by the click suppressor below.
+    }
+  }
   function onTapZone(e, dir) {
     if (e.target.closest('[data-story-controls]')) return;
+    if (wasHeldRef.current) {
+      // The click after a long-press should be swallowed.
+      wasHeldRef.current = false;
+      return;
+    }
     dir === 'next' ? advance() : rewind();
   }
 
@@ -147,16 +216,20 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col bg-black text-white"
-      style={{
-        // 100dvh = the *currently visible* viewport (excluding Safari's URL
-        // bar when it's showing), so the reply controls always anchor to a
-        // tappable spot at the bottom of the screen. The body bg + scroll
-        // lock (the effect below) keeps the home page from peeking through
-        // any area the viewer doesn't cover.
-        height: '100dvh',
-        width: '100vw',
-      }}
+      style={{ height: '100dvh', width: '100vw' }}
     >
+      {/* Keyframes for the sent-toast pop animation. Inlined so the viewer
+          remains self-contained (no Tailwind config + no global CSS). */}
+      <style>{`
+        @keyframes storyToastPop {
+          0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+          22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+          34%  { transform: translate(-50%, -50%) scale(1); }
+          80%  { opacity: 1; }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+        }
+      `}</style>
+
       {/* Progress bars */}
       <div className="flex gap-1 px-3 pt-3 supports-[padding:env(safe-area-inset-top)]:pt-[calc(env(safe-area-inset-top)+0.25rem)]">
         {stories.map((_, i) => (
@@ -183,27 +256,32 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setReelModalOpen(true)}
-            aria-label="Save to highlight"
-            className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
-          </button>
-          <button
-            onClick={handleDelete}
-            aria-label="Delete story"
-            className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6" /><path d="M14 11v6" />
-              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-            </svg>
-          </button>
+          {/* Author-only controls — only the original poster can save or delete. */}
+          {isMine && (
+            <>
+              <button
+                onClick={() => setReelModalOpen(true)}
+                aria-label="Save to highlight"
+                className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+              </button>
+              <button
+                onClick={handleDelete}
+                aria-label="Delete story"
+                className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6" /><path d="M14 11v6" />
+                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </>
+          )}
           <button onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-white/80 hover:bg-white/10">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
@@ -214,8 +292,22 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 
       {/* Media */}
       <div className="relative flex-1 select-none">
-        <div className="absolute inset-y-0 left-0 z-10 w-1/3" onClick={(e) => onTapZone(e, 'prev')} />
-        <div className="absolute inset-y-0 right-0 z-10 w-2/3" onClick={(e) => onTapZone(e, 'next')} />
+        <div
+          className="absolute inset-y-0 left-0 z-10 w-1/3"
+          onClick={(e) => onTapZone(e, 'prev')}
+          onPointerDown={pressStart}
+          onPointerUp={pressEnd}
+          onPointerCancel={pressEnd}
+          onPointerLeave={pressEnd}
+        />
+        <div
+          className="absolute inset-y-0 right-0 z-10 w-2/3"
+          onClick={(e) => onTapZone(e, 'next')}
+          onPointerDown={pressStart}
+          onPointerUp={pressEnd}
+          onPointerCancel={pressEnd}
+          onPointerLeave={pressEnd}
+        />
 
         {story.media_type === 'video' ? (
           <video
@@ -258,11 +350,39 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 
         {story.caption && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4">
-            {/* Semi-transparent black banner so captions stay readable over
-                light images. backdrop-blur softens the edge a touch. */}
             <span className="inline-block max-w-full rounded-lg bg-black/55 px-3 py-1.5 text-center text-sm font-medium text-white backdrop-blur-sm">
               {story.caption}
             </span>
+          </div>
+        )}
+
+        {/* Big centred toast — pops up over the story for ~1.5s to confirm
+            a reaction landed. Pointer-events-none so it doesn't intercept
+            taps; sits above the tap zones via z-30. */}
+        {sentToast && (
+          <div
+            key={`${sentToast.text}-${Date.now()}`}
+            className="pointer-events-none absolute left-1/2 top-1/2 z-30"
+            style={{
+              transform: 'translate(-50%, -50%)',
+              animation: 'storyToastPop 1.5s ease-out forwards',
+            }}
+          >
+            <div className={`rounded-2xl px-6 py-4 text-center shadow-xl backdrop-blur-md ${
+              sentToast.kind === 'error' ? 'bg-red-600/80' : 'bg-black/65'
+            }`}>
+              <div className="text-5xl leading-none">{sentToast.text}</div>
+              <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-white/90">
+                {sentToast.kind === 'error' ? '' : 'Sent'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Subtle "paused" indicator while held */}
+        {paused && (
+          <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/85 backdrop-blur-sm">
+            Paused
           </div>
         )}
       </div>
@@ -292,6 +412,8 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           <input
             value={reply}
             onChange={(e) => setReply(e.target.value)}
+            onFocus={() => setPausedByReply(true)}
+            onBlur={() => setPausedByReply(false)}
             placeholder={`Reply to ${story.author_name}…`}
             className="h-10 flex-1 rounded-full border border-white/30 bg-white/10 px-4 text-sm text-white placeholder:text-white/60 focus:border-white/60 focus:outline-none"
           />
@@ -303,19 +425,13 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             Send
           </button>
         </form>
-        {sentToast && (
-          <p className="text-center text-xs text-white/80">{sentToast}</p>
-        )}
       </div>
 
       {reelModalOpen && story && (
         <AddToReelModal
           storyId={story.id}
           onClose={() => setReelModalOpen(false)}
-          onDone={() => {
-            setSentToast('Saved to highlight');
-            setTimeout(() => setSentToast(null), 1400);
-          }}
+          onDone={() => flashToast('Saved to highlight', 'sent', 1500)}
         />
       )}
     </div>

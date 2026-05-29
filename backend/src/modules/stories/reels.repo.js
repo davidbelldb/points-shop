@@ -77,10 +77,23 @@ export async function getReel(id) {
 }
 
 /* Create a reel — and, if an initial_story_id is supplied, link that
-   story and stamp it as the cover in a single round-trip. */
+   story and stamp it as the cover in a single round-trip. The initial
+   story (if any) must be authored by the caller; reels can only contain
+   their owner's stories. */
 export async function createReel(accountId, { name, initial_story_id }) {
   const cleanName = String(name ?? '').trim();
   if (!cleanName) throw httpError(400, 'name required');
+
+  if (initial_story_id) {
+    const { rows: storyRows } = await query(
+      `SELECT author_id FROM sneaky_stories WHERE id = $1`,
+      [initial_story_id],
+    );
+    if (storyRows.length === 0) throw httpError(404, 'story not found');
+    if (storyRows[0].author_id !== accountId) {
+      throw httpError(403, 'you can only save your own stories to a highlight');
+    }
+  }
 
   const r = await query(
     `INSERT INTO story_reels (name, cover_story_id, created_by)
@@ -128,9 +141,21 @@ export async function deleteReel(id) {
   await query(`DELETE FROM story_reels WHERE id = $1`, [id]);
 }
 
-export async function addStoryToReel(reelId, storyId) {
-  // Insert the link (idempotent). If the reel currently has no cover, adopt
-  // this story as the new cover so the circle thumbnail updates.
+/* Adds a story to a reel — but only if the caller is BOTH the reel owner
+   AND the story author. This is the second half of the privacy boundary:
+   reel ownership is already checked at the route layer, and we additionally
+   require the story to have been posted by the same account so Katie can't
+   save David's stories into her "Childhood" reel, and vice versa. */
+export async function addStoryToReel(reelId, storyId, accountId) {
+  const { rows: storyRows } = await query(
+    `SELECT author_id FROM sneaky_stories WHERE id = $1`,
+    [storyId],
+  );
+  if (storyRows.length === 0) throw httpError(404, 'story not found');
+  if (storyRows[0].author_id !== accountId) {
+    throw httpError(403, 'you can only save your own stories to a highlight');
+  }
+
   await query(
     `INSERT INTO reel_stories (reel_id, story_id) VALUES ($1, $2)
      ON CONFLICT DO NOTHING`,

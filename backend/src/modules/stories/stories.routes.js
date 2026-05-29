@@ -42,10 +42,14 @@ export default async function storiesRoutes(fastify) {
     }
   });
 
-  fastify.delete('/api/stories/:id', async (req) => {
+  fastify.delete('/api/stories/:id', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
-    await deleteStory(req.params.id, accountId);
-    return { ok: true };
+    try {
+      await deleteStory(req.params.id, accountId);
+      return { ok: true };
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
   });
 
   /* ----- Highlight reels -----
@@ -101,8 +105,12 @@ export default async function storiesRoutes(fastify) {
     if (!(await assertReelOwner(req.params.id, accountId, reply))) return;
     const { story_id } = req.body ?? {};
     if (!story_id) return reply.code(400).send({ error: 'story_id required' });
-    await addStoryToReel(req.params.id, story_id);
-    return { ok: true };
+    try {
+      await addStoryToReel(req.params.id, story_id, accountId);
+      return { ok: true };
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
   });
 
   fastify.delete('/api/reels/:id/stories/:storyId', async (req, reply) => {
