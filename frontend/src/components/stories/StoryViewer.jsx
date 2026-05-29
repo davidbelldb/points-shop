@@ -29,6 +29,9 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   const [sending, setSending] = useState(false);
   const [sentToast, setSentToast] = useState(null); // { text, kind } | null
   const [reelModalOpen, setReelModalOpen] = useState(false);
+  // Active emoji bursts — each burst is 30 floating glyphs of the picked
+  // emoji. Cleaned up when the longest particle in the burst finishes.
+  const [bursts, setBursts] = useState([]);
   // Pause sources combine — paused if either pressing or the reply input is focused.
   const [pausedByPress, setPausedByPress] = useState(false);
   const [pausedByReply, setPausedByReply] = useState(false);
@@ -160,6 +163,26 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     setTimeout(() => setSentToast(null), ms);
   }
 
+  /* Spawn 30 instances of the picked emoji at random positions across the
+     bottom of the media area, each with its own size, rotation, horizontal
+     sway and rise duration. Removed once the longest particle has finished. */
+  function spawnEmojiBurst(emoji) {
+    const burstId = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const particles = Array.from({ length: 30 }, (_, i) => ({
+      id: `${burstId}-${i}`,
+      left: 4 + Math.random() * 88,            // 4 → 92 %
+      size: 22 + Math.random() * 44,           // 22 → 66 px
+      rot: -25 + Math.random() * 50,           // -25 → 25 deg
+      sway: -40 + Math.random() * 80,          // -40 → 40 px lateral drift
+      delay: Math.random() * 500,              // up to 500ms stagger
+      duration: 1700 + Math.random() * 1500,   // 1.7 → 3.2 s
+    }));
+    setBursts((prev) => [...prev, { id: burstId, emoji, particles }]);
+    setTimeout(() => {
+      setBursts((prev) => prev.filter((b) => b.id !== burstId));
+    }, 3700);
+  }
+
   // Send a reply (emoji or text). Pops a centred animated confirmation so
   // the reaction visibly registers.
   async function send(text) {
@@ -170,7 +193,10 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       await api.sendMessage(`${trimmed}`, story.id);
       setReply('');
       setPausedByReply(false);
-      flashToast(trimmed.length <= 3 ? trimmed : 'Reply sent', 'sent');
+      // Short reactions (single emoji) get the IG-style burst; longer text
+      // replies get the calmer text toast.
+      if (trimmed.length <= 3) spawnEmojiBurst(trimmed);
+      else flashToast('Reply sent', 'sent');
     } catch (e) {
       flashToast(`Failed: ${e.message}`, 'error', 2200);
     } finally {
@@ -218,8 +244,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       className="fixed inset-0 z-50 flex flex-col bg-black text-white"
       style={{ height: '100dvh', width: '100vw' }}
     >
-      {/* Keyframes for the sent-toast pop animation. Inlined so the viewer
-          remains self-contained (no Tailwind config + no global CSS). */}
+      {/* Inline keyframes — keep the viewer self-contained. */}
       <style>{`
         @keyframes storyToastPop {
           0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
@@ -227,6 +252,12 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           34%  { transform: translate(-50%, -50%) scale(1); }
           80%  { opacity: 1; }
           100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+        }
+        @keyframes storyEmojiRise {
+          0%   { opacity: 0; transform: translate(0, 0) rotate(var(--rot, 0deg)) scale(0.55); }
+          12%  { opacity: 1; }
+          88%  { opacity: 1; }
+          100% { opacity: 0; transform: translate(var(--sway, 0), -110vh) rotate(var(--rot, 0deg)) scale(1.05); }
         }
       `}</style>
 
@@ -356,25 +387,51 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           </div>
         )}
 
-        {/* Big centred toast — pops up over the story for ~1.5s to confirm
-            a reaction landed. Pointer-events-none so it doesn't intercept
-            taps; sits above the tap zones via z-30. */}
+        {/* Emoji burst layer — 30 floating glyphs per reaction, rising to
+            the top of the media area with random size/rotation/sway. */}
+        {bursts.map((b) => (
+          <div
+            key={b.id}
+            className="pointer-events-none absolute inset-0 z-30 overflow-hidden"
+            aria-hidden="true"
+          >
+            {b.particles.map((p) => (
+              <span
+                key={p.id}
+                className="absolute"
+                style={{
+                  left: `${p.left}%`,
+                  bottom: 0,
+                  fontSize: `${p.size}px`,
+                  lineHeight: 1,
+                  '--rot': `${p.rot}deg`,
+                  '--sway': `${p.sway}px`,
+                  animation: `storyEmojiRise ${p.duration}ms ease-out ${p.delay}ms forwards`,
+                  willChange: 'transform, opacity',
+                }}
+              >
+                {b.emoji}
+              </span>
+            ))}
+          </div>
+        ))}
+
+        {/* Text toast for non-emoji confirmations (text replies, reel
+            saves) and errors. Mounted with a stable key derived from the
+            content so it doesn't remount on parent re-renders. */}
         {sentToast && (
           <div
-            key={`${sentToast.text}-${Date.now()}`}
+            key={sentToast.text}
             className="pointer-events-none absolute left-1/2 top-1/2 z-30"
             style={{
               transform: 'translate(-50%, -50%)',
               animation: 'storyToastPop 1.5s ease-out forwards',
             }}
           >
-            <div className={`rounded-2xl px-6 py-4 text-center shadow-xl backdrop-blur-md ${
-              sentToast.kind === 'error' ? 'bg-red-600/80' : 'bg-black/65'
+            <div className={`rounded-2xl px-5 py-3 text-center shadow-xl backdrop-blur-md ${
+              sentToast.kind === 'error' ? 'bg-red-600/85' : 'bg-black/65'
             }`}>
-              <div className="text-5xl leading-none">{sentToast.text}</div>
-              <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-white/90">
-                {sentToast.kind === 'error' ? '' : 'Sent'}
-              </p>
+              <p className="text-sm font-semibold text-white">{sentToast.text}</p>
             </div>
           </div>
         )}

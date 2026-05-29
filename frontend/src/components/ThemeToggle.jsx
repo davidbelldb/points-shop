@@ -36,9 +36,13 @@ export default function ThemeToggle({ iconColor }) {
         Dark mode
       </span>
       <span className={`relative inline-block h-5 w-9 rounded-full transition-colors ${isDark ? 'bg-amber-500' : 'bg-neutral-300'}`}>
+        {/* Knob position is anchored by `left` rather than transform, so the
+            off (light-mode) state always sits flush to the left of the track
+            and the on (dark-mode) state sits flush to the right. */}
         <span
-          className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform"
-          style={{ transform: isDark ? 'translateX(18px)' : 'translateX(2px)' }}
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+            isDark ? 'left-[18px]' : 'left-0.5'
+          }`}
         />
       </span>
     </button>
