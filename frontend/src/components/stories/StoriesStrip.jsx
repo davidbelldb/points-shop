@@ -138,10 +138,13 @@ export default function StoriesStrip() {
 
           {visibleReels.length > 0 && archive.length > 0 && <Divider />}
 
-          {/* Archive vault — every past story as its own circle with date */}
+          {/* Archive vault — every past story as its own circle with date.
+              Videos pass posterUrl so the ring shows a still rather than
+              trying to decode the whole clip. */}
           {archive.map((s) => (
             <StoryRing
               key={`vault-${s.id}`}
+              posterUrl={s.thumbnail_url}
               thumbnailUrl={s.media_url}
               mediaType={s.media_type}
               glow={false}

@@ -110,6 +110,12 @@ await fastify.register(mediaRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 
+// One-shot background backfill for legacy video stories without poster
+// thumbnails. Doesn't block startup; logs progress through fastify.log.
+import('./modules/stories/backfill_thumbnails.js')
+  .then(({ backfillVideoThumbnails }) => backfillVideoThumbnails(fastify.log))
+  .catch((e) => fastify.log.error({ err: e }, 'thumbnail backfill bootstrap failed'));
+
 const shutdown = async (signal) => {
   fastify.log.info(`Received ${signal}, shutting down`);
   await fastify.close();

@@ -1,9 +1,47 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { unlink, rename, stat } from 'fs/promises';
+import { unlink, rename, stat, access } from 'fs/promises';
+import { constants as fsConstants } from 'fs';
 import path from 'path';
 
 const execFileAsync = promisify(execFile);
+
+/* Extract a single JPEG frame ~1s into the video as a poster image. Used
+   so the story circles on the home strip can show a still without having
+   to load + decode the whole video. Returns { filename, filepath } of the
+   saved JPEG, or null on failure. */
+export async function extractVideoThumbnail(videoPath) {
+  const dir = path.dirname(videoPath);
+  const base = path.basename(videoPath, path.extname(videoPath));
+  const outPath = path.join(dir, `${base}.thumb.jpg`);
+  try {
+    await execFileAsync(
+      'ffmpeg',
+      [
+        '-ss', '00:00:01',          // skip the first frame which is often blank
+        '-i', videoPath,
+        '-frames:v', '1',
+        '-vf', "scale='min(720,iw)':-2",
+        '-q:v', '4',                // good-quality JPEG
+        '-y', outPath,
+      ],
+      { timeout: 60_000 },
+    );
+    // Some short clips don't have a frame at 1s — retry from 0s.
+    try { await access(outPath, fsConstants.F_OK); }
+    catch {
+      await execFileAsync(
+        'ffmpeg',
+        ['-i', videoPath, '-frames:v', '1', '-vf', "scale='min(720,iw)':-2", '-q:v', '4', '-y', outPath],
+        { timeout: 60_000 },
+      );
+    }
+    return { filename: path.basename(outPath), filepath: outPath };
+  } catch {
+    await unlink(outPath).catch(() => {});
+    return null;
+  }
+}
 
 /* Server-side video normalisation.
    --------------------------------

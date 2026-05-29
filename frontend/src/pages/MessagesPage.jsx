@@ -73,6 +73,21 @@ function StoryReplyPreview({ m, onClick }) {
   );
 }
 
+/* Inline quote shown above a message's body when it's a reply to a
+   previous chat message. Keeps the rendering consistent with the
+   story-reply quote — same opacity scheme so it reads in both modes. */
+function MessageReplyPreview({ m }) {
+  const snippet = (m.reply_to_body || '').trim();
+  return (
+    <div className="mb-2 rounded-md border-l-2 border-current/50 bg-black/10 px-2 py-1 text-xs opacity-80">
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+        Replying to {m.reply_to_sender_name ?? 'a message'}
+      </p>
+      <p className="line-clamp-1">{snippet || 'Message no longer available'}</p>
+    </div>
+  );
+}
+
 function timeLabel(iso) {
   const d = new Date(iso);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -95,9 +110,23 @@ function dayLabel(iso) {
    - single-tap (your own bubble): opens edit mode
    - single-tap on the other person's bubble: ignored
    The X (delete) and the edit pencil stop propagation so they don't fire taps. */
-function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onToggleHeart, onOpenStory }) {
+/* WhatsApp-style swipe-right-to-reply gesture.
+   - Track horizontal drag distance and translate the bubble along.
+   - Past SWIPE_TRIGGER px the row latches "reply armed"; on release the
+     parent's onSwipeReply fires.
+   - A reply arrow grows in from the left as you drag, fading to full
+     opacity when the latch fires for tactile feedback.
+   - Vertical drag dominance abandons the gesture so the user can still
+     scroll the chat normally. */
+const SWIPE_TRIGGER = 60;
+const SWIPE_MAX     = 80;
+
+function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onToggleHeart, onOpenStory, onSwipeReply }) {
   const tapTimer = useRef(null);
+  const swipeRef = useRef(null);
   const [draft, setDraft] = useState(m.body);
+  const [dragX, setDragX] = useState(0);
+  const [armed, setArmed] = useState(false);
 
   useEffect(() => { if (isEditing) setDraft(m.body); }, [isEditing, m.body]);
   useEffect(() => () => { if (tapTimer.current) clearTimeout(tapTimer.current); }, []);
@@ -106,6 +135,12 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     if (isEditing) return; // taps go to the input while editing
     // Ignore taps on internal action buttons.
     if (e.target.closest('[data-bubble-action]')) return;
+    // Suppress the click that follows a swipe so we don't accidentally
+    // open edit / toggle heart at the end of a drag.
+    if (swipeRef.current?.suppressClick) {
+      swipeRef.current.suppressClick = false;
+      return;
+    }
     if (tapTimer.current) {
       clearTimeout(tapTimer.current);
       tapTimer.current = null;
@@ -118,6 +153,54 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     }
   }
 
+  function onPointerDown(e) {
+    if (isEditing) return;
+    if (e.target.closest('[data-bubble-action]')) return;
+    swipeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      tracking: true,
+      decided: false,
+      suppressClick: false,
+      pointerId: e.pointerId,
+    };
+  }
+  function onPointerMove(e) {
+    const s = swipeRef.current;
+    if (!s?.tracking) return;
+    const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
+    if (!s.decided) {
+      // Wait until the motion is decisively horizontal before claiming
+      // the gesture — otherwise we'd hijack vertical scrolls.
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        s.tracking = false;
+        setDragX(0);
+        return;
+      }
+      s.decided = true;
+      try { e.currentTarget.setPointerCapture?.(s.pointerId); } catch { /* noop */ }
+    }
+    // Allow rightward drag for everyone; clamp leftward to 0.
+    const clamped = Math.max(0, Math.min(SWIPE_MAX, dx));
+    setDragX(clamped);
+    setArmed(clamped >= SWIPE_TRIGGER);
+  }
+  function onPointerUp() {
+    const s = swipeRef.current;
+    if (!s) return;
+    if (s.decided) {
+      // We owned the gesture; squash the synthetic click that follows.
+      s.suppressClick = true;
+      if (armed) onSwipeReply?.(m);
+    }
+    setDragX(0);
+    setArmed(false);
+    s.tracking = false;
+    s.decided = false;
+  }
+
   const tone = mine
     ? 'rounded-br-sm bg-amber-100 text-amber-900'
     : 'rounded-bl-sm bg-pink-100 text-pink-900';
@@ -125,9 +208,34 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
   return (
     <div
       onClick={handleClick}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{
+        transform: dragX ? `translateX(${dragX}px)` : undefined,
+        transition: dragX ? 'none' : 'transform 0.22s ease-out',
+        touchAction: 'pan-y',
+      }}
       className={`group relative max-w-[78%] cursor-pointer select-none rounded-2xl px-3 py-2 ${tone}`}
     >
+      {/* Reply-arrow ghost — grows from invisible to full opacity as the
+          bubble swipes past the trigger threshold. */}
+      <span
+        aria-hidden="true"
+        style={{
+          opacity: Math.min(1, dragX / SWIPE_TRIGGER),
+          transform: `translate(-${SWIPE_TRIGGER * 0.75}px, -50%) scale(${armed ? 1.15 : 1})`,
+        }}
+        className={`pointer-events-none absolute top-1/2 ${mine ? 'right-full mr-2' : 'left-0 ml-[-3px]'} flex h-7 w-7 items-center justify-center rounded-full ${armed ? 'bg-amber-500 text-white' : 'bg-white text-amber-700 shadow ring-1 ring-amber-200'}`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 17 4 12 9 7" />
+          <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+        </svg>
+      </span>
       {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
+      {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
       {isEditing ? (
         <div className="space-y-2">
           <textarea
@@ -199,6 +307,10 @@ export default function MessagesPage() {
   // Story viewer state — when a user taps a quoted-story preview we fetch
   // the full story and render it through the shared StoryViewer modal.
   const [viewerStory, setViewerStory] = useState(null);
+  // Replying-to state — set when the user swipes right on a bubble. The
+  // banner above the input shows the quote; sending clears it.
+  const [replyTo, setReplyTo] = useState(null); // { id, body, senderName } | null
+  const inputRef = useRef(null);
   const bottomRef = useRef(null);
   const lastCountRef = useRef(0);
 
@@ -245,8 +357,9 @@ export default function MessagesPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.sendMessage(draft);
+      await api.sendMessage(draft, null, replyTo?.id ?? null);
       setDraft('');
+      setReplyTo(null);
       await refresh(false);
       await refreshBasket();
     } catch (e) {
@@ -254,6 +367,16 @@ export default function MessagesPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleSwipeReply(m) {
+    setReplyTo({
+      id: m.id,
+      body: m.body,
+      senderName: m.sender_id === user?.id ? 'yourself' : (data.other?.name ?? m.sender_name ?? 'them'),
+    });
+    // Focus the composer so the user can start typing immediately.
+    setTimeout(() => inputRef.current?.focus(), 50);
   }
 
   async function remove(id) {
@@ -340,6 +463,7 @@ export default function MessagesPage() {
                       onSaveEdit={(body) => saveEdit(m.id, body)}
                       onDelete={() => remove(m.id)}
                       onToggleHeart={() => toggleHeart(m.id)}
+                      onSwipeReply={handleSwipeReply}
                     />
                   </div>
                 </li>
@@ -356,13 +480,34 @@ export default function MessagesPage() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-md px-4 py-3">
-          <form onSubmit={send} className="flex items-stretch gap-2">
+        <div className="mx-auto max-w-md px-4">
+          {replyTo && (
+            <div className="mt-2 flex items-center gap-2 rounded-xl border-l-2 border-amber-500 bg-amber-50 px-3 py-1.5 text-xs">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                  Replying to {replyTo.senderName}
+                </p>
+                <p className="line-clamp-1 text-neutral-700">{replyTo.body}</p>
+              </div>
+              <button
+                onClick={() => setReplyTo(null)}
+                aria-label="Cancel reply"
+                className="shrink-0 rounded-full p-1 text-neutral-500 hover:bg-amber-100"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              </button>
+            </div>
+          )}
+          <form onSubmit={send} className="flex items-stretch gap-2 py-3">
             <input
+              ref={inputRef}
               type="text"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Say something..."
+              placeholder={replyTo ? `Reply to ${replyTo.senderName}…` : 'Say something...'}
               autoComplete="off"
               className="block h-11 flex-1 rounded-2xl border border-neutral-200 bg-white px-4 text-sm focus:border-amber-500 focus:outline-none"
             />

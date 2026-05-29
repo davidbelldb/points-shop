@@ -6,13 +6,6 @@ import SliderSticker from './SliderSticker.jsx';
    optional emoji-stage progression (the morphing handle emoji). The
    user gets a live preview at the top of the sheet so they can see the
    slider exactly as recipients will. */
-const PROGRESSION_PRESETS = [
-  { name: 'Reaction', stages: ['💩', '🤡', '😎', '😍'] },
-  { name: 'Heat',     stages: ['🥶', '😐', '🥵', '🔥'] },
-  { name: 'Cute',     stages: ['😴', '🥰', '😍', '🥹'] },
-  { name: 'Yum',      stages: ['🤢', '🤔', '👍', '🤤'] },
-];
-
 const EMPTY = {
   prompt: '',
   start_label: '',
@@ -31,11 +24,6 @@ export default function SliderStickerConfig({ initial, onCancel, onSave, onDelet
     setStagesText(text);
     const stages = String(text).split(/\s+/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
     setDraft((d) => ({ ...d, emoji_stages: stages }));
-  }
-
-  function applyPreset(p) {
-    setStagesText(p.stages.join(' '));
-    setDraft((d) => ({ ...d, emoji_stages: [...p.stages] }));
   }
 
   const previewSticker = {
@@ -112,18 +100,6 @@ export default function SliderStickerConfig({ initial, onCancel, onSave, onDelet
             <p className="mt-1 text-[11px] text-neutral-400">
               Up to 8 emojis, separated by spaces. The handle morphs through them as the slider moves.
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {PROGRESSION_PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  onClick={() => applyPreset(p)}
-                  className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold text-neutral-600 hover:bg-amber-100 hover:text-amber-800"
-                >
-                  {p.stages.join('')} {p.name}
-                </button>
-              ))}
-            </div>
           </div>
 
           {onDelete && (

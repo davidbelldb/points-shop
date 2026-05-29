@@ -119,7 +119,7 @@ export default function StoryUploader({ onClose, onPosted }) {
     if (!file || busy) return;
     setBusy(true); setErr(null);
     try {
-      const { url, type } = await api.upload(file);
+      const { url, type, thumbnail_url } = await api.upload(file);
       if (type !== 'image' && type !== 'video' && type !== 'audio') {
         throw new Error('Only photos, short videos, or voice notes can be posted as stories.');
       }
@@ -131,6 +131,7 @@ export default function StoryUploader({ onClose, onPosted }) {
         caption: caption.trim() || null,
       };
       if (type === 'image') payload.duration_seconds = seconds;
+      if (type === 'video' && thumbnail_url) payload.thumbnail_url = thumbnail_url;
       if (sticker) payload.stickers = [sticker];
       await api.createStory(payload);
       onPosted?.();

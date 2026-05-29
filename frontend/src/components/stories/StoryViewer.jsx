@@ -15,7 +15,7 @@ import SliderSticker from './SliderSticker.jsx';
    and delete (trash) icons only appear on stories the current user
    authored — Katie can't manage David's stories and vice versa. */
 const DEFAULT_IMG_DURATION_MS = 5000;
-const QUICK_EMOJIS = ['💜', '😍', '😂', '🔥', '😮'];
+const QUICK_EMOJIS = ['❤️', '🫦', '🫠', '😂', '🥹', '😮', '💜'];
 const LONG_PRESS_MS = 220;
 
 export default function StoryViewer({ stories: initialStories, initialIndex = 0, onClose, onStoryDeleted }) {

@@ -18,7 +18,7 @@ export default async function chatRoutes(fastify) {
   });
 
   fastify.post('/api/messages', async (req, reply) => {
-    const { body, reply_to_story_id } = req.body ?? {};
+    const { body, reply_to_story_id, reply_to_message_id } = req.body ?? {};
     if (typeof body !== 'string' || !body.trim()) {
       return reply.code(400).send({ error: 'body required' });
     }
@@ -27,7 +27,7 @@ export default async function chatRoutes(fastify) {
     if (!other) return reply.code(400).send({ error: 'No recipient available' });
     try {
       return reply.code(201).send(
-        await sendMessage(accountId, other.id, body, reply_to_story_id || null),
+        await sendMessage(accountId, other.id, body, reply_to_story_id || null, reply_to_message_id || null),
       );
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });

@@ -18,7 +18,7 @@ export async function findOtherUser(accountId) {
 export async function listMessages(accountId, otherId, limit = 200) {
   const { rows } = await query(
     `SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
-            m.edited_at, m.reaction, m.reply_to_story_id,
+            m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
             s.username AS sender_username,
             s.name     AS sender_name,
             s.photo_url AS sender_photo,
@@ -26,11 +26,16 @@ export async function listMessages(accountId, otherId, limit = 200) {
             st.media_type  AS story_media_type,
             st.caption     AS story_caption,
             st.author_id   AS story_author_id,
-            sta.name       AS story_author_name
+            sta.name       AS story_author_name,
+            rm.body        AS reply_to_body,
+            rm.sender_id   AS reply_to_sender_id,
+            rms.name       AS reply_to_sender_name
        FROM chat_messages m
        JOIN accounts s   ON s.id  = m.sender_id
        LEFT JOIN sneaky_stories  st  ON st.id  = m.reply_to_story_id
        LEFT JOIN accounts        sta ON sta.id = st.author_id
+       LEFT JOIN chat_messages   rm  ON rm.id  = m.reply_to_message_id
+       LEFT JOIN accounts        rms ON rms.id = rm.sender_id
       WHERE (m.sender_id = $1 AND m.recipient_id = $2)
          OR (m.sender_id = $2 AND m.recipient_id = $1)
       ORDER BY m.created_at ASC
@@ -109,7 +114,7 @@ export async function setReaction(messageId, accountId, reaction) {
   return updated;
 }
 
-export async function sendMessage(senderId, recipientId, body, replyToStoryId = null) {
+export async function sendMessage(senderId, recipientId, body, replyToStoryId = null, replyToMessageId = null) {
   const trimmed = body.trim();
   if (!trimmed) {
     const err = new Error('Message body required');
@@ -117,10 +122,10 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
     throw err;
   }
   const { rows } = await query(
-    `INSERT INTO chat_messages (sender_id, recipient_id, body, reply_to_story_id)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction, reply_to_story_id`,
-    [senderId, recipientId, trimmed, replyToStoryId || null],
+    `INSERT INTO chat_messages (sender_id, recipient_id, body, reply_to_story_id, reply_to_message_id)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction, reply_to_story_id, reply_to_message_id`,
+    [senderId, recipientId, trimmed, replyToStoryId || null, replyToMessageId || null],
   );
 
   const senderRes = await query(`SELECT name FROM accounts WHERE id = $1`, [senderId]);

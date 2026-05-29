@@ -3,6 +3,7 @@
    Used by both the home page strip and the Sneaky Feed page. */
 export default function StoryRing({
   thumbnailUrl,
+  posterUrl,
   mediaType,
   glow = true,
   label,
@@ -35,7 +36,15 @@ export default function StoryRing({
               </svg>
             </span>
           ) : mediaType === 'video' ? (
-            <video src={thumbnailUrl} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+            // Prefer a still poster image (server generates these on upload
+            // and backfills legacy rows on first boot). If the parent passes
+            // a poster URL we use that; otherwise fall back to a muted
+            // <video> with preload=metadata for browsers that decode it.
+            posterUrl ? (
+              <img src={posterUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <video src={thumbnailUrl} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+            )
           ) : mediaType === 'audio' ? (
             <span className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 text-white">
               <svg width={Math.round(size * 0.45)} height={Math.round(size * 0.45)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

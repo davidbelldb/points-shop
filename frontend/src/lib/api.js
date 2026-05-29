@@ -51,8 +51,15 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me'),
   getMessages: () => request('/messages'),
-  sendMessage: (body, replyToStoryId = null) =>
-    request('/messages', { method: 'POST', body: JSON.stringify({ body, reply_to_story_id: replyToStoryId }) }),
+  sendMessage: (body, replyToStoryId = null, replyToMessageId = null) =>
+    request('/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        body,
+        reply_to_story_id: replyToStoryId,
+        reply_to_message_id: replyToMessageId,
+      }),
+    }),
   markMessagesRead: () => request('/messages/mark-read', { method: 'POST' }),
   deleteMessage: (id) => request(`/messages/${id}`, { method: 'DELETE' }),
   editMessage: (id, body) =>

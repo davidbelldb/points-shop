@@ -39,7 +39,13 @@ function StoryTile({ s, onClick }) {
     <button onClick={onClick} className="relative aspect-square overflow-hidden rounded-lg bg-neutral-100">
       {s.media_type === 'video' ? (
         <>
-          <video src={s.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+          {/* Prefer the server-generated poster; fall back to the muted
+              <video> so older rows (pre-backfill) still show something. */}
+          {s.thumbnail_url ? (
+            <img src={s.thumbnail_url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <video src={s.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+          )}
           <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">▶</span>
         </>
       ) : (

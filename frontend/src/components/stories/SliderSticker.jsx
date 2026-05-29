@@ -53,6 +53,23 @@ export default function SliderSticker({ sticker, mode = 'preview', defaultValue 
         )}
 
         <div className="relative mt-2">
+          {/* Floating handle emoji — given its own height row so it never
+              collides with the prompt above. Bottom-anchored so it sits
+              right above the track regardless of scale. */}
+          {handleEmoji && (
+            <div className="relative mb-1 h-7">
+              <span
+                className="pointer-events-none absolute bottom-0 text-2xl leading-none drop-shadow-md transition-transform"
+                style={{
+                  left: `${value}%`,
+                  transform: `translateX(-50%) scale(${committed ? 1.4 : 1})`,
+                }}
+              >
+                {handleEmoji}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between px-1 text-base">
             <span className="line-clamp-1 max-w-[40%] text-left text-xs font-semibold text-neutral-700">
               {startLabel || (stages[0] ?? '')}
@@ -70,19 +87,6 @@ export default function SliderSticker({ sticker, mode = 'preview', defaultValue 
             />
           </div>
 
-          {/* Big handle emoji floating above the track. */}
-          {handleEmoji && (
-            <div
-              className="pointer-events-none absolute -top-7 -translate-x-1/2 transition-transform"
-              style={{
-                left: `${value}%`,
-                transform: `translateX(-50%) scale(${committed ? 1.4 : 1})`,
-              }}
-            >
-              <span className="text-2xl leading-none drop-shadow-md">{handleEmoji}</span>
-            </div>
-          )}
-
           {/* Native range input handles touch + mouse for free. Hidden
               when not interactive so the canvas / response views are static. */}
           {interactive && (
@@ -96,7 +100,7 @@ export default function SliderSticker({ sticker, mode = 'preview', defaultValue 
               onMouseUp={commit}
               onTouchEnd={commit}
               onKeyUp={(e) => { if (e.key === 'Enter' || e.key === ' ') commit(); }}
-              className="absolute inset-0 m-0 h-3 w-full cursor-pointer appearance-none bg-transparent opacity-0"
+              className="absolute inset-x-0 bottom-0 m-0 h-3 w-full cursor-pointer appearance-none bg-transparent opacity-0"
               aria-label={prompt || 'Slider response'}
             />
           )}

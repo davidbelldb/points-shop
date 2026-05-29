@@ -2,7 +2,7 @@ import { query } from '../../db.js';
 
 const COLUMNS = `
   s.id, s.author_id, s.media_url, s.media_type, s.caption,
-  s.duration_seconds, s.stickers,
+  s.duration_seconds, s.stickers, s.thumbnail_url,
   s.created_at, s.expires_at,
   a.name     AS author_name,
   a.username AS author_username,
@@ -65,7 +65,7 @@ export async function getStory(id) {
   return rows[0] ?? null;
 }
 
-export async function createStory(authorId, { media_url, media_type, caption, duration_seconds, stickers }) {
+export async function createStory(authorId, { media_url, media_type, caption, duration_seconds, stickers, thumbnail_url }) {
   if (!media_url) throw httpError(400, 'media_url required');
   if (!['image', 'video', 'audio'].includes(media_type)) {
     throw httpError(400, 'media_type must be image, video, or audio');
@@ -85,10 +85,10 @@ export async function createStory(authorId, { media_url, media_type, caption, du
         .slice(0, 6)
     : [];
   const { rows } = await query(
-    `INSERT INTO sneaky_stories (author_id, media_url, media_type, caption, duration_seconds, stickers)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-     RETURNING id, author_id, media_url, media_type, caption, duration_seconds, stickers, created_at, expires_at`,
-    [authorId, media_url, media_type, caption ? String(caption).trim() : null, dur, JSON.stringify(safeStickers)],
+    `INSERT INTO sneaky_stories (author_id, media_url, media_type, caption, duration_seconds, stickers, thumbnail_url)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+     RETURNING id, author_id, media_url, media_type, caption, duration_seconds, stickers, thumbnail_url, created_at, expires_at`,
+    [authorId, media_url, media_type, caption ? String(caption).trim() : null, dur, JSON.stringify(safeStickers), thumbnail_url || null],
   );
   return rows[0];
 }

@@ -8,7 +8,7 @@ import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { randomUUID } from 'crypto';
 import { config } from '../../config.js';
-import { transcodeVideoIfNeeded } from './transcode.js';
+import { transcodeVideoIfNeeded, extractVideoThumbnail } from './transcode.js';
 
 const MEDIA_DIR = config.mediaDir;
 
@@ -63,6 +63,13 @@ export default async function mediaRoutes(fastify) {
     } else if (out.error) {
       req.log?.warn({ filename, err: out.error }, 'video transcode skipped');
     }
-    return { url: `/media/${out.filename}`, type, mimetype: data.mimetype };
+    // Generate a poster thumbnail for videos so the story circles can show
+    // a still instead of trying to decode the whole video.
+    let thumbnail_url = null;
+    if (type === 'video') {
+      const thumb = await extractVideoThumbnail(out.filepath);
+      if (thumb) thumbnail_url = `/media/${thumb.filename}`;
+    }
+    return { url: `/media/${out.filename}`, type, mimetype: data.mimetype, thumbnail_url };
   });
 }
