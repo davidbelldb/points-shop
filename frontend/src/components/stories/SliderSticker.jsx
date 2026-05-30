@@ -74,7 +74,7 @@ export default function SliderSticker({ sticker, mode = 'editor', defaultValue =
           </div>
 
           {/* Track — tall enough that the emoji handle has vertical room */}
-          <div className="relative mt-1 h-8 flex items-center">
+          <div className="relative mt-1 h-14 flex items-center">
             <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-pink-400 via-amber-400 to-emerald-400" />
 
             {/* Emoji handle: the selected emoji IS the pip */}
@@ -85,7 +85,7 @@ export default function SliderSticker({ sticker, mode = 'editor', defaultValue =
                   left: `${value}%`,
                   top: '50%',
                   transform: `translate(-50%, -50%) scale(${committed ? 1.5 : 1})`,
-                  fontSize: committed ? '1.6rem' : '1.5rem',
+                  fontSize: committed ? '3.2rem' : '3rem',
                   transition: 'transform 0.15s ease, font-size 0.15s ease',
                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
                 }}
