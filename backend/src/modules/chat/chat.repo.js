@@ -19,6 +19,7 @@ export async function listMessages(accountId, otherId, limit = 200) {
   const { rows } = await query(
     `SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
             m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
+            m.slider_response,
             s.username AS sender_username,
             s.name     AS sender_name,
             s.photo_url AS sender_photo,
@@ -26,6 +27,7 @@ export async function listMessages(accountId, otherId, limit = 200) {
             st.media_type  AS story_media_type,
             st.caption     AS story_caption,
             st.author_id   AS story_author_id,
+            st.stickers    AS story_stickers,
             sta.name       AS story_author_name,
             rm.body        AS reply_to_body,
             rm.sender_id   AS reply_to_sender_id,
@@ -114,18 +116,28 @@ export async function setReaction(messageId, accountId, reaction) {
   return updated;
 }
 
-export async function sendMessage(senderId, recipientId, body, replyToStoryId = null, replyToMessageId = null) {
+export async function sendMessage(senderId, recipientId, body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) {
   const trimmed = body.trim();
   if (!trimmed) {
     const err = new Error('Message body required');
     err.statusCode = 400;
     throw err;
   }
+  // Sanity-clamp the slider payload so we don't store arbitrary JSON.
+  let safeSlider = null;
+  if (sliderResponse && typeof sliderResponse === 'object' && !Array.isArray(sliderResponse)) {
+    const v = Number(sliderResponse.value);
+    safeSlider = {
+      sticker_index: Number.isFinite(Number(sliderResponse.sticker_index)) ? Math.max(0, Number(sliderResponse.sticker_index)) : 0,
+      value: Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 50,
+      emoji: typeof sliderResponse.emoji === 'string' ? sliderResponse.emoji.slice(0, 16) : null,
+    };
+  }
   const { rows } = await query(
-    `INSERT INTO chat_messages (sender_id, recipient_id, body, reply_to_story_id, reply_to_message_id)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction, reply_to_story_id, reply_to_message_id`,
-    [senderId, recipientId, trimmed, replyToStoryId || null, replyToMessageId || null],
+    `INSERT INTO chat_messages (sender_id, recipient_id, body, reply_to_story_id, reply_to_message_id, slider_response)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+     RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction, reply_to_story_id, reply_to_message_id, slider_response`,
+    [senderId, recipientId, trimmed, replyToStoryId || null, replyToMessageId || null, safeSlider ? JSON.stringify(safeSlider) : null],
   );
 
   const senderRes = await query(`SELECT name FROM accounts WHERE id = $1`, [senderId]);

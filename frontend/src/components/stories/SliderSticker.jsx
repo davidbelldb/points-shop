@@ -1,20 +1,28 @@
 import { useState } from 'react';
 
-/* Reusable slider sticker visual. Three modes:
-   - 'preview' (editor): rendered on the canvas, slider non-interactive
-   - 'viewer'  (recipient): slider is draggable; calling code receives the
-                            final value + chosen emoji on release
-   - 'response' (after submit): a static rendition showing what was sent
+/* Reusable slider sticker visual. Four modes:
+   - 'editor'   — canvas editor in StoryUploader. Static slider, footer
+                  reads "Drag to move • Tap to edit" so you know how to
+                  reposition / reconfigure.
+   - 'preview'  — neutral static rendition (used in the config modal's
+                  live preview). No footer, no interaction.
+   - 'viewer'   — story recipient view. Slider is interactive; onCommit
+                  fires once on release with { value, emoji }.
+   - 'response' — chat-preview rendition. Shows the slider at the value
+                  that was sent (via `response.value`), with the chosen
+                  emoji enlarged.
    The component never decides positioning — the caller wraps it in an
    absolutely-positioned container at the sticker's (x, y). */
-export default function SliderSticker({ sticker, mode = 'preview', defaultValue = 50, onCommit, response }) {
+export default function SliderSticker({ sticker, mode = 'editor', defaultValue = 50, onCommit, response }) {
   const stages = Array.isArray(sticker.emoji_stages) ? sticker.emoji_stages.filter(Boolean) : [];
   const startLabel = (sticker.start_label || '').trim();
   const endLabel   = (sticker.end_label   || '').trim();
   const prompt     = (sticker.prompt      || '').trim();
 
+  const responseValue = response?.value;
+  const responseEmoji = response?.emoji;
   const [value, setValue] = useState(
-    typeof response === 'number' ? response : (sticker.default_value ?? defaultValue),
+    typeof responseValue === 'number' ? responseValue : (sticker.default_value ?? defaultValue),
   );
   const [committed, setCommitted] = useState(mode === 'response');
 
@@ -27,10 +35,13 @@ export default function SliderSticker({ sticker, mode = 'preview', defaultValue 
     return stages[idx];
   }
 
-  const handleEmoji = pickEmoji(value);
-  const editorMode = mode === 'preview';
-  const viewerMode = mode === 'viewer';
-  const interactive = viewerMode && !committed;
+  // Response mode pins the slider to whatever the recipient chose; otherwise
+  // the handle emoji follows the live `value` (in viewer mode this is the
+  // value the recipient is dragging towards).
+  const handleEmoji = mode === 'response'
+    ? (responseEmoji ?? pickEmoji(value))
+    : pickEmoji(value);
+  const interactive = mode === 'viewer' && !committed;
 
   function commit() {
     if (!interactive) return;
@@ -106,10 +117,10 @@ export default function SliderSticker({ sticker, mode = 'preview', defaultValue 
           )}
         </div>
 
-        {editorMode && (
+        {mode === 'editor' && (
           <p className="mt-2 text-center text-[10px] text-neutral-400">Drag to move • Tap to edit</p>
         )}
-        {committed && mode === 'viewer' && (
+        {(committed && mode === 'viewer') && (
           <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-wide text-amber-700">
             Sent
           </p>

@@ -240,7 +240,7 @@ export default function StoryUploader({ onClose, onPosted }) {
                     onPointerCancel={onStickerPointerUp}
                     onClick={(e) => { e.stopPropagation(); setConfigOpen(true); }}
                   >
-                    <SliderSticker sticker={sticker} mode="preview" />
+                    <SliderSticker sticker={sticker} mode="editor" />
                   </div>
                 )}
               </div>

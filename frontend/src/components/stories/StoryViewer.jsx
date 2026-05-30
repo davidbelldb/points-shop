@@ -17,6 +17,7 @@ import SliderSticker from './SliderSticker.jsx';
 const DEFAULT_IMG_DURATION_MS = 5000;
 const QUICK_EMOJIS = ['❤️', '🫦', '🫠', '😂', '🥹', '😮', '💜'];
 const LONG_PRESS_MS = 220;
+const SWIPE_UP_THRESHOLD = 60;
 
 export default function StoryViewer({ stories: initialStories, initialIndex = 0, onClose, onStoryDeleted }) {
   const { user } = useAuth();
@@ -40,13 +41,16 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 
   const videoRef = useRef(null);
   const audioRef = useRef(null);
+  const replyInputRef = useRef(null);
   const startedAtRef = useRef(Date.now());
   const pausedAccumRef = useRef(0);
   const pauseStartRef = useRef(null);
   const pausedRef = useRef(false);
-  // Long-press / tap discrimination.
+  // Long-press / tap / swipe-up discrimination.
   const holdTimerRef = useRef(null);
   const wasHeldRef = useRef(false);
+  const wasSwipeUpRef = useRef(false);
+  const pressStartYRef = useRef(null);
 
   const story = stories[idx];
   const isMine = !!(story && user?.id && story.author_id === user.id);
@@ -185,14 +189,29 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   }
 
   /* Slider response — fires when the recipient lets go of the handle.
-     We send the chosen emoji (or label) into chat as a story-threaded
-     reply, then pop the emoji burst for visible feedback. */
-  async function onSliderCommit(sticker, result) {
+     - For the author viewing their own story: just pop the emoji burst as
+       local feedback. We don't send a chat message to themselves.
+     - For the recipient: send a chat message linked to the story + sticker,
+       with a slider_response payload so the chat preview can render the
+       slider at the exact value they chose. */
+  async function onSliderCommit(sticker, result, isAuthor, stickerIdx) {
     const emoji = result?.emoji;
-    const fallback = result?.value >= 50 ? (sticker.end_label || 'high') : (sticker.start_label || 'low');
+    const fallback = result?.value >= 50
+      ? (sticker.end_label || 'high')
+      : (sticker.start_label || 'low');
     const body = emoji ? `${emoji}` : `${fallback} (${Math.round(result.value)}%)`;
+    if (isAuthor) {
+      if (emoji) spawnEmojiBurst(emoji);
+      else flashToast('Test reply', 'sent', 1200);
+      return;
+    }
     try {
-      await api.sendMessage(body, story.id);
+      const sliderResponse = {
+        sticker_index: stickerIdx,
+        value: Math.round(result.value),
+        emoji: emoji ?? null,
+      };
+      await api.sendMessage(body, story.id, null, sliderResponse);
       if (emoji) spawnEmojiBurst(emoji);
       else flashToast('Reply sent', 'sent');
     } catch (e) {
@@ -227,28 +246,40 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
      clear the timer and let the click handler advance/rewind. We track
      wasHeldRef so the trailing click event after a long-press doesn't
      also advance the story. */
-  function pressStart() {
+  function pressStart(e) {
     wasHeldRef.current = false;
+    wasSwipeUpRef.current = false;
+    pressStartYRef.current = e?.clientY ?? null;
     holdTimerRef.current = setTimeout(() => {
       wasHeldRef.current = true;
       setPausedByPress(true);
     }, LONG_PRESS_MS);
   }
-  function pressEnd() {
+  function pressEnd(e) {
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
     if (wasHeldRef.current) {
       setPausedByPress(false);
-      // wasHeldRef is reset by the click suppressor below.
     }
+    // Detect a swipe-up gesture — if the pointer ended noticeably above
+    // where it started, focus the reply input. Same effect as tapping it.
+    if (pressStartYRef.current != null && e?.clientY != null) {
+      const dy = pressStartYRef.current - e.clientY;
+      if (dy > SWIPE_UP_THRESHOLD) {
+        wasSwipeUpRef.current = true;
+        setTimeout(() => replyInputRef.current?.focus(), 0);
+      }
+    }
+    pressStartYRef.current = null;
   }
   function onTapZone(e, dir) {
     if (e.target.closest('[data-story-controls]')) return;
-    if (wasHeldRef.current) {
-      // The click after a long-press should be swallowed.
+    if (wasHeldRef.current || wasSwipeUpRef.current) {
+      // Click after a long-press / swipe-up shouldn't also advance/rewind.
       wasHeldRef.current = false;
+      wasSwipeUpRef.current = false;
       return;
     }
     dir === 'next' ? advance() : rewind();
@@ -426,8 +457,8 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             >
               <SliderSticker
                 sticker={s}
-                mode={isMine ? 'preview' : 'viewer'}
-                onCommit={isMine ? undefined : (result) => onSliderCommit(s, result)}
+                mode="viewer"
+                onCommit={(result) => onSliderCommit(s, result, isMine, i)}
               />
             </div>
           );
@@ -513,6 +544,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           className="flex items-center gap-2"
         >
           <input
+            ref={replyInputRef}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             onFocus={() => setPausedByReply(true)}

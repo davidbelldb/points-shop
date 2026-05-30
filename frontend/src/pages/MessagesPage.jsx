@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 import StoryViewer from '../components/stories/StoryViewer.jsx';
+import SliderSticker from '../components/stories/SliderSticker.jsx';
 
 const POLL_MS = 5000;
 const DOUBLE_TAP_MS = 240;
@@ -29,7 +30,10 @@ function Avatar({ url, name, size = 'md' }) {
    was sent as a reply to a story. Mirrors WhatsApp/IG quote-preview layout.
    Tap to open the story in the viewer. Colours inherit from the bubble's
    text colour (mode-aware) with opacity, so the "REPLIED TO" label reads
-   well on both pink and amber bubbles in light and dark mode. */
+   well on both pink and amber bubbles in light and dark mode.
+   When the message carries a slider_response, we render the slider itself
+   in 'response' mode below the standard story preamble so the recipient's
+   exact position + emoji shows in-thread. */
 function StoryReplyPreview({ m, onClick }) {
   if (!m.story_media_url) {
     return (
@@ -37,6 +41,16 @@ function StoryReplyPreview({ m, onClick }) {
         Replied to a story (no longer available)
       </p>
     );
+  }
+
+  // Pull the original sticker config from the story so we can render the
+  // slider at the response's value. story_stickers comes back from the
+  // backend join — JSONB so it's already an array.
+  let respondedSticker = null;
+  if (m.slider_response && Array.isArray(m.story_stickers)) {
+    const idx = Number(m.slider_response.sticker_index) || 0;
+    const cand = m.story_stickers[idx];
+    if (cand && cand.type === 'slider') respondedSticker = cand;
   }
   return (
     <button
@@ -61,12 +75,21 @@ function StoryReplyPreview({ m, onClick }) {
           <img src={m.story_media_url} alt="" className="h-full w-full object-cover" />
         )}
       </span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
           Replied to {m.story_author_name ?? 'a story'}
         </p>
         {m.story_caption && (
           <p className="line-clamp-1 text-[11px] opacity-80">{m.story_caption}</p>
+        )}
+        {respondedSticker && (
+          <div className="mt-2 flex justify-center" onClick={(e) => e.stopPropagation()}>
+            <SliderSticker
+              sticker={respondedSticker}
+              mode="response"
+              response={m.slider_response}
+            />
+          </div>
         )}
       </div>
     </button>

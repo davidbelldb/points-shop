@@ -51,13 +51,14 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me'),
   getMessages: () => request('/messages'),
-  sendMessage: (body, replyToStoryId = null, replyToMessageId = null) =>
+  sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>
     request('/messages', {
       method: 'POST',
       body: JSON.stringify({
         body,
         reply_to_story_id: replyToStoryId,
         reply_to_message_id: replyToMessageId,
+        slider_response: sliderResponse,
       }),
     }),
   markMessagesRead: () => request('/messages/mark-read', { method: 'POST' }),
