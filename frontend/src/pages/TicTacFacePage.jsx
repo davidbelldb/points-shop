@@ -73,10 +73,11 @@ function MiniCell({ value, myMark, canPlay, onClick, players }) {
     <button
       onClick={canPlay ? onClick : undefined}
       disabled={!canPlay}
+      style={{backgroundColor:'#1f1f1e'}}
       className={[
         'relative aspect-square overflow-hidden rounded-md border transition',
-        'border-neutral-200 bg-white',
-        canPlay ? 'hover:bg-neutral-100 active:scale-90 cursor-pointer' : 'cursor-default',
+        'border-neutral-200',
+        canPlay ? 'active:scale-90 cursor-pointer hover:brightness-125' : 'cursor-default',
       ].join(' ')}
       aria-label={tone ? `Taken by ${tone}` : canPlay ? 'Play here' : 'Empty'}
     >
@@ -107,7 +108,7 @@ function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, 
   const canPlayInBoard = !resolved && isMyTurn && isActive;
 
   return (
-    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder} bg-neutral-100`}>
+    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder}`} style={{backgroundColor:'#1f1f1e'}}>
       {resolved ? (
         <div className="flex h-full w-full items-center justify-center">
           {globalCell === 'draw'
@@ -259,7 +260,7 @@ export default function TicTacFacePage() {
       {/* ultimate board */}
       {game && (
         <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md">
-          <div className="grid grid-cols-3 gap-2 rounded-[13px] bg-neutral-300 p-2">
+          <div className="grid grid-cols-3 gap-2 rounded-[13px] p-2" style={{backgroundColor:'#2a2a28'}}>
             {globalBoard.map((globalCell, bi) => {
               const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
               return (
