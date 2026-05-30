@@ -10,7 +10,7 @@ const COLUMNS = `
   (SELECT COUNT(*) FROM story_views v
     WHERE v.story_id = s.id AND v.viewer_id <> s.author_id)::int AS view_count_other,
   COALESCE(
-    (SELECT json_agg(json_build_object('id', va.id, 'name', va.name, 'viewed_at', v.viewed_at))
+    (SELECT json_agg(json_build_object('id', va.id, 'name', va.name, 'photo', va.photo_url, 'viewed_at', v.viewed_at))
        FROM story_views v JOIN accounts va ON va.id = v.viewer_id
       WHERE v.story_id = s.id AND v.viewer_id <> s.author_id),
     '[]'::json

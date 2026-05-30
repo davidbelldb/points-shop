@@ -622,8 +622,9 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 }
 
 /* Author-only footer — surfaces the other participant's view status.
-   Shows "Seen by {name} · {time ago}" if anyone else has viewed; "Not
-   seen yet" otherwise. Plain text — no eye glyph. */
+   Shows the viewer's profile photo + "Seen by {name} · {time ago}" if anyone
+   else has viewed; "Not seen yet" otherwise. The avatar replaces the old eye
+   glyph. Falls back to an initial-letter chip when the viewer has no photo. */
 function StorySeenBy({ story }) {
   const viewers = Array.isArray(story.viewers) ? story.viewers : [];
   if (viewers.length === 0) {
@@ -633,10 +634,23 @@ function StorySeenBy({ story }) {
   }
   const first = viewers[0];
   return (
-    <p className="py-2 text-center text-xs text-white/80">
-      Seen by <span className="font-semibold text-white">{first.name}</span>
-      <span className="text-white/55"> · {relativeTime(first.viewed_at)}</span>
-    </p>
+    <div className="flex items-center justify-center gap-2 py-2 text-xs text-white/80">
+      {first.photo ? (
+        <img
+          src={first.photo}
+          alt=""
+          className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-white/40"
+        />
+      ) : (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold uppercase text-white ring-1 ring-white/40">
+          {first.name?.charAt(0) ?? '?'}
+        </span>
+      )}
+      <span>
+        Seen by <span className="font-semibold text-white">{first.name}</span>
+        <span className="text-white/55"> · {relativeTime(first.viewed_at)}</span>
+      </span>
+    </div>
   );
 }
 
