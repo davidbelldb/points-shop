@@ -10,30 +10,30 @@ const POLL_MS = 5000;
 const DOUBLE_TAP_MS = 240;
 
 // ---------------------------------------------------------------------------
-// Tenor GIF API — swap TENOR_API_KEY for a production key from
-// https://developers.google.com/tenor/guides/quickstart
-// The default key below is Tenor's public demo key (rate-limited but functional).
+// Giphy GIF API — using the public beta key (rate-limited, suitable for
+// low-volume personal use). Swap for a registered key from
+// https://developers.giphy.com if you need higher limits.
 // ---------------------------------------------------------------------------
-const TENOR_API_KEY  = 'AIzaSyAyimkuYQYF_FXVALexPmHA2zHg1PdgQWT';
-const TENOR_BASE     = 'https://tenor.googleapis.com/v2';
+const GIPHY_API_KEY  = 'dc6zaTOxFJmzC';
+const GIPHY_BASE     = 'https://api.giphy.com/v1/gifs';
 const GIF_PAGE_LIMIT = 20;
 
 // Detect whether a message body is a GIF URL we sent ourselves.
 function isGifUrl(body) {
-  return typeof body === 'string' && /^https:\/\/media\.tenor\.com\/.+\.gif(\?.*)?$/.test(body);
+  return typeof body === 'string' && /^https?:\/\/media\d*\.giphy\.com\/.+\.gif(\?.*)?$/.test(body);
 }
 
 // ---------------------------------------------------------------------------
 // GIF Picker modal
 // ---------------------------------------------------------------------------
 function GifPicker({ onSelect, onClose }) {
-  const [query, setQuery]   = useState('');
+  const [query, setQuery]     = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState(null);
-  const [pos, setPos]       = useState(''); // next page cursor
-  const debounceRef         = useRef(null);
-  const inputRef            = useRef(null);
+  const [error, setError]     = useState(null);
+  const [offset, setOffset]   = useState(0); // Giphy uses integer offset pagination
+  const debounceRef           = useRef(null);
+  const inputRef              = useRef(null);
 
   // Load trending GIFs on mount.
   useEffect(() => {
@@ -43,24 +43,24 @@ function GifPicker({ onSelect, onClose }) {
   }, []);
 
   async function fetchGifs(term, reset = false) {
+    const nextOffset = reset ? 0 : offset;
     setLoading(true);
     setError(null);
     try {
       const endpoint = term.trim()
-        ? `${TENOR_BASE}/search?q=${encodeURIComponent(term)}&key=${TENOR_API_KEY}&limit=${GIF_PAGE_LIMIT}&media_filter=gif${reset ? '' : `&pos=${pos}`}`
-        : `${TENOR_BASE}/featured?key=${TENOR_API_KEY}&limit=${GIF_PAGE_LIMIT}&media_filter=gif${reset ? '' : `&pos=${pos}`}`;
+        ? `${GIPHY_BASE}/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(term)}&limit=${GIF_PAGE_LIMIT}&offset=${nextOffset}&rating=g`
+        : `${GIPHY_BASE}/trending?api_key=${GIPHY_API_KEY}&limit=${GIF_PAGE_LIMIT}&offset=${nextOffset}&rating=g`;
       const res  = await fetch(endpoint);
-      if (!res.ok) throw new Error(`Tenor error ${res.status}`);
+      if (!res.ok) throw new Error(`Giphy error ${res.status}`);
       const json = await res.json();
-      const items = (json.results ?? []).map((r) => ({
-        id:       r.id,
-        url:      r.media_formats?.gif?.url ?? r.url,
-        preview:  r.media_formats?.tinygif?.url ?? r.media_formats?.gif?.url ?? r.url,
-        dims:     r.media_formats?.tinygif?.dims ?? [220, 160],
-        title:    r.content_description ?? '',
+      const items = (json.data ?? []).map((r) => ({
+        id:      r.id,
+        url:     r.images?.original?.url ?? r.url,
+        preview: r.images?.fixed_height_small?.url ?? r.images?.original?.url,
+        title:   r.title ?? '',
       }));
       setResults((prev) => reset ? items : [...prev, ...items]);
-      setPos(json.next ?? '');
+      setOffset(nextOffset + items.length);
     } catch (e) {
       setError('Could not load GIFs. Check your connection.');
     } finally {
@@ -132,9 +132,10 @@ function GifPicker({ onSelect, onClose }) {
           </div>
 
           {/* Load more */}
-          {pos && !loading && results.length > 0 && (
+          {results.length > 0 && results.length % GIF_PAGE_LIMIT === 0 && !loading && (
             <button
               onClick={() => fetchGifs(query, false)}
+
               className="mt-1 w-full rounded-xl border border-neutral-200 py-2 text-xs font-semibold text-neutral-500 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
             >
               Load more
@@ -152,7 +153,7 @@ function GifPicker({ onSelect, onClose }) {
 
         {/* Branding */}
         <p className="border-t border-neutral-100 px-3 py-1.5 text-[10px] text-neutral-400 dark:border-neutral-800">
-          Powered by Tenor
+          Powered by GIPHY
         </p>
       </div>
     </div>
