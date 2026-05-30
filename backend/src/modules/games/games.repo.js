@@ -28,10 +28,13 @@ export async function getActiveTtfGame(aId, bId) {
 }
 
 export async function createTtfGame(matchId, p1Id, p2Id, starterId) {
+  const emptyLocalBoards = JSON.stringify(Array(9).fill(null).map(() => Array(9).fill(null)));
+  const emptyGlobalBoard = JSON.stringify(Array(9).fill(null));
   const { rows } = await query(
-    `INSERT INTO tic_tac_face_games (match_id, p1_account_id, p2_account_id, turn_account_id)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [matchId, p1Id, p2Id, starterId],
+    `INSERT INTO tic_tac_face_games
+       (match_id, p1_account_id, p2_account_id, turn_account_id, local_boards, global_board)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [matchId, p1Id, p2Id, starterId, emptyLocalBoards, emptyGlobalBoard],
   );
   return rows[0];
 }
