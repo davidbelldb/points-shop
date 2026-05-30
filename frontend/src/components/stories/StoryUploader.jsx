@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import SliderSticker from './SliderSticker.jsx';
 import SliderStickerConfig from './SliderStickerConfig.jsx';
+import StickerDrawer from './StickerDrawer.jsx';
 
 /* Modal sheet for adding a new story. iPhone's <input type="file"> with
    image/video/audio accept brings up the native picker — Photo Library,
@@ -28,6 +29,7 @@ export default function StoryUploader({ onClose, onPosted }) {
   // preview container's width/height. Default sits low-centre.
   const [sticker, setSticker] = useState(null);
   const [configOpen, setConfigOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const stageRef = useRef(null);
   const dragRef = useRef(null);
 
@@ -103,15 +105,20 @@ export default function StoryUploader({ onClose, onPosted }) {
     dragRef.current = null;
   }
 
-  function addStickerWithDefaults() {
-    setSticker({
-      type: 'slider',
-      x: 50, y: 70,
-      prompt: '',
-      start_label: '',
-      end_label: '',
-      emoji_stages: ['💩', '🤡', '😎', '😍'],
-    });
+  // Drawer → Slider: if there's an existing slider, open its config for
+  // edit; otherwise create one with sensible defaults and open the config.
+  function pickSliderFromDrawer() {
+    setDrawerOpen(false);
+    if (!sticker) {
+      setSticker({
+        type: 'slider',
+        x: 50, y: 70,
+        prompt: '',
+        start_label: '',
+        end_label: '',
+        emoji_stages: ['💩', '🤡', '😎', '😍'],
+      });
+    }
     setConfigOpen(true);
   }
 
@@ -245,37 +252,9 @@ export default function StoryUploader({ onClose, onPosted }) {
                 )}
               </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <button onClick={clearFile} className="text-xs text-neutral-500 underline">
-                  Choose a different file
-                </button>
-                {!sticker ? (
-                  <button
-                    type="button"
-                    onClick={addStickerWithDefaults}
-                    className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800"
-                  >
-                    + Slider sticker
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setConfigOpen(true)}
-                      className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800"
-                    >
-                      Edit sticker
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSticker(null)}
-                      className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button onClick={clearFile} className="text-xs text-neutral-500 underline">
+                Choose a different file
+              </button>
             </div>
           )}
 
@@ -301,6 +280,25 @@ export default function StoryUploader({ onClose, onPosted }) {
             </div>
           )}
 
+          {/* Sticker drawer entry — sits between the duration setter and the
+              caption, deliberately as a wide button bar so it reads as a
+              first-class action rather than a secondary pill. */}
+          {file && (
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition active:scale-[0.99]"
+            >
+              <span className="text-lg leading-none">🏷️</span>
+              <span>Add stickers</span>
+              {sticker && (
+                <span className="ml-1 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                  1 added
+                </span>
+              )}
+            </button>
+          )}
+
           <div>
             <label className="text-xs font-semibold text-neutral-500">Caption (optional)</label>
             <input
@@ -322,6 +320,14 @@ export default function StoryUploader({ onClose, onPosted }) {
           onCancel={() => setConfigOpen(false)}
           onSave={(next) => { setSticker((prev) => ({ ...(prev ?? {}), ...next })); setConfigOpen(false); }}
           onDelete={() => { setSticker(null); setConfigOpen(false); }}
+        />
+      )}
+
+      {drawerOpen && (
+        <StickerDrawer
+          hasSlider={!!sticker}
+          onPickSlider={pickSliderFromDrawer}
+          onClose={() => setDrawerOpen(false)}
         />
       )}
     </div>

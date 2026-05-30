@@ -92,13 +92,18 @@ export default function SliderSticker({ sticker, mode = 'editor', defaultValue =
 
           {/* Track */}
           <div className="relative mt-1 h-2 rounded-full bg-gradient-to-r from-pink-400 via-amber-400 to-emerald-400">
+            {/* Pip is a small white disc inside a pink→amber→emerald
+                gradient stroke so it stays readable over the track AND any
+                background photo behind the sticker. */}
             <div
-              className="pointer-events-none absolute top-1/2 h-[17px] w-[17px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-black/10"
+              className="pointer-events-none absolute top-1/2 h-[19px] w-[19px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 p-[2px]"
               style={{
                 left: `${value}%`,
                 boxShadow: '0 2px 6px rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.15)',
               }}
-            />
+            >
+              <div className="h-full w-full rounded-full bg-white" />
+            </div>
           </div>
 
           {/* Native range input handles touch + mouse for free. Hidden
