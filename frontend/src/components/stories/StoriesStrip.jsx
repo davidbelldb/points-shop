@@ -20,6 +20,13 @@ function ddmm(iso) {
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+// Local calendar-day key (Y-M-D) so stories posted on the same day collapse
+// into one circle regardless of time. Uses local components, not the ISO
+// string, to match what the DD/MM label shows the user.
+function dayKey(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
 
 export default function StoriesStrip() {
   const { user } = useAuth();
@@ -75,13 +82,38 @@ export default function StoriesStrip() {
 
   const activeQueue = useMemo(() => activeGroups.flatMap((g) => g.all), [activeGroups]);
 
+  /* Vault grouped by calendar day so multiple stories from the same date
+     collapse into a single dated circle. The cover is that day's most recent
+     story; tapping plays the whole day chronologically. Days are ordered
+     newest-first. */
+  const archiveGroups = useMemo(() => {
+    const byDay = new Map();
+    for (const s of archive) {
+      const key = dayKey(s.created_at);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(s);
+    }
+    for (const arr of byDay.values()) {
+      arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    }
+    return Array.from(byDay.entries())
+      .map(([key, arr]) => ({
+        key,
+        label: ddmm(arr[0].created_at),
+        stories: arr,
+        cover: arr[arr.length - 1],
+      }))
+      .sort((a, b) => new Date(b.cover.created_at) - new Date(a.cover.created_at));
+  }, [archive]);
+
   function openActive(authorIdx) {
     const target = activeGroups[authorIdx].all[0];
     setViewer({ stories: activeQueue, index: activeQueue.findIndex((s) => s.id === target.id) });
   }
-  function openArchiveStory(s) {
-    // Archive plays as a single-card queue — keeps the date label honest.
-    setViewer({ stories: [s], index: 0 });
+  function openArchiveDay(group) {
+    // A dated circle plays every story from that day, oldest → newest. All
+    // share the same DD/MM, so the date label stays honest across the queue.
+    setViewer({ stories: group.stories, index: 0 });
   }
   // Home strip just PLAYS reels (your own or the other person's). The
   // manager lives on /stories where you can only see your own reels.
@@ -103,7 +135,11 @@ export default function StoriesStrip() {
 
   return (
     <>
-      <div className="-mx-4 px-4">
+      {/* Bleed only the RIGHT edge out past the page's horizontal padding so
+          older circles clip at the screen edge (hinting "scroll for more")
+          instead of being cut off inside the page. The left stays aligned to
+          page content. */}
+      <div className="-mr-4">
         <div className="flex items-start gap-3 overflow-x-auto pb-2">
           {/* Active stories (max 2 — one circle per author). Per spec, the
               circle shows the author's PROFILE photo (not the story media),
@@ -147,15 +183,16 @@ export default function StoriesStrip() {
           {/* Archive vault — every past story as its own circle with date.
               Videos pass posterUrl so the ring shows a still rather than
               trying to decode the whole clip. */}
-          {archive.map((s) => (
+          {archiveGroups.map((g) => (
             <StoryRing
-              key={`vault-${s.id}`}
-              posterUrl={s.thumbnail_url}
-              thumbnailUrl={s.media_url}
-              mediaType={s.media_type}
+              key={`vault-${g.key}`}
+              posterUrl={g.cover.thumbnail_url}
+              thumbnailUrl={g.cover.media_url}
+              mediaType={g.cover.media_type}
               glow={false}
-              label={ddmm(s.created_at)}
-              onClick={() => openArchiveStory(s)}
+              label={g.label}
+              sublabel={g.stories.length > 1 ? `${g.stories.length} stories` : null}
+              onClick={() => openArchiveDay(g)}
             />
           ))}
         </div>
