@@ -14,7 +14,7 @@ const DOUBLE_TAP_MS = 240;
 // low-volume personal use). Swap for a registered key from
 // https://developers.giphy.com if you need higher limits.
 // ---------------------------------------------------------------------------
-const GIPHY_API_KEY  = 'dc6zaTOxFJmzC';
+const GIPHY_API_KEY  = import.meta.env.VITE_GIPHY_API_KEY ?? '';
 const GIPHY_BASE     = 'https://api.giphy.com/v1/gifs';
 const GIF_PAGE_LIMIT = 20;
 

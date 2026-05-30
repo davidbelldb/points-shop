@@ -50,6 +50,8 @@ services:
     build:
       context: .
       dockerfile: caddy/Dockerfile
+      args:
+        VITE_GIPHY_API_KEY: ${VITE_GIPHY_API_KEY}
     container_name: points-shop-caddy
     restart: unless-stopped
     depends_on:
