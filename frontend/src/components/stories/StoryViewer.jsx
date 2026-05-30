@@ -4,6 +4,7 @@ import { useAuth } from '../../lib/AuthContext.jsx';
 import { useTheme } from '../../lib/ThemeContext.jsx';
 import AddToReelModal from './AddToReelModal.jsx';
 import SliderSticker from './SliderSticker.jsx';
+import TextSticker from './TextSticker.jsx';
 
 /* Full-screen story player. Renders one story at a time from a flat queue,
    auto-advances after the story's duration_seconds (default 5s for images,
@@ -497,7 +498,24 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             Author sees a static preview; the other person gets the
             interactive slider that posts a chat reply on release. */}
         {Array.isArray(story.stickers) && story.stickers.map((s, i) => {
-          if (!s || s.type !== 'slider') return null;
+          if (!s) return null;
+          // Floating text — decorative, lets taps pass through to advance.
+          if (s.type === 'text') {
+            return (
+              <div
+                key={i}
+                className="pointer-events-none absolute z-20"
+                style={{
+                  left: `${Number(s.x) || 50}%`,
+                  top: `${Number(s.y) || 45}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              >
+                <TextSticker sticker={s} />
+              </div>
+            );
+          }
+          if (s.type !== 'slider') return null;
           return (
             <div
               key={i}
@@ -575,22 +593,24 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
         {!isMine && reactionsVisible && !pausedByReply && (
           <div
             data-story-controls
-            className="absolute inset-x-0 bottom-4 z-40 flex justify-center gap-3 px-4"
+            className="pointer-events-none absolute inset-x-0 top-[24%] z-40 flex justify-center px-6"
           >
-            {QUICK_EMOJIS.map((em, i) => (
-              <button
-                key={em}
-                onClick={() => { send(em); setReactionsVisible(false); }}
-                disabled={sending}
-                aria-label={`React with ${em}`}
-                className="text-4xl drop-shadow-lg active:scale-90"
-                style={{
-                  animation: `storyReactionPop 320ms cubic-bezier(0.34,1.56,0.64,1) ${i * 45}ms backwards, storyReactionBob 2.6s ease-in-out ${320 + i * 45}ms infinite`,
-                }}
-              >
-                {em}
-              </button>
-            ))}
+            <div className="pointer-events-auto grid grid-cols-3 gap-x-10 gap-y-9">
+              {QUICK_EMOJIS.map((em, i) => (
+                <button
+                  key={em}
+                  onClick={() => { send(em); setReactionsVisible(false); }}
+                  disabled={sending}
+                  aria-label={`React with ${em}`}
+                  className="text-5xl drop-shadow-lg active:scale-90"
+                  style={{
+                    animation: `storyReactionPop 320ms cubic-bezier(0.34,1.56,0.64,1) ${i * 45}ms backwards, storyReactionBob 2.8s ease-in-out ${320 + i * 45}ms infinite`,
+                  }}
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

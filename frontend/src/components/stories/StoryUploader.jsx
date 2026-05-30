@@ -3,6 +3,8 @@ import { api } from '../../lib/api.js';
 import SliderSticker from './SliderSticker.jsx';
 import SliderStickerConfig from './SliderStickerConfig.jsx';
 import StickerDrawer from './StickerDrawer.jsx';
+import TextSticker from './TextSticker.jsx';
+import TextStickerConfig from './TextStickerConfig.jsx';
 
 /* Modal sheet for adding a new story. iPhone's <input type="file"> with
    image/video/audio accept brings up the native picker — Photo Library,
@@ -30,8 +32,14 @@ export default function StoryUploader({ onClose, onPosted }) {
   const [sticker, setSticker] = useState(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Floating text stickers — independent of the single slider sticker, so the
+  // user can stack several lines of text plus an optional slider. textEditor
+  // holds which one is being edited ({ index } where index === null = new).
+  const [textStickers, setTextStickers] = useState([]);
+  const [textEditor, setTextEditor] = useState(null);
   const stageRef = useRef(null);
   const dragRef = useRef(null);
+  const textDragMovedRef = useRef(false);
 
   // Best-effort local detection — used so the duration slider only shows
   // for image stories (videos/audio play for their natural length).
@@ -105,6 +113,71 @@ export default function StoryUploader({ onClose, onPosted }) {
     dragRef.current = null;
   }
 
+  /* Text-sticker drag — same model as the slider but keyed to an index so
+     each text line moves independently. textDragMovedRef lets the trailing
+     click skip opening the editor when the gesture was actually a drag. */
+  function onTextPointerDown(e, index) {
+    if (!stageRef.current) return;
+    e.stopPropagation();
+    const rect = stageRef.current.getBoundingClientRect();
+    const t = textStickers[index];
+    textDragMovedRef.current = false;
+    dragRef.current = {
+      kind: 'text',
+      index,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      originalX: t.x,
+      originalY: t.y,
+      width: rect.width,
+      height: rect.height,
+    };
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* noop */ }
+  }
+  function onTextPointerMove(e) {
+    const d = dragRef.current;
+    if (!d || d.kind !== 'text') return;
+    e.stopPropagation();
+    const dx = ((e.clientX - d.startClientX) / d.width) * 100;
+    const dy = ((e.clientY - d.startClientY) / d.height) * 100;
+    if (Math.abs(e.clientX - d.startClientX) > 3 || Math.abs(e.clientY - d.startClientY) > 3) {
+      textDragMovedRef.current = true;
+    }
+    setTextStickers((arr) => arr.map((s, i) => i === d.index ? {
+      ...s,
+      x: Math.max(8, Math.min(92, d.originalX + dx)),
+      y: Math.max(8, Math.min(92, d.originalY + dy)),
+    } : s));
+  }
+  function onTextPointerUp(e) {
+    if (dragRef.current?.kind === 'text') e.stopPropagation();
+    dragRef.current = null;
+  }
+
+  // Drawer → Text: always open a fresh editor for a new line.
+  function pickTextFromDrawer() {
+    setDrawerOpen(false);
+    setTextEditor({ index: null });
+  }
+  function saveText(next) {
+    const clean = { ...next, type: 'text' };
+    if (!clean.text || !clean.text.trim()) { // empty = treat as remove/cancel
+      if (textEditor?.index != null) removeText(textEditor.index);
+      setTextEditor(null);
+      return;
+    }
+    clean.text = clean.text.trim();
+    setTextStickers((arr) => {
+      if (textEditor?.index == null) return [...arr, clean];
+      return arr.map((s, i) => i === textEditor.index ? { ...s, ...clean } : s);
+    });
+    setTextEditor(null);
+  }
+  function removeText(index) {
+    setTextStickers((arr) => arr.filter((_, i) => i !== index));
+    setTextEditor(null);
+  }
+
   // Drawer → Slider: if there's an existing slider, open its config for
   // edit; otherwise create one with sensible defaults and open the config.
   function pickSliderFromDrawer() {
@@ -139,7 +212,8 @@ export default function StoryUploader({ onClose, onPosted }) {
       };
       if (type === 'image') payload.duration_seconds = seconds;
       if (type === 'video' && thumbnail_url) payload.thumbnail_url = thumbnail_url;
-      if (sticker) payload.stickers = [sticker];
+      const allStickers = [...(sticker ? [sticker] : []), ...textStickers];
+      if (allStickers.length) payload.stickers = allStickers.slice(0, 6);
       await api.createStory(payload);
       onPosted?.();
       onClose();
@@ -250,6 +324,31 @@ export default function StoryUploader({ onClose, onPosted }) {
                     <SliderSticker sticker={sticker} mode="editor" />
                   </div>
                 )}
+
+                {/* Text stickers — each draggable + tappable to edit. */}
+                {textStickers.map((t, i) => (
+                  <div
+                    key={i}
+                    className="absolute touch-none"
+                    style={{
+                      left: `${t.x}%`,
+                      top: `${t.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                      cursor: 'grab',
+                    }}
+                    onPointerDown={(e) => onTextPointerDown(e, i)}
+                    onPointerMove={onTextPointerMove}
+                    onPointerUp={onTextPointerUp}
+                    onPointerCancel={onTextPointerUp}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (textDragMovedRef.current) { textDragMovedRef.current = false; return; }
+                      setTextEditor({ index: i });
+                    }}
+                  >
+                    <TextSticker sticker={t} />
+                  </div>
+                ))}
               </div>
 
               <button onClick={clearFile} className="text-xs text-neutral-500 underline">
@@ -294,9 +393,9 @@ export default function StoryUploader({ onClose, onPosted }) {
                 <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
               <span>Add stickers</span>
-              {sticker && (
+              {(sticker ? 1 : 0) + textStickers.length > 0 && (
                 <span className="ml-1 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                  1 added
+                  {(sticker ? 1 : 0) + textStickers.length} added
                 </span>
               )}
             </button>
@@ -329,8 +428,19 @@ export default function StoryUploader({ onClose, onPosted }) {
       {drawerOpen && (
         <StickerDrawer
           hasSlider={!!sticker}
+          textCount={textStickers.length}
           onPickSlider={pickSliderFromDrawer}
+          onPickText={pickTextFromDrawer}
           onClose={() => setDrawerOpen(false)}
+        />
+      )}
+
+      {textEditor && (
+        <TextStickerConfig
+          initial={textEditor.index != null ? textStickers[textEditor.index] : null}
+          onCancel={() => setTextEditor(null)}
+          onSave={saveText}
+          onDelete={textEditor.index != null ? () => removeText(textEditor.index) : undefined}
         />
       )}
     </div>
