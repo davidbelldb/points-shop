@@ -75,8 +75,8 @@ function MiniCell({ value, myMark, canPlay, onClick, players }) {
       disabled={!canPlay}
       className={[
         'relative aspect-square overflow-hidden rounded-md border transition',
-        'border-neutral-200 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800',
-        canPlay ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-90 cursor-pointer' : 'cursor-default',
+        'border-neutral-200 bg-white',
+        canPlay ? 'hover:bg-neutral-100 active:scale-90 cursor-pointer' : 'cursor-default',
       ].join(' ')}
       aria-label={tone ? `Taken by ${tone}` : canPlay ? 'Play here' : 'Empty'}
     >
@@ -87,7 +87,7 @@ function MiniCell({ value, myMark, canPlay, onClick, players }) {
       )}
       {canPlay && !tone && (
         <span className="absolute inset-0 flex items-center justify-center opacity-20">
-          <span className="block h-1 w-1 rounded-full bg-neutral-500" />
+          <span className="block h-1 w-1 rounded-full bg-neutral-400" />
         </span>
       )}
     </button>
@@ -98,7 +98,7 @@ function MiniCell({ value, myMark, canPlay, onClick, players }) {
 function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, onMove, players }) {
   const resolved = globalCell !== null;
 
-  let outerBorder = 'border-neutral-300 dark:border-neutral-700';
+  let outerBorder = 'border-neutral-200';
   if (!resolved) {
     if (isActive && isMyTurn)  outerBorder = 'border-teal-400 shadow-[0_0_14px_3px_rgba(45,212,191,0.35)]';
     else if (isActive)         outerBorder = 'border-pink-400 shadow-[0_0_14px_3px_rgba(244,114,182,0.35)]';
@@ -107,7 +107,7 @@ function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, 
   const canPlayInBoard = !resolved && isMyTurn && isActive;
 
   return (
-    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder} ${resolved ? 'bg-neutral-100 dark:bg-neutral-800/60' : 'bg-white dark:bg-neutral-900'}`}>
+    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder} bg-neutral-100`}>
       {resolved ? (
         <div className="flex h-full w-full items-center justify-center">
           {globalCell === 'draw'
@@ -259,7 +259,7 @@ export default function TicTacFacePage() {
       {/* ultimate board */}
       {game && (
         <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md">
-          <div className="grid grid-cols-3 gap-2 rounded-[13px] bg-neutral-100 dark:bg-neutral-950 p-2">
+          <div className="grid grid-cols-3 gap-2 rounded-[13px] bg-neutral-300 p-2">
             {globalBoard.map((globalCell, bi) => {
               const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
               return (
@@ -282,7 +282,7 @@ export default function TicTacFacePage() {
       )}
 
       {/* status bar */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center">
         {!game && !match?.finished && (
           <>
             <p className="text-sm text-neutral-500">No game in progress.</p>
@@ -318,7 +318,7 @@ export default function TicTacFacePage() {
       {/* match over modal */}
       {showModal && match && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl dark:bg-neutral-900">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
             <h2 className="text-xl font-bold tracking-tight">Game over</h2>
 
             <div className="my-5 flex items-center justify-center gap-4">
@@ -340,7 +340,7 @@ export default function TicTacFacePage() {
             {match.winner === 'draw'  && <p className="text-base font-semibold text-neutral-700">It's a tie.</p>}
 
             {match.points_awarded && (
-              <div className="mt-4 rounded-xl bg-neutral-50 p-3 text-left text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+              <div className="mt-4 rounded-xl bg-neutral-100 p-3 text-left text-sm text-neutral-700">
                 <p className="text-center font-semibold">Points credited</p>
                 <p className="mt-2">
                   {meName}: <span className="font-bold text-teal-700">+{match.points_awarded.me}</span>
