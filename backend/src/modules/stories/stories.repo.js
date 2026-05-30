@@ -1,4 +1,5 @@
 import { query } from '../../db.js';
+import { sendPush } from '../notifications/push.js';
 
 const COLUMNS = `
   s.id, s.author_id, s.media_url, s.media_type, s.caption,
@@ -120,7 +121,34 @@ export async function createStory(authorId, { media_url, media_type, caption, du
      RETURNING id, author_id, media_url, media_type, caption, duration_seconds, stickers, thumbnail_url, created_at, expires_at`,
     [authorId, media_url, media_type, caption ? String(caption).trim() : null, dur, JSON.stringify(safeStickers), thumbnail_url || null],
   );
-  return rows[0];
+  const story = rows[0];
+  // Let the other person know a sneaky story just dropped. Fire-and-forget so
+  // a notification hiccup can never fail the story upload itself.
+  notifyStoryPosted(authorId).catch(() => {});
+  return story;
+}
+
+/* Drops an in-app notification + web push to the OTHER account (the app only
+   has two) whenever someone posts a story. Never throws. */
+async function notifyStoryPosted(authorId) {
+  const { rows } = await query(
+    `SELECT id AS other_id,
+            (SELECT name FROM accounts WHERE id = $1) AS author_name
+       FROM accounts
+      WHERE id <> $1
+      LIMIT 1`,
+    [authorId],
+  );
+  const other = rows[0];
+  if (!other?.other_id) return;
+  const title = `${other.author_name || 'Someone'} posted a sneaky story`;
+  const body = 'Tap to take a peek 👀';
+  await query(
+    `INSERT INTO notifications (account_id, type, title, body, link_url)
+     VALUES ($1, 'story', $2, $3, '/')`,
+    [other.other_id, title, body],
+  );
+  sendPush(other.other_id, { title, body, url: '/' });
 }
 
 /* Smart delete: if the story is currently linked from any highlight reel
