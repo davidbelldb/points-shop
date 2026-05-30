@@ -67,16 +67,16 @@ function DrawMacroCell({ players }) {
 }
 
 /** A mini cell inside a local 3×3 board. */
-function MiniCell({ value, canPlay, onClick, players }) {
-  const tone = value === 'p1' ? 'me' : value === 'p2' ? 'other' : null;
+function MiniCell({ value, myMark, canPlay, onClick, players }) {
+  const tone = value ? (value === myMark ? 'me' : 'other') : null;
   return (
     <button
       onClick={canPlay ? onClick : undefined}
       disabled={!canPlay}
       className={[
         'relative aspect-square overflow-hidden rounded-md border transition',
-        'border-neutral-700 bg-neutral-800',
-        canPlay ? 'hover:bg-neutral-700 active:scale-90 cursor-pointer' : 'cursor-default',
+        'border-neutral-200 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800',
+        canPlay ? 'hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-90 cursor-pointer' : 'cursor-default',
       ].join(' ')}
       aria-label={tone ? `Taken by ${tone}` : canPlay ? 'Play here' : 'Empty'}
     >
@@ -86,8 +86,8 @@ function MiniCell({ value, canPlay, onClick, players }) {
         </span>
       )}
       {canPlay && !tone && (
-        <span className="absolute inset-0 flex items-center justify-center opacity-25">
-          <span className="block h-1 w-1 rounded-full bg-white" />
+        <span className="absolute inset-0 flex items-center justify-center opacity-20">
+          <span className="block h-1 w-1 rounded-full bg-neutral-500" />
         </span>
       )}
     </button>
@@ -95,20 +95,19 @@ function MiniCell({ value, canPlay, onClick, players }) {
 }
 
 /** One macro cell: either resolved (photo/split) or an active mini 3×3 grid. */
-function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, onMove, players, game }) {
+function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, onMove, players }) {
   const resolved = globalCell !== null;
 
-  let outerBorder = 'border-neutral-700';
+  let outerBorder = 'border-neutral-300 dark:border-neutral-700';
   if (!resolved) {
-    if (isActive && isMyTurn)     outerBorder = 'border-teal-400 shadow-[0_0_14px_3px_rgba(45,212,191,0.35)]';
-    else if (isActive)            outerBorder = 'border-pink-400 shadow-[0_0_14px_3px_rgba(244,114,182,0.35)]';
-    else if (isMyTurn)            outerBorder = 'border-neutral-600';
+    if (isActive && isMyTurn)  outerBorder = 'border-teal-400 shadow-[0_0_14px_3px_rgba(45,212,191,0.35)]';
+    else if (isActive)         outerBorder = 'border-pink-400 shadow-[0_0_14px_3px_rgba(244,114,182,0.35)]';
   }
 
   const canPlayInBoard = !resolved && isMyTurn && isActive;
 
   return (
-    <div className={`relative rounded-xl border-2 transition ${outerBorder} ${resolved ? 'bg-neutral-800/60' : 'bg-neutral-900'} p-1`}>
+    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder} ${resolved ? 'bg-neutral-100 dark:bg-neutral-800/60' : 'bg-white dark:bg-neutral-900'}`}>
       {resolved ? (
         <div className="flex h-full w-full items-center justify-center">
           {globalCell === 'draw'
@@ -121,6 +120,7 @@ function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, 
             <MiniCell
               key={ci}
               value={cell}
+              myMark={myMark}
               canPlay={canPlayInBoard && !cell}
               onClick={() => onMove(index, ci)}
               players={players}
@@ -259,7 +259,7 @@ export default function TicTacFacePage() {
       {/* ultimate board */}
       {game && (
         <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md">
-          <div className="grid grid-cols-3 gap-2 rounded-[13px] bg-neutral-950 p-2">
+          <div className="grid grid-cols-3 gap-2 rounded-[13px] bg-neutral-100 dark:bg-neutral-950 p-2">
             {globalBoard.map((globalCell, bi) => {
               const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
               return (
@@ -282,7 +282,7 @@ export default function TicTacFacePage() {
       )}
 
       {/* status bar */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
         {!game && !match?.finished && (
           <>
             <p className="text-sm text-neutral-500">No game in progress.</p>
