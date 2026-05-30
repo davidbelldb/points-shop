@@ -64,23 +64,6 @@ export default function SliderSticker({ sticker, mode = 'editor', defaultValue =
         )}
 
         <div className="relative mt-2">
-          {/* Floating handle emoji — given its own height row so it never
-              collides with the prompt above. Bottom-anchored so it sits
-              right above the track regardless of scale. */}
-          {handleEmoji && (
-            <div className="relative mb-1 h-7">
-              <span
-                className="pointer-events-none absolute bottom-0 text-2xl leading-none drop-shadow-md transition-transform"
-                style={{
-                  left: `${value}%`,
-                  transform: `translateX(-50%) scale(${committed ? 1.4 : 1})`,
-                }}
-              >
-                {handleEmoji}
-              </span>
-            </div>
-          )}
-
           <div className="flex items-center justify-between px-1 text-base">
             <span className="line-clamp-1 max-w-[40%] text-left text-xs font-semibold text-neutral-700">
               {startLabel || (stages[0] ?? '')}
@@ -90,39 +73,45 @@ export default function SliderSticker({ sticker, mode = 'editor', defaultValue =
             </span>
           </div>
 
-          {/* Track */}
-          <div className="relative mt-1 h-2 rounded-full bg-gradient-to-r from-pink-400 via-amber-400 to-emerald-400">
-            {/* Pip is a small white disc inside a pink→amber→emerald
-                gradient stroke so it stays readable over the track AND any
-                background photo behind the sticker. */}
-            <div
-              className="pointer-events-none absolute top-1/2 h-[19px] w-[19px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 p-[2px]"
-              style={{
-                left: `${value}%`,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.15)',
-              }}
-            >
-              <div className="h-full w-full rounded-full bg-white" />
-            </div>
-          </div>
+          {/* Track — tall enough that the emoji handle has vertical room */}
+          <div className="relative mt-1 h-8 flex items-center">
+            <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-pink-400 via-amber-400 to-emerald-400" />
 
-          {/* Native range input handles touch + mouse for free. Hidden
-              when not interactive so the canvas / response views are static. */}
-          {interactive && (
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={value}
-              onChange={(e) => setValue(Number(e.target.value))}
-              onMouseUp={commit}
-              onTouchEnd={commit}
-              onKeyUp={(e) => { if (e.key === 'Enter' || e.key === ' ') commit(); }}
-              className="absolute inset-x-0 bottom-0 m-0 h-3 w-full cursor-pointer appearance-none bg-transparent opacity-0"
-              aria-label={prompt || 'Slider response'}
-            />
-          )}
+            {/* Emoji handle: the selected emoji IS the pip */}
+            {handleEmoji && (
+              <span
+                className="pointer-events-none absolute leading-none drop-shadow-md"
+                style={{
+                  left: `${value}%`,
+                  top: '50%',
+                  transform: `translate(-50%, -50%) scale(${committed ? 1.5 : 1})`,
+                  fontSize: committed ? '1.6rem' : '1.5rem',
+                  transition: 'transform 0.15s ease, font-size 0.15s ease',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                }}
+              >
+                {handleEmoji}
+              </span>
+            )}
+
+            {/* Native range input — sits on top for interaction, fully transparent */}
+            {interactive && (
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={value}
+                onChange={(e) => setValue(Number(e.target.value))}
+                onMouseUp={commit}
+                onTouchEnd={commit}
+                onKeyUp={(e) => { if (e.key === 'Enter' || e.key === ' ') commit(); }}
+                className="absolute inset-x-0 inset-y-0 m-0 h-full w-full cursor-pointer appearance-none bg-transparent opacity-0"
+                style={{ zIndex: 10 }}
+                aria-label={prompt || 'Slider response'}
+              />
+            )}
+          </div>
         </div>
 
         {mode === 'editor' && (
