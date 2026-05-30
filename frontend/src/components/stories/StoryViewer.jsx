@@ -42,6 +42,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const replyInputRef = useRef(null);
+  const mediaZoneRef = useRef(null);
   const startedAtRef = useRef(Date.now());
   const pausedAccumRef = useRef(0);
   const pauseStartRef = useRef(null);
@@ -80,6 +81,35 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     if (!story?.id || isMine) return;
     api.markStoryViewed(story.id).catch(() => {});
   }, [story?.id, isMine]);
+
+  // Native touchend listener for the swipe-up gesture. iOS Safari requires
+  // programmatic focus() that opens the keyboard to be called from inside
+  // a *native* user-gesture handler (touchend / click) — calling it from
+  // React's synthetic pointerup doesn't qualify on all iOS versions, so we
+  // bind the focus trigger here instead of in the pointer handlers.
+  useEffect(() => {
+    const el = mediaZoneRef.current;
+    if (!el || isMine) return undefined; // author has no reply input to focus
+    let startY = null;
+    function onDown(e) { startY = e.touches?.[0]?.clientY ?? null; }
+    function onUp(e) {
+      const sy = startY; startY = null;
+      if (sy == null) return;
+      const ey = e.changedTouches?.[0]?.clientY ?? null;
+      if (ey == null) return;
+      if (sy - ey > SWIPE_UP_THRESHOLD) {
+        // Inside a native touchend = user activation on iOS = keyboard pops.
+        wasSwipeUpRef.current = true;
+        replyInputRef.current?.focus();
+      }
+    }
+    el.addEventListener('touchstart', onDown, { passive: true });
+    el.addEventListener('touchend', onUp, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onDown);
+      el.removeEventListener('touchend', onUp);
+    };
+  }, [isMine]);
 
   // Paint the body black + lock scroll while the viewer is mounted. Stops
   // the home page (or Safari's URL-bar peek-through) bleeding behind the
@@ -271,15 +301,17 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     if (wasHeldRef.current) {
       setPausedByPress(false);
     }
-    // Detect a swipe-up gesture — if the pointer ended noticeably above
-    // where it started, focus the reply input. The focus call MUST be
-    // synchronous within the pointer event so iOS Safari treats it as a
-    // user-gesture-initiated focus and actually pops the keyboard.
+    // Detect a swipe-up gesture so the trailing click doesn't advance/rewind.
+    // NOTE: do NOT call replyInputRef.focus() here. On iOS, pointerup fires
+    // *before* the native touchend, and a synthetic-event focus() moves DOM
+    // focus onto the input without opening the keyboard. That leaves the
+    // element already-focused, so the native touchend handler's focus() —
+    // the one that actually pops the keyboard — becomes a no-op. Focusing is
+    // owned solely by the native touchend listener above.
     if (pressStartYRef.current != null && e?.clientY != null) {
       const dy = pressStartYRef.current - e.clientY;
       if (dy > SWIPE_UP_THRESHOLD) {
         wasSwipeUpRef.current = true;
-        replyInputRef.current?.focus();
       }
     }
     pressStartYRef.current = null;
@@ -380,7 +412,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       </div>
 
       {/* Media */}
-      <div className="relative flex-1 select-none">
+      <div ref={mediaZoneRef} className="relative flex-1 select-none">
         <div
           className="absolute inset-y-0 left-0 z-10 w-1/3"
           onClick={(e) => onTapZone(e, 'prev')}
@@ -591,41 +623,20 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 
 /* Author-only footer — surfaces the other participant's view status.
    Shows "Seen by {name} · {time ago}" if anyone else has viewed; "Not
-   seen yet" otherwise. We render an eye glyph so it reads even at a
-   glance without parsing the text. */
+   seen yet" otherwise. Plain text — no eye glyph. */
 function StorySeenBy({ story }) {
   const viewers = Array.isArray(story.viewers) ? story.viewers : [];
   if (viewers.length === 0) {
     return (
-      <p className="flex items-center justify-center gap-1.5 py-2 text-xs text-white/70">
-        <EyeOff />
-        Not seen yet
-      </p>
+      <p className="py-2 text-center text-xs text-white/70">Not seen yet</p>
     );
   }
   const first = viewers[0];
   return (
-    <p className="flex items-center justify-center gap-1.5 py-2 text-xs text-white/80">
-      <Eye />
+    <p className="py-2 text-center text-xs text-white/80">
       Seen by <span className="font-semibold text-white">{first.name}</span>
-      <span className="text-white/55">· {relativeTime(first.viewed_at)}</span>
+      <span className="text-white/55"> · {relativeTime(first.viewed_at)}</span>
     </p>
-  );
-}
-function Eye() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-function EyeOff() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-      <path d="M1 1l22 22" />
-    </svg>
   );
 }
 
