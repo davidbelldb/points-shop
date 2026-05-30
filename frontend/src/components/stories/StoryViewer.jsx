@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useAuth } from '../../lib/AuthContext.jsx';
+import { useTheme } from '../../lib/ThemeContext.jsx';
 import AddToReelModal from './AddToReelModal.jsx';
 import SliderSticker from './SliderSticker.jsx';
 
@@ -15,12 +16,15 @@ import SliderSticker from './SliderSticker.jsx';
    and delete (trash) icons only appear on stories the current user
    authored — Katie can't manage David's stories and vice versa. */
 const DEFAULT_IMG_DURATION_MS = 5000;
-const QUICK_EMOJIS = ['❤️', '🫦', '🫠', '😂', '🥹', '😮', '💜'];
+// Heart removed — 6 quick reactions surfaced via swipe-up over the story.
+const QUICK_EMOJIS = ['🫦', '🫠', '😂', '🥹', '😮', '💜'];
 const LONG_PRESS_MS = 220;
 const SWIPE_UP_THRESHOLD = 60;
 
 export default function StoryViewer({ stories: initialStories, initialIndex = 0, onClose, onStoryDeleted }) {
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   // Local copy of the queue so we can drop a story after deletion without
   // requiring the parent to re-supply the prop. Parent gets a callback so
   // its own list (strip / archive) can refresh in parallel.
@@ -38,6 +42,9 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   const [pausedByPress, setPausedByPress] = useState(false);
   const [pausedByReply, setPausedByReply] = useState(false);
   const paused = pausedByPress || pausedByReply;
+  // Floating quick-reaction emojis, revealed by swiping up over the story
+  // and hidden whenever the reply input takes focus.
+  const [reactionsVisible, setReactionsVisible] = useState(false);
 
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -82,14 +89,11 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     api.markStoryViewed(story.id).catch(() => {});
   }, [story?.id, isMine]);
 
-  // Native touchend listener for the swipe-up gesture. iOS Safari requires
-  // programmatic focus() that opens the keyboard to be called from inside
-  // a *native* user-gesture handler (touchend / click) — calling it from
-  // React's synthetic pointerup doesn't qualify on all iOS versions, so we
-  // bind the focus trigger here instead of in the pointer handlers.
+  // Native touchend listener for the swipe-up gesture. Swiping up over the
+  // story reveals the floating quick-reaction emojis on top of the media.
   useEffect(() => {
     const el = mediaZoneRef.current;
-    if (!el || isMine) return undefined; // author has no reply input to focus
+    if (!el || isMine) return undefined; // author has no reply controls
     let startY = null;
     function onDown(e) { startY = e.touches?.[0]?.clientY ?? null; }
     function onUp(e) {
@@ -98,9 +102,8 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       const ey = e.changedTouches?.[0]?.clientY ?? null;
       if (ey == null) return;
       if (sy - ey > SWIPE_UP_THRESHOLD) {
-        // Inside a native touchend = user activation on iOS = keyboard pops.
         wasSwipeUpRef.current = true;
-        replyInputRef.current?.focus();
+        setReactionsVisible(true);
       }
     }
     el.addEventListener('touchstart', onDown, { passive: true });
@@ -111,19 +114,20 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     };
   }, [isMine]);
 
-  // Paint the body black + lock scroll while the viewer is mounted. Stops
-  // the home page (or Safari's URL-bar peek-through) bleeding behind the
-  // fixed full-screen container on iOS.
+  // Paint the body to match the viewer theme + lock scroll while mounted.
+  // Stops the home page (or Safari's URL-bar peek-through) bleeding behind
+  // the fixed full-screen container on iOS. Black in dark mode, white in
+  // light mode so the wrapper edges stay seamless.
   useEffect(() => {
     const prevBg = document.body.style.backgroundColor;
     const prevOverflow = document.body.style.overflow;
-    document.body.style.backgroundColor = '#000';
+    document.body.style.backgroundColor = isDark ? '#000' : '#fff';
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.backgroundColor = prevBg;
       document.body.style.overflow = prevOverflow;
     };
-  }, []);
+  }, [isDark]);
 
   function advance() {
     setReply('');
@@ -312,6 +316,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       const dy = pressStartYRef.current - e.clientY;
       if (dy > SWIPE_UP_THRESHOLD) {
         wasSwipeUpRef.current = true;
+        if (!isMine) setReactionsVisible(true);
       }
     }
     pressStartYRef.current = null;
@@ -331,7 +336,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-black text-white"
+      className={`fixed inset-0 z-50 flex flex-col ${isDark ? 'bg-black text-white' : 'bg-white text-neutral-900'}`}
       style={{ height: '100dvh', width: '100vw' }}
     >
       {/* Inline keyframes — keep the viewer self-contained. */}
@@ -349,14 +354,23 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           88%  { opacity: 1; }
           100% { opacity: 0; transform: translate(var(--sway, 0), -110vh) rotate(var(--rot, 0deg)) scale(1.05); }
         }
+        @keyframes storyReactionPop {
+          0%   { opacity: 0; transform: translateY(24px) scale(0.4); }
+          60%  { opacity: 1; transform: translateY(-4px) scale(1.15); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes storyReactionBob {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-8px); }
+        }
       `}</style>
 
       {/* Progress bars */}
       <div className="flex gap-1 px-3 pt-3 supports-[padding:env(safe-area-inset-top)]:pt-[calc(env(safe-area-inset-top)+0.25rem)]">
         {stories.map((_, i) => (
-          <div key={i} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
+          <div key={i} className={`h-0.5 flex-1 overflow-hidden rounded-full ${isDark ? 'bg-white/30' : 'bg-black/15'}`}>
             <div
-              className="h-full bg-white transition-[width] duration-100"
+              className={`h-full transition-[width] duration-100 ${isDark ? 'bg-white' : 'bg-neutral-800'}`}
               style={{ width: `${i < idx ? 100 : i === idx ? progress * 100 : 0}%` }}
             />
           </div>
@@ -366,14 +380,14 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       {/* Header row */}
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/20 text-xs">
+          <div className={`flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs ${isDark ? 'bg-white/20' : 'bg-black/10'}`}>
             {story.author_photo
               ? <img src={story.author_photo} alt="" className="h-full w-full object-cover" />
               : story.author_name?.[0]?.toUpperCase() ?? '?'}
           </div>
           <div className="text-sm">
             <p className="font-semibold leading-tight">{story.author_name}</p>
-            <p className="text-[11px] text-white/70 leading-tight">{relativeTime(story.created_at)}</p>
+            <p className={`text-[11px] leading-tight ${isDark ? 'text-white/70' : 'text-neutral-500'}`}>{relativeTime(story.created_at)}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -383,7 +397,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
               <button
                 onClick={() => setReelModalOpen(true)}
                 aria-label="Save to highlight"
-                className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
+                className={`rounded-full p-1.5 ${isDark ? 'text-white/80 hover:bg-white/10' : 'text-neutral-600 hover:bg-black/5'}`}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
@@ -392,7 +406,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
               <button
                 onClick={handleDelete}
                 aria-label="Delete story"
-                className="rounded-full p-1.5 text-white/80 hover:bg-white/10"
+                className={`rounded-full p-1.5 ${isDark ? 'text-white/80 hover:bg-white/10' : 'text-neutral-600 hover:bg-black/5'}`}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6" />
@@ -403,7 +417,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
               </button>
             </>
           )}
-          <button onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-white/80 hover:bg-white/10">
+          <button onClick={onClose} aria-label="Close" className={`rounded-full p-1.5 ${isDark ? 'text-white/80 hover:bg-white/10' : 'text-neutral-600 hover:bg-black/5'}`}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
             </svg>
@@ -555,6 +569,31 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           </div>
         )}
 
+        {/* Floating quick-reaction emojis — revealed on swipe-up, hidden
+            while the reply input is focused. Tapping one fires the reaction
+            and dismisses the row. */}
+        {!isMine && reactionsVisible && !pausedByReply && (
+          <div
+            data-story-controls
+            className="absolute inset-x-0 bottom-4 z-40 flex justify-center gap-3 px-4"
+          >
+            {QUICK_EMOJIS.map((em, i) => (
+              <button
+                key={em}
+                onClick={() => { send(em); setReactionsVisible(false); }}
+                disabled={sending}
+                aria-label={`React with ${em}`}
+                className="text-4xl drop-shadow-lg active:scale-90"
+                style={{
+                  animation: `storyReactionPop 320ms cubic-bezier(0.34,1.56,0.64,1) ${i * 45}ms backwards, storyReactionBob 2.6s ease-in-out ${320 + i * 45}ms infinite`,
+                }}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Subtle "paused" indicator while held */}
         {paused && (
           <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/85 backdrop-blur-sm">
@@ -569,44 +608,29 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
         className="space-y-2 px-3 pt-2 pb-3 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
       >
         {isMine ? (
-          <StorySeenBy story={story} />
+          <StorySeenBy story={story} isDark={isDark} />
         ) : (
-          <>
-            <div className="flex justify-around">
-              {QUICK_EMOJIS.map((em) => (
-                <button
-                  key={em}
-                  onClick={() => send(em)}
-                  disabled={sending}
-                  className="text-2xl active:scale-90"
-                  aria-label={`React with ${em}`}
-                >
-                  {em}
-                </button>
-              ))}
-            </div>
-            <form
-              onSubmit={(e) => { e.preventDefault(); send(reply); }}
-              className="flex items-center gap-2"
+          <form
+            onSubmit={(e) => { e.preventDefault(); send(reply); }}
+            className="flex items-center gap-2"
+          >
+            <input
+              ref={replyInputRef}
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              onFocus={() => { setPausedByReply(true); setReactionsVisible(false); }}
+              onBlur={() => { setPausedByReply(false); setReactionsVisible(true); }}
+              placeholder={`Reply to ${story.author_name}…`}
+              className="h-10 flex-1 rounded-full border border-teal-500/40 bg-transparent px-4 text-sm font-medium text-teal-500 placeholder:text-teal-500/60 focus:border-teal-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!reply.trim() || sending}
+              className="h-10 rounded-full bg-transparent px-4 text-sm font-semibold text-teal-500 disabled:opacity-40"
             >
-              <input
-                ref={replyInputRef}
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                onFocus={() => setPausedByReply(true)}
-                onBlur={() => setPausedByReply(false)}
-                placeholder={`Reply to ${story.author_name}…`}
-                className="h-10 flex-1 rounded-full border border-white/30 bg-white/10 px-4 text-sm text-white placeholder:text-white/60 focus:border-white/60 focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={!reply.trim() || sending}
-                className="h-10 rounded-full bg-amber-500 px-4 text-sm font-semibold text-amber-950 disabled:opacity-40"
-              >
-                Send
-              </button>
-            </form>
-          </>
+              Send
+            </button>
+          </form>
         )}
       </div>
 
@@ -625,30 +649,30 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
    Shows the viewer's profile photo + "Seen by {name} · {time ago}" if anyone
    else has viewed; "Not seen yet" otherwise. The avatar replaces the old eye
    glyph. Falls back to an initial-letter chip when the viewer has no photo. */
-function StorySeenBy({ story }) {
+function StorySeenBy({ story, isDark = true }) {
   const viewers = Array.isArray(story.viewers) ? story.viewers : [];
   if (viewers.length === 0) {
     return (
-      <p className="py-2 text-center text-xs text-white/70">Not seen yet</p>
+      <p className={`py-2 text-center text-xs ${isDark ? 'text-white/70' : 'text-neutral-500'}`}>Not seen yet</p>
     );
   }
   const first = viewers[0];
   return (
-    <div className="flex items-center justify-center gap-2 py-2 text-xs text-white/80">
+    <div className={`flex items-center justify-center gap-2 py-2 text-xs ${isDark ? 'text-white/80' : 'text-neutral-600'}`}>
       {first.photo ? (
         <img
           src={first.photo}
           alt=""
-          className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-white/40"
+          className={`h-5 w-5 shrink-0 rounded-full object-cover ring-1 ${isDark ? 'ring-white/40' : 'ring-black/20'}`}
         />
       ) : (
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold uppercase text-white ring-1 ring-white/40">
+        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold uppercase ring-1 ${isDark ? 'bg-white/20 text-white ring-white/40' : 'bg-black/10 text-neutral-700 ring-black/20'}`}>
           {first.name?.charAt(0) ?? '?'}
         </span>
       )}
       <span>
-        Seen by <span className="font-semibold text-white">{first.name}</span>
-        <span className="text-white/55"> · {relativeTime(first.viewed_at)}</span>
+        Seen by <span className={`font-semibold ${isDark ? 'text-white' : 'text-neutral-900'}`}>{first.name}</span>
+        <span className={isDark ? 'text-white/55' : 'text-neutral-400'}> · {relativeTime(first.viewed_at)}</span>
       </span>
     </div>
   );
