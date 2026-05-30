@@ -51,7 +51,10 @@ function GifPicker({ onSelect, onClose }) {
         ? `${GIPHY_BASE}/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(term)}&limit=${GIF_PAGE_LIMIT}&offset=${nextOffset}&rating=g`
         : `${GIPHY_BASE}/trending?api_key=${GIPHY_API_KEY}&limit=${GIF_PAGE_LIMIT}&offset=${nextOffset}&rating=g`;
       const res  = await fetch(endpoint);
-      if (!res.ok) throw new Error(`Giphy error ${res.status}`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Giphy ${res.status}: ${body.slice(0, 120)}`);
+      }
       const json = await res.json();
       const items = (json.data ?? []).map((r) => ({
         id:      r.id,
@@ -62,7 +65,8 @@ function GifPicker({ onSelect, onClose }) {
       setResults((prev) => reset ? items : [...prev, ...items]);
       setOffset(nextOffset + items.length);
     } catch (e) {
-      setError('Could not load GIFs. Check your connection.');
+      console.error('[GifPicker]', e);
+      setError(e.message || 'Could not load GIFs.');
     } finally {
       setLoading(false);
     }
