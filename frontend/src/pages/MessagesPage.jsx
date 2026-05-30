@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
@@ -9,6 +9,159 @@ import SliderSticker from '../components/stories/SliderSticker.jsx';
 const POLL_MS = 5000;
 const DOUBLE_TAP_MS = 240;
 
+// ---------------------------------------------------------------------------
+// Tenor GIF API — swap TENOR_API_KEY for a production key from
+// https://developers.google.com/tenor/guides/quickstart
+// The default key below is Tenor's public demo key (rate-limited but functional).
+// ---------------------------------------------------------------------------
+const TENOR_API_KEY  = 'AIzaSyAyimkuYQYF_FXVALexPmHA2zHg1PdgQWT';
+const TENOR_BASE     = 'https://tenor.googleapis.com/v2';
+const GIF_PAGE_LIMIT = 20;
+
+// Detect whether a message body is a GIF URL we sent ourselves.
+function isGifUrl(body) {
+  return typeof body === 'string' && /^https:\/\/media\.tenor\.com\/.+\.gif(\?.*)?$/.test(body);
+}
+
+// ---------------------------------------------------------------------------
+// GIF Picker modal
+// ---------------------------------------------------------------------------
+function GifPicker({ onSelect, onClose }) {
+  const [query, setQuery]   = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState(null);
+  const [pos, setPos]       = useState(''); // next page cursor
+  const debounceRef         = useRef(null);
+  const inputRef            = useRef(null);
+
+  // Load trending GIFs on mount.
+  useEffect(() => {
+    fetchGifs('', true);
+    setTimeout(() => inputRef.current?.focus(), 80);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function fetchGifs(term, reset = false) {
+    setLoading(true);
+    setError(null);
+    try {
+      const endpoint = term.trim()
+        ? `${TENOR_BASE}/search?q=${encodeURIComponent(term)}&key=${TENOR_API_KEY}&limit=${GIF_PAGE_LIMIT}&media_filter=gif${reset ? '' : `&pos=${pos}`}`
+        : `${TENOR_BASE}/featured?key=${TENOR_API_KEY}&limit=${GIF_PAGE_LIMIT}&media_filter=gif${reset ? '' : `&pos=${pos}`}`;
+      const res  = await fetch(endpoint);
+      if (!res.ok) throw new Error(`Tenor error ${res.status}`);
+      const json = await res.json();
+      const items = (json.results ?? []).map((r) => ({
+        id:       r.id,
+        url:      r.media_formats?.gif?.url ?? r.url,
+        preview:  r.media_formats?.tinygif?.url ?? r.media_formats?.gif?.url ?? r.url,
+        dims:     r.media_formats?.tinygif?.dims ?? [220, 160],
+        title:    r.content_description ?? '',
+      }));
+      setResults((prev) => reset ? items : [...prev, ...items]);
+      setPos(json.next ?? '');
+    } catch (e) {
+      setError('Could not load GIFs. Check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleQueryChange(e) {
+    const val = e.target.value;
+    setQuery(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchGifs(val, true), 420);
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+      <div className="flex w-full max-w-md flex-col rounded-t-2xl bg-white sm:max-h-[80vh] sm:rounded-2xl dark:bg-neutral-900">
+
+        {/* Header */}
+        <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-neutral-400">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={handleQueryChange}
+            placeholder="Search GIFs…"
+            className="flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-neutral-400 dark:text-white"
+          />
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            aria-label="Close GIF picker"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Grid */}
+        <div className="flex-1 overflow-y-auto p-2" style={{ maxHeight: '55vh' }}>
+          {error && (
+            <p className="py-8 text-center text-sm text-red-500">{error}</p>
+          )}
+          {!error && results.length === 0 && !loading && (
+            <p className="py-8 text-center text-sm text-neutral-400">No results</p>
+          )}
+          <div className="columns-2 gap-2 sm:columns-3">
+            {results.map((gif) => (
+              <button
+                key={gif.id}
+                type="button"
+                onClick={() => onSelect(gif.url)}
+                className="mb-2 block w-full overflow-hidden rounded-lg transition active:scale-95 hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                title={gif.title}
+              >
+                <img
+                  src={gif.preview}
+                  alt={gif.title}
+                  loading="lazy"
+                  className="h-auto w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+
+          {/* Load more */}
+          {pos && !loading && results.length > 0 && (
+            <button
+              onClick={() => fetchGifs(query, false)}
+              className="mt-1 w-full rounded-xl border border-neutral-200 py-2 text-xs font-semibold text-neutral-500 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            >
+              Load more
+            </button>
+          )}
+          {loading && (
+            <div className="flex items-center justify-center py-6">
+              <svg className="h-6 w-6 animate-spin text-amber-500" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Branding */}
+        <p className="border-t border-neutral-100 px-3 py-1.5 text-[10px] text-neutral-400 dark:border-neutral-800">
+          Powered by Tenor
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared avatar
+// ---------------------------------------------------------------------------
 function Avatar({ url, name, size = 'md' }) {
   const cls = size === 'lg' ? 'h-12 w-12' : 'h-9 w-9';
   const iconSize = size === 'lg' ? 22 : 16;
@@ -27,13 +180,7 @@ function Avatar({ url, name, size = 'md' }) {
 }
 
 /* Small thumbnail + caption rendered above a message body when the message
-   was sent as a reply to a story. Mirrors WhatsApp/IG quote-preview layout.
-   Tap to open the story in the viewer. Colours inherit from the bubble's
-   text colour (mode-aware) with opacity, so the "REPLIED TO" label reads
-   well on both pink and amber bubbles in light and dark mode.
-   When the message carries a slider_response, we render the slider itself
-   in 'response' mode below the standard story preamble so the recipient's
-   exact position + emoji shows in-thread. */
+   was sent as a reply to a story. Mirrors WhatsApp/IG quote-preview layout. */
 function StoryReplyPreview({ m, onClick }) {
   if (!m.story_media_url) {
     return (
@@ -43,9 +190,6 @@ function StoryReplyPreview({ m, onClick }) {
     );
   }
 
-  // Pull the original sticker config from the story so we can render the
-  // slider at the response's value. story_stickers comes back from the
-  // backend join — JSONB so it's already an array.
   let respondedSticker = null;
   if (m.slider_response && Array.isArray(m.story_stickers)) {
     const idx = Number(m.slider_response.sticker_index) || 0;
@@ -96,9 +240,6 @@ function StoryReplyPreview({ m, onClick }) {
   );
 }
 
-/* Inline quote shown above a message's body when it's a reply to a
-   previous chat message. Keeps the rendering consistent with the
-   story-reply quote — same opacity scheme so it reads in both modes. */
 function MessageReplyPreview({ m }) {
   const snippet = (m.reply_to_body || '').trim();
   return (
@@ -128,19 +269,6 @@ function dayLabel(iso) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/* One chat bubble — handles its own tap/double-tap discrimination.
-   - double-tap (any bubble): toggles the purple-heart reaction
-   - single-tap (your own bubble): opens edit mode
-   - single-tap on the other person's bubble: ignored
-   The X (delete) and the edit pencil stop propagation so they don't fire taps. */
-/* WhatsApp-style swipe-right-to-reply gesture.
-   - Track horizontal drag distance and translate the bubble along.
-   - Past SWIPE_TRIGGER px the row latches "reply armed"; on release the
-     parent's onSwipeReply fires.
-   - A reply arrow grows in from the left as you drag, fading to full
-     opacity when the latch fires for tactile feedback.
-   - Vertical drag dominance abandons the gesture so the user can still
-     scroll the chat normally. */
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
@@ -155,11 +283,8 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
   useEffect(() => () => { if (tapTimer.current) clearTimeout(tapTimer.current); }, []);
 
   function handleClick(e) {
-    if (isEditing) return; // taps go to the input while editing
-    // Ignore taps on internal action buttons.
+    if (isEditing) return;
     if (e.target.closest('[data-bubble-action]')) return;
-    // Suppress the click that follows a swipe so we don't accidentally
-    // open edit / toggle heart at the end of a drag.
     if (swipeRef.current?.suppressClick) {
       swipeRef.current.suppressClick = false;
       return;
@@ -171,7 +296,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     } else {
       tapTimer.current = setTimeout(() => {
         tapTimer.current = null;
-        if (mine) onStartEdit();
+        if (mine && !isGifUrl(m.body)) onStartEdit();
       }, DOUBLE_TAP_MS);
     }
   }
@@ -194,8 +319,6 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     const dx = e.clientX - s.startX;
     const dy = e.clientY - s.startY;
     if (!s.decided) {
-      // Wait until the motion is decisively horizontal before claiming
-      // the gesture — otherwise we'd hijack vertical scrolls.
       if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
       if (Math.abs(dy) > Math.abs(dx)) {
         s.tracking = false;
@@ -205,7 +328,6 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       s.decided = true;
       try { e.currentTarget.setPointerCapture?.(s.pointerId); } catch { /* noop */ }
     }
-    // Allow rightward drag for everyone; clamp leftward to 0.
     const clamped = Math.max(0, Math.min(SWIPE_MAX, dx));
     setDragX(clamped);
     setArmed(clamped >= SWIPE_TRIGGER);
@@ -214,7 +336,6 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     const s = swipeRef.current;
     if (!s) return;
     if (s.decided) {
-      // We owned the gesture; squash the synthetic click that follows.
       s.suppressClick = true;
       if (armed) onSwipeReply?.(m);
     }
@@ -228,6 +349,9 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     ? 'rounded-br-sm bg-amber-100 text-amber-900'
     : 'rounded-bl-sm bg-pink-100 text-pink-900';
 
+  // GIF messages — render inline image, no edit mode.
+  const bodyIsGif = isGifUrl(m.body);
+
   return (
     <div
       onClick={handleClick}
@@ -240,10 +364,9 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
         transition: dragX ? 'none' : 'transform 0.22s ease-out',
         touchAction: 'pan-y',
       }}
-      className={`group relative max-w-[78%] cursor-pointer select-none rounded-2xl px-3 py-2 ${tone}`}
+      className={`group relative max-w-[78%] cursor-pointer select-none ${bodyIsGif ? 'overflow-hidden rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
     >
-      {/* Reply-arrow ghost — grows from invisible to full opacity as the
-          bubble swipes past the trigger threshold. */}
+      {/* Swipe reply arrow */}
       <span
         aria-hidden="true"
         style={{
@@ -257,9 +380,39 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
           <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
         </svg>
       </span>
+
       {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
-      {isEditing ? (
+
+      {bodyIsGif ? (
+        /* GIF bubble — frameless image with time overlay */
+        <div className="relative">
+          <img
+            src={m.body}
+            alt="GIF"
+            className="block max-w-[220px] rounded-2xl"
+            loading="lazy"
+          />
+          <p className="absolute bottom-1 right-2 text-[10px] text-white/80 drop-shadow">
+            {timeLabel(m.created_at)}
+          </p>
+          {mine && (
+            <button
+              data-bubble-action
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-black/30 text-white group-hover:flex"
+              aria-label="Delete"
+            >
+              {'×'}
+            </button>
+          )}
+          {m.reaction === 'heart' && (
+            <span className={`pointer-events-none absolute -bottom-2 ${mine ? 'left-1' : 'right-1'} text-base leading-none`} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}>
+              {'💜'}
+            </span>
+          )}
+        </div>
+      ) : isEditing ? (
         <div className="space-y-2">
           <textarea
             value={draft}
@@ -319,6 +472,30 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
   );
 }
 
+// ---------------------------------------------------------------------------
+// GIF icon button (inline SVG — no dependency)
+// ---------------------------------------------------------------------------
+function GifButton({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Send a GIF"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
+    >
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="6" width="20" height="12" rx="2.5" />
+        <path d="M11 10H8a2.5 2.5 0 0 0 0 5h3v-2.5" />
+        <line x1="14.5" y1="10" x2="14.5" y2="15" />
+        <path d="M17.5 10h2M17.5 12.5h1.5M17.5 15h2" />
+      </svg>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 export default function MessagesPage() {
   const { user } = useAuth();
   const { refresh: refreshBasket } = useBasket();
@@ -327,12 +504,9 @@ export default function MessagesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  // Story viewer state — when a user taps a quoted-story preview we fetch
-  // the full story and render it through the shared StoryViewer modal.
   const [viewerStory, setViewerStory] = useState(null);
-  // Replying-to state — set when the user swipes right on a bubble. The
-  // banner above the input shows the quote; sending clears it.
-  const [replyTo, setReplyTo] = useState(null); // { id, body, senderName } | null
+  const [replyTo, setReplyTo] = useState(null);
+  const [gifOpen, setGifOpen] = useState(false);
   const inputRef = useRef(null);
   const bottomRef = useRef(null);
   const lastCountRef = useRef(0);
@@ -392,13 +566,28 @@ export default function MessagesPage() {
     }
   }
 
+  async function sendGif(gifUrl) {
+    setGifOpen(false);
+    setBusy(true);
+    setError(null);
+    try {
+      await api.sendMessage(gifUrl, null, replyTo?.id ?? null);
+      setReplyTo(null);
+      await refresh(false);
+      await refreshBasket();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function handleSwipeReply(m) {
     setReplyTo({
       id: m.id,
       body: m.body,
       senderName: m.sender_id === user?.id ? 'yourself' : (data.other?.name ?? m.sender_name ?? 'them'),
     });
-    // Focus the composer so the user can start typing immediately.
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
@@ -416,7 +605,6 @@ export default function MessagesPage() {
     } catch (e) { setError(e.message); }
   }
 
-  // Optimistically flip the reaction locally, then sync with the server.
   async function toggleHeart(id) {
     const current = data.messages.find((x) => x.id === id);
     if (!current) return;
@@ -428,7 +616,7 @@ export default function MessagesPage() {
     try { await api.setMessageReaction(id, next); }
     catch (e) {
       setError(e.message);
-      await refresh(false); // re-sync on failure
+      await refresh(false);
     }
   }
 
@@ -502,6 +690,7 @@ export default function MessagesPage() {
         )}
       </div>
 
+      {/* Composer bar */}
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-md px-4">
           {replyTo && (
@@ -525,6 +714,7 @@ export default function MessagesPage() {
             </div>
           )}
           <form onSubmit={send} className="flex items-stretch gap-2 py-3">
+            <GifButton onClick={() => setGifOpen(true)} />
             <input
               ref={inputRef}
               type="text"
@@ -544,6 +734,13 @@ export default function MessagesPage() {
           </form>
         </div>
       </div>
+
+      {gifOpen && (
+        <GifPicker
+          onSelect={sendGif}
+          onClose={() => setGifOpen(false)}
+        />
+      )}
 
       {viewerStory && (
         <StoryViewer

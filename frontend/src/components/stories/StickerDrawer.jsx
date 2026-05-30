@@ -3,29 +3,92 @@
    visible-but-disabled placeholders so the user can see what's coming.
    Adding a new sticker later is one row in the STICKER_TYPES array +
    wiring the callback. */
+
 const STICKER_TYPES = [
-  { id: 'slider',  label: 'Slider',      emoji: '🎚️', enabled: true  },
-  { id: 'text',    label: 'Text',        emoji: '🅰️', enabled: false },
-  { id: 'emoji',   label: 'Emoji',       emoji: '😎', enabled: false },
-  { id: 'gif',     label: 'GIF',         emoji: '🎞️', enabled: false },
-  { id: 'playing', label: 'Now playing', emoji: '🎧', enabled: false },
-  { id: 'place',   label: 'Location',    emoji: '📍', enabled: false },
+  { id: 'slider',  label: 'Slider',       icon: SliderIcon,     enabled: true  },
+  { id: 'emoji',   label: 'Emoji',        icon: EmojiIcon,      enabled: false },
+  { id: 'text',    label: 'Text Line',    icon: TextIcon,       enabled: false },
+  { id: 'playing', label: 'Now Playing',  icon: NowPlayingIcon, enabled: false },
+  { id: 'place',   label: 'Location',     icon: LocationIcon,   enabled: false },
+  { id: 'gif',     label: 'GIF',          icon: GifIcon,        enabled: false },
 ];
 
+function SliderIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function EmojiIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 14.5s1 2 3.5 2 3.5-2 3.5-2" />
+      <line x1="9" y1="9.5" x2="9.01" y2="9.5" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="15" y1="9.5" x2="15.01" y2="9.5" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TextIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 7 4 4 20 4 20 7" />
+      <line x1="9" y1="20" x2="15" y2="20" />
+      <line x1="12" y1="4" x2="12" y2="20" />
+    </svg>
+  );
+}
+
+function NowPlayingIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function LocationIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s-7-6.75-7-11a7 7 0 0 1 14 0c0 4.25-7 11-7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function GifIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M10 9.5H7.5a2 2 0 0 0 0 4H10v-2" strokeLinecap="round" />
+      <line x1="13" y1="9.5" x2="13" y2="13.5" />
+      <path d="M16 9.5h2M16 11.5h1.5M16 13.5h2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function StickerTile({ entry, badge, onClick }) {
-  const { label, emoji, enabled } = entry;
+  const { label, icon: Icon, enabled } = entry;
   return (
     <button
       type="button"
       onClick={enabled ? onClick : undefined}
       disabled={!enabled}
-      className={`flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border text-center transition active:scale-95 ${
+      className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-xl border text-center transition active:scale-95 ${
         enabled
           ? 'border-amber-200 bg-amber-50 text-amber-800 hover:shadow-sm'
           : 'border-neutral-200 bg-neutral-50 text-neutral-300'
       }`}
     >
-      <span className="text-3xl leading-none">{emoji}</span>
+      <span className="flex items-center justify-center">
+        <Icon />
+      </span>
       <span className={`text-xs font-semibold ${enabled ? '' : 'text-neutral-400'}`}>{label}</span>
       {!enabled && (
         <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-400">Soon</span>
