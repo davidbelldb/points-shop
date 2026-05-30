@@ -6,21 +6,35 @@ const COLUMNS = `
   s.created_at, s.expires_at,
   a.name     AS author_name,
   a.username AS author_username,
-  a.photo_url AS author_photo
+  a.photo_url AS author_photo,
+  (SELECT COUNT(*) FROM story_views v
+    WHERE v.story_id = s.id AND v.viewer_id <> s.author_id)::int AS view_count_other,
+  COALESCE(
+    (SELECT json_agg(json_build_object('id', va.id, 'name', va.name, 'viewed_at', v.viewed_at))
+       FROM story_views v JOIN accounts va ON va.id = v.viewer_id
+      WHERE v.story_id = s.id AND v.viewer_id <> s.author_id),
+    '[]'::json
+  ) AS viewers
 `;
+
+// Caller-scoped column — needs the viewer's account id as a param.
+function callerViewedColumn(paramIndex) {
+  return `EXISTS(SELECT 1 FROM story_views v WHERE v.story_id = s.id AND v.viewer_id = $${paramIndex}) AS viewed_by_me`;
+}
 
 /* Stories with expires_at still in the future. Newest first. UI groups
    client-side by author so each person gets one circle in the strip.
    hidden_at filters out stories that have been removed from the feed but
-   kept in a highlight reel. */
-export async function listActive() {
+   kept in a highlight reel. callerId enables the viewed_by_me flag. */
+export async function listActive(callerId = null) {
   const { rows } = await query(
-    `SELECT ${COLUMNS}
+    `SELECT ${COLUMNS}, ${callerViewedColumn(1)}
        FROM sneaky_stories s
        JOIN accounts a ON a.id = s.author_id
       WHERE s.expires_at > NOW()
         AND s.hidden_at IS NULL
       ORDER BY s.created_at DESC`,
+    [callerId],
   );
   return rows;
 }
@@ -28,10 +42,10 @@ export async function listActive() {
 /* Archived stories — expired. Optional date window for the calendar's
    per-month view. Pass empty strings to fetch everything. Excludes
    stories that have been hidden from the feed (still in reels). */
-export async function listArchive(fromIso, toIso) {
+export async function listArchive(fromIso, toIso, callerId = null) {
   if (fromIso && toIso) {
     const { rows } = await query(
-      `SELECT ${COLUMNS}
+      `SELECT ${COLUMNS}, ${callerViewedColumn(3)}
          FROM sneaky_stories s
          JOIN accounts a ON a.id = s.author_id
         WHERE s.expires_at <= NOW()
@@ -39,30 +53,46 @@ export async function listArchive(fromIso, toIso) {
           AND s.created_at >= $1
           AND s.created_at <  $2
         ORDER BY s.created_at DESC`,
-      [fromIso, toIso],
+      [fromIso, toIso, callerId],
     );
     return rows;
   }
   const { rows } = await query(
-    `SELECT ${COLUMNS}
+    `SELECT ${COLUMNS}, ${callerViewedColumn(1)}
        FROM sneaky_stories s
        JOIN accounts a ON a.id = s.author_id
       WHERE s.expires_at <= NOW()
         AND s.hidden_at IS NULL
       ORDER BY s.created_at DESC`,
+    [callerId],
   );
   return rows;
 }
 
-export async function getStory(id) {
+export async function getStory(id, callerId = null) {
   const { rows } = await query(
-    `SELECT ${COLUMNS}
+    `SELECT ${COLUMNS}, ${callerViewedColumn(2)}
        FROM sneaky_stories s
        JOIN accounts a ON a.id = s.author_id
       WHERE s.id = $1`,
-    [id],
+    [id, callerId],
   );
   return rows[0] ?? null;
+}
+
+/* Record that `viewerId` has viewed `storyId`. Idempotent — re-opening
+   a story doesn't bump the timestamp. Authors viewing their own story
+   are a no-op (the UI doesn't count author self-views as a "seen"). */
+export async function markStoryViewed(storyId, viewerId) {
+  if (!viewerId || !storyId) return;
+  await query(
+    `INSERT INTO story_views (story_id, viewer_id)
+     SELECT $1, $2
+       FROM sneaky_stories s
+      WHERE s.id = $1 AND s.author_id <> $2
+     ON CONFLICT DO NOTHING`,
+    [storyId, viewerId],
+  );
 }
 
 export async function createStory(authorId, { media_url, media_type, caption, duration_seconds, stickers, thumbnail_url }) {

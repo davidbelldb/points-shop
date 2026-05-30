@@ -1,5 +1,5 @@
 import {
-  listActive, listArchive, getStory, createStory, deleteStory,
+  listActive, listArchive, getStory, createStory, deleteStory, markStoryViewed,
 } from './stories.repo.js';
 import {
   listReels, getReel, getReelOwner, createReel, updateReel, deleteReel,
@@ -17,18 +17,30 @@ async function assertReelOwner(reelId, accountId, reply) {
 
 export default async function storiesRoutes(fastify) {
   /* Active stories — 24-hour live feed. Both authors' rows, newest first. */
-  fastify.get('/api/stories/active', async () => listActive());
+  fastify.get('/api/stories/active', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    return listActive(accountId);
+  });
 
   /* Archive — expired stories. Optional from/to (ISO) for per-month windows. */
   fastify.get('/api/stories/archive', async (req) => {
     const { from, to } = req.query ?? {};
-    return listArchive(from ? String(from) : null, to ? String(to) : null);
+    const accountId = getEffectiveAccountId(req);
+    return listArchive(from ? String(from) : null, to ? String(to) : null, accountId);
   });
 
   fastify.get('/api/stories/:id', async (req, reply) => {
-    const s = await getStory(req.params.id);
+    const accountId = getEffectiveAccountId(req);
+    const s = await getStory(req.params.id, accountId);
     if (!s) return reply.code(404).send({ error: 'not found' });
     return s;
+  });
+
+  /* Mark a story as seen by the current viewer. Idempotent + author-safe. */
+  fastify.post('/api/stories/:id/view', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    await markStoryViewed(req.params.id, accountId);
+    return { ok: true };
   });
 
   /* Create — caller has already uploaded the media via /api/admin/upload and

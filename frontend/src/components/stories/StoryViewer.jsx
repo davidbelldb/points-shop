@@ -73,6 +73,14 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     }
   }, [paused]);
 
+  // Mark a story as seen the moment it lands in the viewer (skipping
+  // stories the current user authored — author self-views don't count).
+  // Fire-and-forget; never block the UI on this.
+  useEffect(() => {
+    if (!story?.id || isMine) return;
+    api.markStoryViewed(story.id).catch(() => {});
+  }, [story?.id, isMine]);
+
   // Paint the body black + lock scroll while the viewer is mounted. Stops
   // the home page (or Safari's URL-bar peek-through) bleeding behind the
   // fixed full-screen container on iOS.
@@ -264,12 +272,14 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       setPausedByPress(false);
     }
     // Detect a swipe-up gesture — if the pointer ended noticeably above
-    // where it started, focus the reply input. Same effect as tapping it.
+    // where it started, focus the reply input. The focus call MUST be
+    // synchronous within the pointer event so iOS Safari treats it as a
+    // user-gesture-initiated focus and actually pops the keyboard.
     if (pressStartYRef.current != null && e?.clientY != null) {
       const dy = pressStartYRef.current - e.clientY;
       if (dy > SWIPE_UP_THRESHOLD) {
         wasSwipeUpRef.current = true;
-        setTimeout(() => replyInputRef.current?.focus(), 0);
+        replyInputRef.current?.focus();
       }
     }
     pressStartYRef.current = null;
@@ -521,45 +531,51 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
         )}
       </div>
 
-      {/* Reply controls — emoji row + text input */}
+      {/* Footer — author sees "Seen by …", recipient gets reply controls. */}
       <div
         data-story-controls
         className="space-y-2 px-3 pt-2 pb-3 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
       >
-        <div className="flex justify-around">
-          {QUICK_EMOJIS.map((em) => (
-            <button
-              key={em}
-              onClick={() => send(em)}
-              disabled={sending}
-              className="text-2xl active:scale-90"
-              aria-label={`React with ${em}`}
+        {isMine ? (
+          <StorySeenBy story={story} />
+        ) : (
+          <>
+            <div className="flex justify-around">
+              {QUICK_EMOJIS.map((em) => (
+                <button
+                  key={em}
+                  onClick={() => send(em)}
+                  disabled={sending}
+                  className="text-2xl active:scale-90"
+                  aria-label={`React with ${em}`}
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
+            <form
+              onSubmit={(e) => { e.preventDefault(); send(reply); }}
+              className="flex items-center gap-2"
             >
-              {em}
-            </button>
-          ))}
-        </div>
-        <form
-          onSubmit={(e) => { e.preventDefault(); send(reply); }}
-          className="flex items-center gap-2"
-        >
-          <input
-            ref={replyInputRef}
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            onFocus={() => setPausedByReply(true)}
-            onBlur={() => setPausedByReply(false)}
-            placeholder={`Reply to ${story.author_name}…`}
-            className="h-10 flex-1 rounded-full border border-white/30 bg-white/10 px-4 text-sm text-white placeholder:text-white/60 focus:border-white/60 focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={!reply.trim() || sending}
-            className="h-10 rounded-full bg-amber-500 px-4 text-sm font-semibold text-amber-950 disabled:opacity-40"
-          >
-            Send
-          </button>
-        </form>
+              <input
+                ref={replyInputRef}
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                onFocus={() => setPausedByReply(true)}
+                onBlur={() => setPausedByReply(false)}
+                placeholder={`Reply to ${story.author_name}…`}
+                className="h-10 flex-1 rounded-full border border-white/30 bg-white/10 px-4 text-sm text-white placeholder:text-white/60 focus:border-white/60 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!reply.trim() || sending}
+                className="h-10 rounded-full bg-amber-500 px-4 text-sm font-semibold text-amber-950 disabled:opacity-40"
+              >
+                Send
+              </button>
+            </form>
+          </>
+        )}
       </div>
 
       {reelModalOpen && story && (
@@ -570,6 +586,46 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
         />
       )}
     </div>
+  );
+}
+
+/* Author-only footer — surfaces the other participant's view status.
+   Shows "Seen by {name} · {time ago}" if anyone else has viewed; "Not
+   seen yet" otherwise. We render an eye glyph so it reads even at a
+   glance without parsing the text. */
+function StorySeenBy({ story }) {
+  const viewers = Array.isArray(story.viewers) ? story.viewers : [];
+  if (viewers.length === 0) {
+    return (
+      <p className="flex items-center justify-center gap-1.5 py-2 text-xs text-white/70">
+        <EyeOff />
+        Not seen yet
+      </p>
+    );
+  }
+  const first = viewers[0];
+  return (
+    <p className="flex items-center justify-center gap-1.5 py-2 text-xs text-white/80">
+      <Eye />
+      Seen by <span className="font-semibold text-white">{first.name}</span>
+      <span className="text-white/55">· {relativeTime(first.viewed_at)}</span>
+    </p>
+  );
+}
+function Eye() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+function EyeOff() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+      <path d="M1 1l22 22" />
+    </svg>
   );
 }
 
