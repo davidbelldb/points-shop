@@ -228,43 +228,19 @@ export default async function duckyRoutes(fastify) {
       whirlpools[d.ord] = [...whirls, ...buoys, ...pads].sort((a, b) => a.at - b.at);
     }
 
-    // Sink logic: 50% random chance normally; iceberg gives a 50/50 — sink or mega surge.
+    // Sink logic: 50% random chance for a non-winner, non-chaser duck to sink mid-race.
     let sinkOrd = null;
     let sinkAt = null;
-    let icebergAt = null;
     const sinkPool = lineup.filter((d) => d.ord !== winner.ord && d.ord !== chaserOrd);
-    const icebergEnabled = !!(cfg.iceberg_enabled) && sinkPool.length >= 1 && lineup.length >= 3;
-
-    if (icebergEnabled) {
-      // Iceberg placed mid-course (0.28–0.70).
-      icebergAt = Math.round((0.28 + Math.random() * 0.42) * 1000) / 1000;
-      const chosen = sinkPool[Math.floor(Math.random() * sinkPool.length)];
-      if (Math.random() < 0.5) {
-        // Outcome A: duck sinks at the iceberg.
-        sinkOrd = chosen.ord;
-        sinkAt = icebergAt;
-      } else {
-        // Outcome B: duck ricochets off the iceberg into a mega speed surge.
-        // Inject a large pad obstacle at the iceberg position and shave time off their finish.
-        const surgePad = {
-          kind: 'pad',
-          at: icebergAt,
-          boost: 0.28,    // covers 28% of the remaining course in the burst
-          boostMs: 700,   // short, dramatic sprint
-        };
-        whirlpools[chosen.ord] = [...(whirlpools[chosen.ord] || []), surgePad].sort((a, b) => a.at - b.at);
-        // Give them a genuine time advantage — still behind winner but meaningfully faster.
-        finishMs[chosen.ord] = Math.max(winMs + 350, finishMs[chosen.ord] - 3500);
-      }
-    } else if (sinkPool.length >= 1 && lineup.length >= 3 && Math.random() < 0.5) {
+    if (sinkPool.length >= 1 && lineup.length >= 3 && Math.random() < 0.5) {
       sinkOrd = sinkPool[Math.floor(Math.random() * sinkPool.length)].ord;
       sinkAt = Math.round((0.35 + Math.random() * 0.4) * 1000) / 1000;
     }
 
     const { rows } = await query(
-      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools, sink_ord, sink_at, iceberg_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools), sinkOrd, sinkAt, icebergAt],
+      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools, sink_ord, sink_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools), sinkOrd, sinkAt],
     );
     return { lineup_id: rows[0].id, ducks: lineup, balance: await getBalance(meId) };
   });
@@ -312,7 +288,6 @@ export default async function duckyRoutes(fastify) {
       finish_ms: race.finish_ms,
       whirlpools: race.whirlpools,
       sink: race.sink_ord != null ? { ord: race.sink_ord, at: Number(race.sink_at) } : null,
-      iceberg: race.iceberg_at != null ? { at: Number(race.iceberg_at) } : null,
       ducks: lineup,
       picked_ord: picked.ord,
       odds_num: picked.odds_num,

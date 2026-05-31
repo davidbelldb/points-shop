@@ -44,11 +44,6 @@ function grassBg(col) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-/* Iceberg — fixed 130×81 px, matching the SVG viewBox ratio (1312×815). */
-function Iceberg() {
-  return <img src="/iceberg.svg" alt="" width={130} height={81} style={{ display: 'block' }} />;
-}
-
 // Subtle tiling star-field rendered on the night-sky top bank.
 function starfieldBg() {
   const stars = Array.from({ length: 22 }, (_, i) => {
@@ -348,7 +343,6 @@ export default function DuckyDerbyPage() {
   const padRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
-  const icebergRef = useRef(null);
   const resultTimer = useRef(null);
   const sinkRef = useRef(null);
   const commentaryId = useRef(0);
@@ -440,8 +434,7 @@ export default function DuckyDerbyPage() {
         }
       });
     });
-    const iceberg = result?.iceberg ? { wx: result.iceberg.at * COURSE_LEN } : null;
-    return { buoys, pads, iceberg };
+    return { buoys, pads };
   }, [result]);
 
   /* photo finish — if the top two finish within a whisker, slow-mo + a camera flash kick in */
@@ -529,10 +522,6 @@ export default function DuckyDerbyPage() {
         const el = padRefs.current[p.key];
         if (el) el.style.left = `${(p.wx - camX) * 100}%`;
       }
-      if (icebergRef.current && courseObjects.iceberg) {
-        icebergRef.current.style.left = `${(courseObjects.iceberg.wx - camX) * 100}%`;
-      }
-
       if (elapsed < photo.raceEndMs) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -626,9 +615,7 @@ export default function DuckyDerbyPage() {
     // sink callout
     if (sink) {
       const st = progressToTime(sink.at, result.finish_ms[sink.ord], result.whirlpools?.[sink.ord] || []);
-      const sinkText = result.iceberg
-        ? `${names[sink.ord]} has struck the iceberg!`
-        : `Disaster — ${names[sink.ord]} has gone under!`;
+      const sinkText = `Disaster — ${names[sink.ord]} has gone under!`;
       schedule.push({ t: st, text: sinkText });
     }
 
@@ -733,8 +720,7 @@ export default function DuckyDerbyPage() {
         @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}
         @keyframes ddbuoy{0%,100%{transform:translateY(-9px)}50%{transform:translateY(9px)}}
-        @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}
-        @keyframes ddiceberg{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
+        @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}`}</style>
 
       <div className="flex items-center justify-between">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
@@ -790,17 +776,6 @@ export default function DuckyDerbyPage() {
               : 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
           }}
         />
-
-        {/* iceberg — static scene object, same pattern as lily pads / buoys */}
-        {courseObjects.iceberg && (
-          <div
-            ref={icebergRef}
-            className="absolute"
-            style={{ top: WATER_TOP - 22, left: preRace ? `${courseObjects.iceberg.wx * 100}%` : undefined, zIndex: 8 }}
-          >
-            <Iceberg />
-          </div>
-        )}
 
         {/* lily pads — speed-boost spots, behind the ducks */}
         {courseObjects.pads.map((p) => (
