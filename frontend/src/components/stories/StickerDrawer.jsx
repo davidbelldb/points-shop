@@ -45,15 +45,20 @@ function TextIcon() {
 
 function NowPlayingIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-      {/* Beam */}
-      <rect x="7" y="5" width="10" height="2" rx="1" />
-      {/* Left stem + note head */}
-      <rect x="7" y="5" width="1.8" height="9" rx="0.9" />
-      <ellipse cx="8" cy="15.5" rx="3" ry="2" transform="rotate(-15 8 15.5)" />
-      {/* Right stem + note head */}
-      <rect x="15.2" y="5" width="1.8" height="9" rx="0.9" />
-      <ellipse cx="16" cy="15.5" rx="3" ry="2" transform="rotate(-15 16 15.5)" />
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      {/* Cassette body */}
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      {/* Left spool */}
+      <circle cx="8" cy="13" r="2.2" />
+      {/* Right spool */}
+      <circle cx="16" cy="13" r="2.2" />
+      {/* Tape window cutout (bottom arc between spools) */}
+      <path d="M10.2 13 Q12 16 13.8 13" fill="none" />
+      {/* Label strip */}
+      <line x1="5" y1="8" x2="19" y2="8" />
+      {/* Corner notches */}
+      <line x1="2" y1="17" x2="5" y2="19" />
+      <line x1="22" y1="17" x2="19" y2="19" />
     </svg>
   );
 }
