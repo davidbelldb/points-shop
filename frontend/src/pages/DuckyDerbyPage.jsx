@@ -807,14 +807,16 @@ export default function DuckyDerbyPage() {
         />
 
         {/* iceberg — rises from the water, sinks any duck that strikes it.
-             Only shown during the race itself (not countdown/betting) to avoid size flicker.
+             Shown from countdown onward so it's pre-positioned before the rAF loop starts.
+             During countdown (camX=0) we pin left via inline style; during racing the rAF ref takes over.
              z-index 8: behind ducks (10+) and speech bubbles, in front of waves (1). */}
-        {courseObjects.iceberg && phase === 'racing' && (
+        {courseObjects.iceberg && (phase === 'racing' || phase === 'countdown') && (
           <div
             ref={icebergRef}
             className="absolute"
             style={{
               top: WATER_TOP - Math.round(icebergH * 0.28),
+              left: phase === 'countdown' ? `${courseObjects.iceberg.wx * 100}%` : undefined,
               zIndex: 8,
               animation: 'ddiceberg 7s ease-in-out infinite',
             }}
