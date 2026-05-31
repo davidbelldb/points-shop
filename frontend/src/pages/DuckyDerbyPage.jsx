@@ -66,12 +66,11 @@ const NIGHT = {
 
 function DuckSprite({ ord, duckColour, billColour, w, h, isDark }) {
   const [broken, setBroken] = useState(false);
-  // Moonlit filter: darkens, desaturates slightly, tints cool-blue — applied only in dark mode.
-  const nightFilter = isDark ? 'brightness(0.72) saturate(0.85) sepia(0.18) hue-rotate(198deg)' : undefined;
+  const src = isDark ? `/night_duck_${ord}.png` : `/duck_${ord}.png?v=6`;
 
   if (broken) {
     return (
-      <div className="relative" style={{ width: w, height: h, filter: nightFilter }}>
+      <div className="relative" style={{ width: w, height: h }}>
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
           style={{ width: w * 0.82, height: w * 0.62, background: duckColour }}>
           <span className="absolute" style={{ right: -w * 0.13, top: '42%', width: w * 0.26, height: w * 0.16, background: billColour, borderRadius: '0 50% 50% 0' }} />
@@ -79,7 +78,7 @@ function DuckSprite({ ord, duckColour, billColour, w, h, isDark }) {
       </div>
     );
   }
-  return <img src={`/duck_${ord}.png?v=6`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block', filter: nightFilter }} onError={() => setBroken(true)} />;
+  return <img src={src} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
 }
 
 /* A tattered, hand-painted cloth flag held up by two black poles. The poles tuck
