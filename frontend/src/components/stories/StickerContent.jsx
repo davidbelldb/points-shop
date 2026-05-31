@@ -54,7 +54,7 @@ export default function StickerContent({ sticker }) {
     case 'location':
       return (
         <span
-          className="inline-flex max-w-[80vw] items-center gap-1 rounded-full px-3 py-1 text-sm font-bold shadow-md"
+          className="inline-flex max-w-[240px] items-center gap-1 rounded-full px-3 py-1 text-sm font-bold shadow-md"
           style={{ backgroundColor: sticker.bgColor || '#ffffff', color: sticker.color || '#111827' }}
         >
           <PinIcon />
@@ -65,7 +65,7 @@ export default function StickerContent({ sticker }) {
     case 'playing':
       return (
         <span
-          className="inline-flex max-w-[80vw] items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold shadow-md"
+          className="inline-flex max-w-[240px] items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold shadow-md"
           style={{ backgroundColor: sticker.bgColor || '#000000', color: sticker.color || '#ffffff' }}
         >
           <NoteIcon />

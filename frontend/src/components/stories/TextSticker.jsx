@@ -10,7 +10,7 @@ export default function TextSticker({ sticker }) {
   const hasBg = !!sticker?.bg;
   return (
     <span
-      className="inline-block max-w-[80vw] whitespace-pre-wrap break-words text-center font-bold leading-tight"
+      className="inline-block max-w-[260px] whitespace-pre-wrap break-words text-center font-bold leading-tight"
       style={{
         fontSize: `${size}px`,
         color,
