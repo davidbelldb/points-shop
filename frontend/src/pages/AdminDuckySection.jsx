@@ -146,6 +146,45 @@ export default function AdminDuckySection() {
             onSave={(patch) => run(() => api.admin.updateDuckyIntro(c.ord, patch))} />
         ))}
       </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">🌙 Night — duck speech phrases</p>
+        <p className="text-[11px] text-neutral-400">Replaces the day phrases when dark mode is active.</p>
+      </div>
+      <div className="space-y-2">
+        {(cfg.night_phrases || []).map((p) => (
+          <TextRowEditor key={p.ord} row={p} label={`Night phrase ${p.ord}`} busy={busy}
+            onSave={(patch) => run(() => api.admin.updateDuckyNightPhrase(p.ord, patch))} />
+        ))}
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">🌙 Night — race commentary</p>
+        <p className="text-[11px] text-neutral-400">Filler lines for night races — {'{duck}'} becomes a racer name.</p>
+      </div>
+      <div className="space-y-2">
+        {(cfg.night_commentary || []).map((c) => (
+          <TextRowEditor key={c.ord} row={c} label={`Night line ${c.ord}`} busy={busy}
+            onSave={(patch) => run(() => api.admin.updateDuckyNightCommentary(c.ord, patch))} />
+        ))}
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">🌙 Night — pre-race intro</p>
+        <p className="text-[11px] text-neutral-400">Plays before betting in night mode — {'{duck}'} and {'{duck2}'} become racer names.</p>
+      </div>
+      <div className="space-y-2">
+        {(cfg.night_intro || []).map((c) => (
+          <TextRowEditor key={c.ord} row={c} label={`Night intro ${c.ord}`} busy={busy}
+            onSave={(patch) => run(() => api.admin.updateDuckyNightIntro(c.ord, patch))} />
+        ))}
+      </div>
     </section>
   );
 }

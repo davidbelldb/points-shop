@@ -532,10 +532,10 @@ export default function DuckyDerbyPage() {
   }, [phase, result, laneIndex, n, bannerLayout, courseObjects, photo]);
 
   /* ---- speech bubbles ---- */
-  const activePhrases = useMemo(
-    () => (config?.phrases || []).filter((p) => p.active && p.text.trim()).map((p) => p.text),
-    [config],
-  );
+  const activePhrases = useMemo(() => {
+    const pool = isDark ? (config?.night_phrases || []) : (config?.phrases || []);
+    return pool.filter((p) => p.active && p.text.trim()).map((p) => p.text);
+  }, [config, isDark]);
   useEffect(() => {
     if (phase !== 'racing' || !result || activePhrases.length === 0) return;
     const timers = [];
@@ -630,8 +630,9 @@ export default function DuckyDerbyPage() {
       schedule.push({ t: winMs - 150, text: `${names[result.winner_ord]} romps home to take it!` });
     }
 
-    // admin-editable filler lines between the beats
-    const fillers = (config?.commentary || [])
+    // admin-editable filler lines — night mode uses its own pool
+    const commentaryPool = isDark ? (config?.night_commentary || []) : (config?.commentary || []);
+    const fillers = commentaryPool
       .filter((c) => c.active && c.text.trim())
       .map((c) => c.text);
     if (fillers.length) {
@@ -654,13 +655,14 @@ export default function DuckyDerbyPage() {
     }, Math.max(0, raceToReal(ev.t, photo))));
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, result, config]);
+  }, [phase, result, config, isDark]);
 
   /* ---- pre-race intro commentary cycle (admin-editable, during betting) ---- */
   useEffect(() => {
     if (phase !== 'betting' || !lineup) return;
     const ds = lineup.ducks || [];
-    const lines = (config?.intro || [])
+    const introPool = isDark ? (config?.night_intro || []) : (config?.intro || []);
+    const lines = introPool
       .filter((r) => r.active && r.text.trim())
       .map((r) => fillDuckTokens(r.text, ds));
     if (!lines.length) return;
@@ -670,7 +672,7 @@ export default function DuckyDerbyPage() {
       setCommentary((prev) => [...prev, { id, text }].slice(-2));
     }, i * 2500));
     return () => timers.forEach(clearTimeout);
-  }, [phase, lineup, config]);
+  }, [phase, lineup, config, isDark]);
 
   const stakeN = parseInt(stake, 10);
   const stakeValid = Number.isInteger(stakeN) && stakeN > 0 && stakeN <= balance;
@@ -746,19 +748,6 @@ export default function DuckyDerbyPage() {
             zIndex: 5,
           }}
         />
-        {/* Starfield overlay — only visible in night mode, sits above sky, below grass fringe */}
-        {isDark && (
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0"
-            style={{
-              height: GRASS_TOP - 6,
-              backgroundImage: starfieldBg(),
-              backgroundRepeat: 'repeat',
-              zIndex: 6,
-              opacity: 0.9,
-            }}
-          />
-        )}
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
