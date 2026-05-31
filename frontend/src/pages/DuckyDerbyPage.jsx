@@ -138,6 +138,17 @@ function LilyPad({ isDark }) {
   );
 }
 
+/* An iceberg — renders the SVG asset at a fixed display size in the river. */
+function Iceberg({ w = 56, h = 36 }) {
+  return (
+    <img
+      src="/iceberg.svg"
+      alt=""
+      style={{ width: w, height: h, objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
+    />
+  );
+}
+
 /* A burst of falling confetti — pure CSS, clipped by the track's overflow-hidden. */
 // Night confetti: neon/electric palette pops brilliantly against the dark track.
 const DAY_COLS   = ['#ffd23f', '#ff5d8f', '#4aa3c7', '#5bbf3a', '#ff8c42', '#a878ff', '#ffffff'];
@@ -182,8 +193,8 @@ function obstacleTotals(list) {
   let boostMsTotal = 0;
   let boostProg = 0;
   for (const o of list) {
-    if (o.kind === 'pad') { boostMsTotal += o.boostMs; boostProg += o.boost; }
-    else pauseTotal += o.durationMs;
+    if (o.kind === 'pad' || (o.kind === 'iceberg' && o.outcome === 'boost')) { boostMsTotal += o.boostMs; boostProg += o.boost; }
+    else pauseTotal += (o.durationMs || 0);
   }
   return { pauseTotal, boostMsTotal, boostProg };
 }
@@ -199,7 +210,7 @@ function duckState(elapsed, finishMs, obstacles) {
     const segMs = Math.max(0, ob.at - lastAt) / rate;
     if (rem < segMs) return { m: lastAt + rem * rate, pause: null };
     rem -= segMs;
-    if (ob.kind === 'pad') {
+    if (ob.kind === 'pad' || (ob.kind === 'iceberg' && ob.outcome === 'boost')) {
       if (rem < ob.boostMs) {
         return { m: Math.min(1, ob.at + (rem / ob.boostMs) * ob.boost), pause: { kind: 'pad', frac: rem / ob.boostMs } };
       }
@@ -227,7 +238,7 @@ function progressToTime(targetM, finishMs, obstacles) {
   for (const ob of list) {
     if (targetM <= ob.at) return t + Math.max(0, targetM - lastAt) / rate;
     t += Math.max(0, ob.at - lastAt) / rate;
-    if (ob.kind === 'pad') { t += ob.boostMs; lastAt = ob.at + ob.boost; }
+    if (ob.kind === 'pad' || (ob.kind === 'iceberg' && ob.outcome === 'boost')) { t += ob.boostMs; lastAt = ob.at + ob.boost; }
     else { t += ob.durationMs; lastAt = ob.at; }
   }
   return t + Math.max(0, targetM - lastAt) / rate;
@@ -341,6 +352,7 @@ export default function DuckyDerbyPage() {
   const bannerRefs = useRef({});
   const buoyRefs = useRef({});
   const padRefs = useRef({});
+  const icebergRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
   const resultTimer = useRef(null);
@@ -396,16 +408,21 @@ export default function DuckyDerbyPage() {
   const lastDuckBottom = WATER_TOP - TOP_OVERLAP + (n - 1) * LANE_GAP + DUCK_H;
   const TRACK_H = lastDuckBottom - BOTTOM_TUCK + GRASS_BOTTOM;
 
-  /* banners — spread evenly start-to-end; top and bottom banks spaced independently */
+  /* banners — spread evenly with a fixed max gap (0.38 world units) so they stay
+     close together and readable as the camera scrolls, rather than strung out over
+     the full course length. Groups are centred around the mid-course point. */
   const bannerLayout = useMemo(() => {
     const active = (config?.banners || []).filter((b) => b.active && b.text.trim());
+    const MAX_GAP = 0.38; // world units between adjacent banners
     const spread = (group) => {
       const k = group.length;
-      const lo = 0.36;
-      const hi = COURSE_LEN - 0.16;
+      if (k === 0) return [];
+      const span = (k - 1) * MAX_GAP;
+      const mid = COURSE_LEN * 0.5;
+      const lo = Math.max(0.28, mid - span / 2);
       return group.map((b, i) => ({
         ...b,
-        wx: k <= 1 ? (lo + hi) / 2 : lo + (hi - lo) * (i / (k - 1)),
+        wx: k <= 1 ? mid : lo + MAX_GAP * i,
       }));
     };
     return [
@@ -414,11 +431,12 @@ export default function DuckyDerbyPage() {
     ];
   }, [config]);
 
-  /* buoys + lily pads laid out along the course, in each duck's lane */
+  /* buoys + lily pads + icebergs laid out along the course, in each duck's lane */
   const courseObjects = useMemo(() => {
-    if (!result) return { buoys: [], pads: [] };
+    if (!result) return { buoys: [], pads: [], icebergs: [] };
     const buoys = [];
     const pads = [];
+    const icebergs = [];
     result.ducks.forEach((d, i) => {
       const laneY = WATER_TOP - TOP_OVERLAP + i * LANE_GAP;
       (result.whirlpools?.[d.ord] || []).forEach((o, k) => {
@@ -431,10 +449,12 @@ export default function DuckyDerbyPage() {
           });
         } else if (o.kind === 'pad') {
           pads.push({ key: `p${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 30 });
+        } else if (o.kind === 'iceberg') {
+          icebergs.push({ key: `ice${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 18 });
         }
       });
     });
-    return { buoys, pads };
+    return { buoys, pads, icebergs };
   }, [result]);
 
   /* photo finish — if the top two finish within a whisker, slow-mo + a camera flash kick in */
@@ -522,6 +542,10 @@ export default function DuckyDerbyPage() {
         const el = padRefs.current[p.key];
         if (el) el.style.left = `${(p.wx - camX) * 100}%`;
       }
+      for (const ice of courseObjects.icebergs) {
+        const el = icebergRefs.current[ice.key];
+        if (el) el.style.left = `${(ice.wx - camX) * 100}%`;
+      }
       if (elapsed < photo.raceEndMs) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -599,6 +623,8 @@ export default function DuckyDerbyPage() {
           let text;
           if (o.kind === 'buoy') text = `${names[d.ord]} clatters into a buoy!`;
           else if (o.kind === 'pad') text = `${names[d.ord]} catches a lily pad and surges!`;
+          else if (o.kind === 'iceberg' && o.outcome === 'boost') text = `${names[d.ord]} bounces off an iceberg and accelerates!`;
+          else if (o.kind === 'iceberg') text = `${names[d.ord]} hits an iceberg!`;
           else text = `${names[d.ord]} hits the rapids!`;
           hitEvents.push({ t, text });
         }
@@ -741,7 +767,7 @@ export default function DuckyDerbyPage() {
           style={{ height: GRASS_TOP, background: grass, zIndex: 5 }}
         />
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
-        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
+        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: '0px bottom' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
 
         {/* cartoon wave layers — night mode gets boosted opacity for moonlit shimmer */}
@@ -786,6 +812,18 @@ export default function DuckyDerbyPage() {
             style={{ top: p.y, left: preRace ? `${p.wx * 100}%` : undefined, zIndex: 7 }}
           >
             <LilyPad isDark={isDark} />
+          </div>
+        ))}
+
+        {/* icebergs — floating hazards; 50/50 drown or speed boost */}
+        {courseObjects.icebergs.map((ice) => (
+          <div
+            key={ice.key}
+            ref={(el) => { icebergRefs.current[ice.key] = el; }}
+            className="absolute"
+            style={{ top: ice.y, left: preRace ? `${ice.wx * 100}%` : undefined, zIndex: 8 }}
+          >
+            <Iceberg />
           </div>
         ))}
 
@@ -838,7 +876,7 @@ export default function DuckyDerbyPage() {
         <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: grass, zIndex: 30 }} />
         {/* cartoon grass tufts poking up off the near bank — zIndex 33 so bottom-bank
             banner poles (zIndex 31) tuck behind */}
-        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 33, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
+        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 33, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: '0px bottom' }} />
 
         {/* start line (dashed) — a marking ON the water, so the ducks swim over it */}
         <div

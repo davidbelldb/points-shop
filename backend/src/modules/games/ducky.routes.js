@@ -228,11 +228,54 @@ export default async function duckyRoutes(fastify) {
       whirlpools[d.ord] = [...whirls, ...buoys, ...pads].sort((a, b) => a.at - b.at);
     }
 
-    // Sink logic: 50% random chance for a non-winner, non-chaser duck to sink mid-race.
+    // Iceberg logic: if enabled, spread icebergs across the field. Each hit is 50/50
+    // drown (stops the duck) or boost (speed surge forward). Drowns feed into the sink
+    // mechanism; boosts are encoded as iceberg obstacles with boost fields.
+    const icebergEnabled = cfg.iceberg_enabled ?? true;
+    const icebergCount = icebergEnabled ? Math.max(0, Math.min(Number(cfg.iceberg_size ?? 3) || 0, 10)) : 0;
+    const icebergPool = shuffle(lineup.filter((d) => d.ord !== winner.ord && d.ord !== chaserOrd));
+    const icebergSinkCandidates = []; // ord → at, chosen from drown outcomes
+    for (let i = 0; i < icebergCount && icebergPool.length > 0; i++) {
+      const d = icebergPool[i % icebergPool.length];
+      const at = Math.round((0.2 + Math.random() * 0.58) * 1000) / 1000;
+      const drowns = Math.random() < 0.5;
+      if (drowns) {
+        icebergSinkCandidates.push({ ord: d.ord, at });
+        // Mark as an obstacle for visual purposes (duck pauses on hit then sinks)
+        (whirlpools[d.ord] = whirlpools[d.ord] || []).push({
+          kind: 'iceberg',
+          at,
+          outcome: 'drown',
+          durationMs: 600,
+        });
+      } else {
+        // Boost — encode as iceberg with pad-like boost fields
+        (whirlpools[d.ord] = whirlpools[d.ord] || []).push({
+          kind: 'iceberg',
+          at,
+          outcome: 'boost',
+          boost: 0.09,
+          boostMs: 550,
+        });
+        // Adjust finish time: boosted duck gains ~900ms like a lily pad
+        if (finishMs[d.ord]) finishMs[d.ord] = Math.max(finishMs[d.ord] - 900, winMs + 350);
+      }
+    }
+    // Re-sort whirlpools now iceberg entries have been added out-of-order
+    for (const ord of Object.keys(whirlpools)) {
+      whirlpools[ord].sort((a, b) => a.at - b.at);
+    }
+
+    // Sink logic: prefer an iceberg-drown candidate; fall back to random 50% chance.
     let sinkOrd = null;
     let sinkAt = null;
     const sinkPool = lineup.filter((d) => d.ord !== winner.ord && d.ord !== chaserOrd);
-    if (sinkPool.length >= 1 && lineup.length >= 3 && Math.random() < 0.5) {
+    if (icebergSinkCandidates.length > 0) {
+      // Pick one iceberg drown to be the actual sink (others just cause a wobble)
+      const chosen = icebergSinkCandidates[Math.floor(Math.random() * icebergSinkCandidates.length)];
+      sinkOrd = chosen.ord;
+      sinkAt = chosen.at;
+    } else if (sinkPool.length >= 1 && lineup.length >= 3 && Math.random() < 0.5) {
       sinkOrd = sinkPool[Math.floor(Math.random() * sinkPool.length)].ord;
       sinkAt = Math.round((0.35 + Math.random() * 0.4) * 1000) / 1000;
     }
