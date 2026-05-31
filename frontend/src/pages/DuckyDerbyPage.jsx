@@ -47,37 +47,18 @@ function grassBg(col) {
 // Maps admin size (1-10) → pixel height: 26 px (tiny buoy-like) → 132 px (half-river monster).
 function icebergPixelH(sizeN) { return Math.round(26 + (sizeN - 1) * 11.8); }
 
-/* A jagged ice formation that rises from the water and sinks any duck that hits it.
-   Rendered as an SVG with lit/shadow facets; gains a cold-blue glow in night mode. */
+/* Iceberg obstacle — uses the photoshopped iceberg.png asset.
+   Night mode adds a cold-blue glow; size scales the rendered dimensions. */
 function Iceberg({ sizeN, isDark }) {
   const iceH = icebergPixelH(sizeN);
   const iceW = Math.round(iceH * 0.64);
-  const base   = isDark ? '#9ac8e8' : '#cce0f0';
-  const bright = isDark ? '#dff2ff' : '#eef6ff';
-  const mid    = isDark ? '#68aacb' : '#a8c8e0';
-  const dark   = isDark ? '#3a78a8' : '#80aac8';
-  const stroke = isDark ? '#1e5880' : '#6090b0';
-  const glow   = isDark ? 'drop-shadow(0 0 6px rgba(130,200,255,0.75))' : undefined;
+  const glow = isDark ? 'drop-shadow(0 0 6px rgba(130,200,255,0.75))' : undefined;
   return (
-    <svg width={iceW} height={iceH} viewBox="0 0 60 100"
-      style={{ display: 'block', filter: glow, overflow: 'visible' }}>
-      {/* Full silhouette */}
-      <path d="M0,100 L2,80 L0,64 L6,50 L2,36 L13,20 L25,6 L30,0 L35,7 L45,11 L50,5 L56,19 L59,36 L60,54 L57,70 L60,88 L58,100 Z"
-        fill={base} stroke={stroke} strokeWidth="1.3" strokeLinejoin="round" />
-      {/* Left bright face (lit side of main peak) */}
-      <path d="M30,0 L13,20 L24,31 Z" fill={bright} />
-      {/* Right mid face */}
-      <path d="M30,0 L35,7 L45,11 L36,27 Z" fill={mid} />
-      {/* Secondary right peak face */}
-      <path d="M50,5 L56,19 L46,19 Z" fill={bright} opacity="0.75" />
-      {/* Left body below peak */}
-      <path d="M24,31 L13,20 L6,50 L16,54 Z" fill={mid} />
-      {/* Right body below peak */}
-      <path d="M36,27 L45,11 L59,36 L48,52 Z" fill={dark} />
-      {/* Highlight streak on main peak */}
-      <path d="M29,1 L22,10 L24,7 Z" fill="white" opacity="0.9" />
-      <line x1="21" y1="13" x2="26" y2="4" stroke="white" strokeWidth="0.9" opacity="0.55" />
-    </svg>
+    <img
+      src="/iceberg.png"
+      alt=""
+      style={{ width: iceW, height: iceH, objectFit: 'contain', display: 'block', filter: glow }}
+    />
   );
 }
 
