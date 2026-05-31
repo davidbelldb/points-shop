@@ -21,6 +21,7 @@ const DEFAULT_IMG_DURATION_MS = 5000;
 const QUICK_EMOJIS = ['🫦', '🫠', '😂', '🥹', '😮', '💜'];
 const LONG_PRESS_MS = 220;
 const SWIPE_UP_THRESHOLD = 60;
+const SWIPE_DOWN_THRESHOLD = 60;
 
 export default function StoryViewer({ stories: initialStories, initialIndex = 0, onClose, onStoryDeleted }) {
   const { user } = useAuth();
@@ -103,9 +104,13 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       if (sy == null) return;
       const ey = e.changedTouches?.[0]?.clientY ?? null;
       if (ey == null) return;
-      if (sy - ey > SWIPE_UP_THRESHOLD) {
+      const dy = sy - ey;
+      if (dy > SWIPE_UP_THRESHOLD) {
         wasSwipeUpRef.current = true;
         setReactionsVisible(true);
+      } else if (dy < -SWIPE_DOWN_THRESHOLD) {
+        // Swipe down — dismiss the emoji tray if it's open.
+        setReactionsVisible(false);
       }
     }
     el.addEventListener('touchstart', onDown, { passive: true });

@@ -72,14 +72,39 @@ export default function App() {
         <div className="mx-auto flex max-w-md items-center justify-between gap-2 px-3 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <button
-              onClick={() => setMenuOpen(true)}
-              aria-label="Open menu"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ overflow: 'visible' }}>
+                {/* Top line: slides to centre + rotates 45° when open */}
+                <line
+                  x1="3" y1="6" x2="21" y2="6"
+                  style={{
+                    transformOrigin: '12px 12px',
+                    transition: 'transform 300ms cubic-bezier(0.4,0,0.2,1)',
+                    transform: menuOpen ? 'translateY(6px) rotate(45deg)' : 'none',
+                  }}
+                />
+                {/* Middle line: fades out when open */}
+                <line
+                  x1="3" y1="12" x2="21" y2="12"
+                  style={{
+                    transformOrigin: '12px 12px',
+                    transition: 'opacity 200ms ease, transform 300ms cubic-bezier(0.4,0,0.2,1)',
+                    opacity: menuOpen ? 0 : 1,
+                    transform: menuOpen ? 'scaleX(0)' : 'none',
+                  }}
+                />
+                {/* Bottom line: slides to centre + rotates -45° when open */}
+                <line
+                  x1="3" y1="18" x2="21" y2="18"
+                  style={{
+                    transformOrigin: '12px 12px',
+                    transition: 'transform 300ms cubic-bezier(0.4,0,0.2,1)',
+                    transform: menuOpen ? 'translateY(-6px) rotate(-45deg)' : 'none',
+                  }}
+                />
               </svg>
             </button>
             <Link to="/" className="flex min-w-0 items-center gap-2">

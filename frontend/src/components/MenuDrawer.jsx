@@ -87,12 +87,33 @@ function Item({ to, label, icon, onClose }) {
   );
 }
 
+const SWIPE_LEFT_THRESHOLD = 60;
+
 export default function MenuDrawer({ open, onClose }) {
   useEffect(() => {
     if (!open) return undefined;
     function onKey(e) { if (e.key === 'Escape') onClose(); }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  // Left-swipe anywhere on the drawer closes it.
+  useEffect(() => {
+    if (!open) return undefined;
+    let startX = null;
+    function onTouchStart(e) { startX = e.touches?.[0]?.clientX ?? null; }
+    function onTouchEnd(e) {
+      if (startX == null) return;
+      const endX = e.changedTouches?.[0]?.clientX ?? null;
+      if (endX != null && startX - endX > SWIPE_LEFT_THRESHOLD) onClose();
+      startX = null;
+    }
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
   }, [open, onClose]);
 
   // Drawer slides out BELOW the sticky nav bar so the nav remains visible.
