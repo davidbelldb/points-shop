@@ -933,11 +933,12 @@ export default function DuckyDerbyPage() {
             <button
               key={d.ord}
               onClick={atBetting ? () => setPickedOrd(d.ord) : undefined}
-              className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
+              className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${atBetting ? '' : 'cursor-default'}`}
+              style={
                 pickedOrd === d.ord
-                  ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40'
-                  : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800'
-              } ${atBetting ? '' : 'cursor-default'}`}
+                  ? { borderColor: '#f59e0b', background: isDark ? 'rgba(120,53,15,0.35)' : '#fffbeb' }
+                  : { borderColor: isDark ? '#404040' : '#e5e5e5', background: isDark ? '#262626' : '#ffffff' }
+              }
             >
               <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={38} h={32} isDark={isDark} />
               <div className="min-w-0 flex-1">
@@ -955,7 +956,10 @@ export default function DuckyDerbyPage() {
            Lift content above the iPhone home-indicator / curved corner zone:
            - safe-area inset on supported browsers (iOS PWA), plus a 12px buffer
            - generous fallback padding (pb-5) for everything else */}
-      <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t px-4 pt-3 pb-5 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-neutral-700 dark:bg-neutral-900 border-neutral-200 bg-white">
+      <div
+        className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t px-4 pt-3 pb-5 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+        style={{ borderColor: isDark ? '#404040' : '#e5e5e5', background: isDark ? '#171717' : '#ffffff' }}
+      >
         {noFunds ? (
           <p className="py-1 text-center text-sm font-medium text-amber-800">
             You need points to place a bet — win some elsewhere first!
@@ -967,7 +971,13 @@ export default function DuckyDerbyPage() {
               <input
                 type="number" inputMode="numeric" min={1} max={balance}
                 value={stake} onChange={(e) => setStake(e.target.value)}
-                className="mt-0.5 block w-full rounded-md border border-neutral-200 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder-neutral-500 px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none"
+                className="mt-0.5 block w-full rounded-md border px-2.5 py-2 text-sm focus:outline-none"
+                style={{
+                  borderColor: isDark ? '#525252' : '#e5e5e5',
+                  background: isDark ? '#262626' : '#ffffff',
+                  color: isDark ? '#f5f5f5' : undefined,
+                  outlineColor: '#5fc4b1',
+                }}
                 placeholder="Points"
               />
             </label>
@@ -989,7 +999,7 @@ export default function DuckyDerbyPage() {
       {/* ---- Result modal ---- */}
       {phase === 'result' && result && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-neutral-900 p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-3xl p-6 shadow-2xl" style={{ background: isDark ? '#171717' : '#ffffff' }}>
             <div className="-mt-1 mb-1 flex justify-center">
               <DuckSprite
                 ord={result.winner_ord}
@@ -1006,7 +1016,7 @@ export default function DuckyDerbyPage() {
             <p className={`mt-2 text-center text-3xl font-extrabold ${result.won ? 'text-emerald-600' : 'text-pink-500'}`}>
               {result.won ? `+${result.payout} POINTS` : `-${result.stake} POINTS`}
             </p>
-            <div className="mt-4 rounded-xl bg-neutral-100 dark:bg-neutral-800 px-4 py-3 text-center text-sm text-neutral-700 dark:text-neutral-300">
+            <div className="mt-4 rounded-xl px-4 py-3 text-center text-sm" style={{ background: isDark ? '#262626' : '#f5f5f5', color: isDark ? '#d4d4d4' : '#404040' }}>
               {(() => {
                 const winner = ducks.find((d) => d.ord === result.winner_ord);
                 const mine = ducks.find((d) => d.ord === result.picked_ord);
