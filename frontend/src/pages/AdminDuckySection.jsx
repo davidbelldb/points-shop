@@ -16,6 +16,8 @@ export default function AdminDuckySection() {
   const [buoy, setBuoy] = useState('');
   const [count, setCount] = useState(10);
   const [buoyCount, setBuoyCount] = useState(4);
+  const [icebergEnabled, setIcebergEnabled] = useState(false);
+  const [icebergSize, setIcebergSize] = useState(5);
 
   async function load() {
     try {
@@ -27,6 +29,8 @@ export default function AdminDuckySection() {
       setBuoy(c.buoy_colour ?? '');
       setCount(c.race_duck_count ?? 10);
       setBuoyCount(c.buoy_count ?? 4);
+      setIcebergEnabled(!!(c.iceberg_enabled));
+      setIcebergSize(c.iceberg_size ?? 5);
     } catch (e) { setError(e.message); }
   }
   useEffect(() => { load(); }, []);
@@ -50,6 +54,7 @@ export default function AdminDuckySection() {
     run(() => api.admin.updateDucky({
       water_colour: water, grass_colour: grass, mud_colour: mud, buoy_colour: buoy,
       race_duck_count: Number(count), buoy_count: Number(buoyCount),
+      iceberg_enabled: icebergEnabled, iceberg_size: Number(icebergSize),
     }));
   }
 
@@ -87,6 +92,24 @@ export default function AdminDuckySection() {
           <select className={inputCls + ' mt-0.5'} value={buoyCount} onChange={(e) => setBuoyCount(Number(e.target.value))}>
             {[0, 1, 2, 3, 4, 5, 6, 8, 10, 12].map((nn) => (
               <option key={nn} value={nn}>{nn === 0 ? 'Off' : nn}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <span className="text-[11px] text-neutral-500">🧊 Iceberg</span>
+          <button
+            type="button"
+            onClick={() => setIcebergEnabled((v) => !v)}
+            className={`mt-0.5 block w-full rounded-md py-1.5 text-sm font-semibold transition ${icebergEnabled ? 'bg-sky-600 text-white' : 'bg-neutral-200 text-neutral-600'}`}
+          >
+            {icebergEnabled ? 'Enabled' : 'Disabled'}
+          </button>
+        </div>
+        <div>
+          <span className="text-[11px] text-neutral-500">🧊 Iceberg size (1–10)</span>
+          <select className={inputCls + ' mt-0.5'} value={icebergSize} onChange={(e) => setIcebergSize(Number(e.target.value))} disabled={!icebergEnabled}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <option key={n} value={n}>{n === 1 ? '1 — tiny (buoy-like)' : n === 10 ? '10 — colossal' : n}</option>
             ))}
           </select>
         </div>

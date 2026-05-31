@@ -44,6 +44,43 @@ function grassBg(col) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
+// Maps admin size (1-10) → pixel height: 26 px (tiny buoy-like) → 132 px (half-river monster).
+function icebergPixelH(sizeN) { return Math.round(26 + (sizeN - 1) * 11.8); }
+
+/* A jagged ice formation that rises from the water and sinks any duck that hits it.
+   Rendered as an SVG with lit/shadow facets; gains a cold-blue glow in night mode. */
+function Iceberg({ sizeN, isDark }) {
+  const iceH = icebergPixelH(sizeN);
+  const iceW = Math.round(iceH * 0.64);
+  const base   = isDark ? '#9ac8e8' : '#cce0f0';
+  const bright = isDark ? '#dff2ff' : '#eef6ff';
+  const mid    = isDark ? '#68aacb' : '#a8c8e0';
+  const dark   = isDark ? '#3a78a8' : '#80aac8';
+  const stroke = isDark ? '#1e5880' : '#6090b0';
+  const glow   = isDark ? 'drop-shadow(0 0 6px rgba(130,200,255,0.75))' : undefined;
+  return (
+    <svg width={iceW} height={iceH} viewBox="0 0 60 100"
+      style={{ display: 'block', filter: glow, overflow: 'visible' }}>
+      {/* Full silhouette */}
+      <path d="M0,100 L2,80 L0,64 L6,50 L2,36 L13,20 L25,6 L30,0 L35,7 L45,11 L50,5 L56,19 L59,36 L60,54 L57,70 L60,88 L58,100 Z"
+        fill={base} stroke={stroke} strokeWidth="1.3" strokeLinejoin="round" />
+      {/* Left bright face (lit side of main peak) */}
+      <path d="M30,0 L13,20 L24,31 Z" fill={bright} />
+      {/* Right mid face */}
+      <path d="M30,0 L35,7 L45,11 L36,27 Z" fill={mid} />
+      {/* Secondary right peak face */}
+      <path d="M50,5 L56,19 L46,19 Z" fill={bright} opacity="0.75" />
+      {/* Left body below peak */}
+      <path d="M24,31 L13,20 L6,50 L16,54 Z" fill={mid} />
+      {/* Right body below peak */}
+      <path d="M36,27 L45,11 L59,36 L48,52 Z" fill={dark} />
+      {/* Highlight streak on main peak */}
+      <path d="M29,1 L22,10 L24,7 Z" fill="white" opacity="0.9" />
+      <line x1="21" y1="13" x2="26" y2="4" stroke="white" strokeWidth="0.9" opacity="0.55" />
+    </svg>
+  );
+}
+
 // Subtle tiling star-field rendered on the night-sky top bank.
 function starfieldBg() {
   const stars = Array.from({ length: 22 }, (_, i) => {
@@ -343,6 +380,7 @@ export default function DuckyDerbyPage() {
   const padRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
+  const icebergRef = useRef(null);
   const resultTimer = useRef(null);
   const sinkRef = useRef(null);
   const commentaryId = useRef(0);
@@ -434,7 +472,8 @@ export default function DuckyDerbyPage() {
         }
       });
     });
-    return { buoys, pads };
+    const iceberg = result?.iceberg ? { wx: result.iceberg.at * COURSE_LEN } : null;
+    return { buoys, pads, iceberg };
   }, [result]);
 
   /* photo finish — if the top two finish within a whisker, slow-mo + a camera flash kick in */
@@ -521,6 +560,9 @@ export default function DuckyDerbyPage() {
       for (const p of courseObjects.pads) {
         const el = padRefs.current[p.key];
         if (el) el.style.left = `${(p.wx - camX) * 100}%`;
+      }
+      if (icebergRef.current && courseObjects.iceberg) {
+        icebergRef.current.style.left = `${(courseObjects.iceberg.wx - camX) * 100}%`;
       }
 
       if (elapsed < photo.raceEndMs) raf = requestAnimationFrame(tick);
@@ -616,7 +658,10 @@ export default function DuckyDerbyPage() {
     // sink callout
     if (sink) {
       const st = progressToTime(sink.at, result.finish_ms[sink.ord], result.whirlpools?.[sink.ord] || []);
-      schedule.push({ t: st, text: `Disaster — ${names[sink.ord]} has gone under!` });
+      const sinkText = result.iceberg
+        ? `${names[sink.ord]} has struck the iceberg!`
+        : `Disaster — ${names[sink.ord]} has gone under!`;
+      schedule.push({ t: st, text: sinkText });
     }
 
     schedule.push({ t: winMs * 0.42, text: "It's neck and neck out there!" });
@@ -707,6 +752,9 @@ export default function DuckyDerbyPage() {
   const water = isDark ? NIGHT.water : (config?.water_colour || '#4aa3c7');
   const grass = isDark ? NIGHT.grass : (config?.grass_colour || '#5bbf3a');
   const mud   = isDark ? NIGHT.mud   : (config?.mud_colour   || '#6b4a2a');
+  const icebergSizeN = config?.iceberg_size || 5;
+  const icebergH = icebergPixelH(icebergSizeN);
+  const icebergW = Math.round(icebergH * 0.64);
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
   const preRace = phase === 'betting' || phase === 'countdown';
@@ -720,7 +768,8 @@ export default function DuckyDerbyPage() {
         @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}
         @keyframes ddbuoy{0%,100%{transform:translateY(-9px)}50%{transform:translateY(9px)}}
-        @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}`}</style>
+        @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}
+        @keyframes ddiceberg{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
 
       <div className="flex items-center justify-between">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
@@ -776,6 +825,23 @@ export default function DuckyDerbyPage() {
               : 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
           }}
         />
+
+        {/* iceberg — rises from the water, sinks any duck that strikes it */}
+        {courseObjects.iceberg && (
+          <div
+            ref={icebergRef}
+            className="absolute"
+            style={{
+              top: WATER_TOP - Math.round(icebergH * 0.28),
+              left: preRace ? `${courseObjects.iceberg.wx * 100}%` : undefined,
+              marginLeft: -Math.round(icebergW / 2),
+              zIndex: 22,
+              animation: 'ddiceberg 7s ease-in-out infinite',
+            }}
+          >
+            <Iceberg sizeN={icebergSizeN} isDark={isDark} />
+          </div>
+        )}
 
         {/* lily pads — speed-boost spots, behind the ducks */}
         {courseObjects.pads.map((p) => (

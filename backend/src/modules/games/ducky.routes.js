@@ -228,19 +228,27 @@ export default async function duckyRoutes(fastify) {
       whirlpools[d.ord] = [...whirls, ...buoys, ...pads].sort((a, b) => a.at - b.at);
     }
 
-    // 50% chance one non-winning duck sinks partway through (never the winner/chaser).
+    // Sink logic: 50% random chance normally; iceberg guarantees a sink every race.
     let sinkOrd = null;
     let sinkAt = null;
+    let icebergAt = null;
     const sinkPool = lineup.filter((d) => d.ord !== winner.ord && d.ord !== chaserOrd);
-    if (sinkPool.length >= 1 && lineup.length >= 3 && Math.random() < 0.5) {
+    const icebergEnabled = !!(cfg.iceberg_enabled) && sinkPool.length >= 1 && lineup.length >= 3;
+
+    if (icebergEnabled) {
+      // Iceberg placed mid-course (0.28–0.70); the unlucky duck sinks exactly there.
+      icebergAt = Math.round((0.28 + Math.random() * 0.42) * 1000) / 1000;
       sinkOrd = sinkPool[Math.floor(Math.random() * sinkPool.length)].ord;
-      sinkAt = Math.round((0.35 + Math.random() * 0.4) * 1000) / 1000; // 0.35-0.75
+      sinkAt = icebergAt;
+    } else if (sinkPool.length >= 1 && lineup.length >= 3 && Math.random() < 0.5) {
+      sinkOrd = sinkPool[Math.floor(Math.random() * sinkPool.length)].ord;
+      sinkAt = Math.round((0.35 + Math.random() * 0.4) * 1000) / 1000;
     }
 
     const { rows } = await query(
-      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools, sink_ord, sink_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools), sinkOrd, sinkAt],
+      `INSERT INTO ducky_races (account_id, lineup, winner_ord, finish_ms, whirlpools, sink_ord, sink_at, iceberg_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [meId, JSON.stringify(lineup), winner.ord, JSON.stringify(finishMs), JSON.stringify(whirlpools), sinkOrd, sinkAt, icebergAt],
     );
     return { lineup_id: rows[0].id, ducks: lineup, balance: await getBalance(meId) };
   });
@@ -288,6 +296,7 @@ export default async function duckyRoutes(fastify) {
       finish_ms: race.finish_ms,
       whirlpools: race.whirlpools,
       sink: race.sink_ord != null ? { ord: race.sink_ord, at: Number(race.sink_at) } : null,
+      iceberg: race.iceberg_at != null ? { at: Number(race.iceberg_at) } : null,
       ducks: lineup,
       picked_ord: picked.ord,
       odds_num: picked.odds_num,
@@ -324,9 +333,12 @@ export default async function duckyRoutes(fastify) {
     if ('buoy_count' in p && (!Number.isInteger(p.buoy_count) || p.buoy_count < 0 || p.buoy_count > 12)) {
       return reply.code(400).send({ error: 'buoy_count must be 0-12' });
     }
+    if ('iceberg_size' in p && (!Number.isInteger(p.iceberg_size) || p.iceberg_size < 1 || p.iceberg_size > 10)) {
+      return reply.code(400).send({ error: 'iceberg_size must be 1-10' });
+    }
     const updates = [];
     const values = [];
-    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'buoy_count', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days']) {
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'buoy_count', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days', 'iceberg_enabled', 'iceberg_size']) {
       if (k in p) { values.push(p[k]); updates.push(`${k} = $${values.length}`); }
     }
     if (updates.length) {
