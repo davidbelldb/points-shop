@@ -44,22 +44,9 @@ function grassBg(col) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-// Maps admin size (1-10) → pixel height: 26 px (size 1) → 660 px (size 10, colossal).
-function icebergPixelH(sizeN) { return Math.round(26 + (sizeN - 1) * 70.4); }
-
-/* Iceberg obstacle — fixed pixel dimensions derived from the PNG's natural aspect ratio
-   (3388 × 2048 ≈ 1.655 : 1).  PNG avoids the viewport-scaling quirk of the SVG. */
-const ICEBERG_RATIO = 3388 / 2048;
-function Iceberg({ sizeN }) {
-  const iceH = icebergPixelH(sizeN);
-  const iceW = Math.round(iceH * ICEBERG_RATIO);
-  return (
-    <img
-      src="/iceberg.png"
-      alt=""
-      style={{ width: iceW, height: iceH, display: 'block' }}
-    />
-  );
+/* Iceberg — fixed 130×81 px, matching the SVG viewBox ratio (1312×815). */
+function Iceberg() {
+  return <img src="/iceberg.svg" alt="" width={130} height={81} style={{ display: 'block' }} />;
 }
 
 // Subtle tiling star-field rendered on the night-sky top bank.
@@ -733,8 +720,6 @@ export default function DuckyDerbyPage() {
   const water = isDark ? NIGHT.water : (config?.water_colour || '#4aa3c7');
   const grass = isDark ? NIGHT.grass : (config?.grass_colour || '#5bbf3a');
   const mud   = isDark ? NIGHT.mud   : (config?.mud_colour   || '#6b4a2a');
-  const icebergSizeN = config?.iceberg_size || 5;
-  const icebergH = icebergPixelH(icebergSizeN);
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
   const preRace = phase === 'betting' || phase === 'countdown';
@@ -806,21 +791,14 @@ export default function DuckyDerbyPage() {
           }}
         />
 
-        {/* iceberg — mirrors the buoy/banner pattern exactly: always in the DOM once result
-             exists, pre-positioned with a static left during pre-race, then the rAF ref takes
-             over during racing. z-index 8: behind ducks (10+), in front of waves (1). */}
+        {/* iceberg — static scene object, same pattern as lily pads / buoys */}
         {courseObjects.iceberg && (
           <div
             ref={icebergRef}
             className="absolute"
-            style={{
-              top: WATER_TOP - Math.round(icebergH * 0.28),
-              left: preRace ? `${courseObjects.iceberg.wx * 100}%` : undefined,
-              zIndex: 8,
-              animation: 'ddiceberg 7s ease-in-out infinite',
-            }}
+            style={{ top: WATER_TOP - 22, left: preRace ? `${courseObjects.iceberg.wx * 100}%` : undefined, zIndex: 8 }}
           >
-            <Iceberg sizeN={icebergSizeN} />
+            <Iceberg />
           </div>
         )}
 
