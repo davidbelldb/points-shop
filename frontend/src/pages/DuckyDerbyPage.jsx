@@ -58,10 +58,9 @@ function starfieldBg() {
 
 // Night-mode colour palette — replaces admin-configured colours when dark theme is active.
 const NIGHT = {
-  water:  '#0b2545',   // deep navy
-  grass:  '#1a3d20',   // dark forest
-  mud:    '#1a0e06',   // almost-black brown
-  skyTop: '#080f1c',   // near-black sky at zenith
+  water: '#0b2545',  // deep navy
+  grass: '#1a3d20',  // dark forest
+  mud:   '#1a0e06',  // almost-black brown
 };
 
 function DuckSprite({ ord, duckColour, billColour, w, h, isDark }) {
@@ -739,28 +738,11 @@ export default function DuckyDerbyPage() {
         {/* Night: gradient from deep-sky at top to dark-forest at bottom; Day: solid grass colour */}
         <div
           className="absolute inset-x-0 top-0"
-          style={{
-            height: GRASS_TOP,
-            background: isDark
-              ? `linear-gradient(to bottom, ${NIGHT.skyTop} 48%, ${NIGHT.grass} 100%)`
-              : grass,
-            zIndex: 5,
-          }}
+          style={{ height: GRASS_TOP, background: grass, zIndex: 5 }}
         />
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
-
-        {/* Moon glow — soft radial light from top-right, night mode only */}
-        {isDark && (
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: 'radial-gradient(ellipse at 80% 6%, rgba(190,215,255,0.14) 0%, transparent 52%)',
-              zIndex: 4,
-            }}
-          />
-        )}
 
         {/* cartoon wave layers — night mode gets boosted opacity for moonlit shimmer */}
         <div className="absolute inset-x-0" style={{ top: WATER_TOP + 20, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: isDark ? 0.75 : 0.55, animation: 'ddwave 7s linear infinite' }} />
