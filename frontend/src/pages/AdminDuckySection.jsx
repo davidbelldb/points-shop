@@ -30,7 +30,7 @@ export default function AdminDuckySection() {
       setCount(c.race_duck_count ?? 10);
       setBuoyCount(c.buoy_count ?? 4);
       setIcebergEnabled(!!(c.iceberg_enabled));
-      setIcebergSize(c.iceberg_size ?? 5);
+      setIcebergSize(c.iceberg_enabled ? (c.iceberg_size ?? 3) : 0);
     } catch (e) { setError(e.message); }
   }
   useEffect(() => { load(); }, []);
@@ -96,20 +96,14 @@ export default function AdminDuckySection() {
           </select>
         </div>
         <div>
-          <span className="text-[11px] text-neutral-500">🧊 Iceberg</span>
-          <button
-            type="button"
-            onClick={() => setIcebergEnabled((v) => !v)}
-            className={`mt-0.5 block w-full rounded-md py-1.5 text-sm font-semibold transition ${icebergEnabled ? 'bg-sky-600 text-white' : 'bg-neutral-200 text-neutral-600'}`}
-          >
-            {icebergEnabled ? 'Enabled' : 'Disabled'}
-          </button>
-        </div>
-        <div>
-          <span className="text-[11px] text-neutral-500">🧊 Iceberg size (1–10)</span>
-          <select className={inputCls + ' mt-0.5'} value={icebergSize} onChange={(e) => setIcebergSize(Number(e.target.value))} disabled={!icebergEnabled}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-              <option key={n} value={n}>{n === 1 ? '1 — tiny (buoy-like)' : n === 10 ? '10 — colossal' : n}</option>
+          <span className="text-[11px] text-neutral-500">🧊 Icebergs per race</span>
+          <select className={inputCls + ' mt-0.5'} value={icebergSize} onChange={(e) => {
+            const v = Number(e.target.value);
+            setIcebergSize(v);
+            setIcebergEnabled(v > 0);
+          }}>
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <option key={n} value={n}>{n === 0 ? 'Off' : n}</option>
             ))}
           </select>
         </div>

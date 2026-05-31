@@ -746,6 +746,7 @@ export default function DuckyDerbyPage() {
         @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}
         @keyframes ddbuoy{0%,100%{transform:translateY(-9px)}50%{transform:translateY(9px)}}
+        @keyframes ddgrass{from{background-position-x:0}to{background-position-x:-96px}}
         @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}`}</style>
 
       <div className="flex items-center justify-between">
@@ -767,7 +768,7 @@ export default function DuckyDerbyPage() {
           style={{ height: GRASS_TOP, background: grass, zIndex: 5 }}
         />
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
-        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: '0px bottom' }} />
+        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom', animation: 'ddgrass 5s linear infinite' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
 
         {/* cartoon wave layers — night mode gets boosted opacity for moonlit shimmer */}
@@ -876,7 +877,7 @@ export default function DuckyDerbyPage() {
         <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: grass, zIndex: 30 }} />
         {/* cartoon grass tufts poking up off the near bank — zIndex 33 so bottom-bank
             banner poles (zIndex 31) tuck behind */}
-        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 33, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: '0px bottom' }} />
+        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 33, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom', animation: 'ddgrass 4s linear infinite' }} />
 
         {/* start line (dashed) — a marking ON the water, so the ducks swim over it */}
         <div
