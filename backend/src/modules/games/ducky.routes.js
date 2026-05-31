@@ -228,7 +228,7 @@ export default async function duckyRoutes(fastify) {
       whirlpools[d.ord] = [...whirls, ...buoys, ...pads].sort((a, b) => a.at - b.at);
     }
 
-    // Sink logic: 50% random chance normally; iceberg guarantees a sink every race.
+    // Sink logic: 50% random chance normally; iceberg gives a 50/50 — sink or mega surge.
     let sinkOrd = null;
     let sinkAt = null;
     let icebergAt = null;
@@ -236,10 +236,26 @@ export default async function duckyRoutes(fastify) {
     const icebergEnabled = !!(cfg.iceberg_enabled) && sinkPool.length >= 1 && lineup.length >= 3;
 
     if (icebergEnabled) {
-      // Iceberg placed mid-course (0.28–0.70); the unlucky duck sinks exactly there.
+      // Iceberg placed mid-course (0.28–0.70).
       icebergAt = Math.round((0.28 + Math.random() * 0.42) * 1000) / 1000;
-      sinkOrd = sinkPool[Math.floor(Math.random() * sinkPool.length)].ord;
-      sinkAt = icebergAt;
+      const chosen = sinkPool[Math.floor(Math.random() * sinkPool.length)];
+      if (Math.random() < 0.5) {
+        // Outcome A: duck sinks at the iceberg.
+        sinkOrd = chosen.ord;
+        sinkAt = icebergAt;
+      } else {
+        // Outcome B: duck ricochets off the iceberg into a mega speed surge.
+        // Inject a large pad obstacle at the iceberg position and shave time off their finish.
+        const surgePad = {
+          kind: 'pad',
+          at: icebergAt,
+          boost: 0.28,    // covers 28% of the remaining course in the burst
+          boostMs: 700,   // short, dramatic sprint
+        };
+        whirlpools[chosen.ord] = [...(whirlpools[chosen.ord] || []), surgePad].sort((a, b) => a.at - b.at);
+        // Give them a genuine time advantage — still behind winner but meaningfully faster.
+        finishMs[chosen.ord] = Math.max(winMs + 350, finishMs[chosen.ord] - 3500);
+      }
     } else if (sinkPool.length >= 1 && lineup.length >= 3 && Math.random() < 0.5) {
       sinkOrd = sinkPool[Math.floor(Math.random() * sinkPool.length)].ord;
       sinkAt = Math.round((0.35 + Math.random() * 0.4) * 1000) / 1000;

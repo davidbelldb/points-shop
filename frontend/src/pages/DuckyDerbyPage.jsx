@@ -47,14 +47,17 @@ function grassBg(col) {
 // Maps admin size (1-10) → pixel height: 26 px (size 1) → 660 px (size 10, colossal).
 function icebergPixelH(sizeN) { return Math.round(26 + (sizeN - 1) * 70.4); }
 
-/* Iceberg obstacle — scales by height only; width tracks the SVG's natural aspect ratio. */
+/* Iceberg obstacle — fixed pixel dimensions derived from the PNG's natural aspect ratio
+   (3388 × 2048 ≈ 1.655 : 1).  PNG avoids the viewport-scaling quirk of the SVG. */
+const ICEBERG_RATIO = 3388 / 2048;
 function Iceberg({ sizeN }) {
   const iceH = icebergPixelH(sizeN);
+  const iceW = Math.round(iceH * ICEBERG_RATIO);
   return (
     <img
-      src="/iceberg.svg"
+      src="/iceberg.png"
       alt=""
-      style={{ height: iceH, width: 'auto', display: 'block' }}
+      style={{ width: iceW, height: iceH, display: 'block' }}
     />
   );
 }
