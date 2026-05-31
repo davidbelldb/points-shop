@@ -454,12 +454,17 @@ export default function DuckyDerbyPage() {
         } else if (o.kind === 'pad') {
           pads.push({ key: `p${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 30 });
         } else if (o.kind === 'iceberg') {
-          icebergs.push({ key: `ice${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 18 });
+          const sMin = Math.max(1, Math.min(10, config?.iceberg_size_min ?? 2));
+          const sMax = Math.max(sMin, Math.min(10, config?.iceberg_size ?? 7));
+          const sz = sMin + Math.random() * (sMax - sMin);
+          const iw = Math.round(70 + (sz - 1) * 7.8);
+          const ih = Math.round(iw * (815 / 1312));
+          icebergs.push({ key: `ice${d.ord}-${k}`, wx: o.at * COURSE_LEN, y: laneY + 18, iw, ih });
         }
       });
     });
     return { buoys, pads, icebergs };
-  }, [result]);
+  }, [result, config]);
 
   /* photo finish — if the top two finish within a whisker, slow-mo + a camera flash kick in */
   const photo = useMemo(() => {
@@ -823,22 +828,17 @@ export default function DuckyDerbyPage() {
           </div>
         ))}
 
-        {/* icebergs — floating hazards; 50/50 drown or speed boost */}
-        {(() => {
-          const sz = Math.max(1, Math.min(10, config?.iceberg_size ?? 5));
-          const iw = Math.round(70 + (sz - 1) * 7.8); // 70px at size 1 → 140px at size 10
-          const ih = Math.round(iw * (815 / 1312));    // preserve SVG aspect ratio
-          return courseObjects.icebergs.map((ice) => (
-            <div
-              key={ice.key}
-              ref={(el) => { icebergRefs.current[ice.key] = el; }}
-              className="absolute"
-              style={{ top: ice.y, left: preRace ? `${ice.wx * 100}%` : undefined, zIndex: 8 }}
-            >
-              <Iceberg w={iw} h={ih} />
-            </div>
-          ));
-        })()}
+        {/* icebergs — floating hazards; 50/50 drown or speed boost; each sized randomly within the admin range */}
+        {courseObjects.icebergs.map((ice) => (
+          <div
+            key={ice.key}
+            ref={(el) => { icebergRefs.current[ice.key] = el; }}
+            className="absolute"
+            style={{ top: ice.y, left: preRace ? `${ice.wx * 100}%` : undefined, zIndex: 8 }}
+          >
+            <Iceberg w={ice.iw} h={ice.ih} />
+          </div>
+        ))}
 
         {/* buoys — floating obstacles that bob up and down the river */}
         {courseObjects.buoys.map((b) => (

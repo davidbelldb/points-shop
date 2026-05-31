@@ -370,12 +370,15 @@ export default async function duckyRoutes(fastify) {
     if ('iceberg_size' in p && (!Number.isInteger(p.iceberg_size) || p.iceberg_size < 1 || p.iceberg_size > 10)) {
       return reply.code(400).send({ error: 'iceberg_size must be 1-10' });
     }
+    if ('iceberg_size_min' in p && (!Number.isInteger(p.iceberg_size_min) || p.iceberg_size_min < 1 || p.iceberg_size_min > 10)) {
+      return reply.code(400).send({ error: 'iceberg_size_min must be 1-10' });
+    }
     if ('iceberg_count' in p && (!Number.isInteger(p.iceberg_count) || p.iceberg_count < 0 || p.iceberg_count > 10)) {
       return reply.code(400).send({ error: 'iceberg_count must be 0-10' });
     }
     const updates = [];
     const values = [];
-    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'buoy_count', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days', 'iceberg_enabled', 'iceberg_size', 'iceberg_count']) {
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'buoy_count', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days', 'iceberg_enabled', 'iceberg_size', 'iceberg_size_min', 'iceberg_count']) {
       if (k in p) { values.push(p[k]); updates.push(`${k} = $${values.length}`); }
     }
     if (updates.length) {

@@ -17,7 +17,8 @@ export default function AdminDuckySection() {
   const [count, setCount] = useState(10);
   const [buoyCount, setBuoyCount] = useState(4);
   const [icebergEnabled, setIcebergEnabled] = useState(false);
-  const [icebergSize, setIcebergSize] = useState(5);
+  const [icebergSizeMin, setIcebergSizeMin] = useState(2);
+  const [icebergSizeMax, setIcebergSizeMax] = useState(7);
   const [icebergCount, setIcebergCount] = useState(3);
 
   async function load() {
@@ -31,7 +32,8 @@ export default function AdminDuckySection() {
       setCount(c.race_duck_count ?? 10);
       setBuoyCount(c.buoy_count ?? 4);
       setIcebergEnabled(!!(c.iceberg_enabled));
-      setIcebergSize(c.iceberg_size ?? 5);
+      setIcebergSizeMin(c.iceberg_size_min ?? 2);
+      setIcebergSizeMax(c.iceberg_size ?? 7);
       setIcebergCount(c.iceberg_count ?? 3);
     } catch (e) { setError(e.message); }
   }
@@ -56,7 +58,10 @@ export default function AdminDuckySection() {
     run(() => api.admin.updateDucky({
       water_colour: water, grass_colour: grass, mud_colour: mud, buoy_colour: buoy,
       race_duck_count: Number(count), buoy_count: Number(buoyCount),
-      iceberg_enabled: icebergEnabled, iceberg_size: Number(icebergSize), iceberg_count: Number(icebergCount),
+      iceberg_enabled: icebergEnabled,
+      iceberg_size_min: Number(icebergSizeMin),
+      iceberg_size: Number(icebergSizeMax),
+      iceberg_count: Number(icebergCount),
     }));
   }
 
@@ -110,11 +115,25 @@ export default function AdminDuckySection() {
           </select>
         </div>
         <div>
-          <span className="text-[11px] text-neutral-500">🧊 Iceberg size (1–10)</span>
-          <select className={inputCls + ' mt-0.5'} value={icebergSize} onChange={(e) => setIcebergSize(Number(e.target.value))} disabled={!icebergEnabled}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
+          <span className="text-[11px] text-neutral-500">🧊 Size — min</span>
+          <select className={inputCls + ' mt-0.5'} value={icebergSizeMin} disabled={!icebergEnabled}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setIcebergSizeMin(v);
+              if (v > icebergSizeMax) setIcebergSizeMax(v);
+            }}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div>
+          <span className="text-[11px] text-neutral-500">🧊 Size — max</span>
+          <select className={inputCls + ' mt-0.5'} value={icebergSizeMax} disabled={!icebergEnabled}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setIcebergSizeMax(v);
+              if (v < icebergSizeMin) setIcebergSizeMin(v);
+            }}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
       </div>
