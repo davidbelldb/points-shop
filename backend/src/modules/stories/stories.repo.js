@@ -142,7 +142,7 @@ async function notifyStoryPosted(authorId) {
   const other = rows[0];
   if (!other?.other_id) return;
   const title = `${other.author_name || 'Someone'} posted a sneaky story`;
-  const body = 'Tap to take a peek 👀';
+  const body = 'Tap to take a peek';
   await query(
     `INSERT INTO notifications (account_id, type, title, body, link_url)
      VALUES ($1, 'story', $2, $3, '/')`,

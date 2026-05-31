@@ -45,10 +45,15 @@ function TextIcon() {
 
 function NowPlayingIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeWidth="1.4" />
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      {/* Beam */}
+      <rect x="7" y="5" width="10" height="2" rx="1" />
+      {/* Left stem + note head */}
+      <rect x="7" y="5" width="1.8" height="9" rx="0.9" />
+      <ellipse cx="8" cy="15.5" rx="3" ry="2" transform="rotate(-15 8 15.5)" />
+      {/* Right stem + note head */}
+      <rect x="15.2" y="5" width="1.8" height="9" rx="0.9" />
+      <ellipse cx="16" cy="15.5" rx="3" ry="2" transform="rotate(-15 16 15.5)" />
     </svg>
   );
 }

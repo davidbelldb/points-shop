@@ -62,10 +62,17 @@ export async function getReel(id) {
   if (r.rows.length === 0) return null;
   const stories = await query(
     `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,
+            s.duration_seconds, s.stickers, s.thumbnail_url,
             s.created_at, s.expires_at,
             a.name     AS author_name,
             a.username AS author_username,
-            a.photo_url AS author_photo
+            a.photo_url AS author_photo,
+            COALESCE(
+              (SELECT json_agg(json_build_object('id', va.id, 'name', va.name, 'photo', va.photo_url, 'viewed_at', v.viewed_at))
+                 FROM story_views v JOIN accounts va ON va.id = v.viewer_id
+                WHERE v.story_id = s.id AND v.viewer_id <> s.author_id),
+              '[]'::json
+            ) AS viewers
        FROM reel_stories rs
        JOIN sneaky_stories s ON s.id = rs.story_id
        JOIN accounts a       ON a.id = s.author_id

@@ -39,13 +39,14 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   // Active emoji bursts — each burst is 30 floating glyphs of the picked
   // emoji. Cleaned up when the longest particle in the burst finishes.
   const [bursts, setBursts] = useState([]);
-  // Pause sources combine — paused if either pressing or the reply input is focused.
-  const [pausedByPress, setPausedByPress] = useState(false);
-  const [pausedByReply, setPausedByReply] = useState(false);
-  const paused = pausedByPress || pausedByReply;
   // Floating quick-reaction emojis, revealed by swiping up over the story
   // and hidden whenever the reply input takes focus.
   const [reactionsVisible, setReactionsVisible] = useState(false);
+  // Pause sources combine — paused if any of: pressing, reply input focused,
+  // highlight reel modal open, or swipe-up emoji tray visible.
+  const [pausedByPress, setPausedByPress] = useState(false);
+  const [pausedByReply, setPausedByReply] = useState(false);
+  const paused = pausedByPress || pausedByReply || reelModalOpen || reactionsVisible;
 
   const videoRef = useRef(null);
   const audioRef = useRef(null);

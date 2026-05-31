@@ -49,7 +49,7 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
                 onChange={(e) => set({ text: e.target.value })}
                 maxLength={60}
                 autoFocus
-                placeholder="e.g. Brighton Beach"
+                placeholder="e.g. City Kebab"
                 className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
               />
             </div>
@@ -62,7 +62,7 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
                   onChange={(e) => set({ title: e.target.value })}
                   maxLength={50}
                   autoFocus
-                  placeholder="Galvanize"
+                  placeholder="Class Historian"
                   className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
                 />
               </div>
@@ -72,7 +72,7 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
                   value={draft.artist}
                   onChange={(e) => set({ artist: e.target.value })}
                   maxLength={50}
-                  placeholder="The Chemical Brothers"
+                  placeholder="BRONCHO"
                   className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
                 />
               </div>
