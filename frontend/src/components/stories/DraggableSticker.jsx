@@ -98,6 +98,7 @@ export default function DraggableSticker({ sticker, stageRef, onChange, onTap, a
         top: `${sticker.y ?? 50}%`,
         transform: `translate(-50%, -50%) rotate(${rot}deg) scale(${scale})`,
         cursor: 'grab',
+        width: 'max-content',
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
