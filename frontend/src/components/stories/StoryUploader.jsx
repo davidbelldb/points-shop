@@ -46,7 +46,6 @@ export default function StoryUploader({ onClose, onPosted }) {
   const [emojiPicker, setEmojiPicker] = useState(null); // { index }
   const [gifPicker, setGifPicker] = useState(null);     // { index }
   const stageRef = useRef(null);
-  const dragRef = useRef(null);
 
   // Best-effort local detection — used so the duration slider only shows
   // for image stories (videos/audio play for their natural length).
@@ -83,41 +82,6 @@ export default function StoryUploader({ onClose, onPosted }) {
     if (n < 1024) return `${n} B`;
     if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
     return `${Math.round((n / (1024 * 1024)) * 10) / 10} MB`;
-  }
-
-  /* Sticker drag — pointer-event based so it works on touch + mouse.
-     We capture the pointer, then translate every move into a delta on
-     the preview container's bounding box, clamping to a sensible
-     in-frame range so the sticker can't be dragged off-screen. */
-  function onStickerPointerDown(e) {
-    if (!stageRef.current || !sticker) return;
-    e.stopPropagation();
-    const rect = stageRef.current.getBoundingClientRect();
-    dragRef.current = {
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      originalX: sticker.x,
-      originalY: sticker.y,
-      width: rect.width,
-      height: rect.height,
-    };
-    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* noop */ }
-  }
-  function onStickerPointerMove(e) {
-    const d = dragRef.current;
-    if (!d) return;
-    e.stopPropagation();
-    const dx = ((e.clientX - d.startClientX) / d.width) * 100;
-    const dy = ((e.clientY - d.startClientY) / d.height) * 100;
-    setSticker((s) => s ? {
-      ...s,
-      x: Math.max(15, Math.min(85, d.originalX + dx)),
-      y: Math.max(12, Math.min(88, d.originalY + dy)),
-    } : s);
-  }
-  function onStickerPointerUp(e) {
-    if (dragRef.current) e.stopPropagation();
-    dragRef.current = null;
   }
 
   /* ===== Canvas sticker CRUD ===== */
@@ -179,6 +143,7 @@ export default function StoryUploader({ onClose, onPosted }) {
       setSticker({
         type: 'slider',
         x: 50, y: 70,
+        rot: 0, scale: 1,
         prompt: '',
         start_label: '',
         end_label: '',
@@ -297,25 +262,18 @@ export default function StoryUploader({ onClose, onPosted }) {
                   <img src={previewUrl} alt="" className="h-full w-full object-contain" />
                 )}
 
-                {/* Sticker overlay — absolutely positioned at the sticker's
-                    (x%, y%). Pointer events bound here for drag-to-move. */}
+                {/* Sticker overlay — drag to move, two-finger to rotate +
+                    pinch-scale, tap to open config. */}
                 {sticker && (
-                  <div
-                    className="absolute touch-none"
-                    style={{
-                      left: `${sticker.x}%`,
-                      top: `${sticker.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                      cursor: 'grab',
-                    }}
-                    onPointerDown={onStickerPointerDown}
-                    onPointerMove={onStickerPointerMove}
-                    onPointerUp={onStickerPointerUp}
-                    onPointerCancel={onStickerPointerUp}
-                    onClick={(e) => { e.stopPropagation(); setConfigOpen(true); }}
+                  <DraggableSticker
+                    sticker={sticker}
+                    stageRef={stageRef}
+                    allowScale={true}
+                    onChange={(patch) => setSticker((s) => s ? { ...s, ...patch } : s)}
+                    onTap={() => setConfigOpen(true)}
                   >
                     <SliderSticker sticker={sticker} mode="editor" />
-                  </div>
+                  </DraggableSticker>
                 )}
 
                 {/* Canvas stickers — drag to move, two-finger to rotate
@@ -325,7 +283,7 @@ export default function StoryUploader({ onClose, onPosted }) {
                     key={i}
                     sticker={s}
                     stageRef={stageRef}
-                    allowScale={s.type === 'emoji' || s.type === 'gif'}
+                    allowScale={true}
                     onChange={(patch) => updateCanvasSticker(i, patch)}
                     onTap={() => openStickerEditor(i)}
                   >
