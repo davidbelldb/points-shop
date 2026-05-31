@@ -44,20 +44,17 @@ function grassBg(col) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-// Maps admin size (1-10) → pixel height: 26 px (tiny buoy-like) → 132 px (half-river monster).
-function icebergPixelH(sizeN) { return Math.round(26 + (sizeN - 1) * 11.8); }
+// Maps admin size (1-10) → pixel height: 26 px (size 1) → 660 px (size 10, colossal).
+function icebergPixelH(sizeN) { return Math.round(26 + (sizeN - 1) * 70.4); }
 
-/* Iceberg obstacle — uses the photoshopped iceberg.png asset.
-   Night mode adds a cold-blue glow; size scales the rendered dimensions. */
-function Iceberg({ sizeN, isDark }) {
+/* Iceberg obstacle — scales by height only; width tracks the SVG's natural aspect ratio. */
+function Iceberg({ sizeN }) {
   const iceH = icebergPixelH(sizeN);
-  const iceW = Math.round(iceH * 0.64);
-  const glow = isDark ? 'drop-shadow(0 0 6px rgba(130,200,255,0.75))' : undefined;
   return (
     <img
       src="/iceberg.svg"
       alt=""
-      style={{ width: iceW, height: iceH, objectFit: 'contain', display: 'block', filter: glow }}
+      style={{ height: iceH, width: 'auto', display: 'block' }}
     />
   );
 }
@@ -735,7 +732,6 @@ export default function DuckyDerbyPage() {
   const mud   = isDark ? NIGHT.mud   : (config?.mud_colour   || '#6b4a2a');
   const icebergSizeN = config?.iceberg_size || 5;
   const icebergH = icebergPixelH(icebergSizeN);
-  const icebergW = Math.round(icebergH * 0.64);
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
   const preRace = phase === 'betting' || phase === 'countdown';
@@ -807,20 +803,20 @@ export default function DuckyDerbyPage() {
           }}
         />
 
-        {/* iceberg — rises from the water, sinks any duck that strikes it */}
-        {courseObjects.iceberg && (
+        {/* iceberg — rises from the water, sinks any duck that strikes it.
+             Only shown during the race itself (not countdown/betting) to avoid size flicker.
+             z-index 8: behind ducks (10+) and speech bubbles, in front of waves (1). */}
+        {courseObjects.iceberg && phase === 'racing' && (
           <div
             ref={icebergRef}
             className="absolute"
             style={{
               top: WATER_TOP - Math.round(icebergH * 0.28),
-              left: preRace ? `${courseObjects.iceberg.wx * 100}%` : undefined,
-              marginLeft: -Math.round(icebergW / 2),
-              zIndex: 22,
+              zIndex: 8,
               animation: 'ddiceberg 7s ease-in-out infinite',
             }}
           >
-            <Iceberg sizeN={icebergSizeN} isDark={isDark} />
+            <Iceberg sizeN={icebergSizeN} />
           </div>
         )}
 
