@@ -138,12 +138,16 @@ function LilyPad({ isDark }) {
   );
 }
 
-/* An iceberg — renders the SVG asset at a fixed display size in the river. */
-function Iceberg({ w = 56, h = 36 }) {
+/* An iceberg — renders the SVG asset at a fixed display size in the river.
+   Width/height are set as both HTML attributes and CSS so the browser reserves
+   the exact footprint before the file finishes loading (no pop-in resize). */
+function Iceberg({ w = 110, h = 70 }) {
   return (
     <img
       src="/iceberg.svg"
       alt=""
+      width={w}
+      height={h}
       style={{ width: w, height: h, objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
     />
   );
@@ -756,6 +760,9 @@ export default function DuckyDerbyPage() {
       </div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      {/* Preload iceberg SVG so it's cached before the race starts — prevents pop-in resize */}
+      <img src="/iceberg.svg" alt="" aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }} />
 
       {/* ---- Race track (single layered container) ---- */}
       <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
