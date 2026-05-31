@@ -265,7 +265,7 @@ function placeClass(p) {
 }
 
 /* Form guide — each racer's recent finishing positions, shown under the odds list. */
-function FormGuide({ ducks, form }) {
+function FormGuide({ ducks, form, isDark }) {
   if (!form || ducks.length === 0) return null;
   return (
     <div>
@@ -949,7 +949,7 @@ export default function DuckyDerbyPage() {
         </div>
       </div>
 
-      <FormGuide ducks={ducks} form={form} />
+      <FormGuide ducks={ducks} form={form} isDark={isDark} />
 
       {/* ---- Bottom-anchored bet bar ----
            Lift content above the iPhone home-indicator / curved corner zone:
