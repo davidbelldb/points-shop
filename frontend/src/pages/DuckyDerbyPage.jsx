@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
+import { useTheme } from '../lib/ThemeContext.jsx';
 
 /* Side-scroller camera: course is COURSE_LEN screen-widths long; camera follows the leader. */
 const COURSE_LEN = 2.5;
@@ -43,11 +44,34 @@ function grassBg(col) {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-function DuckSprite({ ord, duckColour, billColour, w, h }) {
+// Subtle tiling star-field rendered on the night-sky top bank.
+function starfieldBg() {
+  const stars = Array.from({ length: 22 }, (_, i) => {
+    const x = ((i * 53 + 11) % 120).toFixed(1);
+    const y = ((i * 37 + 5) % 44).toFixed(1);
+    const r = i % 4 === 0 ? 1.3 : i % 3 === 0 ? 0.9 : 0.55;
+    const op = (0.35 + (i % 5) * 0.13).toFixed(2);
+    return `<circle cx='${x}' cy='${y}' r='${r}' fill='white' opacity='${op}'/>`;
+  }).join('');
+  return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='120' height='44'>${stars}</svg>`)}")`;
+}
+
+// Night-mode colour palette — replaces admin-configured colours when dark theme is active.
+const NIGHT = {
+  water:  '#0b2545',   // deep navy
+  grass:  '#1a3d20',   // dark forest
+  mud:    '#1a0e06',   // almost-black brown
+  skyTop: '#080f1c',   // near-black sky at zenith
+};
+
+function DuckSprite({ ord, duckColour, billColour, w, h, isDark }) {
   const [broken, setBroken] = useState(false);
+  // Moonlit filter: darkens, desaturates slightly, tints cool-blue — applied only in dark mode.
+  const nightFilter = isDark ? 'brightness(0.72) saturate(0.85) sepia(0.18) hue-rotate(198deg)' : undefined;
+
   if (broken) {
     return (
-      <div className="relative" style={{ width: w, height: h }}>
+      <div className="relative" style={{ width: w, height: h, filter: nightFilter }}>
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
           style={{ width: w * 0.82, height: w * 0.62, background: duckColour }}>
           <span className="absolute" style={{ right: -w * 0.13, top: '42%', width: w * 0.26, height: w * 0.16, background: billColour, borderRadius: '0 50% 50% 0' }} />
@@ -55,7 +79,7 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
       </div>
     );
   }
-  return <img src={`/duck_${ord}.png?v=6`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block' }} onError={() => setBroken(true)} />;
+  return <img src={`/duck_${ord}.png?v=6`} alt="" style={{ width: w, height: h, objectFit: 'contain', display: 'block', filter: nightFilter }} onError={() => setBroken(true)} />;
 }
 
 /* A tattered, hand-painted cloth flag held up by two black poles. The poles tuck
@@ -64,21 +88,24 @@ function DuckSprite({ ord, duckColour, billColour, w, h }) {
 const BANNER_TATTER =
   'polygon(0% 6%, 8% 0%, 30% 7%, 52% 1%, 73% 7%, 93% 0%, 100% 9%, 96% 30%, 100% 52%, 95% 73%, 100% 92%, 92% 100%, 72% 94%, 50% 100%, 27% 94%, 8% 100%, 0% 90%, 5% 70%, 0% 50%, 5% 27%)';
 
-function PoleBanner({ text, placement }) {
+function PoleBanner({ text, placement, isDark }) {
   const bottom = placement === 'bottom';
-  // bottom banners sit in front of the near bank; top banners tuck behind the grass fringe
   const poleZ = bottom ? 36 : 6;
   const clothZ = bottom ? 37 : 8;
+  // Night: deep midnight-purple cloth, pale-lavender text, near-black poles & backing.
+  const poleBg    = isDark ? '#07050f' : '#1a1a1a';
+  const backingBg = isDark ? '#07050f' : '#1a1a1a';
+  const clothBg   = isDark ? '#1e1848' : '#ffffff';
+  const clothCol  = isDark ? '#dcd8ff' : '#000000';
   return (
     <div className="relative">
-      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: poleZ }} />
-      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 44, background: '#1a1a1a', borderRadius: 2, zIndex: poleZ }} />
+      <div className="absolute" style={{ left: 4, top: 5, width: 5, height: 44, background: poleBg, borderRadius: 2, zIndex: poleZ }} />
+      <div className="absolute" style={{ right: 4, top: 5, width: 5, height: 44, background: poleBg, borderRadius: 2, zIndex: poleZ }} />
       <div className="relative" style={{ zIndex: clothZ }}>
-        {/* dark backing — shows as a tattered outline behind the cloth */}
-        <div className="absolute inset-0" style={{ background: '#1a1a1a', clipPath: BANNER_TATTER }} />
+        <div className="absolute inset-0" style={{ background: backingBg, clipPath: BANNER_TATTER }} />
         <div
-          className="relative whitespace-nowrap px-3.5 py-1 text-center text-[12px] font-extrabold uppercase text-black"
-          style={{ margin: 2, background: '#ffffff', clipPath: BANNER_TATTER }}
+          className="relative whitespace-nowrap px-3.5 py-1 text-center text-[12px] font-extrabold uppercase"
+          style={{ margin: 2, background: clothBg, color: clothCol, clipPath: BANNER_TATTER }}
         >
           {text}
         </div>
@@ -88,39 +115,49 @@ function PoleBanner({ text, placement }) {
 }
 
 /* A floating buoy — a coloured semicircle that bobs up and down the river. */
-function Buoy({ colour }) {
+function Buoy({ colour, isDark }) {
+  // In night mode darken the buoy and add a cool-blue highlight to read against dark water.
+  const buoyFilter = isDark ? 'brightness(0.7) saturate(1.15)' : undefined;
+  const anchorAlpha = isDark ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.45)';
+  const borderAlpha = isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.28)';
   return (
-    <div style={{ width: 30, height: 18, position: 'relative' }}>
-      <div style={{ position: 'absolute', left: '50%', top: -5, marginLeft: -1.5, width: 3, height: 7, background: 'rgba(0,0,0,0.45)' }} />
-      <div style={{ position: 'absolute', inset: 0, background: colour, borderRadius: '15px 15px 4px 4px', border: '2px solid rgba(0,0,0,0.28)' }} />
+    <div style={{ width: 30, height: 18, position: 'relative', filter: buoyFilter }}>
+      <div style={{ position: 'absolute', left: '50%', top: -5, marginLeft: -1.5, width: 3, height: 7, background: anchorAlpha }} />
+      <div style={{ position: 'absolute', inset: 0, background: colour, borderRadius: '15px 15px 4px 4px', border: `2px solid ${borderAlpha}` }} />
     </div>
   );
 }
 
 /* A lily pad — a green disc with a little flower; crossing one gives a speed boost. */
-function LilyPad() {
+function LilyPad({ isDark }) {
+  const padBg  = isDark ? '#0a3d14' : '#3a9d4a';
+  const flower = isDark ? '#e8207a' : '#ff8fc3';
   return (
-    <div style={{ width: 38, height: 20, borderRadius: '50%', background: '#3a9d4a', boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.18)', position: 'relative' }}>
-      <div style={{ position: 'absolute', left: '22%', top: '22%', width: 9, height: 9, borderRadius: '50%', background: '#ff8fc3' }} />
+    <div style={{ width: 38, height: 20, borderRadius: '50%', background: padBg, boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.28)', position: 'relative' }}>
+      <div style={{ position: 'absolute', left: '22%', top: '22%', width: 9, height: 9, borderRadius: '50%', background: flower }} />
       <div style={{ position: 'absolute', left: '27%', top: '32%', width: 3, height: 3, borderRadius: '50%', background: '#ffe27a' }} />
     </div>
   );
 }
 
 /* A burst of falling confetti — pure CSS, clipped by the track's overflow-hidden. */
-function Confetti() {
+// Night confetti: neon/electric palette pops brilliantly against the dark track.
+const DAY_COLS   = ['#ffd23f', '#ff5d8f', '#4aa3c7', '#5bbf3a', '#ff8c42', '#a878ff', '#ffffff'];
+const NIGHT_COLS = ['#ffe600', '#ff1a6e', '#00d4ff', '#39ff14', '#ff7700', '#bf3eff', '#ffffff'];
+
+function Confetti({ isDark }) {
   const pieces = useMemo(() => {
-    const cols = ['#ffd23f', '#ff5d8f', '#4aa3c7', '#5bbf3a', '#ff8c42', '#a878ff', '#ffffff'];
     return Array.from({ length: 60 }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
-      col: cols[i % cols.length],
+      colIdx: i % 7,
       delay: Math.random() * 1.2,
       dur: 1.9 + Math.random() * 1.8,
       size: 6 + Math.random() * 6,
       drift: (Math.random() - 0.5) * 90,
     }));
   }, []);
+  const cols = isDark ? NIGHT_COLS : DAY_COLS;
   return (
     <div className="pointer-events-none absolute inset-0" style={{ zIndex: 35 }}>
       {pieces.map((p) => (
@@ -129,7 +166,7 @@ function Confetti() {
           className="absolute"
           style={{
             left: `${p.left}%`, top: -24, width: p.size, height: p.size * 0.55,
-            background: p.col, borderRadius: 1,
+            background: cols[p.colIdx], borderRadius: 1,
             animation: `ddconfetti ${p.dur}s linear ${p.delay}s infinite`,
             ['--drift']: `${p.drift}px`,
           }}
@@ -250,7 +287,7 @@ function FormGuide({ ducks, form }) {
                 <tr key={d.ord} className={i > 0 ? 'border-t border-neutral-100' : ''}>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={28} h={24} />
+                      <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={28} h={24} isDark={isDark} />
                       <span className="font-medium text-neutral-800">{d.name}</span>
                     </div>
                   </td>
@@ -282,6 +319,8 @@ function FormGuide({ ducks, form }) {
 }
 
 export default function DuckyDerbyPage() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const { refresh: refreshBasket } = useBasket();
   const [phase, setPhase] = useState('loading');
   const [config, setConfig] = useState(null);
@@ -665,9 +704,9 @@ export default function DuckyDerbyPage() {
     );
   }
 
-  const water = config?.water_colour || '#4aa3c7';
-  const grass = config?.grass_colour || '#5bbf3a';
-  const mud = config?.mud_colour || '#6b4a2a';
+  const water = isDark ? NIGHT.water : (config?.water_colour || '#4aa3c7');
+  const grass = isDark ? NIGHT.grass : (config?.grass_colour || '#5bbf3a');
+  const mud   = isDark ? NIGHT.mud   : (config?.mud_colour   || '#6b4a2a');
   const noFunds = balance <= 0;
   const atBetting = phase === 'betting';
   const preRace = phase === 'betting' || phase === 'countdown';
@@ -695,16 +734,50 @@ export default function DuckyDerbyPage() {
       <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
        {/* scene layer */}
        <div className="absolute inset-0">
-        {/* far bank: grass + mud — above the water/start line, below the ducks */}
-        <div className="absolute inset-x-0 top-0" style={{ height: GRASS_TOP, background: grass, zIndex: 5 }} />
+        {/* far bank: sky/grass + mud — above the water/start line, below the ducks */}
+        {/* Night: gradient from deep-sky at top to dark-forest at bottom; Day: solid grass colour */}
+        <div
+          className="absolute inset-x-0 top-0"
+          style={{
+            height: GRASS_TOP,
+            background: isDark
+              ? `linear-gradient(to bottom, ${NIGHT.skyTop} 48%, ${NIGHT.grass} 100%)`
+              : grass,
+            zIndex: 5,
+          }}
+        />
+        {/* Starfield overlay — only visible in night mode, sits above sky, below grass fringe */}
+        {isDark && (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0"
+            style={{
+              height: GRASS_TOP - 6,
+              backgroundImage: starfieldBg(),
+              backgroundRepeat: 'repeat',
+              zIndex: 6,
+              opacity: 0.9,
+            }}
+          />
+        )}
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
 
-        {/* cartoon wave layers */}
-        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 20, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: 0.55, animation: 'ddwave 7s linear infinite' }} />
-        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 80, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: 0.4, animation: 'ddwave 11s linear infinite' }} />
-        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 140, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: 0.5, animation: 'ddwave 9s linear infinite' }} />
+        {/* Moon glow — soft radial light from top-right, night mode only */}
+        {isDark && (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: 'radial-gradient(ellipse at 80% 6%, rgba(190,215,255,0.14) 0%, transparent 52%)',
+              zIndex: 4,
+            }}
+          />
+        )}
+
+        {/* cartoon wave layers — night mode gets boosted opacity for moonlit shimmer */}
+        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 20, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 26)), backgroundRepeat: 'repeat-x', opacity: isDark ? 0.75 : 0.55, animation: 'ddwave 7s linear infinite' }} />
+        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 80, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, -22)), backgroundRepeat: 'repeat-x', opacity: isDark ? 0.55 : 0.4, animation: 'ddwave 11s linear infinite' }} />
+        <div className="absolute inset-x-0" style={{ top: WATER_TOP + 140, height: 30, zIndex: 1, backgroundImage: waveBg(shade(water, 40)), backgroundRepeat: 'repeat-x', opacity: isDark ? 0.7 : 0.5, animation: 'ddwave 9s linear infinite' }} />
 
         {/* pole banners — top or bottom bank, spread evenly along the course */}
         {bannerLayout.map((b) => {
@@ -716,7 +789,7 @@ export default function DuckyDerbyPage() {
               className="absolute"
               style={{ top: isBottom ? TRACK_H - GRASS_BOTTOM - 41 : 6, left: preRace ? `${b.wx * 100}%` : undefined }}
             >
-              <PoleBanner text={b.text} placement={b.placement} />
+              <PoleBanner text={b.text} placement={b.placement} isDark={isDark} />
             </div>
           );
         })}
@@ -728,7 +801,9 @@ export default function DuckyDerbyPage() {
           style={{
             top: WATER_TOP - 8, left: preRace ? `${COURSE_LEN * 100}%` : undefined,
             width: 16, height: TRACK_H - WATER_TOP + 8, zIndex: 2,
-            background: 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
+            background: isDark
+              ? 'repeating-conic-gradient(#07050f 0% 25%, #c8d8f0 0% 50%) 0 0 / 16px 16px'
+              : 'repeating-conic-gradient(#1a1a1a 0% 25%, #fff 0% 50%) 0 0 / 16px 16px',
           }}
         />
 
@@ -740,7 +815,7 @@ export default function DuckyDerbyPage() {
             className="absolute"
             style={{ top: p.y, left: preRace ? `${p.wx * 100}%` : undefined, zIndex: 7 }}
           >
-            <LilyPad />
+            <LilyPad isDark={isDark} />
           </div>
         ))}
 
@@ -752,7 +827,7 @@ export default function DuckyDerbyPage() {
             className="absolute"
             style={{ top: b.y, left: preRace ? `${b.wx * 100}%` : undefined, zIndex: 9, animation: `ddbuoy ${b.dur}s ease-in-out ${b.delay}s infinite` }}
           >
-            <Buoy colour={b.colour} />
+            <Buoy colour={b.colour} isDark={isDark} />
           </div>
         ))}
 
@@ -765,9 +840,18 @@ export default function DuckyDerbyPage() {
             style={{ top: laneTop(i), left: preRace ? '0%' : undefined, zIndex: 10 + i }}
           >
             {bubbles[d.ord] && (
-              <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-800 shadow">
+              <div
+                className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2 py-0.5 text-[10px] font-semibold shadow"
+                style={{
+                  background: isDark ? '#1e2d45' : '#ffffff',
+                  color: isDark ? '#c8deff' : '#1f2937',
+                }}
+              >
                 {bubbles[d.ord]}
-                <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
+                <span
+                  className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45"
+                  style={{ background: isDark ? '#1e2d45' : '#ffffff' }}
+                />
               </div>
             )}
             <div
@@ -775,7 +859,7 @@ export default function DuckyDerbyPage() {
               className={phase === 'racing' ? '' : 'animate-[ddbob_2.4s_ease-in-out_infinite]'}
               style={{ animationDelay: `${(-((i * 0.7) % 2.4)).toFixed(2)}s` }}
             >
-              <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={DUCK_W} h={DUCK_H} />
+              <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={DUCK_W} h={DUCK_H} isDark={isDark} />
             </div>
           </div>
         ))}
@@ -794,7 +878,7 @@ export default function DuckyDerbyPage() {
         />
 
         {/* confetti — falls from when the winner crosses the line */}
-        {confetti && <Confetti />}
+        {confetti && <Confetti isDark={isDark} />}
 
         {/* 3-2-1-GO! countdown overlay */}
         {phase === 'countdown' && (
@@ -820,12 +904,21 @@ export default function DuckyDerbyPage() {
       </div>
 
       {/* ---- Live commentary ticker ---- */}
-      <div className="relative h-9 overflow-hidden rounded-xl border border-teal-400 bg-teal-50">
+      <div
+        className="relative h-9 overflow-hidden rounded-xl border"
+        style={{
+          borderColor: isDark ? '#2a5a6a' : '#2dd4bf',
+          background:  isDark ? '#0d1f2d' : '#f0fdfa',
+        }}
+      >
         {commentary.map((ln, idx) => (
           <div
             key={ln.id}
-            className="absolute inset-0 flex items-center justify-center px-3 text-center text-[13px] font-semibold text-neutral-900"
-            style={{ animation: `${idx === commentary.length - 1 ? 'ddtickerIn' : 'ddtickerOut'} 0.5s ease forwards` }}
+            className="absolute inset-0 flex items-center justify-center px-3 text-center text-[13px] font-semibold"
+            style={{
+              color: isDark ? '#7dd8e8' : '#111827',
+              animation: `${idx === commentary.length - 1 ? 'ddtickerIn' : 'ddtickerOut'} 0.5s ease forwards`,
+            }}
           >
             {ln.text}
           </div>
@@ -841,10 +934,12 @@ export default function DuckyDerbyPage() {
               key={d.ord}
               onClick={atBetting ? () => setPickedOrd(d.ord) : undefined}
               className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
-                pickedOrd === d.ord ? 'border-amber-500 bg-amber-50' : 'border-neutral-200 bg-white'
+                pickedOrd === d.ord
+                  ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40'
+                  : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800'
               } ${atBetting ? '' : 'cursor-default'}`}
             >
-              <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={38} h={32} />
+              <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={38} h={32} isDark={isDark} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium">{d.name}</p>
                 <p className="text-[11px] font-bold text-neutral-500">{oddsLabel(d.odds_num, d.odds_den)}</p>
@@ -860,7 +955,7 @@ export default function DuckyDerbyPage() {
            Lift content above the iPhone home-indicator / curved corner zone:
            - safe-area inset on supported browsers (iOS PWA), plus a 12px buffer
            - generous fallback padding (pb-5) for everything else */}
-      <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t border-neutral-200 bg-white px-4 pt-3 pb-5 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+      <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t px-4 pt-3 pb-5 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-neutral-700 dark:bg-neutral-900 border-neutral-200 bg-white">
         {noFunds ? (
           <p className="py-1 text-center text-sm font-medium text-amber-800">
             You need points to place a bet — win some elsewhere first!
@@ -872,7 +967,7 @@ export default function DuckyDerbyPage() {
               <input
                 type="number" inputMode="numeric" min={1} max={balance}
                 value={stake} onChange={(e) => setStake(e.target.value)}
-                className="mt-0.5 block w-full rounded-md border border-neutral-200 px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none"
+                className="mt-0.5 block w-full rounded-md border border-neutral-200 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder-neutral-500 px-2.5 py-2 text-sm focus:border-amber-500 focus:outline-none"
                 placeholder="Points"
               />
             </label>
@@ -894,7 +989,7 @@ export default function DuckyDerbyPage() {
       {/* ---- Result modal ---- */}
       {phase === 'result' && result && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-neutral-900 p-6 shadow-2xl">
             <div className="-mt-1 mb-1 flex justify-center">
               <DuckSprite
                 ord={result.winner_ord}
@@ -902,6 +997,7 @@ export default function DuckyDerbyPage() {
                 billColour={ducks.find((d) => d.ord === result.winner_ord)?.bill_colour}
                 w={104}
                 h={92}
+                isDark={isDark}
               />
             </div>
             <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
@@ -910,7 +1006,7 @@ export default function DuckyDerbyPage() {
             <p className={`mt-2 text-center text-3xl font-extrabold ${result.won ? 'text-emerald-600' : 'text-pink-500'}`}>
               {result.won ? `+${result.payout} POINTS` : `-${result.stake} POINTS`}
             </p>
-            <div className="mt-4 rounded-xl bg-neutral-100 px-4 py-3 text-center text-sm text-neutral-700">
+            <div className="mt-4 rounded-xl bg-neutral-100 dark:bg-neutral-800 px-4 py-3 text-center text-sm text-neutral-700 dark:text-neutral-300">
               {(() => {
                 const winner = ducks.find((d) => d.ord === result.winner_ord);
                 const mine = ducks.find((d) => d.ord === result.picked_ord);
