@@ -3,8 +3,12 @@ import { api } from '../../lib/api.js';
 import SliderSticker from './SliderSticker.jsx';
 import SliderStickerConfig from './SliderStickerConfig.jsx';
 import StickerDrawer from './StickerDrawer.jsx';
-import TextSticker from './TextSticker.jsx';
 import TextStickerConfig from './TextStickerConfig.jsx';
+import PillStickerConfig from './PillStickerConfig.jsx';
+import EmojiStickerPicker from './EmojiStickerPicker.jsx';
+import GifStickerPicker from './GifStickerPicker.jsx';
+import StickerContent from './StickerContent.jsx';
+import DraggableSticker from './DraggableSticker.jsx';
 
 /* Modal sheet for adding a new story. iPhone's <input type="file"> with
    image/video/audio accept brings up the native picker — Photo Library,
@@ -32,14 +36,17 @@ export default function StoryUploader({ onClose, onPosted }) {
   const [sticker, setSticker] = useState(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // Floating text stickers — independent of the single slider sticker, so the
-  // user can stack several lines of text plus an optional slider. textEditor
-  // holds which one is being edited ({ index } where index === null = new).
-  const [textStickers, setTextStickers] = useState([]);
-  const [textEditor, setTextEditor] = useState(null);
+  // Canvas stickers — every non-slider overlay (text, emoji, gif, location,
+  // playing) lives in one array so they share drag/rotate/scale. The slider
+  // sticker stays separate (it has its own interactive config + single slot).
+  const [canvasStickers, setCanvasStickers] = useState([]);
+  // Which canvas sticker (if any) has an open editor/picker. `index === null`
+  // means "creating a new one"; otherwise the array index being edited.
+  const [formEditor, setFormEditor] = useState(null);   // { kind:'text'|'location'|'playing', index }
+  const [emojiPicker, setEmojiPicker] = useState(null); // { index }
+  const [gifPicker, setGifPicker] = useState(null);     // { index }
   const stageRef = useRef(null);
   const dragRef = useRef(null);
-  const textDragMovedRef = useRef(false);
 
   // Best-effort local detection — used so the duration slider only shows
   // for image stories (videos/audio play for their natural length).
@@ -113,69 +120,55 @@ export default function StoryUploader({ onClose, onPosted }) {
     dragRef.current = null;
   }
 
-  /* Text-sticker drag — same model as the slider but keyed to an index so
-     each text line moves independently. textDragMovedRef lets the trailing
-     click skip opening the editor when the gesture was actually a drag. */
-  function onTextPointerDown(e, index) {
-    if (!stageRef.current) return;
-    e.stopPropagation();
-    const rect = stageRef.current.getBoundingClientRect();
-    const t = textStickers[index];
-    textDragMovedRef.current = false;
-    dragRef.current = {
-      kind: 'text',
-      index,
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      originalX: t.x,
-      originalY: t.y,
-      width: rect.width,
-      height: rect.height,
-    };
-    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* noop */ }
+  /* ===== Canvas sticker CRUD ===== */
+  function updateCanvasSticker(index, patch) {
+    setCanvasStickers((arr) => arr.map((s, i) => i === index ? { ...s, ...patch } : s));
   }
-  function onTextPointerMove(e) {
-    const d = dragRef.current;
-    if (!d || d.kind !== 'text') return;
-    e.stopPropagation();
-    const dx = ((e.clientX - d.startClientX) / d.width) * 100;
-    const dy = ((e.clientY - d.startClientY) / d.height) * 100;
-    if (Math.abs(e.clientX - d.startClientX) > 3 || Math.abs(e.clientY - d.startClientY) > 3) {
-      textDragMovedRef.current = true;
-    }
-    setTextStickers((arr) => arr.map((s, i) => i === d.index ? {
-      ...s,
-      x: Math.max(8, Math.min(92, d.originalX + dx)),
-      y: Math.max(8, Math.min(92, d.originalY + dy)),
-    } : s));
+  function removeCanvasSticker(index) {
+    setCanvasStickers((arr) => arr.filter((_, i) => i !== index));
   }
-  function onTextPointerUp(e) {
-    if (dragRef.current?.kind === 'text') e.stopPropagation();
-    dragRef.current = null;
+  function addCanvasSticker(obj) {
+    setCanvasStickers((arr) => [...arr, { rot: 0, x: 50, y: 45, ...obj }]);
   }
 
-  // Drawer → Text: always open a fresh editor for a new line.
-  function pickTextFromDrawer() {
+  // Tapping a placed sticker re-opens the right editor/picker for its type.
+  function openStickerEditor(index) {
+    const s = canvasStickers[index];
+    if (!s) return;
+    if (s.type === 'emoji') setEmojiPicker({ index });
+    else if (s.type === 'gif') setGifPicker({ index });
+    else setFormEditor({ kind: s.type, index }); // text | location | playing
+  }
+
+  // Drawer entry points — open a fresh editor/picker for a new sticker.
+  function pickFromDrawer(kind) {
     setDrawerOpen(false);
-    setTextEditor({ index: null });
+    if (kind === 'emoji') setEmojiPicker({ index: null });
+    else if (kind === 'gif') setGifPicker({ index: null });
+    else setFormEditor({ kind, index: null }); // text | location | playing
   }
-  function saveText(next) {
-    const clean = { ...next, type: 'text' };
-    if (!clean.text || !clean.text.trim()) { // empty = treat as remove/cancel
-      if (textEditor?.index != null) removeText(textEditor.index);
-      setTextEditor(null);
-      return;
-    }
-    clean.text = clean.text.trim();
-    setTextStickers((arr) => {
-      if (textEditor?.index == null) return [...arr, clean];
-      return arr.map((s, i) => i === textEditor.index ? { ...s, ...clean } : s);
-    });
-    setTextEditor(null);
+
+  // Save handler for the form-based editors (text / location / playing).
+  function saveForm(next) {
+    const { kind, index } = formEditor ?? {};
+    const clean = { ...next, type: kind };
+    if (index == null) addCanvasSticker(clean);
+    else updateCanvasSticker(index, clean);
+    setFormEditor(null);
   }
-  function removeText(index) {
-    setTextStickers((arr) => arr.filter((_, i) => i !== index));
-    setTextEditor(null);
+
+  function chooseEmoji(em) {
+    const { index } = emojiPicker ?? {};
+    if (index == null) addCanvasSticker({ type: 'emoji', emoji: em, scale: 1 });
+    else updateCanvasSticker(index, { emoji: em });
+    setEmojiPicker(null);
+  }
+
+  function chooseGif(gif) {
+    const { index } = gifPicker ?? {};
+    if (index == null) addCanvasSticker({ type: 'gif', url: gif.url, aspect: gif.aspect, scale: 1 });
+    else updateCanvasSticker(index, { url: gif.url, aspect: gif.aspect });
+    setGifPicker(null);
   }
 
   // Drawer → Slider: if there's an existing slider, open its config for
@@ -212,7 +205,7 @@ export default function StoryUploader({ onClose, onPosted }) {
       };
       if (type === 'image') payload.duration_seconds = seconds;
       if (type === 'video' && thumbnail_url) payload.thumbnail_url = thumbnail_url;
-      const allStickers = [...(sticker ? [sticker] : []), ...textStickers];
+      const allStickers = [...(sticker ? [sticker] : []), ...canvasStickers];
       if (allStickers.length) payload.stickers = allStickers.slice(0, 6);
       await api.createStory(payload);
       onPosted?.();
@@ -325,29 +318,19 @@ export default function StoryUploader({ onClose, onPosted }) {
                   </div>
                 )}
 
-                {/* Text stickers — each draggable + tappable to edit. */}
-                {textStickers.map((t, i) => (
-                  <div
+                {/* Canvas stickers — drag to move, two-finger to rotate
+                    (and pinch-scale emoji/gif), tap to edit. */}
+                {canvasStickers.map((s, i) => (
+                  <DraggableSticker
                     key={i}
-                    className="absolute touch-none"
-                    style={{
-                      left: `${t.x}%`,
-                      top: `${t.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                      cursor: 'grab',
-                    }}
-                    onPointerDown={(e) => onTextPointerDown(e, i)}
-                    onPointerMove={onTextPointerMove}
-                    onPointerUp={onTextPointerUp}
-                    onPointerCancel={onTextPointerUp}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (textDragMovedRef.current) { textDragMovedRef.current = false; return; }
-                      setTextEditor({ index: i });
-                    }}
+                    sticker={s}
+                    stageRef={stageRef}
+                    allowScale={s.type === 'emoji' || s.type === 'gif'}
+                    onChange={(patch) => updateCanvasSticker(i, patch)}
+                    onTap={() => openStickerEditor(i)}
                   >
-                    <TextSticker sticker={t} />
-                  </div>
+                    <StickerContent sticker={s} />
+                  </DraggableSticker>
                 ))}
               </div>
 
@@ -393,9 +376,9 @@ export default function StoryUploader({ onClose, onPosted }) {
                 <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
               <span>Add stickers</span>
-              {(sticker ? 1 : 0) + textStickers.length > 0 && (
+              {(sticker ? 1 : 0) + canvasStickers.length > 0 && (
                 <span className="ml-1 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                  {(sticker ? 1 : 0) + textStickers.length} added
+                  {(sticker ? 1 : 0) + canvasStickers.length} added
                 </span>
               )}
             </button>
@@ -428,19 +411,44 @@ export default function StoryUploader({ onClose, onPosted }) {
       {drawerOpen && (
         <StickerDrawer
           hasSlider={!!sticker}
-          textCount={textStickers.length}
           onPickSlider={pickSliderFromDrawer}
-          onPickText={pickTextFromDrawer}
+          onPick={pickFromDrawer}
           onClose={() => setDrawerOpen(false)}
         />
       )}
 
-      {textEditor && (
+      {formEditor?.kind === 'text' && (
         <TextStickerConfig
-          initial={textEditor.index != null ? textStickers[textEditor.index] : null}
-          onCancel={() => setTextEditor(null)}
-          onSave={saveText}
-          onDelete={textEditor.index != null ? () => removeText(textEditor.index) : undefined}
+          initial={formEditor.index != null ? canvasStickers[formEditor.index] : null}
+          onCancel={() => setFormEditor(null)}
+          onSave={saveForm}
+          onDelete={formEditor.index != null ? () => { removeCanvasSticker(formEditor.index); setFormEditor(null); } : undefined}
+        />
+      )}
+
+      {(formEditor?.kind === 'location' || formEditor?.kind === 'playing') && (
+        <PillStickerConfig
+          kind={formEditor.kind}
+          initial={formEditor.index != null ? canvasStickers[formEditor.index] : null}
+          onCancel={() => setFormEditor(null)}
+          onSave={saveForm}
+          onDelete={formEditor.index != null ? () => { removeCanvasSticker(formEditor.index); setFormEditor(null); } : undefined}
+        />
+      )}
+
+      {emojiPicker && (
+        <EmojiStickerPicker
+          onSelect={chooseEmoji}
+          onClose={() => setEmojiPicker(null)}
+          onRemove={emojiPicker.index != null ? () => { removeCanvasSticker(emojiPicker.index); setEmojiPicker(null); } : undefined}
+        />
+      )}
+
+      {gifPicker && (
+        <GifStickerPicker
+          onSelect={chooseGif}
+          onClose={() => setGifPicker(null)}
+          onRemove={gifPicker.index != null ? () => { removeCanvasSticker(gifPicker.index); setGifPicker(null); } : undefined}
         />
       )}
     </div>

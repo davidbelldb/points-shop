@@ -6,11 +6,11 @@
 
 const STICKER_TYPES = [
   { id: 'slider',  label: 'Slider',       icon: SliderIcon,     enabled: true  },
-  { id: 'emoji',   label: 'Emoji',        icon: EmojiIcon,      enabled: false },
+  { id: 'emoji',   label: 'Emoji',        icon: EmojiIcon,      enabled: true  },
   { id: 'text',    label: 'Text Line',    icon: TextIcon,       enabled: true  },
-  { id: 'playing', label: 'Now Playing',  icon: NowPlayingIcon, enabled: false },
-  { id: 'place',   label: 'Location',     icon: LocationIcon,   enabled: false },
-  { id: 'gif',     label: 'GIF',          icon: GifIcon,        enabled: false },
+  { id: 'playing', label: 'Now Playing',  icon: NowPlayingIcon, enabled: true  },
+  { id: 'location', label: 'Location',    icon: LocationIcon,   enabled: true  },
+  { id: 'gif',     label: 'GIF',          icon: GifIcon,        enabled: true  },
 ];
 
 function SliderIcon() {
@@ -100,7 +100,7 @@ function StickerTile({ entry, badge, onClick }) {
   );
 }
 
-export default function StickerDrawer({ onClose, onPickSlider, onPickText, hasSlider, textCount = 0 }) {
+export default function StickerDrawer({ onClose, onPickSlider, onPick, hasSlider }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
       <div className="w-full max-w-md rounded-t-2xl bg-white sm:rounded-2xl">
@@ -115,16 +115,8 @@ export default function StickerDrawer({ onClose, onPickSlider, onPickText, hasSl
             <StickerTile
               key={t.id}
               entry={t}
-              badge={
-                t.id === 'slider' ? (hasSlider ? 'Edit' : null)
-                : t.id === 'text' ? (textCount > 0 ? `${textCount} added` : null)
-                : null
-              }
-              onClick={
-                t.id === 'slider' ? onPickSlider
-                : t.id === 'text' ? onPickText
-                : undefined
-              }
+              badge={t.id === 'slider' ? (hasSlider ? 'Edit' : null) : null}
+              onClick={t.id === 'slider' ? onPickSlider : () => onPick?.(t.id)}
             />
           ))}
         </div>

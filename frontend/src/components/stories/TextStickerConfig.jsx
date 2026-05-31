@@ -7,8 +7,9 @@ import TextSticker from './TextSticker.jsx';
    exactly what lands on the story. Position (x/y %) is owned by the canvas
    drag, so it's preserved across edits and not touched here. */
 const COLORS = ['#ffffff', '#000000', '#f43f5e', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#14b8a6'];
+const PILL_COLORS = ['rgba(0,0,0,0.45)', '#000000', '#ffffff', '#f43f5e', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7'];
 const SIZES = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];
-const EMPTY = { type: 'text', text: '', color: '#ffffff', size: 'm', bg: false, x: 50, y: 45 };
+const EMPTY = { type: 'text', text: '', color: '#ffffff', size: 'm', bg: false, bgColor: 'rgba(0,0,0,0.45)', rot: 0, x: 50, y: 45 };
 
 export default function TextStickerConfig({ initial, onCancel, onSave, onDelete }) {
   const [draft, setDraft] = useState(() => ({ ...EMPTY, ...(initial ?? {}) }));
@@ -97,6 +98,26 @@ export default function TextStickerConfig({ initial, onCancel, onSave, onDelete 
               </button>
             </div>
           </div>
+
+          {draft.bg && (
+            <div>
+              <label className="text-xs font-semibold text-neutral-500">Pill colour</label>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {PILL_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => set({ bgColor: c })}
+                    aria-label={`Pill colour ${c}`}
+                    className={`h-8 w-8 rounded-full border transition ${
+                      draft.bgColor === c ? 'ring-2 ring-amber-500 ring-offset-2' : 'border-neutral-300'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {onDelete && (
             <button

@@ -15,7 +15,7 @@ export default function TextSticker({ sticker }) {
         fontSize: `${size}px`,
         color,
         textShadow: hasBg ? 'none' : '0 1px 5px rgba(0,0,0,0.65)',
-        background: hasBg ? 'rgba(0,0,0,0.45)' : 'transparent',
+        background: hasBg ? (sticker?.bgColor || 'rgba(0,0,0,0.45)') : 'transparent',
         padding: hasBg ? '4px 12px' : 0,
         borderRadius: hasBg ? '12px' : 0,
         backdropFilter: hasBg ? 'blur(2px)' : 'none',

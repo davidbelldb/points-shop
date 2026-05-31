@@ -4,7 +4,7 @@ import { useAuth } from '../../lib/AuthContext.jsx';
 import { useTheme } from '../../lib/ThemeContext.jsx';
 import AddToReelModal from './AddToReelModal.jsx';
 import SliderSticker from './SliderSticker.jsx';
-import TextSticker from './TextSticker.jsx';
+import StickerContent from './StickerContent.jsx';
 
 /* Full-screen story player. Renders one story at a time from a flat queue,
    auto-advances after the story's duration_seconds (default 5s for images,
@@ -499,8 +499,10 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             interactive slider that posts a chat reply on release. */}
         {Array.isArray(story.stickers) && story.stickers.map((s, i) => {
           if (!s) return null;
-          // Floating text — decorative, lets taps pass through to advance.
-          if (s.type === 'text') {
+          // Decorative stickers (text/emoji/gif/location/playing) — rendered
+          // with their saved position, rotation and scale; taps pass through
+          // to the advance zones beneath.
+          if (s.type !== 'slider') {
             return (
               <div
                 key={i}
@@ -508,14 +510,13 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
                 style={{
                   left: `${Number(s.x) || 50}%`,
                   top: `${Number(s.y) || 45}%`,
-                  transform: 'translate(-50%, -50%)',
+                  transform: `translate(-50%, -50%) rotate(${s.rot || 0}deg) scale(${s.scale || 1})`,
                 }}
               >
-                <TextSticker sticker={s} />
+                <StickerContent sticker={s} />
               </div>
             );
           }
-          if (s.type !== 'slider') return null;
           return (
             <div
               key={i}
