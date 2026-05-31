@@ -55,7 +55,7 @@ function Iceberg({ sizeN, isDark }) {
   const glow = isDark ? 'drop-shadow(0 0 6px rgba(130,200,255,0.75))' : undefined;
   return (
     <img
-      src="/iceberg.png"
+      src="/iceberg.svg"
       alt=""
       style={{ width: iceW, height: iceH, objectFit: 'contain', display: 'block', filter: glow }}
     />
@@ -953,7 +953,7 @@ export default function DuckyDerbyPage() {
               className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${atBetting ? '' : 'cursor-default'}`}
               style={
                 pickedOrd === d.ord
-                  ? { borderColor: '#f59e0b', background: isDark ? 'rgba(120,53,15,0.35)' : '#fffbeb' }
+                  ? { borderColor: '#ec4899', background: isDark ? 'rgba(131,24,67,0.3)' : '#fdf2f8' }
                   : { borderColor: isDark ? '#404040' : '#e5e5e5', background: isDark ? '#262626' : '#ffffff' }
               }
             >
