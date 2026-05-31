@@ -75,33 +75,34 @@ export default function App() {
               onClick={() => setMenuOpen((o) => !o)}
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100"
-              style={{ overflow: 'visible' }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ overflow: 'visible' }}>
-                {/* Top line: slides to centre + rotates 45° when open */}
+              {/* transformBox:'view-box' makes transformOrigin relative to the SVG
+                  viewport, not each line's own bounding box — fixes off-centre rotation. */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line
                   x1="3" y1="6" x2="21" y2="6"
                   style={{
-                    transformOrigin: '12px 12px',
+                    transformBox: 'view-box',
+                    transformOrigin: '50% 50%',
                     transition: 'transform 300ms cubic-bezier(0.4,0,0.2,1)',
                     transform: menuOpen ? 'translateY(6px) rotate(45deg)' : 'none',
                   }}
                 />
-                {/* Middle line: fades out when open */}
                 <line
                   x1="3" y1="12" x2="21" y2="12"
                   style={{
-                    transformOrigin: '12px 12px',
+                    transformBox: 'view-box',
+                    transformOrigin: '50% 50%',
                     transition: 'opacity 200ms ease, transform 300ms cubic-bezier(0.4,0,0.2,1)',
                     opacity: menuOpen ? 0 : 1,
                     transform: menuOpen ? 'scaleX(0)' : 'none',
                   }}
                 />
-                {/* Bottom line: slides to centre + rotates -45° when open */}
                 <line
                   x1="3" y1="18" x2="21" y2="18"
                   style={{
-                    transformOrigin: '12px 12px',
+                    transformBox: 'view-box',
+                    transformOrigin: '50% 50%',
                     transition: 'transform 300ms cubic-bezier(0.4,0,0.2,1)',
                     transform: menuOpen ? 'translateY(-6px) rotate(-45deg)' : 'none',
                   }}
