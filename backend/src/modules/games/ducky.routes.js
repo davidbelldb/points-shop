@@ -231,8 +231,8 @@ export default async function duckyRoutes(fastify) {
     // Iceberg logic: if enabled, spread icebergs across the field. Each hit is 50/50
     // drown (stops the duck) or boost (speed surge forward). Drowns feed into the sink
     // mechanism; boosts are encoded as iceberg obstacles with boost fields.
-    const icebergEnabled = cfg.iceberg_enabled ?? true;
-    const icebergCount = icebergEnabled ? Math.max(0, Math.min(Number(cfg.iceberg_size ?? 3) || 0, 10)) : 0;
+    const icebergEnabled = cfg.iceberg_enabled ?? false;
+    const icebergCount = icebergEnabled ? Math.max(0, Math.min(Number(cfg.iceberg_count ?? 3) || 0, 10)) : 0;
     const icebergPool = shuffle(lineup.filter((d) => d.ord !== winner.ord && d.ord !== chaserOrd));
     const icebergSinkCandidates = []; // ord → at, chosen from drown outcomes
     for (let i = 0; i < icebergCount && icebergPool.length > 0; i++) {
@@ -370,9 +370,12 @@ export default async function duckyRoutes(fastify) {
     if ('iceberg_size' in p && (!Number.isInteger(p.iceberg_size) || p.iceberg_size < 1 || p.iceberg_size > 10)) {
       return reply.code(400).send({ error: 'iceberg_size must be 1-10' });
     }
+    if ('iceberg_count' in p && (!Number.isInteger(p.iceberg_count) || p.iceberg_count < 0 || p.iceberg_count > 10)) {
+      return reply.code(400).send({ error: 'iceberg_count must be 0-10' });
+    }
     const updates = [];
     const values = [];
-    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'buoy_count', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days', 'iceberg_enabled', 'iceberg_size']) {
+    for (const k of ['water_colour', 'grass_colour', 'mud_colour', 'buoy_colour', 'buoy_count', 'race_duck_count', 'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days', 'iceberg_enabled', 'iceberg_size', 'iceberg_count']) {
       if (k in p) { values.push(p[k]); updates.push(`${k} = $${values.length}`); }
     }
     if (updates.length) {

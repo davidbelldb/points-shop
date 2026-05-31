@@ -824,16 +824,21 @@ export default function DuckyDerbyPage() {
         ))}
 
         {/* icebergs — floating hazards; 50/50 drown or speed boost */}
-        {courseObjects.icebergs.map((ice) => (
-          <div
-            key={ice.key}
-            ref={(el) => { icebergRefs.current[ice.key] = el; }}
-            className="absolute"
-            style={{ top: ice.y, left: preRace ? `${ice.wx * 100}%` : undefined, zIndex: 8 }}
-          >
-            <Iceberg />
-          </div>
-        ))}
+        {(() => {
+          const sz = Math.max(1, Math.min(10, config?.iceberg_size ?? 5));
+          const iw = Math.round(70 + (sz - 1) * 7.8); // 70px at size 1 → 140px at size 10
+          const ih = Math.round(iw * (815 / 1312));    // preserve SVG aspect ratio
+          return courseObjects.icebergs.map((ice) => (
+            <div
+              key={ice.key}
+              ref={(el) => { icebergRefs.current[ice.key] = el; }}
+              className="absolute"
+              style={{ top: ice.y, left: preRace ? `${ice.wx * 100}%` : undefined, zIndex: 8 }}
+            >
+              <Iceberg w={iw} h={ih} />
+            </div>
+          ));
+        })()}
 
         {/* buoys — floating obstacles that bob up and down the river */}
         {courseObjects.buoys.map((b) => (
