@@ -412,7 +412,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
             </button>
           )}
           {m.reaction === 'heart' && (
-            <span className={`pointer-events-none absolute -bottom-2 ${mine ? 'left-1' : 'right-1'} text-base leading-none`} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}>
+            <span className={`pointer-events-none absolute -bottom-2 z-10 ${mine ? 'left-1' : 'right-1'} text-base leading-none`} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}>
               {'💜'}
             </span>
           )}
@@ -464,7 +464,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
           )}
           {m.reaction === 'heart' && (
             <span
-              className={`pointer-events-none absolute -bottom-2 ${mine ? 'left-1' : 'right-1'} text-base leading-none`}
+              className={`pointer-events-none absolute -bottom-2 z-10 ${mine ? 'left-1' : 'right-1'} text-base leading-none`}
               style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
               aria-label="Purple heart reaction"
             >
