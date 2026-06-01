@@ -172,13 +172,8 @@ function ResultModal({ result, oppTheme, onClose }) {
 }
 
 function GsLeaderboard() {
-  const [rows, setRows] = useState(null);
-  useEffect(() => {
-    api.gsLeaderboard().then(setRows).catch(() => setRows([]));
-  }, []);
-
-  if (!rows) return null;
-  const hasData = rows.length > 0 && rows.some(r => r.wins > 0 || r.items_found > 0);
+  const hasData = false; // reset — re-enable once leaderboard data is meaningful
+  const rows = [];
 
   return (
     <div>
