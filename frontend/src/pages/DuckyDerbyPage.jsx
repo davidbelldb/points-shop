@@ -359,6 +359,9 @@ export default function DuckyDerbyPage() {
   const icebergRefs = useRef({});
   const finishRef = useRef(null);
   const startRef = useRef(null);
+  const trackRef = useRef(null);
+  const topGrassRef = useRef(null);
+  const bottomGrassRef = useRef(null);
   const resultTimer = useRef(null);
   const sinkRef = useRef(null);
   const commentaryId = useRef(0);
@@ -555,6 +558,12 @@ export default function DuckyDerbyPage() {
         const el = icebergRefs.current[ice.key];
         if (el) el.style.left = `${(ice.wx - camX) * 100}%`;
       }
+      // Scroll the grass tiles in sync with the camera so stationary blades
+      // appear to drift right-to-left at the same rate as the world.
+      const containerW = trackRef.current?.clientWidth || 400;
+      const grassOff = `${(-(camX * containerW) % 96).toFixed(1)}px`;
+      if (topGrassRef.current)    topGrassRef.current.style.backgroundPositionX    = grassOff;
+      if (bottomGrassRef.current) bottomGrassRef.current.style.backgroundPositionX = grassOff;
       if (elapsed < photo.raceEndMs) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -755,7 +764,6 @@ export default function DuckyDerbyPage() {
         @keyframes ddtickerIn{from{transform:translateY(115%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes ddtickerOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-115%);opacity:0}}
         @keyframes ddbuoy{0%,100%{transform:translateY(-9px)}50%{transform:translateY(9px)}}
-        @keyframes ddgrass{from{background-position-x:0}to{background-position-x:-96px}}
         @keyframes ddflash{0%{opacity:0}7%{opacity:.92}17%{opacity:0}30%{opacity:.72}42%{opacity:0}100%{opacity:0}}`}</style>
 
       <div className="flex items-center justify-between">
@@ -770,7 +778,7 @@ export default function DuckyDerbyPage() {
       <img src="/iceberg.svg" alt="" aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }} />
 
       {/* ---- Race track (single layered container) ---- */}
-      <div className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
+      <div ref={trackRef} className="relative isolate overflow-hidden rounded-2xl shadow-lg" style={{ height: TRACK_H, background: water }}>
        {/* scene layer */}
        <div className="absolute inset-0">
         {/* far bank: sky/grass + mud — above the water/start line, below the ducks */}
@@ -780,7 +788,7 @@ export default function DuckyDerbyPage() {
           style={{ height: GRASS_TOP, background: grass, zIndex: 5 }}
         />
         {/* cartoon grass tufts fringing the far bank — zIndex 7 so banner poles (zIndex 6) tuck behind */}
-        <div className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom', animation: 'ddgrass 5s linear infinite' }} />
+        <div ref={topGrassRef} className="absolute inset-x-0" style={{ top: GRASS_TOP - 22, height: 22, zIndex: 7, backgroundImage: grassBg(shade(grass, -34)), backgroundRepeat: 'repeat-x', backgroundPositionY: 'bottom' }} />
         <div className="absolute inset-x-0" style={{ top: GRASS_TOP, height: MUD_H, background: mud, zIndex: 5 }} />
 
         {/* cartoon wave layers — night mode gets boosted opacity for moonlit shimmer */}
@@ -889,7 +897,7 @@ export default function DuckyDerbyPage() {
         <div className="absolute inset-x-0 bottom-0" style={{ height: GRASS_BOTTOM, background: grass, zIndex: 30 }} />
         {/* cartoon grass tufts poking up off the near bank — zIndex 33 so bottom-bank
             banner poles (zIndex 31) tuck behind */}
-        <div className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 33, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPosition: 'bottom', animation: 'ddgrass 4s linear infinite' }} />
+        <div ref={bottomGrassRef} className="absolute inset-x-0" style={{ top: TRACK_H - GRASS_BOTTOM - 12, height: 22, zIndex: 33, backgroundImage: grassBg(shade(grass, -28)), backgroundRepeat: 'repeat-x', backgroundPositionY: 'bottom' }} />
 
         {/* start line (dashed) — a marking ON the water, so the ducks swim over it */}
         <div
