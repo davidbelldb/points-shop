@@ -886,7 +886,7 @@ export default function DuckyDerbyPage() {
             left: preRace ? `${START_WX * 100}%` : undefined,
             width: preRace ? `${(COURSE_LEN + 0.08 - START_WX) * 100}%` : undefined,
             height: 2,
-            background: '#1a0e06',
+            background: '#000000',
             zIndex: 38,
           }}
         />
