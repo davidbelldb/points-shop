@@ -886,7 +886,7 @@ export default function DuckyDerbyPage() {
             width: preRace ? `${(COURSE_LEN + 0.08 - START_WX) * 100}%` : undefined,
             height: 2,
             background: '#1a0e06',
-            zIndex: 12,
+            zIndex: 34,
           }}
         />
 
@@ -927,10 +927,10 @@ export default function DuckyDerbyPage() {
           ref={breadRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 30,
+            top: TRACK_H - GRASS_BOTTOM - 9,
             left: preRace ? `${START_WX * 100}%` : undefined,
             transform: 'translateX(-50%)',
-            zIndex: 13,
+            zIndex: 35,
             animation: phase === 'racing' ? 'ddbob 1.1s ease-in-out infinite' : undefined,
           }}
         >
