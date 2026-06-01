@@ -571,7 +571,8 @@ export default function DuckyDerbyPage() {
       // Bread lure — moves faster than the fastest duck so it always leads the pack
       const fastestDuckMs = Math.min(...result.ducks.map((d) => result.finish_ms[d.ord]));
       const breadProgress = Math.min(1, elapsed / (fastestDuckMs * 0.72));
-      const breadWorldX = START_WX + breadProgress * (COURSE_LEN - START_WX);
+      const BREAD_START_WX = START_WX + 0.03;
+      const breadWorldX = BREAD_START_WX + breadProgress * (COURSE_LEN - BREAD_START_WX);
       const BREAD_END_WX = COURSE_LEN + 0.08;
       if (breadRef.current) breadRef.current.style.left = `${(breadWorldX - camX) * 100}%`;
       if (startBreadPostRef.current) startBreadPostRef.current.style.left = `${(START_WX - camX) * 100}%`;
@@ -881,12 +882,12 @@ export default function DuckyDerbyPage() {
           ref={wireRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 9,
+            top: TRACK_H - GRASS_BOTTOM - 19,
             left: preRace ? `${START_WX * 100}%` : undefined,
             width: preRace ? `${(COURSE_LEN + 0.08 - START_WX) * 100}%` : undefined,
             height: 2,
             background: '#1a0e06',
-            zIndex: 34,
+            zIndex: 28,
           }}
         />
 
@@ -895,10 +896,10 @@ export default function DuckyDerbyPage() {
           ref={startBreadPostRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 26,
+            top: TRACK_H - GRASS_BOTTOM - 36,
             left: preRace ? `${START_WX * 100}%` : undefined,
             width: 18,
-            height: GRASS_BOTTOM + 26,
+            height: GRASS_BOTTOM + 36,
             transform: 'translateX(-50%)',
             zIndex: 32,
           }}
@@ -911,10 +912,10 @@ export default function DuckyDerbyPage() {
           ref={endBreadPostRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 26,
+            top: TRACK_H - GRASS_BOTTOM - 36,
             left: preRace ? `${(COURSE_LEN + 0.08) * 100}%` : undefined,
             width: 18,
-            height: GRASS_BOTTOM + 26,
+            height: GRASS_BOTTOM + 36,
             transform: 'translateX(-50%)',
             zIndex: 32,
           }}
@@ -927,8 +928,8 @@ export default function DuckyDerbyPage() {
           ref={breadRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 9,
-            left: preRace ? `${START_WX * 100}%` : undefined,
+            top: TRACK_H - GRASS_BOTTOM - 19,
+            left: preRace ? `${(START_WX + 0.03) * 100}%` : undefined,
             transform: 'translateX(-50%)',
             zIndex: 35,
             animation: phase === 'racing' ? 'ddbob 1.1s ease-in-out infinite' : undefined,
