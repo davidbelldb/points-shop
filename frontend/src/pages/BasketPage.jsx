@@ -27,7 +27,7 @@ export default function BasketPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-xl font-semibold">Katie's safe pocket</h1>
-        <p className="text-sm text-neutral-500">Oh look. It's empty. Better put something in it. 🍆.</p>
+        <p className="text-sm text-neutral-500">Oh look. It's empty. Better put something in it.</p>
         <Link to="/" className="inline-block rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-amber-900">
           Back to shop
         </Link>

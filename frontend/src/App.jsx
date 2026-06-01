@@ -8,6 +8,7 @@ import { useTheme } from './lib/ThemeContext.jsx';
 import SurveyBanner from './components/SurveyBanner.jsx';
 import MenuDrawer from './components/MenuDrawer.jsx';
 import SideNav from './components/SideNav.jsx';
+import BasketDrawer from './components/BasketDrawer.jsx';
 import { countdownClock } from './lib/countdown.js';
 
 function AvatarFallback() {
@@ -37,7 +38,8 @@ export default function App() {
   const { account, basket, notifications } = useBasket();
   const { user, refresh: refreshAuth } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen,   setMenuOpen]   = useState(false);
+  const [basketOpen, setBasketOpen] = useState(false);
 
   // Sync the theme from the currently-loaded account, so each user gets their own.
   useEffect(() => {
@@ -149,10 +151,10 @@ export default function App() {
               {points.toLocaleString()} pts
             </Link>
 
-            <Link
-              to="/basket"
+            <button
+              onClick={() => setBasketOpen(true)}
               className="block rounded-full p-0.5"
-              aria-label="Basket"
+              aria-label="Open basket"
             >
               <span className="relative inline-block">
                 <img
@@ -167,12 +169,14 @@ export default function App() {
                   </span>
                 )}
               </span>
-            </Link>
+            </button>
           </div>
         </div>
       </header>
-      {/* Drawer — mobile only */}
+      {/* Nav drawer — mobile only */}
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
+      {/* Basket drawer — all devices */}
+      <BasketDrawer open={basketOpen} onClose={() => setBasketOpen(false)} />
       {isHome && bannerOn && (
         <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
           <div className="flex w-full items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide lg:px-6">
