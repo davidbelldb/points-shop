@@ -516,15 +516,15 @@ export default function GiftsweeperPage() {
         <p className="mt-1 text-xs text-neutral-400">Your balance: <strong>{balance} pts</strong></p>
       </div>
 
-      {/* Two grids: stack on mobile, side-by-side on desktop */}
-      <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
-        <div className="space-y-2">
+      {/* Two grids: stack on mobile, side-by-side on desktop at the same ~540px width as TicTacFace */}
+      <div className="md:flex md:gap-8 md:items-start md:flex-wrap">
+        <div className="space-y-2 md:w-[540px] md:shrink-0">
           <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
           <p className="text-center text-xs text-neutral-500">
             You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {oppKindPlural}
           </p>
         </div>
-        <div className="space-y-2 mt-4 md:mt-0">
+        <div className="space-y-2 mt-4 md:mt-0 md:w-[540px] md:shrink-0">
           <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
           <p className="text-center text-xs text-neutral-500">
             {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {myKindPlural}
