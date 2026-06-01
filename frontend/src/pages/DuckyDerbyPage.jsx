@@ -901,7 +901,7 @@ export default function DuckyDerbyPage() {
             width: 18,
             height: GRASS_BOTTOM + 36,
             transform: 'translateX(-50%)',
-            zIndex: 32,
+            zIndex: 40,
           }}
         >
           <img src="/bread_post.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
@@ -917,7 +917,7 @@ export default function DuckyDerbyPage() {
             width: 18,
             height: GRASS_BOTTOM + 36,
             transform: 'translateX(-50%)',
-            zIndex: 32,
+            zIndex: 40,
           }}
         >
           <img src="/bread_post.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
