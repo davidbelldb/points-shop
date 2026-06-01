@@ -571,7 +571,7 @@ export default function DuckyDerbyPage() {
       // Bread lure — moves faster than the fastest duck so it always leads the pack
       const fastestDuckMs = Math.min(...result.ducks.map((d) => result.finish_ms[d.ord]));
       const breadProgress = Math.min(1, elapsed / (fastestDuckMs * 0.82));
-      const BREAD_START_WX = START_WX + 0.03;
+      const BREAD_START_WX = START_WX + 0.05;
       const breadWorldX = BREAD_START_WX + breadProgress * (COURSE_LEN - BREAD_START_WX);
       const BREAD_END_WX = COURSE_LEN + 0.08;
       if (breadRef.current) breadRef.current.style.left = `${(breadWorldX - camX) * 100}%`;
@@ -928,8 +928,8 @@ export default function DuckyDerbyPage() {
           ref={breadRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 32,
-            left: preRace ? `${(START_WX + 0.03) * 100}%` : undefined,
+            top: TRACK_H - GRASS_BOTTOM - 35,
+            left: preRace ? `${(START_WX + 0.05) * 100}%` : undefined,
             transform: 'translateX(-50%)',
             zIndex: 35,
             animation: phase === 'racing' ? 'ddbob 1.1s ease-in-out infinite' : undefined,
