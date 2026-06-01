@@ -13,7 +13,7 @@ function Field({ label, children }) {
   );
 }
 
-export default function AdminHeroSlides() {
+export default function AdminHeroSlides({ bare = false }) {
   const [slides, setSlides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,9 +25,8 @@ export default function AdminHeroSlides() {
   }
   useEffect(() => { load(); }, []);
 
-  return (
-    <section className="space-y-3">
-      <h2 className="text-base font-semibold">Hero carousel slides</h2>
+  const body = (
+    <>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {loading ? (
         <p className="text-sm text-neutral-500">Loading...</p>
@@ -39,6 +38,14 @@ export default function AdminHeroSlides() {
           <NewSlideForm onCreated={load} />
         </>
       )}
+    </>
+  );
+
+  if (bare) return <div className="space-y-3">{body}</div>;
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold">Hero carousel slides</h2>
+      {body}
     </section>
   );
 }

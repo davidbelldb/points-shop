@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 
-export default function AdminOrdersSection() {
+export default function AdminOrdersSection({ bare = false }) {
   const [orders, setOrders] = useState([]);
 
   async function load() {
@@ -10,16 +10,19 @@ export default function AdminOrdersSection() {
   }
   useEffect(() => { load(); }, []);
 
+  const body = orders.length === 0 ? (
+    <p className="text-sm text-neutral-500">No orders yet.</p>
+  ) : (
+    <ul className="space-y-2">
+      {orders.map((o) => <AdminOrderRow key={o.id} order={o} onChanged={load} />)}
+    </ul>
+  );
+
+  if (bare) return <div className="space-y-3">{body}</div>;
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold">Orders</h2>
-      {orders.length === 0 ? (
-        <p className="text-sm text-neutral-500">No orders yet.</p>
-      ) : (
-        <ul className="space-y-2">
-          {orders.map((o) => <AdminOrderRow key={o.id} order={o} onChanged={load} />)}
-        </ul>
-      )}
+      {body}
     </section>
   );
 }

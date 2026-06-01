@@ -17,7 +17,7 @@ function Avatar({ url, name }) {
   );
 }
 
-export default function AdminImpersonateSection() {
+export default function AdminImpersonateSection({ bare = false }) {
   const { user, refresh } = useAuth();
   const [users, setUsers] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -50,44 +50,47 @@ export default function AdminImpersonateSection() {
 
   const others = users.filter((u) => u.id !== user.actual_id);
 
+  const body = user.impersonating ? (
+    <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+      <p className="text-sm text-amber-900">
+        You're currently viewing the site as <strong>{user.username}</strong>.
+      </p>
+      <button
+        onClick={stop}
+        disabled={busy}
+        className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40"
+      >
+        Stop impersonating
+      </button>
+    </div>
+  ) : (
+    <ul className="space-y-2">
+      {others.map((u) => (
+        <li key={u.id} className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3">
+          <div className="flex items-center gap-3">
+            <Avatar url={u.photo_url} name={u.name} />
+            <div>
+              <p className="text-sm font-medium">{u.name}</p>
+              <p className="text-xs text-neutral-500">{u.username} {'\u00b7'} {u.role}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => impersonate(u.id)}
+            disabled={busy}
+            className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40"
+          >
+            View as
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (bare) return <div className="space-y-3">{body}</div>;
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold">Impersonate</h2>
-      {user.impersonating ? (
-        <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <p className="text-sm text-amber-900">
-            You're currently viewing the site as <strong>{user.username}</strong>.
-          </p>
-          <button
-            onClick={stop}
-            disabled={busy}
-            className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-amber-900 disabled:opacity-40"
-          >
-            Stop impersonating
-          </button>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {others.map((u) => (
-            <li key={u.id} className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3">
-              <div className="flex items-center gap-3">
-                <Avatar url={u.photo_url} name={u.name} />
-                <div>
-                  <p className="text-sm font-medium">{u.name}</p>
-                  <p className="text-xs text-neutral-500">{u.username} {'\u00b7'} {u.role}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => impersonate(u.id)}
-                disabled={busy}
-                className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40"
-              >
-                View as
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {body}
     </section>
   );
 }

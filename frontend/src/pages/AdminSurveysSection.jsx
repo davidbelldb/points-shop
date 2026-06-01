@@ -28,7 +28,7 @@ function textToOptions(text, type) {
   return null;
 }
 
-export default function AdminSurveysSection() {
+export default function AdminSurveysSection({ bare = false }) {
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,23 +39,26 @@ export default function AdminSurveysSection() {
   }
   useEffect(() => { load(); }, []);
 
+  const body = loading ? (
+    <p className="text-sm text-neutral-500">Loading...</p>
+  ) : (
+    <>
+      {surveys.length > 0 && (
+        <ul className="space-y-2">
+          {surveys.map((s) => (
+            <SurveyRow key={s.id} survey={s} onChanged={load} />
+          ))}
+        </ul>
+      )}
+      <NewSurveyForm onCreated={load} />
+    </>
+  );
+
+  if (bare) return <div className="space-y-3">{body}</div>;
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold">Surveys</h2>
-      {loading ? (
-        <p className="text-sm text-neutral-500">Loading...</p>
-      ) : (
-        <>
-          {surveys.length > 0 && (
-            <ul className="space-y-2">
-              {surveys.map((s) => (
-                <SurveyRow key={s.id} survey={s} onChanged={load} />
-              ))}
-            </ul>
-          )}
-          <NewSurveyForm onCreated={load} />
-        </>
-      )}
+      {body}
     </section>
   );
 }
