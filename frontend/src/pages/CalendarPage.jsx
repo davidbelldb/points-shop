@@ -180,7 +180,7 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Responsive 2-column layout: calendar left, events right on md+ ── */}
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,340px)_1fr] lg:grid-cols-[minmax(0,300px)_1fr] md:gap-6 md:items-start">
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,460px)_1fr] lg:grid-cols-[minmax(0,420px)_1fr] md:gap-6 md:items-start">
 
         {/* LEFT — month grid */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-3 md:col-start-1 md:row-start-1">

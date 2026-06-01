@@ -442,7 +442,7 @@ export default function GiftsweeperPage() {
           )}
         </div>
 
-        <div className="sticky bottom-0 -mx-4 border-t border-neutral-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        <div className="sticky bottom-0 -mx-4 lg:-mx-8 border-t border-neutral-200 bg-white/95 px-4 lg:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
           <div className="text-center text-xs">
             {setupSelection.length === 0 && <span className="text-neutral-400">Tap empty cells to place an item.</span>}
             {setupSelection.length > 0 && setupContig && (
@@ -516,20 +516,23 @@ export default function GiftsweeperPage() {
         <p className="mt-1 text-xs text-neutral-400">Your balance: <strong>{balance} pts</strong></p>
       </div>
 
-      <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
-
-      <div className="text-center text-xs text-neutral-500">
-        You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {oppKindPlural}
+      {/* Two grids: stack on mobile, side-by-side on desktop */}
+      <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
+        <div className="space-y-2">
+          <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
+          <p className="text-center text-xs text-neutral-500">
+            You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {oppKindPlural}
+          </p>
+        </div>
+        <div className="space-y-2 mt-4 md:mt-0">
+          <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
+          <p className="text-center text-xs text-neutral-500">
+            {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {myKindPlural}
+          </p>
+        </div>
       </div>
 
-      <hr className="border-neutral-200" />
-
-      <div className="text-center text-xs text-neutral-500">
-        {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {myKindPlural}
-      </div>
-      <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
-
-      <div className="sticky bottom-0 -mx-4 border-t border-neutral-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="sticky bottom-0 -mx-4 lg:-mx-8 border-t border-neutral-200 bg-white/95 px-4 lg:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
         {playSelection.length > 0 && (
           <p className="mb-2 text-center text-xs">
             {playSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}{' '}costs <strong>{cost} pt{cost === 1 ? '' : 's'}</strong>.

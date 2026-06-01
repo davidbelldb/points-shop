@@ -947,38 +947,37 @@ export default function DuckyDerbyPage() {
       </div>
 
       {/* ---- Odds list (2 per row) ---- */}
-      <div>
-        <p className="mb-1.5 text-sm font-semibold">Pick your duck</p>
-        <div className="grid grid-cols-2 gap-2">
-          {ducks.map((d) => (
-            <button
-              key={d.ord}
-              onClick={atBetting ? () => setPickedOrd(d.ord) : undefined}
-              className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${atBetting ? '' : 'cursor-default'}`}
-              style={
-                pickedOrd === d.ord
-                  ? { borderColor: '#ec4899', background: isDark ? 'rgba(131,24,67,0.3)' : '#fdf2f8' }
-                  : { borderColor: isDark ? '#404040' : '#e5e5e5', background: isDark ? '#262626' : '#ffffff' }
-              }
-            >
-              <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={38} h={32} isDark={isDark} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium">{d.name}</p>
-                <p className="text-[11px] font-bold text-neutral-500">{oddsLabel(d.odds_num, d.odds_den)}</p>
-              </div>
-            </button>
-          ))}
+      {/* Duck picker + form guide: stack on mobile, side-by-side on desktop */}
+      <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
+        <div>
+          <p className="mb-1.5 text-sm font-semibold">Pick your duck</p>
+          <div className="grid grid-cols-2 gap-2">
+            {ducks.map((d) => (
+              <button
+                key={d.ord}
+                onClick={atBetting ? () => setPickedOrd(d.ord) : undefined}
+                className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${atBetting ? '' : 'cursor-default'}`}
+                style={
+                  pickedOrd === d.ord
+                    ? { borderColor: '#ec4899', background: isDark ? 'rgba(131,24,67,0.3)' : '#fdf2f8' }
+                    : { borderColor: isDark ? '#404040' : '#e5e5e5', background: isDark ? '#262626' : '#ffffff' }
+                }
+              >
+                <DuckSprite ord={d.ord} duckColour={d.duck_colour} billColour={d.bill_colour} w={38} h={32} isDark={isDark} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{d.name}</p>
+                  <p className="text-[11px] font-bold text-neutral-500">{oddsLabel(d.odds_num, d.odds_den)}</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
+        <FormGuide ducks={ducks} form={form} isDark={isDark} />
       </div>
 
-      <FormGuide ducks={ducks} form={form} isDark={isDark} />
-
-      {/* ---- Bottom-anchored bet bar ----
-           Lift content above the iPhone home-indicator / curved corner zone:
-           - safe-area inset on supported browsers (iOS PWA), plus a 12px buffer
-           - generous fallback padding (pb-5) for everything else */}
+      {/* ---- Bottom-anchored bet bar — full width, offset by sidebar on desktop ---- */}
       <div
-        className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t px-4 pt-3 pb-5 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+        className="fixed bottom-0 left-0 md:left-56 right-0 z-40 border-t px-4 pt-3 pb-5 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:px-8"
         style={{ borderColor: isDark ? '#404040' : '#e5e5e5', background: isDark ? '#171717' : '#ffffff' }}
       >
         {noFunds ? (

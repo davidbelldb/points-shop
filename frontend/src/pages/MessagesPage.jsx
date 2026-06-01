@@ -696,8 +696,8 @@ export default function MessagesPage() {
       </div>
 
       {/* Composer bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-md px-4">
+      <div className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
+        <div className="px-4 lg:px-8">
           {replyTo && (
             <div className="mt-2 flex items-center gap-2 rounded-xl border-l-2 border-amber-500 bg-amber-50 px-3 py-1.5 text-xs">
               <div className="min-w-0 flex-1">

@@ -251,70 +251,75 @@ export default function TicTacFacePage() {
         </button>
       </div>
 
-      {/* player chips */}
-      <div className="flex gap-2.5">
-        <PlayerChip tone="me"    label={meName}    active={isMyTurn}                              status={meStatus}    score={myBoardWins}    players={players} />
-        <PlayerChip tone="other" label={otherName} active={!!game && !game.finished && !isMyTurn} status={otherStatus} score={otherBoardWins} players={players} />
-      </div>
+      {/* Responsive: board left, controls right on desktop */}
+      <div className="md:grid md:grid-cols-[1fr_280px] md:gap-6 md:items-start">
 
-      {/* ultimate board */}
-      {game && (
-        <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md">
-          <div className="grid grid-cols-3 gap-2 rounded-[13px] p-2" style={{backgroundColor:'#2a2a28'}}>
-            {globalBoard.map((globalCell, bi) => {
-              const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
-              return (
-                <MacroCell
-                  key={bi}
-                  index={bi}
-                  globalCell={globalCell}
-                  localBoard={localBoards[bi] ?? Array(9).fill(null)}
-                  isActive={isBoardActive}
-                  isMyTurn={isMyTurn}
-                  myMark={myMark}
-                  onMove={play}
-                  players={players}
-                  game={game}
-                />
-              );
-            })}
+        {/* ultimate board — left column */}
+        {game && (
+          <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md">
+            <div className="grid grid-cols-3 gap-2 rounded-[13px] p-2" style={{backgroundColor:'#2a2a28'}}>
+              {globalBoard.map((globalCell, bi) => {
+                const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
+                return (
+                  <MacroCell
+                    key={bi}
+                    index={bi}
+                    globalCell={globalCell}
+                    localBoard={localBoards[bi] ?? Array(9).fill(null)}
+                    isActive={isBoardActive}
+                    isMyTurn={isMyTurn}
+                    myMark={myMark}
+                    onMove={play}
+                    players={players}
+                    game={game}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* right column: player chips + status bar */}
+        <div className="space-y-4 mt-4 md:mt-0">
+          <div className="flex md:flex-col gap-2.5">
+            <PlayerChip tone="me"    label={meName}    active={isMyTurn}                              status={meStatus}    score={myBoardWins}    players={players} />
+            <PlayerChip tone="other" label={otherName} active={!!game && !game.finished && !isMyTurn} status={otherStatus} score={otherBoardWins} players={players} />
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center">
+            {!game && !match?.finished && (
+              <>
+                <p className="text-sm text-neutral-500">No game in progress.</p>
+                <button onClick={start} disabled={busy || !players.other} className={`mt-3 ${TEAL_BTN}`}>
+                  Start a game
+                </button>
+              </>
+            )}
+            {!game && match?.finished && modalDismissed && (
+              <>
+                <p className="text-sm text-neutral-500">Last game complete.</p>
+                <button onClick={start} disabled={busy || !players.other} className={`mt-3 ${TEAL_BTN}`}>
+                  New game
+                </button>
+              </>
+            )}
+            {game && !game.finished && (
+              <p className="text-sm text-neutral-500">
+                {isMyTurn
+                  ? (<><span className="font-semibold text-teal-600">{meName}</span> to play{activeBoard !== null ? ` — board ${activeBoard + 1}` : ''}</>)
+                  : (<>Waiting for <span className="font-semibold text-pink-600">{otherName}</span>...</>)}
+              </p>
+            )}
+            {game?.finished && matchInProgress && (
+              <>
+                {game.winner === 'draw'   && <p className="text-base font-semibold text-neutral-700">Game drawn</p>}
+                {winnerTone === 'me'      && <p className="text-base font-semibold"><span className="text-teal-600">{meName}</span> wins!</p>}
+                {winnerTone === 'other'   && <p className="text-base font-semibold"><span className="text-pink-600">{otherName}</span> wins!</p>}
+              </>
+            )}
           </div>
         </div>
-      )}
-
-      {/* status bar */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center">
-        {!game && !match?.finished && (
-          <>
-            <p className="text-sm text-neutral-500">No game in progress.</p>
-            <button onClick={start} disabled={busy || !players.other} className={`mt-3 ${TEAL_BTN}`}>
-              Start a game
-            </button>
-          </>
-        )}
-        {!game && match?.finished && modalDismissed && (
-          <>
-            <p className="text-sm text-neutral-500">Last game complete.</p>
-            <button onClick={start} disabled={busy || !players.other} className={`mt-3 ${TEAL_BTN}`}>
-              New game
-            </button>
-          </>
-        )}
-        {game && !game.finished && (
-          <p className="text-sm text-neutral-500">
-            {isMyTurn
-              ? (<><span className="font-semibold text-teal-600">{meName}</span> to play{activeBoard !== null ? ` — board ${activeBoard + 1}` : ''}</>)
-              : (<>Waiting for <span className="font-semibold text-pink-600">{otherName}</span>...</>)}
-          </p>
-        )}
-        {game?.finished && matchInProgress && (
-          <>
-            {game.winner === 'draw'   && <p className="text-base font-semibold text-neutral-700">Game drawn</p>}
-            {winnerTone === 'me'      && <p className="text-base font-semibold"><span className="text-teal-600">{meName}</span> wins!</p>}
-            {winnerTone === 'other'   && <p className="text-base font-semibold"><span className="text-pink-600">{otherName}</span> wins!</p>}
-          </>
-        )}
-      </div>
+      </div>{/* end responsive grid */}
 
       {/* match over modal */}
       {showModal && match && (
