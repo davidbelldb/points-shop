@@ -177,7 +177,8 @@ function GsLeaderboard() {
     api.gsLeaderboard().then(setRows).catch(() => setRows([]));
   }, []);
 
-  if (!rows || rows.length === 0) return null;
+  if (!rows) return null;
+  const hasData = rows.length > 0 && rows.some(r => r.wins > 0 || r.items_found > 0);
 
   return (
     <div>
@@ -192,7 +193,7 @@ function GsLeaderboard() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
+            {hasData ? rows.map((r, i) => (
               <tr key={r.id} className={i > 0 ? 'border-t border-neutral-100' : ''}>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
@@ -211,7 +212,11 @@ function GsLeaderboard() {
                   <span className="inline-flex h-5 min-w-6 px-1 items-center justify-center rounded-md bg-pink-100 text-[10px] font-bold text-pink-700">{r.items_found}</span>
                 </td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={3} className="px-3 py-3 text-center text-xs text-neutral-400">N/A — play a match to see stats</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -490,23 +495,23 @@ export default function GiftsweeperPage() {
     );
 
     return (
-      <div className="space-y-5 py-2 pb-32 md:pb-4">
+      <div className="space-y-5 py-2 pb-32 lg:pb-4">
         <Header canCancel />
         <div className="text-center">
           <h2 className="text-xl font-bold">{meName}'s Grid</h2>
           <p className="mt-1 text-sm text-neutral-500">{tagline}</p>
         </div>
 
-        {/* Two-column on desktop: grid left, items + controls right */}
-        <div className="md:flex md:gap-8 md:items-start">
+        {/* Two-column on lg+ (iPad landscape / desktop): grid left, items + controls right */}
+        <div className="lg:flex lg:gap-8 lg:items-start">
 
           {/* LEFT — setup grid */}
-          <div className="md:w-[675px] md:shrink-0">
+          <div className="lg:w-[675px] lg:shrink-0">
             <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={myTheme} onTapCell={tapSetupCell} />
           </div>
 
-          {/* RIGHT — items list + action buttons (desktop only; mobile uses sticky bar below) */}
-          <div className="hidden md:flex md:flex-1 md:min-w-0 md:flex-col md:gap-4">
+          {/* RIGHT — items list + action buttons (lg+ only; mobile/tablet-portrait uses sticky bar below) */}
+          <div className="hidden lg:flex lg:flex-1 lg:min-w-0 lg:flex-col lg:gap-4">
             <div className="space-y-2">
               <p className="text-sm font-semibold">{itemsHeading}</p>
               {myItems.length === 0 ? (
@@ -533,8 +538,8 @@ export default function GiftsweeperPage() {
           </div>
         </div>
 
-        {/* Mobile: items list (shown above sticky bar) */}
-        <div className="md:hidden space-y-2">
+        {/* Mobile + iPad portrait: items list (shown above sticky bar) */}
+        <div className="lg:hidden space-y-2">
           <p className="text-sm font-semibold">{itemsHeading}</p>
           {myItems.length === 0 ? (
             <p className="text-xs text-neutral-400">Nothing assigned yet.</p>
@@ -553,8 +558,8 @@ export default function GiftsweeperPage() {
           )}
         </div>
 
-        {/* Mobile: sticky action bar */}
-        <div className="md:hidden sticky bottom-0 -mx-4 border-t border-neutral-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        {/* Mobile + iPad portrait: sticky action bar */}
+        <div className="lg:hidden sticky bottom-0 -mx-4 border-t border-neutral-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
           {selectionHint}
           <div className="mt-2">{actionButtons}</div>
         </div>
@@ -612,11 +617,11 @@ export default function GiftsweeperPage() {
         <p className="mt-1 text-xs text-neutral-400">Your balance: <strong>{balance} pts</strong></p>
       </div>
 
-      {/* Grids left, leaderboard right on desktop */}
-      <div className="md:flex md:gap-8 md:items-start">
+      {/* Grids left, leaderboard right — lg+ only */}
+      <div className="lg:flex lg:gap-8 lg:items-start">
 
         {/* LEFT — both grids stacked */}
-        <div className="md:flex-1 md:min-w-0 space-y-4">
+        <div className="lg:flex-1 lg:min-w-0 space-y-4">
           <div className="space-y-2">
             <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
             <p className="text-center text-xs text-neutral-500">
@@ -631,8 +636,8 @@ export default function GiftsweeperPage() {
           </div>
         </div>
 
-        {/* RIGHT — leaderboard (desktop only) */}
-        <div className="hidden md:block md:w-72 md:shrink-0">
+        {/* RIGHT — leaderboard (lg+ only) */}
+        <div className="hidden lg:block lg:w-72 lg:shrink-0">
           <GsLeaderboard />
         </div>
       </div>
