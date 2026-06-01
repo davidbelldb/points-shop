@@ -928,10 +928,10 @@ export default function DuckyDerbyPage() {
           ref={breadRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 35,
+            top: TRACK_H - GRASS_BOTTOM - 38,
             left: preRace ? `${(START_WX + 0.05) * 100}%` : undefined,
             transform: 'translateX(-50%)',
-            zIndex: 35,
+            zIndex: 39,
             animation: phase === 'racing' ? 'ddbob 1.1s ease-in-out infinite' : undefined,
           }}
         >
