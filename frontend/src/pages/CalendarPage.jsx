@@ -176,7 +176,7 @@ export default function CalendarPage() {
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Sneaky Calendar</h1>
-        <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
+        <Link to="/" className="text-sm text-neutral-500">Back</Link>
       </div>
 
       {/* ── Responsive 2-column layout: calendar left, events right on md+ ── */}

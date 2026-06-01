@@ -152,7 +152,7 @@ export default function BasketDrawer({ open, onClose }) {
               onClick={onClose}
               className="rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-amber-900"
             >
-              Back to shop
+              Close basket
             </button>
           </div>
         )}

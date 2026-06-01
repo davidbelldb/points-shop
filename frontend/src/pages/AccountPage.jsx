@@ -67,7 +67,7 @@ export default function AccountPage() {
       {/* Page title \u2014 always full width */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Your account</h1>
-        <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
+        <Link to="/" className="text-sm text-neutral-500">Back</Link>
       </div>
 
       {/* \u2500\u2500 Responsive two-column layout \u2500\u2500

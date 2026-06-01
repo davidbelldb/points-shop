@@ -93,7 +93,7 @@ export default function OrderConfirmationPage() {
       </div>
 
       <Link to="/" className="block w-full rounded-xl bg-amber-600 py-3 text-center text-sm font-semibold text-amber-900">
-        Back to shop
+        Back
       </Link>
     </div>
   );

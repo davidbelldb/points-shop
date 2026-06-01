@@ -80,7 +80,7 @@ export default function AdminPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Admin</h1>
-        <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
+        <Link to="/" className="text-sm text-neutral-500">Back</Link>
       </div>
 
       <AdminCollapsible title="Impersonate" storageKey="admin::impersonate">
