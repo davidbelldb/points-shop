@@ -208,7 +208,7 @@ function SegmentRow({ seg, products, onSave, onDelete, busy }) {
   );
 }
 
-export default function AdminWheelSection() {
+export default function AdminWheelSection({ bare = false }) {
   const [data, setData] = useState(null);
   const [products, setProducts] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -258,17 +258,11 @@ export default function AdminWheelSection() {
   if (!data) return null;
   const segments = data.segments || [];
 
-  return (
-    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Wheel of Misfortune</h2>
-        <span className="text-xs text-neutral-400">/games/wheel-of-misfortune</span>
-      </div>
+  const body = (
+    <div className="space-y-3">
       <p className="text-xs text-neutral-500">Add 2+ segments. Each segment can be a no-effect label, a points adjustment, a product reward, or a forfeit.</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
-
       {data.wheel && <HomepageSettings wheel={data.wheel} onSave={saveHomepage} busy={busy} />}
-
       {segments.length === 0 ? (
         <p className="text-sm text-neutral-400">No segments yet. Add at least two to make the wheel spinnable.</p>
       ) : (
@@ -282,6 +276,17 @@ export default function AdminWheelSection() {
               className="w-full rounded-md border border-dashed border-neutral-300 bg-white py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-40">
         + Add segment
       </button>
+    </div>
+  );
+
+  if (bare) return body;
+  return (
+    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">Wheel of Misfortune</h2>
+        <span className="text-xs text-neutral-400">/games/wheel-of-misfortune</span>
+      </div>
+      {body}
     </section>
   );
 }

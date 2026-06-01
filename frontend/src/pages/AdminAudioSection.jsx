@@ -5,7 +5,7 @@ import { useSettings } from '../lib/SettingsContext.jsx';
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
 
-export default function AdminAudioSection() {
+export default function AdminAudioSection({ bare = false }) {
   const { settings, refresh: refreshSettings } = useSettings();
   const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState('');
@@ -43,20 +43,23 @@ export default function AdminAudioSection() {
     finally { setBusy(false); }
   }
 
-  return (
-    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
+  const toggleBtn = (
+    <button
+      onClick={toggleSection}
+      disabled={busy}
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${enabled ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+    >
+      {enabled ? 'Section shown' : 'Section hidden'}
+    </button>
+  );
+
+  const body = (
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Voice notes</h2>
-        <button
-          onClick={toggleSection}
-          disabled={busy}
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${enabled ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
-        >
-          {enabled ? 'Section shown' : 'Section hidden'}
-        </button>
+        {bare ? <span /> : null}
+        {toggleBtn}
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
-
       <label className="block text-xs font-medium text-neutral-600">
         Section title
         <input className={inputCls + ' mt-1'} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A message from our founder" />
@@ -68,9 +71,7 @@ export default function AdminAudioSection() {
       <button onClick={saveText} disabled={busy} className="w-full rounded-md bg-amber-600 py-2 text-sm font-semibold text-amber-900 disabled:opacity-40">
         Save section text
       </button>
-
       <hr className="border-neutral-200" />
-
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Audio notes</p>
         {notes.map((n) => (
@@ -78,6 +79,17 @@ export default function AdminAudioSection() {
         ))}
         <NewNoteForm busy={busy} setBusy={setBusy} onCreated={loadNotes} />
       </div>
+    </div>
+  );
+
+  if (bare) return body;
+  return (
+    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">Voice notes</h2>
+        {toggleBtn}
+      </div>
+      {body}
     </section>
   );
 }

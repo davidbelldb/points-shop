@@ -14,12 +14,18 @@ function Field({ label, children }) {
   );
 }
 
-export default function AdminGamesSection() {
+export default function AdminGamesSection({ bare = false }) {
+  const body = (
+    <div className="space-y-3">
+      <GamesSettingsCard />
+      <TodPromptsCard />
+    </div>
+  );
+  if (bare) return body;
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold">Games</h2>
-      <GamesSettingsCard />
-      <TodPromptsCard />
+      {body}
     </section>
   );
 }

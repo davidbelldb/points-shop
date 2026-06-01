@@ -16,6 +16,46 @@ import { useSettings } from '../lib/SettingsContext.jsx';
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
 
+// Collapsible card for admin sections.
+// Open/closed state is persisted to localStorage so it survives page reloads.
+function AdminCollapsible({ title, storageKey, defaultOpen = false, children }) {
+  const key = storageKey ?? `admin-section::${title}`;
+  const [open, setOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(key)) ?? defaultOpen; }
+    catch { return defaultOpen; }
+  });
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
+      >
+        <span className="text-base font-semibold">{title}</span>
+        <svg
+          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{ flexShrink: 0, transition: 'transform 200ms', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="border-t border-neutral-100 p-4">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { account, refresh } = useBasket();
   const { settings, refresh: refreshSettings } = useSettings();
@@ -43,36 +83,69 @@ export default function AdminPage() {
         <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
       </div>
 
-      <AdminImpersonateSection />
-      <BrandingSection settings={settings} onChanged={refreshSettings} />
-      <AdminAudioSection />
-      <AdminHeroSlides />
-      <AccountSection  account={account}   onChanged={refresh} />
+      <AdminCollapsible title="Impersonate" storageKey="admin::impersonate">
+        <AdminImpersonateSection bare />
+      </AdminCollapsible>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">Products</h2>
+      <AdminCollapsible title="Branding" storageKey="admin::branding">
+        <BrandingSection settings={settings} onChanged={refreshSettings} />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Voice notes" storageKey="admin::audio">
+        <AdminAudioSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Hero carousel slides" storageKey="admin::hero-slides">
+        <AdminHeroSlides bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Account & points" storageKey="admin::account">
+        <AccountSection account={account} onChanged={refresh} />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Products" storageKey="admin::products">
         {error && <p className="text-sm text-red-600">{error}</p>}
         {loading ? (
           <p className="text-sm text-neutral-500">Loading...</p>
         ) : (
-          <>
+          <div className="space-y-3">
             <ul className="space-y-2">
               {products.map((p) => (
                 <ProductRow key={p.id} product={p} onChanged={() => { loadProducts(); refresh(); }} />
               ))}
             </ul>
             <NewProductForm onCreated={() => { loadProducts(); refresh(); }} />
-          </>
+          </div>
         )}
-      </section>
+      </AdminCollapsible>
 
-      <DiscountCodesSection codes={codes} onChanged={loadCodes} />
-      <AdminOrdersSection />
-      <AdminSurveysSection />
-      <AdminGamesSection />
-      <AdminWheelSection />
-      <AdminShutTheBoxSection />
-      <AdminDuckySection />
+      <AdminCollapsible title="Discount codes" storageKey="admin::discounts">
+        <DiscountCodesSection codes={codes} onChanged={loadCodes} />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Orders" storageKey="admin::orders">
+        <AdminOrdersSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Surveys" storageKey="admin::surveys">
+        <AdminSurveysSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Games settings" storageKey="admin::games">
+        <AdminGamesSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Wheel of Misfortune" storageKey="admin::wheel">
+        <AdminWheelSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Shut Katie's Box" storageKey="admin::stb">
+        <AdminShutTheBoxSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Ducky Derby" storageKey="admin::ducky">
+        <AdminDuckySection bare />
+      </AdminCollapsible>
     </div>
   );
 }
@@ -150,8 +223,7 @@ function BrandingSection({ settings, onChanged }) {
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Branding</h2>
+    <div className="space-y-3">
 
       <div className="flex items-center gap-3">
         <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md bg-neutral-100 text-neutral-400">
@@ -244,7 +316,7 @@ function BrandingSection({ settings, onChanged }) {
       <button onClick={saveText} disabled={busy} className="w-full rounded-md bg-amber-600 py-2 text-sm font-semibold text-amber-900 disabled:opacity-40">
         Save branding
       </button>
-    </section>
+    </div>
   );
 }
 
@@ -279,8 +351,7 @@ function AccountSection({ account, onChanged }) {
   const targetName = users.find((u) => u.id === target)?.name || 'user';
 
   return (
-    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Account</h2>
+    <div className="space-y-3">
       <div className="rounded-lg bg-amber-50 p-3">
         <p className="text-xs uppercase tracking-wide text-amber-800">Katie's balance</p>
         <p className="text-xl font-semibold text-amber-900">{account.points_balance.toLocaleString()} pts</p>
@@ -313,7 +384,7 @@ function AccountSection({ account, onChanged }) {
         <p className="mt-1 text-xs text-neutral-500">Adjusts {targetName}'s points. Positive credits, negative debits.</p>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
-    </section>
+    </div>
   );
 }
 
@@ -535,8 +606,7 @@ function NewProductForm({ onCreated }) {
 
 function DiscountCodesSection({ codes, onChanged }) {
   return (
-    <section className="space-y-3">
-      <h2 className="text-base font-semibold">Discount codes</h2>
+    <div className="space-y-3">
       {codes.length === 0 ? (
         <p className="text-sm text-neutral-500">No codes yet.</p>
       ) : (
@@ -545,7 +615,7 @@ function DiscountCodesSection({ codes, onChanged }) {
         </ul>
       )}
       <NewDiscountCodeForm onCreated={onChanged} />
-    </section>
+    </div>
   );
 }
 

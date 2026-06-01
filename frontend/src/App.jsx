@@ -63,14 +63,14 @@ export default function App() {
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
       {user?.impersonating && (
         <div className="bg-amber-100 border-b border-amber-200">
-          <div className="mx-auto flex max-w-md md:max-w-5xl items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900">
+          <div className="mx-auto flex max-w-md md:max-w-2xl lg:max-w-5xl xl:max-w-[1600px] items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900">
             <span>Viewing as <strong>{user.username}</strong> (signed in as {user.actual_username})</span>
             <button onClick={stopImpersonate} className="font-semibold underline">Stop</button>
           </div>
         </div>
       )}
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-md md:max-w-5xl items-center justify-between gap-2 px-3 py-3">
+        <div className="mx-auto flex max-w-md md:max-w-2xl lg:max-w-5xl xl:max-w-[1600px] items-center justify-between gap-2 px-3 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <button
               onClick={() => setMenuOpen((o) => !o)}
@@ -166,14 +166,14 @@ export default function App() {
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       {isHome && bannerOn && (
         <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
-          <div className="mx-auto flex max-w-md md:max-w-5xl items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide">
+          <div className="mx-auto flex max-w-md md:max-w-2xl lg:max-w-5xl xl:max-w-[1600px] items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide">
             <span className="truncate">{settings.banner_text}</span>
             <CountdownClock date={settings.banner_countdown_date} time={settings.banner_countdown_time} />
           </div>
         </div>
       )}
       {showFloater && <SurveyBanner />}
-      <main className={`mx-auto px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-6 pb-24 md:pb-8' : 'max-w-md md:max-w-2xl pb-24'}`}>
+      <main className={`mx-auto px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'max-w-md md:max-w-2xl lg:max-w-5xl xl:max-w-[1600px] pb-24'}`}>
         <Outlet />
       </main>
     </div>

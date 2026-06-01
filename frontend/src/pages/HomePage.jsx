@@ -72,7 +72,7 @@ export default function HomePage() {
                   the left column. No DOM order change needed; grid placement
                   handles the visual reflow via col-start / row-start.
       */}
-      <div className="flex flex-col gap-5 md:grid md:grid-cols-[1fr_360px] md:items-start md:gap-6">
+      <div className="flex flex-col gap-5 md:grid md:grid-cols-[1fr_360px] lg:grid-cols-[1fr_420px] xl:grid-cols-[1fr_480px] md:items-start md:gap-6 lg:gap-8">
 
         {/* RIGHT sidebar \u2014 Calendar, Games, Wheel, STB
             Sits first in the DOM so mobile stacking order matches current layout.
@@ -121,12 +121,12 @@ export default function HomePage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           {!sorted && !error && <p className="text-sm text-neutral-500">Loading...</p>}
           {sorted && (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {sorted.map((p) => (
                 <Link
                   key={p.id}
                   to={`/product/${p.id}`}
-                  className="group rounded-2xl border border-neutral-200 bg-white p-3 transition-all hover:shadow-md active:scale-[0.98]"
+                  className="group rounded-2xl border border-neutral-200 bg-white p-3 md:p-4 transition-all hover:shadow-md active:scale-[0.98]"
                 >
                   <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-400">
                     {p.thumbnail_url ? (

@@ -5,7 +5,7 @@ const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-export default function AdminDuckySection() {
+export default function AdminDuckySection({ bare = false }) {
   const [cfg, setCfg] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -66,6 +66,7 @@ export default function AdminDuckySection() {
   }
 
   if (!cfg) {
+    if (bare) return <div className="space-y-2"><p className="text-sm text-neutral-500">Loading...</p>{error && <p className="text-sm text-red-600">{error}</p>}</div>;
     return (
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Ducky Derby</h2>
@@ -75,12 +76,11 @@ export default function AdminDuckySection() {
     );
   }
 
-  return (
-    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Ducky Derby</h2>
-        {saved && <span className="text-xs text-emerald-600">Saved ✓</span>}
-      </div>
+  const savedIndicator = saved && <span className="text-xs text-emerald-600">Saved ✓</span>;
+
+  const body = (
+    <div className="space-y-3">
+      {savedIndicator}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="grid grid-cols-2 gap-3">
@@ -231,6 +231,17 @@ export default function AdminDuckySection() {
             onSave={(patch) => run(() => api.admin.updateDuckyNightIntro(c.ord, patch))} />
         ))}
       </div>
+    </div>
+  );
+
+  if (bare) return body;
+  return (
+    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">Ducky Derby</h2>
+        {savedIndicator}
+      </div>
+      {body}
     </section>
   );
 }

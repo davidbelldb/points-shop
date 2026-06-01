@@ -16,7 +16,7 @@ const DAY_LABELS = [
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-export default function AdminShutTheBoxSection() {
+export default function AdminShutTheBoxSection({ bare = false }) {
   const [cfg, setCfg] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -123,6 +123,7 @@ export default function AdminShutTheBoxSection() {
   }
 
   if (!cfg) {
+    if (bare) return <div className="space-y-2"><p className="text-sm text-neutral-500">Loading...</p>{error && <p className="text-sm text-red-600">{error}</p>}</div>;
     return (
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Shut Katie's Box</h2>
@@ -132,12 +133,12 @@ export default function AdminShutTheBoxSection() {
     );
   }
 
-  return (
-    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Shut Katie's Box</h2>
-        {saved && <span className="text-xs text-emerald-600">Saved ✓</span>}
-      </div>
+  const savedIndicator = saved && <span className="text-xs text-emerald-600">Saved ✓</span>;
+
+  const body = (
+    <div className="space-y-3">
+      {savedIndicator}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -242,6 +243,17 @@ export default function AdminShutTheBoxSection() {
           </div>
         </div>
       </div>
+    </div>
+  );
+
+  if (bare) return body;
+  return (
+    <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">Shut Katie&apos;s Box</h2>
+        {savedIndicator}
+      </div>
+      {body}
     </section>
   );
 }
