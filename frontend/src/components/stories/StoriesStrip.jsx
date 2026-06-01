@@ -223,7 +223,6 @@ export default function StoriesStrip() {
           ))}
         </div>
       </div>
-      </div>
 
       {/* Tablet / desktop — 9-column grid of circles */}
       <div className="hidden md:grid md:grid-cols-9 md:gap-2">
