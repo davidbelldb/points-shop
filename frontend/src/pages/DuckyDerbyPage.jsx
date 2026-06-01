@@ -357,6 +357,10 @@ export default function DuckyDerbyPage() {
   const buoyRefs = useRef({});
   const padRefs = useRef({});
   const icebergRefs = useRef({});
+  const breadRef = useRef(null);
+  const wireRef = useRef(null);
+  const startBreadPostRef = useRef(null);
+  const endBreadPostRef = useRef(null);
   const finishRef = useRef(null);
   const startRef = useRef(null);
   const trackRef = useRef(null);
@@ -564,6 +568,18 @@ export default function DuckyDerbyPage() {
       const grassOff = `${(-(camX * containerW) % 96).toFixed(1)}px`;
       if (topGrassRef.current)    topGrassRef.current.style.backgroundPositionX    = grassOff;
       if (bottomGrassRef.current) bottomGrassRef.current.style.backgroundPositionX = grassOff;
+      // Bread lure — moves faster than the fastest duck so it always leads the pack
+      const fastestDuckMs = Math.min(...result.ducks.map((d) => result.finish_ms[d.ord]));
+      const breadProgress = Math.min(1, elapsed / (fastestDuckMs * 0.72));
+      const breadWorldX = START_WX + breadProgress * (COURSE_LEN - START_WX);
+      const BREAD_END_WX = COURSE_LEN + 0.08;
+      if (breadRef.current) breadRef.current.style.left = `${(breadWorldX - camX) * 100}%`;
+      if (startBreadPostRef.current) startBreadPostRef.current.style.left = `${(START_WX - camX) * 100}%`;
+      if (endBreadPostRef.current) endBreadPostRef.current.style.left = `${(BREAD_END_WX - camX) * 100}%`;
+      if (wireRef.current) {
+        wireRef.current.style.left = `${(START_WX - camX) * 100}%`;
+        wireRef.current.style.width = `${(BREAD_END_WX - START_WX) * 100}%`;
+      }
       if (elapsed < photo.raceEndMs) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -859,6 +875,71 @@ export default function DuckyDerbyPage() {
             <Buoy colour={b.colour} isDark={isDark} />
           </div>
         ))}
+
+        {/* Bread lure wire — spans from start post to end post */}
+        <div
+          ref={wireRef}
+          className="absolute"
+          style={{
+            top: TRACK_H - GRASS_BOTTOM - 9,
+            left: preRace ? `${START_WX * 100}%` : undefined,
+            width: preRace ? `${(COURSE_LEN + 0.08 - START_WX) * 100}%` : undefined,
+            height: 2,
+            background: '#1a0e06',
+            zIndex: 12,
+          }}
+        />
+
+        {/* Start bread post */}
+        <div
+          ref={startBreadPostRef}
+          className="absolute"
+          style={{
+            top: TRACK_H - GRASS_BOTTOM - 26,
+            left: preRace ? `${START_WX * 100}%` : undefined,
+            width: 18,
+            height: GRASS_BOTTOM + 26,
+            transform: 'translateX(-50%)',
+            zIndex: 32,
+          }}
+        >
+          <img src="/bread_post.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
+        </div>
+
+        {/* End bread post (just past finish line) */}
+        <div
+          ref={endBreadPostRef}
+          className="absolute"
+          style={{
+            top: TRACK_H - GRASS_BOTTOM - 26,
+            left: preRace ? `${(COURSE_LEN + 0.08) * 100}%` : undefined,
+            width: 18,
+            height: GRASS_BOTTOM + 26,
+            transform: 'translateX(-50%)',
+            zIndex: 32,
+          }}
+        >
+          <img src="/bread_post.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
+        </div>
+
+        {/* Bread lure — slides along the wire ahead of the ducks */}
+        <div
+          ref={breadRef}
+          className="absolute"
+          style={{
+            top: TRACK_H - GRASS_BOTTOM - 30,
+            left: preRace ? `${START_WX * 100}%` : undefined,
+            transform: 'translateX(-50%)',
+            zIndex: 13,
+            animation: phase === 'racing' ? 'ddbob 1.1s ease-in-out infinite' : undefined,
+          }}
+        >
+          <img
+            src={isDark ? '/night_bread.png' : '/bread.png'}
+            alt=""
+            style={{ width: 32, height: 32, objectFit: 'contain', display: 'block' }}
+          />
+        </div>
 
         {/* ducks */}
         {ducks.map((d, i) => (
