@@ -415,15 +415,77 @@ export default function GiftsweeperPage() {
     const confirmLabel = isAdmin ? 'Confirm products' : 'Confirm forfeits';
     const itemsHeading = isAdmin ? `Products (${myItems.length}/3 minimum)` : `Forfeits (${myItems.length}/3 minimum)`;
 
+    // Shared action panel — rendered in the right column on desktop, in the sticky bar on mobile
+    const selectionHint = (
+      <div className="text-center text-xs">
+        {setupSelection.length === 0 && <span className="text-neutral-400">Tap empty cells to place an item.</span>}
+        {setupSelection.length > 0 && setupContig && (
+          <span className="font-medium text-neutral-600">
+            {setupSelection.length} cell{setupSelection.length === 1 ? '' : 's'}: {setupSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
+          </span>
+        )}
+        {setupSelection.length > 0 && !setupContig && (
+          <span className="font-medium text-red-500">Item placements cannot contain gaps.</span>
+        )}
+      </div>
+    );
+    const actionButtons = (
+      <>
+        <div className="flex gap-2">
+          <button onClick={() => setSetupSelection([])} disabled={setupSelection.length === 0} className={PALE_BTN}>Clear</button>
+          <button onClick={openAssign} disabled={!canAssign || busy} className={`flex-1 ${TEAL_BTN}`}>{assignBtnLabel}</button>
+        </div>
+        {myItems.length >= 3 && (
+          <button onClick={confirmGrid} disabled={busy} className={`mt-2 w-full ${TEAL_BTN}`}>{confirmLabel}</button>
+        )}
+      </>
+    );
+
     return (
-      <div className="space-y-5 py-2 pb-32">
+      <div className="space-y-5 py-2 pb-32 md:pb-4">
         <Header canCancel />
         <div className="text-center">
           <h2 className="text-xl font-bold">{meName}'s Grid</h2>
           <p className="mt-1 text-sm text-neutral-500">{tagline}</p>
         </div>
-        <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={myTheme} onTapCell={tapSetupCell} />
-        <div className="space-y-2">
+
+        {/* Two-column on desktop: grid left, items + controls right */}
+        <div className="md:flex md:gap-8 md:items-start">
+
+          {/* LEFT — setup grid */}
+          <div className="md:w-[540px] md:shrink-0">
+            <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={myTheme} onTapCell={tapSetupCell} />
+          </div>
+
+          {/* RIGHT — items list + action buttons (desktop only; mobile uses sticky bar below) */}
+          <div className="hidden md:flex md:flex-1 md:min-w-0 md:flex-col md:gap-4">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">{itemsHeading}</p>
+              {myItems.length === 0 ? (
+                <p className="text-xs text-neutral-400">Nothing assigned yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {myItems.map((it) => (
+                    <li key={it.id} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{isAdmin ? (it.product_name || 'Product') : (it.text_label || 'Forfeit')}</p>
+                        <p className="text-xs text-neutral-500">{(it.cells || []).slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}</p>
+                      </div>
+                      <button onClick={() => removeItem(it.id)} disabled={busy} className="shrink-0 text-xs font-medium text-neutral-400 hover:text-red-500 disabled:opacity-30">Remove</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 space-y-3">
+              {selectionHint}
+              {actionButtons}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile: items list (shown above sticky bar) */}
+        <div className="md:hidden space-y-2">
           <p className="text-sm font-semibold">{itemsHeading}</p>
           {myItems.length === 0 ? (
             <p className="text-xs text-neutral-400">Nothing assigned yet.</p>
@@ -442,25 +504,10 @@ export default function GiftsweeperPage() {
           )}
         </div>
 
-        <div className="sticky bottom-0 -mx-4 lg:-mx-8 border-t border-neutral-200 bg-white/95 px-4 lg:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-          <div className="text-center text-xs">
-            {setupSelection.length === 0 && <span className="text-neutral-400">Tap empty cells to place an item.</span>}
-            {setupSelection.length > 0 && setupContig && (
-              <span className="font-medium text-neutral-600">
-                {setupSelection.length} cell{setupSelection.length === 1 ? '' : 's'}: {setupSelection.slice().sort((a,b)=>a.r-b.r||a.c-b.c).map(cellLabel).join(', ')}
-              </span>
-            )}
-            {setupSelection.length > 0 && !setupContig && (
-              <span className="font-medium text-red-500">Item placements cannot contain gaps.</span>
-            )}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button onClick={() => setSetupSelection([])} disabled={setupSelection.length === 0} className={PALE_BTN}>Clear</button>
-            <button onClick={openAssign} disabled={!canAssign || busy} className={`flex-1 ${TEAL_BTN}`}>{assignBtnLabel}</button>
-          </div>
-          {myItems.length >= 3 && (
-            <button onClick={confirmGrid} disabled={busy} className={`mt-2 w-full ${TEAL_BTN}`}>{confirmLabel}</button>
-          )}
+        {/* Mobile: sticky action bar */}
+        <div className="md:hidden sticky bottom-0 -mx-4 border-t border-neutral-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+          {selectionHint}
+          <div className="mt-2">{actionButtons}</div>
         </div>
 
         {showAssign && (

@@ -256,7 +256,7 @@ export default function TicTacFacePage() {
 
         {/* ultimate board — capped width so it stays at ~540px on wide screens */}
         {game && (
-          <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md md:w-[540px] md:shrink-0">
+          <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md md:w-[620px] md:shrink-0">
             <div className="grid grid-cols-3 gap-2 rounded-[13px] p-2" style={{backgroundColor:'#2a2a28'}}>
               {globalBoard.map((globalCell, bi) => {
                 const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
