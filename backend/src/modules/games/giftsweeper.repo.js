@@ -1,5 +1,48 @@
 import { query } from '../../db.js';
 
+export async function getGsLeaderboard() {
+  const { rows } = await query(
+    `WITH hits AS (
+       SELECT match_id, guesser_account_id, COUNT(*)::int AS items_found
+       FROM giftsweeper_guesses
+       WHERE hit_item_id IS NOT NULL
+       GROUP BY match_id, guesser_account_id
+     ),
+     match_results AS (
+       SELECT
+         m.id                            AS match_id,
+         m.initiator_account_id          AS p1_id,
+         m.opponent_account_id           AS p2_id,
+         COALESCE(h1.items_found, 0)     AS p1_found,
+         COALESCE(h2.items_found, 0)     AS p2_found,
+         CASE
+           WHEN COALESCE(h1.items_found,0) > COALESCE(h2.items_found,0) THEN m.initiator_account_id
+           WHEN COALESCE(h2.items_found,0) > COALESCE(h1.items_found,0) THEN m.opponent_account_id
+           ELSE NULL
+         END AS winner_id
+       FROM giftsweeper_matches m
+       LEFT JOIN hits h1 ON h1.match_id = m.id AND h1.guesser_account_id = m.initiator_account_id
+       LEFT JOIN hits h2 ON h2.match_id = m.id AND h2.guesser_account_id = m.opponent_account_id
+       WHERE m.finished_at IS NOT NULL
+     )
+     SELECT
+       a.id,
+       a.name,
+       a.photo_url,
+       COUNT(CASE WHEN mr.winner_id = a.id THEN 1 END)::int  AS wins,
+       COALESCE(SUM(CASE
+         WHEN a.id = mr.p1_id THEN mr.p1_found
+         WHEN a.id = mr.p2_id THEN mr.p2_found
+         ELSE 0
+       END), 0)::int                                          AS items_found
+     FROM accounts a
+     JOIN match_results mr ON (mr.p1_id = a.id OR mr.p2_id = a.id)
+     GROUP BY a.id, a.name, a.photo_url
+     ORDER BY wins DESC, items_found DESC`,
+  );
+  return rows;
+}
+
 export async function getActiveGsMatch(aId, bId) {
   const { rows } = await query(
     `SELECT * FROM giftsweeper_matches

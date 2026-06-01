@@ -171,6 +171,54 @@ function ResultModal({ result, oppTheme, onClose }) {
   );
 }
 
+function GsLeaderboard() {
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    api.gsLeaderboard().then(setRows).catch(() => setRows([]));
+  }, []);
+
+  if (!rows || rows.length === 0) return null;
+
+  return (
+    <div>
+      <p className="mb-1.5 text-sm font-semibold">Leaderboard</p>
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="bg-neutral-50 text-[10px] uppercase tracking-wide text-neutral-400">
+              <th className="px-3 py-2 font-semibold">Player</th>
+              <th className="px-2 py-2 text-center font-semibold">Wins</th>
+              <th className="px-2 py-2 text-center font-semibold">Found</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id} className={i > 0 ? 'border-t border-neutral-100' : ''}>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 shrink-0 overflow-hidden rounded-full bg-neutral-200">
+                      {r.photo_url
+                        ? <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
+                        : <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-neutral-500">{r.name?.[0]}</span>}
+                    </span>
+                    <span className="font-medium text-neutral-800">{r.name}</span>
+                  </div>
+                </td>
+                <td className="px-2 py-2 text-center">
+                  <span className="inline-flex h-5 w-6 items-center justify-center rounded-md bg-teal-100 text-[10px] font-bold text-teal-800">{r.wins}</span>
+                </td>
+                <td className="px-2 py-2 text-center">
+                  <span className="inline-flex h-5 min-w-6 px-1 items-center justify-center rounded-md bg-pink-100 text-[10px] font-bold text-pink-700">{r.items_found}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function GiftsweeperPage() {
   const navigate = useNavigate();
   const [state, setState] = useState(null);
@@ -481,6 +529,7 @@ export default function GiftsweeperPage() {
               {selectionHint}
               {actionButtons}
             </div>
+            <GsLeaderboard />
           </div>
         </div>
 
@@ -563,19 +612,28 @@ export default function GiftsweeperPage() {
         <p className="mt-1 text-xs text-neutral-400">Your balance: <strong>{balance} pts</strong></p>
       </div>
 
-      {/* Two grids: stack on mobile, side-by-side on desktop at the same ~540px width as TicTacFace */}
-      <div className="md:flex md:gap-8 md:items-start md:flex-wrap">
-        <div className="space-y-2 md:w-[675px] md:shrink-0">
-          <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
-          <p className="text-center text-xs text-neutral-500">
-            You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {oppKindPlural}
-          </p>
+      {/* Grids left, leaderboard right on desktop */}
+      <div className="md:flex md:gap-8 md:items-start">
+
+        {/* LEFT — both grids stacked */}
+        <div className="md:flex-1 md:min-w-0 space-y-4">
+          <div className="space-y-2">
+            <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
+            <p className="text-center text-xs text-neutral-500">
+              You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {oppKindPlural}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
+            <p className="text-center text-xs text-neutral-500">
+              {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {myKindPlural}
+            </p>
+          </div>
         </div>
-        <div className="space-y-2 mt-4 md:mt-0 md:w-[675px] md:shrink-0">
-          <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
-          <p className="text-center text-xs text-neutral-500">
-            {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {myKindPlural}
-          </p>
+
+        {/* RIGHT — leaderboard (desktop only) */}
+        <div className="hidden md:block md:w-72 md:shrink-0">
+          <GsLeaderboard />
         </div>
       </div>
 

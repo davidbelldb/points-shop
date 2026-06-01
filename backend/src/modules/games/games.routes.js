@@ -3,7 +3,7 @@ import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import {
   getPlayersFor, getActiveTtfGame, createTtfGame, getTtfGameById, updateTtfGame,
   getActiveMatch, getLatestFinishedMatch, getMatchById, createMatch, updateMatch,
-  creditPoints,
+  creditPoints, getTtfLeaderboard,
 } from './games.repo.js';
 import { sendPush } from '../notifications/push.js';
 
@@ -307,5 +307,9 @@ export default async function gamesRoutes(fastify) {
       [meId],
     );
     return { ok: true };
+  });
+
+  fastify.get('/api/games/tic-tac-face/leaderboard', async () => {
+    return getTtfLeaderboard();
   });
 }

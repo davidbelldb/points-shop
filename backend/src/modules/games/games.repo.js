@@ -1,5 +1,25 @@
 import { query } from '../../db.js';
 
+export async function getTtfLeaderboard() {
+  const { rows } = await query(
+    `SELECT
+       a.id,
+       a.name,
+       a.photo_url,
+       COUNT(CASE WHEN m.winner_account_id = a.id THEN 1 END)::int                                          AS wins,
+       COUNT(CASE WHEN m.winner_account_id IS NOT NULL
+                   AND m.winner_account_id != a.id THEN 1 END)::int                                         AS losses,
+       COUNT(CASE WHEN m.winner_account_id IS NULL THEN 1 END)::int                                         AS draws
+     FROM accounts a
+     JOIN tic_tac_face_matches m
+       ON (m.p1_account_id = a.id OR m.p2_account_id = a.id)
+     WHERE m.finished_at IS NOT NULL
+     GROUP BY a.id, a.name, a.photo_url
+     ORDER BY wins DESC, draws DESC`,
+  );
+  return rows;
+}
+
 export async function getPlayersFor(accountId) {
   const { rows } = await query(
     `SELECT id, username, name, photo_url, role

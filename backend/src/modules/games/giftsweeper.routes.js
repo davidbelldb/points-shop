@@ -2,7 +2,7 @@ import { query } from '../../db.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { getPlayersFor } from './games.repo.js';
 import {
-  getActiveGsMatch, createGsMatch, updateGsMatch,
+  getActiveGsMatch, createGsMatch, updateGsMatch, getGsLeaderboard,
   listGsItems, deleteGsItemsForOwner, deleteGsItemById, insertGsItem,
 } from './giftsweeper.repo.js';
 import { sendPush } from '../notifications/push.js';
@@ -418,5 +418,9 @@ export default async function giftsweeperRoutes(fastify) {
       [meId],
     );
     return { ok: true };
+  });
+
+  fastify.get('/api/games/giftsweeper/leaderboard', async () => {
+    return getGsLeaderboard();
   });
 }
