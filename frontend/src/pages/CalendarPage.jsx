@@ -179,82 +179,87 @@ export default function CalendarPage() {
         <Link to="/" className="text-sm text-neutral-500">Back to shop</Link>
       </div>
 
-      {/* Month grid */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-3">
-        <div className="flex items-center justify-between">
-          <button onClick={() => changeMonth(-1)} className="rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100" aria-label="Previous month">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-          </button>
-          <div className="text-sm font-semibold">
-            {MONTH_LABELS[focusDate.getMonth()]} {focusDate.getFullYear()}
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={gotoToday} className="rounded-md px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">Today</button>
-            <button onClick={() => changeMonth(1)} className="rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100" aria-label="Next month">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+      {/* ── Responsive 2-column layout: calendar left, events right on md+ ── */}
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[1fr_1fr] lg:grid-cols-[5fr_4fr] md:gap-6 md:items-start">
+
+        {/* LEFT — month grid */}
+        <section className="rounded-2xl border border-neutral-200 bg-white p-3 md:col-start-1 md:row-start-1">
+          <div className="flex items-center justify-between">
+            <button onClick={() => changeMonth(-1)} className="rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100" aria-label="Previous month">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-          {WEEKDAY_LABELS.map((w) => <div key={w}>{w}</div>)}
-        </div>
-
-        <div className="mt-1 grid grid-cols-7 gap-1">
-          {grid.map((day) => {
-            const inMonth   = day.getMonth() === focusDate.getMonth();
-            const isToday   = sameDay(day, new Date());
-            const isPicked  = selectedDay && sameDay(day, selectedDay);
-            const dayEvents = eventsByDay.get(dayKey(day)) || [];
-            const hasGifts  = dayEvents.some((e) => e.gifts);
-            const hasShow   = dayEvents.some((e) => e.show_and_tell);
-            return (
-              <button
-                key={dayKey(day)}
-                onClick={() => setSelectedDay(isPicked ? null : startOfDay(day))}
-                className={[
-                  'flex aspect-square flex-col items-center justify-center rounded-lg text-xs font-medium transition',
-                  inMonth ? 'text-neutral-800' : 'text-neutral-300',
-                  isPicked ? 'bg-amber-500 text-amber-950'
-                           : isToday ? 'bg-amber-100 text-amber-900'
-                           : 'hover:bg-neutral-100',
-                ].join(' ')}
-              >
-                <span>{day.getDate()}</span>
-                {dayEvents.length > 0 && (
-                  <span className="mt-0.5 flex items-center gap-0.5">
-                    {hasShow  && <span className="h-1 w-1 rounded-full bg-pink-500" />}
-                    {hasGifts && <span className="h-1 w-1 rounded-full bg-emerald-500" />}
-                    {!hasShow && !hasGifts && <span className="h-1 w-1 rounded-full bg-amber-600" />}
-                  </span>
-                )}
+            <div className="text-sm font-semibold">
+              {MONTH_LABELS[focusDate.getMonth()]} {focusDate.getFullYear()}
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={gotoToday} className="rounded-md px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">Today</button>
+              <button onClick={() => changeMonth(1)} className="rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100" aria-label="Next month">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
-            );
-          })}
-        </div>
+            </div>
+          </div>
 
-        <p className="mt-2 text-center text-[11px] text-neutral-400">
-          {selectedDay ? `Showing ${selectedDay.toLocaleDateString(undefined, { weekday:'short', day:'numeric', month:'long' })}` : `Showing ${MONTH_LABELS[focusDate.getMonth()]}`}
-        </p>
-      </section>
+          <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+            {WEEKDAY_LABELS.map((w) => <div key={w}>{w}</div>)}
+          </div>
 
-      {/* List */}
-      <section className="space-y-2">
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {loading && events.length === 0 && (
-          <p className="text-sm text-neutral-500">Loading sneaky events...</p>
-        )}
-        {!loading && listEvents.length === 0 && (
-          <p className="text-sm text-neutral-500">
-            {selectedDay ? 'Nothing on this day yet.' : 'Nothing in this month yet.'}
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {grid.map((day) => {
+              const inMonth   = day.getMonth() === focusDate.getMonth();
+              const isToday   = sameDay(day, new Date());
+              const isPicked  = selectedDay && sameDay(day, selectedDay);
+              const dayEvents = eventsByDay.get(dayKey(day)) || [];
+              const hasGifts  = dayEvents.some((e) => e.gifts);
+              const hasShow   = dayEvents.some((e) => e.show_and_tell);
+              return (
+                <button
+                  key={dayKey(day)}
+                  onClick={() => setSelectedDay(isPicked ? null : startOfDay(day))}
+                  className={[
+                    'flex aspect-square flex-col items-center justify-center rounded-lg text-xs font-medium transition',
+                    inMonth ? 'text-neutral-800' : 'text-neutral-300',
+                    isPicked ? 'bg-amber-500 text-amber-950'
+                             : isToday ? 'bg-amber-100 text-amber-900'
+                             : 'hover:bg-neutral-100',
+                  ].join(' ')}
+                >
+                  <span>{day.getDate()}</span>
+                  {dayEvents.length > 0 && (
+                    <span className="mt-0.5 flex items-center gap-0.5">
+                      {hasShow  && <span className="h-1 w-1 rounded-full bg-pink-500" />}
+                      {hasGifts && <span className="h-1 w-1 rounded-full bg-emerald-500" />}
+                      {!hasShow && !hasGifts && <span className="h-1 w-1 rounded-full bg-amber-600" />}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="mt-2 text-center text-[11px] text-neutral-400">
+            {selectedDay ? `Showing ${selectedDay.toLocaleDateString(undefined, { weekday:'short', day:'numeric', month:'long' })}` : `Showing ${MONTH_LABELS[focusDate.getMonth()]}`}
           </p>
-        )}
-        {listEvents.map((ev) => (
-          <EventCard key={ev.id} ev={ev} onClick={() => setEditing(ev)} />
-        ))}
-      </section>
+        </section>
 
-      {/* Story highlights (archived stories that fell within this month) */}
+        {/* RIGHT — event list */}
+        <section className="space-y-2 md:col-start-2 md:row-start-1">
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {loading && events.length === 0 && (
+            <p className="text-sm text-neutral-500">Loading sneaky events...</p>
+          )}
+          {!loading && listEvents.length === 0 && (
+            <p className="text-sm text-neutral-500">
+              {selectedDay ? 'Nothing on this day yet.' : 'Nothing in this month yet.'}
+            </p>
+          )}
+          {listEvents.map((ev) => (
+            <EventCard key={ev.id} ev={ev} onClick={() => setEditing(ev)} />
+          ))}
+        </section>
+
+      </div>
+
+      {/* Story highlights — full width below both columns */}
       <HighlightsSection focusDate={focusDate} selectedDay={selectedDay} />
 
       {/* Floating create button */}
@@ -340,7 +345,7 @@ function HighlightsSection({ focusDate, selectedDay }) {
             {g.date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
             <span className="ml-2 font-normal text-neutral-400">{g.stories.length}</span>
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 md:grid-cols-6 xl:grid-cols-9 gap-2">
             {g.stories.map((s) => (
               <button
                 key={s.id}

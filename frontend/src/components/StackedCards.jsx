@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 function Card({ slide }) {
   const inner = (
-    <div className="relative aspect-[16/7] overflow-hidden rounded-2xl bg-neutral-100 shadow-sm">
+    <div className="relative aspect-[16/7] md:aspect-square lg:aspect-[4/3] overflow-hidden rounded-2xl bg-neutral-100 shadow-sm">
       <img src={slide.image_url} alt={slide.title ?? ''} className="h-full w-full object-cover" />
       {(slide.title || slide.code || slide.subtitle) && (
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4 text-white">
@@ -27,7 +27,7 @@ function Card({ slide }) {
 export default function StackedCards({ slides }) {
   if (!slides || slides.length === 0) return null;
   return (
-    <div className="space-y-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
       {slides.map((s) => <Card key={s.id} slide={s} />)}
     </div>
   );

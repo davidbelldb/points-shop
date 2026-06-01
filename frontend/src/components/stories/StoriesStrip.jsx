@@ -133,19 +133,54 @@ export default function StoriesStrip() {
   const hasAnything = activeGroups.length > 0 || visibleReels.length > 0 || archive.length > 0;
   if (!hasAnything) return null;
 
+  // All circles in one flat list for the grid layout
+  const allCircles = [
+    ...activeGroups.map((g, idx) => {
+      const isYou = g.authorId === user?.id;
+      const allSeenByMe = !isYou && g.all.every((s) => s.viewed_by_me);
+      return (
+        <StoryRing
+          key={`active-${g.authorId}`}
+          thumbnailUrl={g.latest.author_photo}
+          mediaType="image"
+          glow={!allSeenByMe}
+          label={isYou ? 'Your story' : g.authorName}
+          sublabel={g.all.length > 1 ? `${g.all.length} new` : null}
+          onClick={() => openActive(idx)}
+        />
+      );
+    }),
+    ...visibleReels.map((r) => (
+      <StoryRing
+        key={`reel-${r.id}`}
+        thumbnailUrl={r.cover_url}
+        mediaType={r.cover_media_type}
+        glow={false}
+        label={r.name}
+        sublabel={`${r.story_count} stor${r.story_count === 1 ? 'y' : 'ies'}`}
+        onClick={() => openReel(r.id)}
+      />
+    )),
+    ...archiveGroups.map((g) => (
+      <StoryRing
+        key={`vault-${g.key}`}
+        posterUrl={g.cover.thumbnail_url}
+        thumbnailUrl={g.cover.media_url}
+        mediaType={g.cover.media_type}
+        glow={false}
+        label={g.label}
+        sublabel={g.stories.length > 1 ? `${g.stories.length} stories` : null}
+        onClick={() => openArchiveDay(g)}
+      />
+    )),
+  ];
+
   return (
     <>
-      {/* Bleed only the RIGHT edge out past the page's horizontal padding so
-          older circles clip at the screen edge (hinting "scroll for more")
-          instead of being cut off inside the page. The left stays aligned to
-          page content. */}
-      <div className="-mr-4">
+      {/* Mobile: horizontal scroll strip (bleed right edge).
+          md+: wrapping grid — 9 circles per row so the full width is used. */}
+      <div className="md:hidden -mr-4">
         <div className="flex items-start gap-3 overflow-x-auto pb-2">
-          {/* Active stories (max 2 — one circle per author). Per spec, the
-              circle shows the author's PROFILE photo (not the story media),
-              so David and Katie always recognise their own ring. When YOU
-              have viewed every story in someone else's active set, their
-              ring goes flat (IG behaviour). Your own ring stays gradient. */}
           {activeGroups.map((g, idx) => {
             const isYou = g.authorId === user?.id;
             const allSeenByMe = !isYou && g.all.every((s) => s.viewed_by_me);
@@ -161,11 +196,7 @@ export default function StoriesStrip() {
               />
             );
           })}
-
           {activeGroups.length > 0 && (visibleReels.length > 0 || archive.length > 0) && <Divider />}
-
-          {/* Highlight reels — flat ring with the name underneath. Hidden
-              when a reel has zero stories (no cover image, no content). */}
           {visibleReels.map((r) => (
             <StoryRing
               key={`reel-${r.id}`}
@@ -177,12 +208,7 @@ export default function StoriesStrip() {
               onClick={() => openReel(r.id)}
             />
           ))}
-
           {visibleReels.length > 0 && archive.length > 0 && <Divider />}
-
-          {/* Archive vault — every past story as its own circle with date.
-              Videos pass posterUrl so the ring shows a still rather than
-              trying to decode the whole clip. */}
           {archiveGroups.map((g) => (
             <StoryRing
               key={`vault-${g.key}`}
@@ -196,6 +222,12 @@ export default function StoriesStrip() {
             />
           ))}
         </div>
+      </div>
+      </div>
+
+      {/* Tablet / desktop — 9-column grid of circles */}
+      <div className="hidden md:grid md:grid-cols-9 md:gap-2">
+        {allCircles}
       </div>
 
       {viewer && (

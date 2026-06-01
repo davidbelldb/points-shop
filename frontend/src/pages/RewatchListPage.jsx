@@ -129,7 +129,7 @@ function Section({ heading, items, sort, setSort, emptyText, busy, onToggleWatch
       {sorted.length === 0 ? (
         <p className="text-sm text-neutral-400">{emptyText}</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-9 gap-3">
           {sorted.map((it) => (
             <ItemCard key={it.id} it={it} busy={busy} onToggleWatched={onToggleWatched} onRemove={onRemove} />
           ))}

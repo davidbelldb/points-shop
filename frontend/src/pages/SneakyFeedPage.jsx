@@ -254,7 +254,7 @@ export default function SneakyFeedPage() {
               {MONTHS[bucket.month]} {bucket.year}
               <span className="ml-2 text-xs font-normal text-neutral-400">{bucket.stories.length} stor{bucket.stories.length === 1 ? 'y' : 'ies'}</span>
             </h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 md:grid-cols-6 xl:grid-cols-9 gap-2">
               {bucket.stories.map((s) => {
                 const queue = bucket.stories.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                 const startIdx = queue.findIndex((x) => x.id === s.id);
