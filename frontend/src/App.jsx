@@ -7,6 +7,7 @@ import { useSettings } from './lib/SettingsContext.jsx';
 import { useTheme } from './lib/ThemeContext.jsx';
 import SurveyBanner from './components/SurveyBanner.jsx';
 import MenuDrawer from './components/MenuDrawer.jsx';
+import SideNav from './components/SideNav.jsx';
 import { countdownClock } from './lib/countdown.js';
 
 function AvatarFallback() {
@@ -61,21 +62,27 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
+      {/* Persistent sidebar — tablet & desktop only */}
+      <SideNav />
+
+      {/* All page content shifts right by sidebar width on md+ */}
+      <div className="md:pl-56">
       {user?.impersonating && (
         <div className="bg-amber-100 border-b border-amber-200">
-          <div className="mx-auto flex w-full max-w-md md:max-w-2xl lg:max-w-none lg:px-6 items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900">
+          <div className="mx-auto flex w-full items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900 lg:px-6">
             <span>Viewing as <strong>{user.username}</strong> (signed in as {user.actual_username})</span>
             <button onClick={stopImpersonate} className="font-semibold underline">Stop</button>
           </div>
         </div>
       )}
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-md md:max-w-2xl lg:max-w-none lg:px-6 items-center justify-between gap-2 px-3 py-3">
+        <div className="flex w-full items-center justify-between gap-2 px-3 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-2">
+            {/* Hamburger — mobile only; sidebar handles nav on md+ */}
             <button
               onClick={() => setMenuOpen((o) => !o)}
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100 md:hidden"
             >
               {/* transformBox:'view-box' makes transformOrigin relative to the SVG
                   viewport, not each line's own bounding box — fixes off-centre rotation. */}
@@ -110,7 +117,8 @@ export default function App() {
                 />
               </svg>
             </button>
-            <Link to="/" className="flex min-w-0 items-center gap-2">
+            {/* Logo/name — hidden on md+ because sidebar carries branding */}
+            <Link to="/" className="flex min-w-0 items-center gap-2 md:hidden">
               {logoUrl ? (
                 <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
               ) : null}
@@ -163,19 +171,21 @@ export default function App() {
           </div>
         </div>
       </header>
+      {/* Drawer — mobile only */}
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       {isHome && bannerOn && (
         <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
-          <div className="mx-auto flex w-full max-w-md md:max-w-2xl lg:max-w-none lg:px-6 items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide">
+          <div className="flex w-full items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide lg:px-6">
             <span className="truncate">{settings.banner_text}</span>
             <CountdownClock date={settings.banner_countdown_date} time={settings.banner_countdown_time} />
           </div>
         </div>
       )}
       {showFloater && <SurveyBanner />}
-      <main className={`mx-auto px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'w-full max-w-md md:max-w-2xl lg:max-w-none lg:px-8 pb-24'}`}>
+      <main className={`px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'w-full pb-24 lg:px-8'}`}>
         <Outlet />
       </main>
+      </div>{/* end md:pl-56 wrapper */}
     </div>
   );
 }
