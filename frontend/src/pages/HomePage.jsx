@@ -51,7 +51,7 @@ export default function HomePage() {
 
       {/* \u2500\u2500 Full-width top strip (unchanged on all viewports) \u2500\u2500 */}
       <AudioNotesSection />
-      <div className="text-center md:text-left">
+      <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
           {applyNameToken(settings.hero_title ?? 'Welcome to Sneaky Points', account?.name)}
         </h1>
