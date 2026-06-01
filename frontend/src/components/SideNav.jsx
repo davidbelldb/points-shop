@@ -95,7 +95,7 @@ export default function SideNav() {
   const unread   = notifications?.unread_count ?? 0;
 
   return (
-    <aside className="hidden md:flex fixed left-0 top-0 z-20 h-screen w-56 flex-col bg-white">
+    <aside className="hidden md:flex fixed left-0 top-0 z-20 h-[100dvh] w-56 flex-col bg-white">
 
       {/* Brand header */}
       <Link
