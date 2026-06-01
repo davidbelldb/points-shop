@@ -453,7 +453,7 @@ export default function GiftsweeperPage() {
         <div className="md:flex md:gap-8 md:items-start">
 
           {/* LEFT — setup grid */}
-          <div className="md:w-[540px] md:shrink-0">
+          <div className="md:w-[675px] md:shrink-0">
             <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={myTheme} onTapCell={tapSetupCell} />
           </div>
 
@@ -565,13 +565,13 @@ export default function GiftsweeperPage() {
 
       {/* Two grids: stack on mobile, side-by-side on desktop at the same ~540px width as TicTacFace */}
       <div className="md:flex md:gap-8 md:items-start md:flex-wrap">
-        <div className="space-y-2 md:w-[540px] md:shrink-0">
+        <div className="space-y-2 md:w-[675px] md:shrink-0">
           <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
           <p className="text-center text-xs text-neutral-500">
             You have discovered <strong>{oppGrid?.items_revealed || 0}/{oppGrid?.items_total || 0}</strong> {oppKindPlural}
           </p>
         </div>
-        <div className="space-y-2 mt-4 md:mt-0 md:w-[540px] md:shrink-0">
+        <div className="space-y-2 mt-4 md:mt-0 md:w-[675px] md:shrink-0">
           <MyMiniGrid rows={rows} cols={cols} myItems={myItems} oppMarks={myGrid?.marks || []} theme={myTheme} />
           <p className="text-center text-xs text-neutral-500">
             {otherName} has discovered <strong>{myGrid?.items_revealed || 0}/{myGrid?.items_total || 0}</strong> of your {myKindPlural}
