@@ -304,12 +304,12 @@ export default function TicTacFacePage() {
         </button>
       </div>
 
-      {/* Responsive: board left, controls right — lg+ only (iPad portrait stays single-col) */}
-      <div className="lg:flex lg:gap-6 lg:items-start">
+      {/* Responsive: board left, controls right — lg+ proportional grid */}
+      <div className="lg:grid lg:grid-cols-[3fr_2fr] lg:gap-6 lg:items-start">
 
         {/* ultimate board */}
         {game && (
-          <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md lg:w-[682px] lg:shrink-0">
+          <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md">
             <div className="grid grid-cols-3 gap-2 rounded-[13px] p-2" style={{backgroundColor:'#2a2a28'}}>
               {globalBoard.map((globalCell, bi) => {
                 const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
@@ -333,7 +333,7 @@ export default function TicTacFacePage() {
         )}
 
         {/* right column: player chips + status bar */}
-        <div className="space-y-4 mt-4 lg:mt-0 lg:flex-1 lg:min-w-0">
+        <div className="space-y-4 mt-4 lg:mt-0">
           <div className="flex lg:flex-col gap-2.5">
             <PlayerChip tone="me"    label={meName}    active={isMyTurn}                              status={meStatus}    score={myBoardWins}    players={players} />
             <PlayerChip tone="other" label={otherName} active={!!game && !game.finished && !isMyTurn} status={otherStatus} score={otherBoardWins} players={players} />

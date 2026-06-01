@@ -497,16 +497,16 @@ export default function GiftsweeperPage() {
           <p className="mt-1 text-sm text-neutral-500">{tagline}</p>
         </div>
 
-        {/* Two-column on lg+ (iPad landscape / desktop): grid left, items + controls right */}
-        <div className="lg:flex lg:gap-8 lg:items-start">
+        {/* Two-column on lg+: grid left, items + controls right — proportional */}
+        <div className="lg:grid lg:grid-cols-[3fr_2fr] lg:gap-8 lg:items-start">
 
           {/* LEFT — setup grid */}
-          <div className="lg:w-[675px] lg:shrink-0">
+          <div>
             <SetupGrid rows={rows} cols={cols} items={myItems} selection={setupSelection} theme={myTheme} onTapCell={tapSetupCell} />
           </div>
 
           {/* RIGHT — items list + action buttons (lg+ only; mobile/tablet-portrait uses sticky bar below) */}
-          <div className="hidden lg:flex lg:flex-1 lg:min-w-0 lg:flex-col lg:gap-4">
+          <div className="hidden lg:flex lg:flex-col lg:gap-4">
             <div className="space-y-2">
               <p className="text-sm font-semibold">{itemsHeading}</p>
               {myItems.length === 0 ? (
@@ -612,11 +612,11 @@ export default function GiftsweeperPage() {
         <p className="mt-1 text-xs text-neutral-400">Your balance: <strong>{balance} pts</strong></p>
       </div>
 
-      {/* Grids left, leaderboard right — lg+ only */}
-      <div className="lg:flex lg:gap-8 lg:items-start">
+      {/* Grids left, leaderboard right — lg+ proportional */}
+      <div className="lg:grid lg:grid-cols-[3fr_2fr] lg:gap-8 lg:items-start">
 
         {/* LEFT — both grids stacked */}
-        <div className="lg:flex-1 lg:min-w-0 space-y-4">
+        <div className="space-y-4">
           <div className="space-y-2">
             <OppGrid rows={rows} cols={cols} guesses={oppGrid?.guesses || []} selection={playSelection} theme={oppTheme} onTapCell={tapPlayCell} disabled={!isMyTurn} />
             <p className="text-center text-xs text-neutral-500">
@@ -632,7 +632,7 @@ export default function GiftsweeperPage() {
         </div>
 
         {/* RIGHT — leaderboard (lg+ only) */}
-        <div className="hidden lg:block lg:w-72 lg:shrink-0">
+        <div className="hidden lg:block">
           <GsLeaderboard />
         </div>
       </div>
