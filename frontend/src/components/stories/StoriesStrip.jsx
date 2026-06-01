@@ -178,7 +178,7 @@ export default function StoriesStrip() {
   return (
     <>
       {/* Mobile: single-row horizontal scroll with right bleed (unchanged). */}
-      <div className="md:hidden -mr-4">
+      <div className="lg:hidden -mr-4">
         <div className="flex items-start gap-3 overflow-x-auto pb-2">
           {activeGroups.map((g, idx) => {
             const isYou = g.authorId === user?.id;
@@ -226,7 +226,7 @@ export default function StoriesStrip() {
       {/* Tablet / desktop — same circles at natural size, wrapping into rows.
           flex-wrap keeps each ring its true width (74px + label) so the
           spacing looks identical to the iPhone strip, just without the scroll. */}
-      <div className="hidden md:flex md:flex-wrap md:gap-x-4 md:gap-y-4">
+      <div className="hidden lg:flex lg:flex-wrap lg:gap-x-4 lg:gap-y-4">
         {allCircles}
       </div>
 

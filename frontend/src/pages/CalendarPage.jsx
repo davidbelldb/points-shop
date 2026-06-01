@@ -180,7 +180,7 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Responsive 2-column layout: calendar left, events right on md+ ── */}
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-[1fr_1fr] lg:grid-cols-[5fr_4fr] md:gap-6 md:items-start">
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,340px)_1fr] lg:grid-cols-[minmax(0,300px)_1fr] md:gap-6 md:items-start">
 
         {/* LEFT — month grid */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-3 md:col-start-1 md:row-start-1">
@@ -345,7 +345,7 @@ function HighlightsSection({ focusDate, selectedDay }) {
             {g.date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
             <span className="ml-2 font-normal text-neutral-400">{g.stories.length}</span>
           </p>
-          <div className="grid grid-cols-4 md:grid-cols-6 xl:grid-cols-9 gap-2">
+          <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-2">
             {g.stories.map((s) => (
               <button
                 key={s.id}
@@ -357,7 +357,11 @@ function HighlightsSection({ focusDate, selectedDay }) {
               >
                 {s.media_type === 'video' ? (
                   <>
-                    <video src={s.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+                    {s.thumbnail_url ? (
+                      <img src={s.thumbnail_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <video src={s.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+                    )}
                     <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">▶</span>
                   </>
                 ) : (
