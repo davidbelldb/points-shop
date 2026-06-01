@@ -226,7 +226,7 @@ export default function StoriesStrip() {
       {/* Tablet / desktop — same circles at natural size, wrapping into rows.
           flex-wrap keeps each ring its true width (74px + label) so the
           spacing looks identical to the iPhone strip, just without the scroll. */}
-      <div className="hidden lg:flex lg:flex-wrap lg:gap-x-4 lg:gap-y-4">
+      <div className="hidden lg:flex lg:gap-x-4 lg:overflow-x-auto lg:pb-2">
         {allCircles}
       </div>
 
