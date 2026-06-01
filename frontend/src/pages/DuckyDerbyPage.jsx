@@ -898,13 +898,13 @@ export default function DuckyDerbyPage() {
           style={{
             top: TRACK_H - GRASS_BOTTOM - 44,
             left: preRace ? `${START_WX * 100}%` : undefined,
-            width: 18,
-            height: GRASS_BOTTOM + 44,
+            width: 16,
+            height: GRASS_BOTTOM + 40,
             transform: 'translateX(-50%)',
             zIndex: 40,
           }}
         >
-          <img src="/bread_post.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
+          <img src={isDark ? '/night_bread_post.png' : '/bread_post.png'} alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
         </div>
 
         {/* End bread post (just past finish line) */}
@@ -914,13 +914,13 @@ export default function DuckyDerbyPage() {
           style={{
             top: TRACK_H - GRASS_BOTTOM - 44,
             left: preRace ? `${(COURSE_LEN + 0.08) * 100}%` : undefined,
-            width: 18,
-            height: GRASS_BOTTOM + 44,
+            width: 16,
+            height: GRASS_BOTTOM + 40,
             transform: 'translateX(-50%)',
             zIndex: 40,
           }}
         >
-          <img src="/bread_post.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
+          <img src={isDark ? '/night_bread_post.png' : '/bread_post.png'} alt="" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
         </div>
 
         {/* Bread lure — slides along the wire ahead of the ducks */}
