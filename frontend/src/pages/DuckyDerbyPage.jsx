@@ -882,7 +882,7 @@ export default function DuckyDerbyPage() {
           ref={wireRef}
           className="absolute"
           style={{
-            top: TRACK_H - GRASS_BOTTOM - 32,
+            top: TRACK_H - GRASS_BOTTOM - 34,
             left: preRace ? `${START_WX * 100}%` : undefined,
             width: preRace ? `${(COURSE_LEN + 0.08 - START_WX) * 100}%` : undefined,
             height: 2,
