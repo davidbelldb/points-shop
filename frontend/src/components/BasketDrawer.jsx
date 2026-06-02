@@ -108,7 +108,8 @@ export default function BasketDrawer({ open, onClose }) {
 
       {/* Panel — slides in from the right */}
       <aside
-        className={`absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ backgroundColor: '#7d3c6b' }}
+        className={`absolute right-0 top-0 flex h-full w-[80vw] md:w-full md:max-w-md flex-col shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* ── Drawer header ── */}
         <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-3">
@@ -138,12 +139,12 @@ export default function BasketDrawer({ open, onClose }) {
         {/* ── Empty state ── */}
         {basket && isEmpty && (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
-              <img src="/sphincter-pink.svg" alt="" className="h-9 w-9" />
+            <div className="flex items-center justify-center">
+              <img src="/sphincter-pink.svg" alt="" className="h-96 w-96" />
             </div>
             <div>
-              <p className="font-semibold text-neutral-900">It's empty in here.</p>
-              <p className="mt-1 text-sm text-neutral-500">Add something sneaky from the shop.</p>
+              <p className="font-semibold text-neutral-900">It's looking remarkably clean up in here</p>
+              <p className="mt-1 text-sm text-neutral-500">Probably the perfect time to put occupy it with something...</p>
             </div>
             <button
               onClick={onClose}
