@@ -29,9 +29,13 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4">
       <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <img src="/cheeks.svg" alt="" className="mb-3 h-16 w-16" />
-        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Sneaky Stuff</h1>
-        <p className="mt-1 text-sm text-neutral-500">Sign in to continue.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Sneaky Stuff</h1>
+            <p className="mt-1 text-sm text-neutral-500">Sign in to continue.</p>
+          </div>
+          <img src="/cheeks.svg" alt="" className="h-20 w-20 shrink-0" />
+        </div>
         <form onSubmit={submit} className="mt-5 space-y-3">
           <label className="block">
             <span className="text-xs font-medium text-neutral-600">Username</span>
