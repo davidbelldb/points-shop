@@ -140,7 +140,7 @@ export default function BasketDrawer({ open, onClose }) {
         {basket && isEmpty && (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="flex items-center justify-center">
-              <img src="/sphincter-pink.svg" alt="" className="h-96 w-96" />
+              <img src="/sphincter-pink.svg" alt="" className="h-16 w-16" />
             </div>
             <div>
               <p className="font-semibold text-neutral-900">It's looking remarkably clean up in here</p>
