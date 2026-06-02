@@ -113,7 +113,7 @@ export default function BasketDrawer({ open, onClose }) {
       >
         {/* ── Drawer header ── */}
         <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-white">
             <img src="/sphincter-pink.svg" alt="" className="h-5 w-5" />
             {isEmpty ? "Katie's safe pocket" : `Katie's safe pocket (${basket.items.length})`}
           </h2>
@@ -144,7 +144,7 @@ export default function BasketDrawer({ open, onClose }) {
             </div>
             <div>
               <p className="font-semibold text-white">It's looking remarkably clean up in here</p>
-              <p className="mt-1 text-sm text-neutral-500 dark:text-white">Probably the perfect time to put occupy it with something...</p>
+              <p className="mt-1 text-sm text-white">Probably the perfect time to put occupy it with something...</p>
             </div>
             <button
               onClick={onClose}
