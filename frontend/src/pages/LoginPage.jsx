@@ -34,7 +34,7 @@ export default function LoginPage() {
             <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Sneaky Stuff</h1>
             <p className="mt-1 text-sm text-neutral-500">Sign in to continue.</p>
           </div>
-          <img src="/cheeks.svg" alt="" className="h-20 w-20 shrink-0 -translate-y-[3px]" />
+          <img src="/cheeks.svg" alt="" className="h-[81.6px] w-[81.6px] shrink-0 -translate-y-[3px]" />
         </div>
         <form onSubmit={submit} className="mt-5 space-y-3">
           <label className="block">
