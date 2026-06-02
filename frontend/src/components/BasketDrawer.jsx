@@ -112,12 +112,13 @@ export default function BasketDrawer({ open, onClose }) {
       >
         {/* ── Drawer header ── */}
         <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <h2 className="text-base font-semibold">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <img src="/sphincter-pink.svg" alt="" className="h-5 w-5" />
             {isEmpty ? "Katie's safe pocket" : `Katie's safe pocket (${basket.items.length})`}
           </h2>
           <button
             onClick={onClose}
-            aria-label="Close basket"
+            aria-label="Close safe pocket"
             className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -137,12 +138,8 @@ export default function BasketDrawer({ open, onClose }) {
         {/* ── Empty state ── */}
         {basket && isEmpty && (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 0 1-8 0" />
-              </svg>
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
+              <img src="/sphincter-pink.svg" alt="" className="h-9 w-9" />
             </div>
             <div>
               <p className="font-semibold text-neutral-900">It's empty in here.</p>
@@ -152,7 +149,7 @@ export default function BasketDrawer({ open, onClose }) {
               onClick={onClose}
               className="rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-amber-900"
             >
-              Close basket
+              Close safe pocket
             </button>
           </div>
         )}
