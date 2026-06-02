@@ -1072,7 +1072,7 @@ export default function DuckyDerbyPage() {
       >
         {noFunds ? (
           <p className="py-1 text-center text-sm font-medium text-amber-800">
-            You need points to place a bet — win some elsewhere first!
+            You need at least 2 points to place a bet, you peasant. Come back when you can afford it...
           </p>
         ) : phase === 'betting' ? (
           <div className="flex items-end gap-2">
