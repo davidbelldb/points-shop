@@ -112,7 +112,7 @@ export default function BasketDrawer({ open, onClose }) {
         className={`absolute right-0 top-0 flex h-full w-[80vw] md:w-full md:max-w-md flex-col shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* ── Drawer header ── */}
-        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/20 px-4 py-3">
           <h2 className="flex items-center gap-2 text-base font-semibold text-white">
             <img src="/sphincter-pink.svg" alt="" className="h-5 w-5" />
             {isEmpty ? "Katie's safe pocket" : `Katie's safe pocket (${basket.items.length})`}
@@ -120,7 +120,7 @@ export default function BasketDrawer({ open, onClose }) {
           <button
             onClick={onClose}
             aria-label="Close safe pocket"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -132,7 +132,7 @@ export default function BasketDrawer({ open, onClose }) {
         {/* ── Loading ── */}
         {!basket && (
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-neutral-500">Loading...</p>
+            <p className="text-sm text-white/70">Loading...</p>
           </div>
         )}
 
@@ -163,8 +163,8 @@ export default function BasketDrawer({ open, onClose }) {
               {/* Items */}
               <ul className="space-y-2">
                 {basket.items.map((item) => (
-                  <li key={item.id} className="flex gap-3 rounded-xl border border-neutral-200 bg-white p-3">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100 text-neutral-400">
+                  <li key={item.id} className="flex gap-3 rounded-xl border border-white/20 bg-white/10 p-3">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/20 text-white">
                       {item.thumbnail_url ? (
                         <img src={item.thumbnail_url} alt={item.name} className="h-full w-full object-cover" />
                       ) : (
@@ -178,19 +178,19 @@ export default function BasketDrawer({ open, onClose }) {
                     <div className="flex flex-1 flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-sm font-medium leading-tight">{item.name}</h3>
-                          <button onClick={() => removeItem(item.product_id)} className="text-xs text-neutral-400 hover:text-red-600">Remove</button>
+                          <h3 className="text-sm font-medium leading-tight text-white">{item.name}</h3>
+                          <button onClick={() => removeItem(item.product_id)} className="text-xs text-white/60 hover:text-red-400">Remove</button>
                         </div>
-                        <p className="text-sm font-semibold text-amber-700">{item.price_points} pts</p>
+                        <p className="text-sm font-semibold text-white/80">{item.price_points} pts</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setItemQty(item.product_id, item.qty - 1)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-200 text-base"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-base text-white"
                           aria-label="Decrease">−</button>
-                        <span className="min-w-6 text-center text-sm font-medium">{item.qty}</span>
+                        <span className="min-w-6 text-center text-sm font-medium text-white">{item.qty}</span>
                         <button onClick={() => setItemQty(item.product_id, item.qty + 1)}
                           disabled={item.qty >= item.stock_qty}
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-200 text-base disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-base text-white disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label="Increase">+</button>
                       </div>
                     </div>
@@ -200,17 +200,17 @@ export default function BasketDrawer({ open, onClose }) {
 
               {/* Delivery */}
               {deliveryOptions.length > 0 && (
-                <section className="space-y-1 rounded-xl border border-neutral-200 bg-white p-3">
-                  <p className="text-sm font-semibold">Delivery</p>
+                <section className="space-y-1 rounded-xl border border-white/20 bg-white/10 p-3">
+                  <p className="text-sm font-semibold text-white">Delivery</p>
                   {deliveryOptions.map((opt) => (
-                    <label key={opt.id} className="flex cursor-pointer items-center gap-2 rounded-lg p-2 text-sm hover:bg-neutral-50">
+                    <label key={opt.id} className="flex cursor-pointer items-center gap-2 rounded-lg p-2 text-sm text-white hover:bg-white/10">
                       <input type="radio" name="drawer-delivery"
                         checked={basket.delivery?.id === opt.id}
                         onChange={() => handleSetDelivery(opt.id)}
                         disabled={busy}
                         className="h-4 w-4 accent-[#106655]" />
                       <span className="flex-1">{opt.name}</span>
-                      <span className="font-medium text-amber-700">{opt.points === 0 ? 'Free' : `+${opt.points} pts`}</span>
+                      <span className="font-medium text-white/80">{opt.points === 0 ? 'Free' : `+${opt.points} pts`}</span>
                     </label>
                   ))}
                 </section>
@@ -218,69 +218,69 @@ export default function BasketDrawer({ open, onClose }) {
 
               {/* Discount code */}
               {basket.discount ? (
-                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                <div className="flex items-center justify-between rounded-xl border border-white/20 bg-white/10 p-3 text-sm">
                   <div>
-                    <p className="font-semibold text-emerald-900">{basket.discount.code} applied</p>
-                    {basket.discount.description && <p className="text-xs text-emerald-700">{basket.discount.description}</p>}
+                    <p className="font-semibold text-white">{basket.discount.code} applied</p>
+                    {basket.discount.description && <p className="text-xs text-white/70">{basket.discount.description}</p>}
                   </div>
-                  <button onClick={handleRemovePromo} disabled={busy} className="text-xs font-medium text-emerald-800 hover:text-red-600">Remove</button>
+                  <button onClick={handleRemovePromo} disabled={busy} className="text-xs font-medium text-white/70 hover:text-red-400">Remove</button>
                 </div>
               ) : (
                 <div className="flex gap-2">
                   <input value={code} onChange={(e) => setCode(e.target.value)}
                     placeholder="Discount code"
-                    className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none" />
+                    className="block min-w-0 flex-1 rounded-md border border-white/30 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/50 focus:border-white/60 focus:outline-none" />
                   <button onClick={handleApply} disabled={busy || !code.trim()}
-                    className="shrink-0 rounded-md bg-neutral-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">
+                    className="shrink-0 rounded-md bg-white/20 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">
                     Apply
                   </button>
                 </div>
               )}
 
               {/* Note */}
-              <div className="rounded-xl border border-neutral-200 bg-white p-3">
-                <label className="mb-1 block text-sm font-semibold">Note (optional)</label>
+              <div className="rounded-xl border border-white/20 bg-white/10 p-3">
+                <label className="mb-1 block text-sm font-semibold text-white">Note (optional)</label>
                 <textarea value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} onBlur={handleNotesBlur}
                   placeholder="Just remember to keep it clean. No room for filth here"
                   rows={2}
-                  className="block w-full resize-none rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none" />
+                  className="block w-full resize-none rounded-md border border-white/30 bg-white/10 px-2 py-1.5 text-sm text-white placeholder-white/50 focus:border-white/60 focus:outline-none" />
               </div>
 
             </div>
 
             {/* ── Sticky footer: totals + place order ── */}
-            <div className="shrink-0 border-t border-neutral-200 bg-white px-4 py-4 space-y-3">
+            <div className="shrink-0 border-t border-white/20 bg-white/10 px-4 py-4 space-y-3">
 
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Subtotal</span>
-                  <span>{basket.subtotal_points} pts</span>
+                  <span className="text-white/70">Subtotal</span>
+                  <span className="text-white">{basket.subtotal_points} pts</span>
                 </div>
                 {basket.discount_points > 0 && (
-                  <div className="flex justify-between text-emerald-700">
+                  <div className="flex justify-between text-white/80">
                     <span>Discount</span>
                     <span>−{basket.discount_points} pts</span>
                   </div>
                 )}
                 {basket.delivery && (
                   <div className="flex justify-between">
-                    <span className="text-neutral-500">Delivery</span>
-                    <span>{basket.delivery_points === 0 ? 'Free' : `+${basket.delivery_points} pts`}</span>
+                    <span className="text-white/70">Delivery</span>
+                    <span className="text-white">{basket.delivery_points === 0 ? 'Free' : `+${basket.delivery_points} pts`}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t border-neutral-100 pt-1.5 font-semibold">
+                <div className="flex justify-between border-t border-white/20 pt-1.5 font-semibold text-white">
                   <span>Total</span>
                   <span>{basket.total_points} pts</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Your balance</span>
-                  <span className={canAfford ? 'font-medium' : 'font-medium text-red-600'}>
+                  <span className="text-white/70">Your balance</span>
+                  <span className={canAfford ? 'font-medium text-white' : 'font-medium text-red-400'}>
                     {balance.toLocaleString()} pts
                   </span>
                 </div>
               </div>
 
-              {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+              {error && <p className="rounded-lg bg-white/10 px-3 py-2 text-sm text-red-400">{error}</p>}
 
               <button
                 disabled={!canAfford || placing}
