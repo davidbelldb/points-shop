@@ -1,6 +1,17 @@
 @import "tailwindcss";
 
 @theme {
+  /* Override red palette → pink #ed70bd */
+  --color-red-50:  #fdf0f9;
+  --color-red-100: #fbe0f4;
+  --color-red-200: #f7c2e9;
+  --color-red-300: #f299d8;
+  --color-red-400: #ed70bd;
+  --color-red-500: #ed70bd;
+  --color-red-600: #ed70bd;
+  --color-red-700: #c4529a;
+  --color-red-800: #9b3f78;
+  --color-red-900: #7a2f5e;
   --color-amber-50:  #ecfaf5;
   --color-amber-100: #d3f3e9;
   --color-amber-200: #b3e9d9;
