@@ -144,7 +144,7 @@ export default function BasketDrawer({ open, onClose }) {
             </div>
             <div>
               <p className="font-semibold text-neutral-900">It's looking remarkably clean up in here</p>
-              <p className="mt-1 text-sm text-neutral-500">Probably the perfect time to put occupy it with something...</p>
+              <p className="mt-1 text-sm text-neutral-500 dark:text-white">Probably the perfect time to put occupy it with something...</p>
             </div>
             <button
               onClick={onClose}
