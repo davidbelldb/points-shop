@@ -203,7 +203,18 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
   }), [activePip]);
 
   useEffect(() => {
-    if (!bodyRef.current || !throwSeed) return;
+    if (!bodyRef.current) return;
+    // Park inactive dice far off-screen so their RigidBody stays mounted
+    // (unmounting mid-simulation causes rapier to crash)
+    if (!visible) {
+      bodyRef.current.setTranslation({ x: 0, y: -100, z: 0 }, true);
+      bodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      bodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      settledRef.current = false;
+      restFramesRef.current = 0;
+      return;
+    }
+    if (!throwSeed) return;
     const r = () => Math.random();
     const swipeX = throwVec ? Math.max(-1, Math.min(1, throwVec.x / 200)) : 0;
     // Three lanes: -1.2, 0, +1.2
@@ -227,10 +238,11 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
     }, true);
     settledRef.current = false;
     restFramesRef.current = 0;
-  }, [throwSeed, throwVec, indexOffset]);
+  }, [throwSeed, throwVec, indexOffset, visible]);
 
   useFrame(() => {
-    if (settledRef.current || !bodyRef.current) return;
+    // Skip settlement tracking for inactive dice
+    if (settledRef.current || !bodyRef.current || !visible) return;
     const body = bodyRef.current;
     const lv = body.linvel();
     const av = body.angvel();
@@ -249,8 +261,8 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
     }
   });
 
-  if (!visible) return null;
-
+  // Always keep RigidBody mounted — removing it mid-simulation crashes rapier.
+  // Visual content is only rendered when visible; the body sits at y=-100 otherwise.
   return (
     <RigidBody
       ref={bodyRef}
@@ -261,17 +273,22 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
       linearDamping={0.2}
       angularDamping={0.4}
       ccd
+      position={[0, -100, 0]}
     >
       <CuboidCollider args={[DIE_HALF, DIE_HALF, DIE_HALF]} />
-      <RoundedBox args={[DIE_SIZE, DIE_SIZE, DIE_SIZE]} radius={0.05} smoothness={4} castShadow>
-        <meshStandardMaterial color={activeBody} roughness={0.45} metalness={0.05} />
-      </RoundedBox>
-      {FACE_PIPS.map((f) => (
-        <mesh key={f.value} position={f.pos} rotation={f.rot}>
-          <planeGeometry args={[PIP_PLANE, PIP_PLANE]} />
-          <meshStandardMaterial map={pipTextures[f.value]} transparent roughness={0.5} />
-        </mesh>
-      ))}
+      {visible && (
+        <>
+          <RoundedBox args={[DIE_SIZE, DIE_SIZE, DIE_SIZE]} radius={0.05} smoothness={4} castShadow>
+            <meshStandardMaterial color={activeBody} roughness={0.45} metalness={0.05} />
+          </RoundedBox>
+          {FACE_PIPS.map((f) => (
+            <mesh key={f.value} position={f.pos} rotation={f.rot}>
+              <planeGeometry args={[PIP_PLANE, PIP_PLANE]} />
+              <meshStandardMaterial map={pipTextures[f.value]} transparent roughness={0.5} />
+            </mesh>
+          ))}
+        </>
+      )}
     </RigidBody>
   );
 }
@@ -398,15 +415,16 @@ const BTN_PANEL_Y = 0.09;
 
 function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelX = 0, panelZ = BTN_PANEL_Z_DEFAULT, panelRotY = 0 }) {
   const { buttonsTex } = useStb15Textures();
-  const meshRef = useRef();
+  const innerGroupRef = useRef();
   const pressedRef = useRef(null); // 'left' | 'right' | null
   const offsetY = useRef(0);
 
+  // Animate the whole inner group for press feedback
   useFrame((_, delta) => {
-    if (!meshRef.current) return;
+    if (!innerGroupRef.current) return;
     const target = pressedRef.current ? -0.04 : 0;
     offsetY.current += (target - offsetY.current) * Math.min(delta * 18, 1);
-    meshRef.current.position.y = offsetY.current;
+    innerGroupRef.current.position.y = offsetY.current;
   });
 
   function handlePointerDown(e, side) {
@@ -423,73 +441,88 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
     if (side === 'right' && can1Die)  onToggle1Die?.();
   }
 
-  const halfW = BTN_PANEL_W / 4; // half of each side
+  // Each half is slightly narrower than W/2 to leave a visible seam
+  const halfW = BTN_PANEL_W / 2 - 0.06;
 
   return (
     <group position={[panelX, BTN_PANEL_Y, panelZ]} rotation={[0, panelRotY, 0]}>
-      {/* Main visible panel — glows teal when either side is active */}
-      <mesh ref={meshRef} castShadow receiveShadow>
-        <boxGeometry args={[BTN_PANEL_W, BTN_PANEL_H, BTN_PANEL_D]} />
-        <meshStandardMaterial
-          map={buttonsTex || null}
-          roughness={0.45}
-          metalness={0.05}
-          emissive={(can2Dice || can1Die) ? '#e773b0' : '#000000'}
-          emissiveIntensity={(can2Dice || can1Die) ? 0.4 : 0}
-        />
-      </mesh>
+      <group ref={innerGroupRef}>
+        {/* Left half panel (2 DICE) — glows when 2-dice mode is active */}
+        <mesh position={[-BTN_PANEL_W / 4, 0, 0]} castShadow receiveShadow>
+          <boxGeometry args={[halfW, BTN_PANEL_H, BTN_PANEL_D]} />
+          <meshStandardMaterial
+            map={buttonsTex || null}
+            roughness={0.45}
+            metalness={0.05}
+            emissive={using2Dice ? '#e773b0' : '#000000'}
+            emissiveIntensity={using2Dice ? 0.4 : 0}
+          />
+        </mesh>
 
-      {/* Invisible left click zone (2 DICE) */}
-      <mesh
-        position={[-BTN_PANEL_W / 4, 0, 0]}
-        onPointerDown={(e) => handlePointerDown(e, 'left')}
-        onPointerUp={(e) => handlePointerUp(e, 'left')}
-        onPointerLeave={() => { if (pressedRef.current === 'left') pressedRef.current = null; }}
-      >
-        <boxGeometry args={[BTN_PANEL_W / 2 - 0.05, BTN_PANEL_H + 0.02, BTN_PANEL_D + 0.02]} />
-        <meshStandardMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
+        {/* Right half panel (1 DIE) — glows when 1-die mode is active */}
+        <mesh position={[BTN_PANEL_W / 4, 0, 0]} castShadow receiveShadow>
+          <boxGeometry args={[halfW, BTN_PANEL_H, BTN_PANEL_D]} />
+          <meshStandardMaterial
+            map={buttonsTex || null}
+            roughness={0.45}
+            metalness={0.05}
+            emissive={using1Die ? '#e773b0' : '#000000'}
+            emissiveIntensity={using1Die ? 0.4 : 0}
+          />
+        </mesh>
 
-      {/* Invisible right click zone (1 DIE) */}
-      <mesh
-        position={[BTN_PANEL_W / 4, 0, 0]}
-        onPointerDown={(e) => handlePointerDown(e, 'right')}
-        onPointerUp={(e) => handlePointerUp(e, 'right')}
-        onPointerLeave={() => { if (pressedRef.current === 'right') pressedRef.current = null; }}
-      >
-        <boxGeometry args={[BTN_PANEL_W / 2 - 0.05, BTN_PANEL_H + 0.02, BTN_PANEL_D + 0.02]} />
-        <meshStandardMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-
-      {/* "2 DICE" label — only visible when unlocked */}
-      {can2Dice && (
-        <Text
-          position={[-BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.175}
-          color="#ffffff"
-          anchorX="center"
-          anchorY="middle"
-          renderOrder={10}
+        {/* Invisible left click zone (2 DICE) */}
+        <mesh
+          position={[-BTN_PANEL_W / 4, 0, 0]}
+          onPointerDown={(e) => handlePointerDown(e, 'left')}
+          onPointerUp={(e) => handlePointerUp(e, 'left')}
+          onPointerLeave={() => { if (pressedRef.current === 'left') pressedRef.current = null; }}
         >
-          {using2Dice ? '2 DICE MODE ✓' : '2 DICE MODE'}
-        </Text>
-      )}
+          <boxGeometry args={[BTN_PANEL_W / 2 - 0.05, BTN_PANEL_H + 0.02, BTN_PANEL_D + 0.02]} />
+          <meshStandardMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
 
-      {/* "1 DIE" label — only visible when unlocked */}
-      {can1Die && (
-        <Text
-          position={[BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.175}
-          color="#ffffff"
-          anchorX="center"
-          anchorY="middle"
-          renderOrder={10}
+        {/* Invisible right click zone (1 DIE) */}
+        <mesh
+          position={[BTN_PANEL_W / 4, 0, 0]}
+          onPointerDown={(e) => handlePointerDown(e, 'right')}
+          onPointerUp={(e) => handlePointerUp(e, 'right')}
+          onPointerLeave={() => { if (pressedRef.current === 'right') pressedRef.current = null; }}
         >
-          {using1Die ? '1 DIE MODE ✓' : '1 DIE MODE'}
-        </Text>
-      )}
+          <boxGeometry args={[BTN_PANEL_W / 2 - 0.05, BTN_PANEL_H + 0.02, BTN_PANEL_D + 0.02]} />
+          <meshStandardMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+
+        {/* "2 DICE" label — only visible when unlocked */}
+        {can2Dice && (
+          <Text
+            position={[-BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            fontSize={0.175}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            renderOrder={10}
+          >
+            {using2Dice ? '2 DICE MODE ✓' : '2 DICE MODE'}
+          </Text>
+        )}
+
+        {/* "1 DIE" label — only visible when unlocked */}
+        {can1Die && (
+          <Text
+            position={[BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            fontSize={0.175}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            renderOrder={10}
+          >
+            {using1Die ? '1 DIE MODE ✓' : '1 DIE MODE'}
+          </Text>
+        )}
+      </group>
     </group>
   );
 }
