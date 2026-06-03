@@ -472,7 +472,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
           anchorY="middle"
           renderOrder={10}
         >
-          {using2Dice ? '2 DICE ✓' : '2 DICE'}
+          {using2Dice ? '2 DICE MODE ✓' : '2 DICE MODE'}
         </Text>
       )}
 
@@ -487,7 +487,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
           anchorY="middle"
           renderOrder={10}
         >
-          {using1Die ? '1 DIE ✓' : '1 DIE'}
+          {using1Die ? '1 DIE MODE ✓' : '1 DIE MODE'}
         </Text>
       )}
     </group>
@@ -674,10 +674,9 @@ function TwirlInstance({ position, delay }) {
  * The component suspends while loading (wrap in <Suspense>).
  * ========================================================================== */
 
-// ObjModel uses sequential manual loading (MTL → preload → OBJ) rather than
-// useLoader, which caches the OBJ result before materials are applied and can
-// produce wrong textures when multiple models share the same component.
-function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }) {
+// ObjModel uses sequential manual loading (MTL → preload → OBJ).
+// colorOverride: optional hex string — overrides every mesh's diffuse colour.
+function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
   const [loaded, setLoaded] = useState(null);
 
   useEffect(() => {
@@ -696,8 +695,64 @@ function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], s
     return () => { cancelled = true; };
   }, [dir, obj, mtl]);
 
+  // Apply / re-apply colour override whenever the loaded object or override changes
+  useEffect(() => {
+    if (!loaded) return;
+    const col = colorOverride ? new THREE.Color(colorOverride) : null;
+    loaded.traverse((child) => {
+      if (!child.isMesh) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach((m) => {
+        if (col) { m.color.set(col); }
+        m.needsUpdate = true;
+      });
+    });
+  }, [loaded, colorOverride]);
+
   if (!loaded) return null;
   return <primitive object={loaded} position={position} rotation={rotation} scale={scale} />;
+}
+
+// GlbModel — colorOverride applied after clone
+function GlbModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
+  const { scene } = useGLTF(url);
+  const clone = useMemo(() => {
+    const c = scene.clone(true);
+    if (colorOverride) {
+      const col = new THREE.Color(colorOverride);
+      c.traverse((child) => {
+        if (!child.isMesh) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => { m.color.set(col); m.needsUpdate = true; });
+      });
+    }
+    return c;
+  }, [scene, colorOverride]);
+  return <primitive object={clone} position={position} rotation={rotation} scale={scale} />;
+}
+
+// ProceduralBanana — colorOverride overrides the body colour
+function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
+  const curve = useMemo(() => {
+    const pts = [];
+    for (let i = 0; i <= 20; i++) {
+      const t = (i / 20) * Math.PI * 0.62;
+      pts.push(new THREE.Vector3(Math.cos(t) * 1.0 - 0.85, Math.sin(t) * 0.55, 0));
+    }
+    return new THREE.CatmullRomCurve3(pts);
+  }, []);
+  return (
+    <group position={position} rotation={rotation} scale={scale}>
+      <mesh castShadow receiveShadow>
+        <tubeGeometry args={[curve, 20, 0.09, 8, false]} />
+        <meshStandardMaterial color={colorOverride || '#F4D03F'} roughness={0.85} />
+      </mesh>
+      <mesh position={[0.16, 0.54, 0]} castShadow>
+        <sphereGeometry args={[0.07, 8, 8]} />
+        <meshStandardMaterial color="#7D6608" roughness={0.9} />
+      </mesh>
+    </group>
+  );
 }
 
 // GlbModel — for .glb files (uses useGLTF + Suspense)
@@ -746,6 +801,7 @@ const PROP_DEFINITIONS = {
   kettle: { type: 'obj', dir: '/models/kettle/', obj: 'cgaxis_models_116_09_obj_electric_kettle.obj', mtl: 'cgaxis_models_116_09_obj.mtl' },
   cup:    { type: 'glb', url: '/cup.glb' },
   banana: { type: 'procedural', component: 'banana' },
+  key:    { type: 'obj', dir: '/models/key/', obj: 'standard_key.obj', mtl: 'key.mtl' },
   // twirl_1 / twirl_2 are GLB — handled by DecorativeTwirls
 };
 
@@ -763,14 +819,15 @@ function SceneModels({ sceneProps = [] }) {
         const rot = [(p.rot_x_deg ?? 0) * DEG, (p.rot_y_deg ?? 0) * DEG, (p.rot_z_deg ?? 0) * DEG];
         const sc  = p.scale ?? 1;
 
+        const co = p.color_override || null;
         if (def.type === 'obj') {
-          return <ObjModel key={key} dir={def.dir} obj={def.obj} mtl={def.mtl} position={pos} rotation={rot} scale={sc} />;
+          return <ObjModel key={key} dir={def.dir} obj={def.obj} mtl={def.mtl} position={pos} rotation={rot} scale={sc} colorOverride={co} />;
         }
         if (def.type === 'glb') {
-          return <Suspense key={key} fallback={null}><GlbModel url={def.url} position={pos} rotation={rot} scale={sc} /></Suspense>;
+          return <Suspense key={key} fallback={null}><GlbModel url={def.url} position={pos} rotation={rot} scale={sc} colorOverride={co} /></Suspense>;
         }
         if (def.type === 'procedural' && def.component === 'banana') {
-          return <ProceduralBanana key={key} position={pos} rotation={rot} scale={sc} />;
+          return <ProceduralBanana key={key} position={pos} rotation={rot} scale={sc} colorOverride={co} />;
         }
         return null;
       })}
@@ -998,7 +1055,7 @@ function Stb15Scene({
 
         {/* Dice sum display */}
         {showSum && (
-          <Text position={[-3.2, 0.06, 1.4]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
+          <Text position={[-3.2, 0.06, 0.3]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
             {`${totalDice}`}
           </Text>
         )}
@@ -1278,7 +1335,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
           onToggle2Dice={() => { setUsing2Dice((v) => !v); setUsing1Die(false); }}
           onToggle1Die={() => { setUsing1Die((v) => !v); setUsing2Dice(false); }}
           celebrating={celebrating}
-          onDebugWin={game && phase !== 'won' ? debugSimulateWin : null}
+          onDebugWin={config.show_debug_win && game && phase !== 'won' ? debugSimulateWin : null}
           sceneProps={sceneProps}
         />
       </Stb15CanvasShell>

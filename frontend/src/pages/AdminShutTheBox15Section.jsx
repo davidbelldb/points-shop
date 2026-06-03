@@ -234,6 +234,22 @@ export default function AdminShutTheBox15Section({ bare = false }) {
 
       <hr className="border-neutral-200" />
 
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Debug win button</p>
+          <p className="text-xs text-neutral-400">Shows a ★ SIMULATE WIN button in the 3D scene for testing the win/twirl flow.</p>
+        </div>
+        <button
+          onClick={() => save({ show_debug_win: !cfg.show_debug_win })}
+          disabled={busy}
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${cfg.show_debug_win ? 'bg-orange-500 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {cfg.show_debug_win ? 'On' : 'Off'}
+        </button>
+      </div>
+
+      <hr className="border-neutral-200" />
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Home page placement</p>
@@ -284,7 +300,7 @@ export default function AdminShutTheBox15Section({ bare = false }) {
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">3D scene objects</p>
         <p className="text-xs text-neutral-500">
-          Position (X / Z), rotation (X/Y/Z °), and scale for each prop. X is left/right, Z is back/front (negative = behind box). 3D model rows show full rotation controls; layout rows (box, tiles, button panel) show only position/scale. Changes apply on next page load.
+          Position (X/Y/Z), rotation (X/Y/Z °), scale, and optional colour override for each prop. Y lifts the object above the surface. 3D model rows show full rotation + colour controls; layout rows show only position/scale. Changes apply on next page load.
         </p>
         {sceneProps.length === 0 && <p className="text-xs text-neutral-400">No props found — run DB migration 070.</p>}
         <div className="space-y-2">
@@ -428,10 +444,11 @@ function ScenePropEditor({ prop, busy, onSave }) {
   const [posX, setPosX]   = useState(String(prop.pos_x ?? 0));
   const [posY, setPosY]   = useState(String(prop.pos_y ?? 0));
   const [posZ, setPosZ]   = useState(String(prop.pos_z ?? 0));
-  const [rotX, setRotX]   = useState(String(prop.rot_x_deg ?? 0));
-  const [rotY, setRotY]   = useState(String(prop.rot_y_deg ?? 0));
-  const [rotZ, setRotZ]   = useState(String(prop.rot_z_deg ?? 0));
-  const [scale, setScale] = useState(String(prop.scale     ?? 1));
+  const [rotX, setRotX]         = useState(String(prop.rot_x_deg ?? 0));
+  const [rotY, setRotY]         = useState(String(prop.rot_y_deg ?? 0));
+  const [rotZ, setRotZ]         = useState(String(prop.rot_z_deg ?? 0));
+  const [scale, setScale]       = useState(String(prop.scale     ?? 1));
+  const [colorOvr, setColorOvr] = useState(prop.color_override ?? '');
 
   useEffect(() => {
     setPosX(String(prop.pos_x ?? 0));
@@ -441,19 +458,22 @@ function ScenePropEditor({ prop, busy, onSave }) {
     setRotY(String(prop.rot_y_deg ?? 0));
     setRotZ(String(prop.rot_z_deg ?? 0));
     setScale(String(prop.scale    ?? 1));
+    setColorOvr(prop.color_override ?? '');
   }, [prop]);
 
   const numInput = 'w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono';
 
   function commit() {
+    const HEX = /^#[0-9a-fA-F]{6}$/;
     onSave({
-      pos_x:     parseFloat(posX)  || 0,
-      pos_y:     parseFloat(posY)  || 0,
-      pos_z:     parseFloat(posZ)  || 0,
-      rot_x_deg: parseFloat(rotX)  || 0,
-      rot_y_deg: parseFloat(rotY)  || 0,
-      rot_z_deg: parseFloat(rotZ)  || 0,
-      scale:     parseFloat(scale) || 1,
+      pos_x:          parseFloat(posX)  || 0,
+      pos_y:          parseFloat(posY)  || 0,
+      pos_z:          parseFloat(posZ)  || 0,
+      rot_x_deg:      parseFloat(rotX)  || 0,
+      rot_y_deg:      parseFloat(rotY)  || 0,
+      rot_z_deg:      parseFloat(rotZ)  || 0,
+      scale:          parseFloat(scale) || 1,
+      color_override: HEX.test(colorOvr) ? colorOvr : null,
     });
   }
 
@@ -486,6 +506,25 @@ function ScenePropEditor({ prop, busy, onSave }) {
           <input value={posZ} onChange={(e) => setPosZ(e.target.value)} onBlur={commit} className={numInput} step="0.1" type="number" />
         </label>
         {!isLayout && (<>
+          <label className="col-span-2 flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Colour override</span>
+            <div className="flex items-center gap-1">
+              {/^#[0-9a-fA-F]{6}$/.test(colorOvr) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: colorOvr }} />
+              )}
+              <input
+                value={colorOvr}
+                onChange={(e) => setColorOvr(e.target.value)}
+                onBlur={commit}
+                className="w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none font-mono"
+                placeholder="#c8a020"
+                maxLength={7}
+              />
+              {colorOvr && (
+                <button onClick={() => { setColorOvr(''); onSave({ ...prop, color_override: null }); }} className="text-[11px] text-neutral-400 hover:text-red-500">✕</button>
+              )}
+            </div>
+          </label>
           <label className="flex items-center justify-between gap-2">
             <span className="text-neutral-500">Rot X °</span>
             <input value={rotX} onChange={(e) => setRotX(e.target.value)} onBlur={commit} className={numInput} step="1" type="number" />

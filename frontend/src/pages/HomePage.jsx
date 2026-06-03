@@ -6,6 +6,7 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
 import WheelHomeSection from '../components/WheelHomeSection.jsx';
 import ShutTheBoxHomeSection from '../components/ShutTheBoxHomeSection.jsx';
+import ShutTheBox15HomeSection from '../components/ShutTheBox15HomeSection.jsx';
 import Confetti from '../components/Confetti.jsx';
 import AudioNotesSection from '../components/AudioNotesSection.jsx';
 import CalendarUpcomingSection from '../components/CalendarUpcomingSection.jsx';
@@ -96,6 +97,7 @@ export default function HomePage() {
 
           <WheelHomeSection />
           <ShutTheBoxHomeSection />
+          <ShutTheBox15HomeSection />
         </div>
 
         {/* LEFT main column \u2014 Products

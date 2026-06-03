@@ -100,6 +100,13 @@ export default async function stb15Routes(fastify) {
     if ('rot_y_deg' in patch) { values.push(Number(patch.rot_y_deg)); updates.push(`rot_y_deg = $${values.length}`); }
     if ('rot_z_deg' in patch) { values.push(Number(patch.rot_z_deg)); updates.push(`rot_z_deg = $${values.length}`); }
     if ('scale'     in patch) { values.push(Number(patch.scale));     updates.push(`scale = $${values.length}`); }
+    if ('color_override' in patch) {
+      const v = patch.color_override;
+      if (v !== null && (typeof v !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(v))) {
+        return reply.code(400).send({ error: 'color_override must be a 6-digit hex like #c8a020 or null' });
+      }
+      values.push(v); updates.push(`color_override = $${values.length}`);
+    }
     if ('active'    in patch) {
       if (typeof patch.active !== 'boolean') return reply.code(400).send({ error: 'active must be boolean' });
       values.push(patch.active); updates.push(`active = $${values.length}`);
@@ -162,6 +169,7 @@ export default async function stb15Routes(fastify) {
       'felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'hidden_message',
       'dice_colour', 'pip_colour', 'table_colour',
       'camera_pos_x', 'camera_pos_y', 'camera_pos_z', 'camera_fov',
+      'show_debug_win',
     ];
     const updates = [];
     const values = [];
