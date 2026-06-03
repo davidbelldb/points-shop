@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Text, RoundedBox, useTexture, useGLTF } from '@react-three/drei';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
@@ -8,11 +8,14 @@ import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 
 /* ============================================================================
- * Constants / defaults
+ * Constants
  * ========================================================================== */
 
 const ALL_TILES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-const HIGH_TILES = [7, 8, 9, 10, 11, 12, 13, 14, 15];
+
+// Tiles that must ALL be shut for each staged dice reduction (player option)
+const TILES_FOR_2_DICE = [10, 11, 12, 13, 14, 15];   // shut these → may switch to 2 dice
+const TILES_FOR_1_DIE  = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // shut these → may switch to 1 die
 
 const DEFAULT_CONFIG = {
   felt_colour: '#15b8a6',
@@ -25,12 +28,12 @@ const DEFAULT_CONFIG = {
   hidden_message: 'I_MISS_YOU_SO_MUCH!!',
 };
 
-const GRANITE_TEX_URL = '/textures/granite.png?v=1';
-const TEAL_WOOD_TEX_URL = '/textures/teal_wood.jpg?v=1';
-const VELVET_TEX_URL = '/textures/velour_velvet_diff.jpg?v=3';
-const TWIRL_URL = '/twirl.glb';
+const GRANITE_TEX_URL  = '/textures/granite.png?v=1';
+const WOOD_TEX_URL     = '/textures/wood_table_worn.jpg?v=4';
+const VELVET_TEX_URL   = '/textures/velour_velvet_diff.jpg?v=3';
+const TWIRL_URL        = '/twirl.glb';
 
-// Box geometry constants — wider to fit 15 tiles
+// Box dimensions — wider for 15 tiles
 const BOX_W = 7.4;
 const BOX_D = 3.0;
 const WALL_H = 0.65;
@@ -39,25 +42,23 @@ const TILE_W = 0.36;
 const TILE_H = 0.75;
 const TILE_D = 0.1;
 const TILE_OPEN_ANGLE = -Math.PI / 5.5;
-const TILE_SPACING = 0.47;          // centre-to-centre spacing for 15 tiles
-const TILE_START_X = -((15 - 1) / 2) * TILE_SPACING; // -3.29
+const TILE_SPACING = 0.47;
+const TILE_START_X = -((15 - 1) / 2) * TILE_SPACING; // ≈ -3.29
 
-// Cabinet geometry
-const CAB_PANEL_W = BOX_W + 0.4;
+// Surface sits just below the box floor
+const SURFACE_Y = -0.12;
+// Cabinet panel geometry
 const CAB_PANEL_H = 1.6;
 const CAB_PANEL_D = 0.18;
-const CAB_SURFACE_D = BOX_D + 1.0;
-const CAB_SURFACE_H = 0.12;
-const SURFACE_Y = -0.12;  // top of surface (box sits at y=0 on the box floor, so cabinet top at y≈-0.12)
 
 /* ============================================================================
- * Texture loader hook
+ * Texture hook — wood_table_worn for box/tiles, granite for surface
  * ========================================================================== */
 
 function useStb15Textures() {
-  const [graniteTex, tealWoodTex, velvetTex] = useTexture([GRANITE_TEX_URL, TEAL_WOOD_TEX_URL, VELVET_TEX_URL]);
+  const [graniteTex, woodTex, velvetTex] = useTexture([GRANITE_TEX_URL, WOOD_TEX_URL, VELVET_TEX_URL]);
 
-  [graniteTex, tealWoodTex, velvetTex].forEach((tex) => {
+  [graniteTex, woodTex, velvetTex].forEach((tex) => {
     if (tex && tex.colorSpace !== THREE.SRGBColorSpace) {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -65,15 +66,12 @@ function useStb15Textures() {
       tex.needsUpdate = true;
     }
   });
+  // Granite tiles across a big surface
+  if (graniteTex) graniteTex.repeat.set(8, 6);
+  // Wood repeats
+  if (woodTex) woodTex.repeat.set(2, 1.5);
 
-  if (graniteTex) {
-    graniteTex.repeat.set(3, 2);
-  }
-  if (tealWoodTex) {
-    tealWoodTex.repeat.set(2, 1.5);
-  }
-
-  return { graniteTex, tealWoodTex, velvetTex };
+  return { graniteTex, woodTex, velvetTex };
 }
 
 /* ============================================================================
@@ -82,11 +80,7 @@ function useStb15Textures() {
 
 function lettersFromMessage(msg, len) {
   const m = (msg || '').padEnd(len, '_').slice(0, len);
-  const out = [];
-  for (let i = 0; i < len; i++) {
-    out.push(m[i] === '_' ? '' : m[i]);
-  }
-  return out;
+  return Array.from({ length: len }, (_, i) => (m[i] === '_' ? '' : m[i]));
 }
 
 function pickTileMessage(config) {
@@ -108,7 +102,7 @@ function hasValidClose(openTiles, target) {
 }
 
 /* ============================================================================
- * Dice pip helpers
+ * Pip textures / Die helpers
  * ========================================================================== */
 
 const PIP_PATTERNS = {
@@ -142,11 +136,11 @@ const PIP_OFFSET = DIE_HALF + 0.006;
 const PIP_PLANE = DIE_SIZE * 0.78;
 
 const FACE_PIPS = [
-  { value: 1, pos: [0, PIP_OFFSET, 0], rot: [-Math.PI / 2, 0, 0] },
+  { value: 1, pos: [0, PIP_OFFSET, 0],  rot: [-Math.PI / 2, 0, 0] },
   { value: 6, pos: [0, -PIP_OFFSET, 0], rot: [Math.PI / 2, 0, 0] },
-  { value: 2, pos: [0, 0, PIP_OFFSET], rot: [0, 0, 0] },
+  { value: 2, pos: [0, 0, PIP_OFFSET],  rot: [0, 0, 0] },
   { value: 5, pos: [0, 0, -PIP_OFFSET], rot: [0, Math.PI, 0] },
-  { value: 3, pos: [PIP_OFFSET, 0, 0], rot: [0, Math.PI / 2, 0] },
+  { value: 3, pos: [PIP_OFFSET, 0, 0],  rot: [0, Math.PI / 2, 0] },
   { value: 4, pos: [-PIP_OFFSET, 0, 0], rot: [0, -Math.PI / 2, 0] },
 ];
 
@@ -169,7 +163,7 @@ function readDieFace(quaternion) {
 }
 
 /* ============================================================================
- * Physics die
+ * PhysicsDie — supports 3 lanes (indexOffset 0,1,2)
  * ========================================================================== */
 
 function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, pipColour, palettes, visible }) {
@@ -201,9 +195,11 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
     if (!bodyRef.current || !throwSeed) return;
     const r = () => Math.random();
     const swipeX = throwVec ? Math.max(-1, Math.min(1, throwVec.x / 200)) : 0;
-    const lane = indexOffset === 0 ? -1 : 1;
+    // Three lanes: -1.2, 0, +1.2
+    const lane = (indexOffset - 1) * 1.2;
+
     bodyRef.current.setTranslation({
-      x: lane * 0.6 - swipeX * 1.4 + (r() - 0.5) * 0.6,
+      x: lane - swipeX * 1.4 + (r() - 0.5) * 0.5,
       y: 2.2 + r() * 0.4,
       z: 1.1 + r() * 0.3,
     }, true);
@@ -232,11 +228,10 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
     if (linSq < 0.005 && angSq < 0.005) {
       restFramesRef.current += 1;
       if (restFramesRef.current > 25) {
-        const r = body.rotation();
-        const q = new THREE.Quaternion(r.x, r.y, r.z, r.w);
-        const value = readDieFace(q);
+        const rot = body.rotation();
+        const q = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
         settledRef.current = true;
-        onSettled?.(indexOffset, value);
+        onSettled?.(indexOffset, readDieFace(q));
       }
     } else {
       restFramesRef.current = 0;
@@ -275,15 +270,14 @@ function PhysicsDie({ throwSeed, throwVec, indexOffset, onSettled, diceColour, p
  * ========================================================================== */
 
 function Tile({ value, x, closed, selected, onClick, inkColour, letter, interactive }) {
-  const { tealWoodTex } = useStb15Textures();
+  const { woodTex } = useStb15Textures();
   const groupRef = useRef();
   const angleRef = useRef(TILE_OPEN_ANGLE);
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
     const target = closed ? Math.PI / 2 : TILE_OPEN_ANGLE;
-    const k = Math.min(delta * 9, 1);
-    angleRef.current += (target - angleRef.current) * k;
+    angleRef.current += (target - angleRef.current) * Math.min(delta * 9, 1);
     groupRef.current.rotation.x = angleRef.current;
   });
 
@@ -296,7 +290,7 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
       >
         <boxGeometry args={[TILE_W, TILE_H, TILE_D]} />
         <meshStandardMaterial
-          map={tealWoodTex || null}
+          map={woodTex || null}
           roughness={0.6}
           emissive={selected ? '#15b8a6' : '#000000'}
           emissiveIntensity={selected ? 0.55 : 0}
@@ -326,19 +320,17 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
 }
 
 /* ============================================================================
- * Scattered loose tiles
+ * Scattered loose tiles — also wood_table_worn
  * ========================================================================== */
 
 function ScatteredTile({ letter, position, rotationY, inkColour, size = 1 }) {
-  const { tealWoodTex } = useStb15Textures();
-  const W = 0.7 * size;
-  const H = 0.6 * size;
-  const D = 0.12 * size;
+  const { woodTex } = useStb15Textures();
+  const W = 0.7 * size, H = 0.6 * size, D = 0.12 * size;
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
       <mesh position={[0, D / 2, 0]} castShadow>
         <boxGeometry args={[W, D, H]} />
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </mesh>
       {letter ? (
         <Text
@@ -362,17 +354,14 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
   return (
     <>
       {Array.from({ length: count }).map((_, i) => {
-        const t = (i - (count - 1) / 2) / ((count - 1) / 2);
-        const x = t * spread;
+        const t = count > 1 ? (i - (count - 1) / 2) / ((count - 1) / 2) : 0;
         const jitter = Math.sin((seed + i) * 9.7);
-        const z = baseZ + jitter * 0.18 * size;
-        const yRot = jitter * 0.45;
         return (
           <ScatteredTile
             key={i}
             letter={letters[i] || ''}
-            position={[x + Math.cos((seed + i) * 4.3) * 0.08, 0, z]}
-            rotationY={yRot}
+            position={[t * spread + Math.cos((seed + i) * 4.3) * 0.08, 0, baseZ + jitter * 0.18 * size]}
+            rotationY={jitter * 0.45}
             inkColour={inkColour}
             size={size}
           />
@@ -383,11 +372,12 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
 }
 
 /* ============================================================================
- * Single-die toggle button (3D, inside the scene)
+ * Dice-count toggle buttons (3D, on front lip)
+ * Two buttons: "2 DICE" (unlocks when 10-15 shut) and "1 DIE" (unlocks when 4-15 shut)
  * ========================================================================== */
 
-function SingleDieToggle({ enabled, active, onToggle, inkColour }) {
-  const { tealWoodTex } = useStb15Textures();
+function DiceToggleButton({ label, enabled, active, onToggle, inkColour, posX }) {
+  const { woodTex } = useStb15Textures();
   const meshRef = useRef();
   const pressedRef = useRef(false);
   const offsetY = useRef(0);
@@ -399,8 +389,6 @@ function SingleDieToggle({ enabled, active, onToggle, inkColour }) {
     meshRef.current.position.y = offsetY.current;
   });
 
-  // Placed on the right side of the front lip
-  const posX = BOX_W / 2 - 0.85;
   const posZ = BOX_D / 2 + WALL_THICK / 2 + 0.35;
 
   return (
@@ -410,30 +398,29 @@ function SingleDieToggle({ enabled, active, onToggle, inkColour }) {
         onPointerDown={(e) => { if (enabled) { e.stopPropagation(); pressedRef.current = true; } }}
         onPointerUp={(e) => { if (enabled) { e.stopPropagation(); pressedRef.current = false; onToggle?.(); } }}
         onPointerLeave={() => { pressedRef.current = false; }}
-        castShadow
-        receiveShadow
+        castShadow receiveShadow
       >
-        <boxGeometry args={[1.5, 0.18, 0.55]} />
+        <boxGeometry args={[1.3, 0.18, 0.55]} />
         <meshStandardMaterial
-          map={tealWoodTex || null}
+          map={woodTex || null}
           roughness={0.55}
           emissive={active ? '#15b8a6' : '#000'}
-          emissiveIntensity={active ? 0.4 : 0}
+          emissiveIntensity={active ? 0.45 : 0}
         />
       </mesh>
       <Text
         position={[0, 0.15, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.14}
+        fontSize={0.13}
         color={inkColour}
         anchorX="center"
         anchorY="middle"
         outlineWidth={0.012}
         outlineColor={enabled ? '#000' : '#555'}
-        fillOpacity={enabled ? 1 : 0.4}
+        fillOpacity={enabled ? 1 : 0.38}
         renderOrder={10}
       >
-        {active ? '1 DIE ✓' : '1 DIE'}
+        {active ? `${label} ✓` : label}
       </Text>
     </group>
   );
@@ -444,7 +431,7 @@ function SingleDieToggle({ enabled, active, onToggle, inkColour }) {
  * ========================================================================== */
 
 function BigBoxButton({ label, onClick, disabled, inkColour }) {
-  const { tealWoodTex } = useStb15Textures();
+  const { woodTex } = useStb15Textures();
   const meshRef = useRef();
   const pressedRef = useRef(false);
   const offsetY = useRef(0);
@@ -466,7 +453,7 @@ function BigBoxButton({ label, onClick, disabled, inkColour }) {
         castShadow receiveShadow
       >
         <boxGeometry args={[2.7, 0.25, 0.7]} />
-        <meshStandardMaterial map={tealWoodTex} roughness={0.55} />
+        <meshStandardMaterial map={woodTex} roughness={0.55} />
       </mesh>
       <Text
         position={[0, 0.18, 0]}
@@ -485,44 +472,42 @@ function BigBoxButton({ label, onClick, disabled, inkColour }) {
 }
 
 /* ============================================================================
- * Box frame + colliders
+ * Box frame + colliders — wood_table_worn throughout
  * ========================================================================== */
 
 function BoxFrame() {
-  const { tealWoodTex, velvetTex } = useStb15Textures();
+  const { woodTex, velvetTex } = useStb15Textures();
   const R = 0.05;
 
   return (
     <group>
-      {/* Felt floor */}
+      {/* Felt floor — velvet */}
       <mesh position={[0, 0.005, 0]} receiveShadow>
         <boxGeometry args={[BOX_W - WALL_THICK * 2 + 0.02, 0.01, BOX_D - WALL_THICK * 2 + 0.02]} />
         <meshStandardMaterial map={velvetTex || null} roughness={0.95} />
       </mesh>
       {/* Floor base */}
       <RoundedBox args={[BOX_W, 0.12, BOX_D]} radius={R} smoothness={3} position={[0, -0.06, 0]} receiveShadow>
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
-      {/* Left wall */}
+      {/* Walls */}
       <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[-BOX_W / 2 + WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
-      {/* Right wall */}
       <RoundedBox args={[WALL_THICK, WALL_H, BOX_D]} radius={R} smoothness={3} position={[BOX_W / 2 - WALL_THICK / 2, WALL_H / 2, 0]} castShadow receiveShadow>
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
-      {/* Back wall */}
       <RoundedBox args={[BOX_W, WALL_H, WALL_THICK]} radius={R} smoothness={3} position={[0, WALL_H / 2, -BOX_D / 2 + WALL_THICK / 2]} castShadow receiveShadow>
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       {/* Front lip (short) */}
       <RoundedBox args={[BOX_W, 0.4, WALL_THICK]} radius={R} smoothness={3} position={[0, 0.2, BOX_D / 2 - WALL_THICK / 2]} castShadow receiveShadow>
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.6} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       {/* Tile rod */}
       <mesh position={[0, 0.08, -0.8]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.03, 0.03, BOX_W - WALL_THICK * 2 - 0.1, 16]} />
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.5} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.5} />
       </mesh>
     </group>
   );
@@ -531,8 +516,7 @@ function BoxFrame() {
 function BoxColliders() {
   const innerW = BOX_W - WALL_THICK * 2;
   const innerD = BOX_D - WALL_THICK * 2;
-  const tallH = 2.0;
-  const halfTall = tallH / 2;
+  const tallH = 2.0, halfTall = tallH / 2;
   return (
     <RigidBody type="fixed" colliders={false}>
       <CuboidCollider args={[BOX_W / 2, 0.05, BOX_D / 2]} position={[0, 0.005, 0]} restitution={0.2} friction={0.7} />
@@ -546,75 +530,71 @@ function BoxColliders() {
 }
 
 /* ============================================================================
- * Kitchen cabinet / surface environment
+ * Kitchen cabinet environment
+ * Granite surface fills the entire background; two teal_wood vertical panels
  * ========================================================================== */
 
 function CabinetEnvironment() {
-  const { graniteTex, tealWoodTex } = useStb15Textures();
+  const { graniteTex, woodTex } = useStb15Textures();
+
+  // Giant surface — large enough to fill the entire camera view
+  const SURF_W = 40;
+  const SURF_D = 40;
+  const SURF_H = 0.14;
+
+  const PANEL_W = BOX_W + 0.6;
 
   return (
     <group position={[0, SURFACE_Y, 0]}>
-      {/* Granite worktop surface */}
+      {/* Enormous granite worktop */}
       <mesh position={[0, 0, 0]} receiveShadow>
-        <boxGeometry args={[CAB_PANEL_W + 0.4, CAB_SURFACE_H, CAB_SURFACE_D]} />
-        <meshStandardMaterial map={graniteTex || null} roughness={0.35} metalness={0.1} />
+        <boxGeometry args={[SURF_W, SURF_H, SURF_D]} />
+        <meshStandardMaterial map={graniteTex || null} roughness={0.35} metalness={0.08} />
       </mesh>
 
       {/* Front vertical panel */}
-      <mesh position={[0, -(CAB_PANEL_H / 2 + CAB_SURFACE_H / 2), CAB_SURFACE_D / 2 - CAB_PANEL_D / 2]} castShadow receiveShadow>
-        <boxGeometry args={[CAB_PANEL_W, CAB_PANEL_H, CAB_PANEL_D]} />
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.5} />
+      <mesh
+        position={[0, -(CAB_PANEL_H / 2 + SURF_H / 2), (BOX_D / 2 + 0.5) - CAB_PANEL_D / 2]}
+        castShadow receiveShadow
+      >
+        <boxGeometry args={[PANEL_W, CAB_PANEL_H, CAB_PANEL_D]} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.5} />
       </mesh>
 
       {/* Back vertical panel */}
-      <mesh position={[0, -(CAB_PANEL_H / 2 + CAB_SURFACE_H / 2), -(CAB_SURFACE_D / 2 - CAB_PANEL_D / 2)]} castShadow receiveShadow>
-        <boxGeometry args={[CAB_PANEL_W, CAB_PANEL_H, CAB_PANEL_D]} />
-        <meshStandardMaterial map={tealWoodTex || null} roughness={0.5} />
+      <mesh
+        position={[0, -(CAB_PANEL_H / 2 + SURF_H / 2), -(BOX_D / 2 + 0.5) + CAB_PANEL_D / 2]}
+        castShadow receiveShadow
+      >
+        <boxGeometry args={[PANEL_W, CAB_PANEL_H, CAB_PANEL_D]} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.5} />
       </mesh>
     </group>
   );
 }
 
 /* ============================================================================
- * Twirl celebration — 20 falling twirl.glb on win
+ * Twirl celebration — 20 falling twirl.glb
  * ========================================================================== */
 
 function TwirlInstance({ position, delay }) {
   const { scene } = useGLTF(TWIRL_URL);
   const bodyRef = useRef();
-  const startedRef = useRef(false);
-  const timerRef = useRef(null);
-
-  // Clone the scene so each instance is independent
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
 
   useEffect(() => {
-    timerRef.current = setTimeout(() => {
+    const t = setTimeout(() => {
       if (bodyRef.current) {
-        startedRef.current = true;
         bodyRef.current.setTranslation(position, true);
         bodyRef.current.setLinvel({ x: (Math.random() - 0.5) * 1.5, y: -2 - Math.random() * 3, z: (Math.random() - 0.5) * 1.5 }, true);
-        bodyRef.current.setAngvel({
-          x: (Math.random() - 0.5) * 15,
-          y: (Math.random() - 0.5) * 15,
-          z: (Math.random() - 0.5) * 15,
-        }, true);
+        bodyRef.current.setAngvel({ x: (Math.random() - 0.5) * 15, y: (Math.random() - 0.5) * 15, z: (Math.random() - 0.5) * 15 }, true);
       }
     }, delay);
-    return () => clearTimeout(timerRef.current);
+    return () => clearTimeout(t);
   }, []);
 
   return (
-    <RigidBody
-      ref={bodyRef}
-      type="dynamic"
-      colliders="hull"
-      restitution={0.4}
-      friction={0.5}
-      linearDamping={0.3}
-      angularDamping={0.5}
-      position={[position.x, position.y, position.z]}
-    >
+    <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
       <primitive object={clonedScene} scale={0.35} />
     </RigidBody>
   );
@@ -625,34 +605,24 @@ function TwirlCelebration({ active }) {
     if (!active) return [];
     return Array.from({ length: 20 }).map((_, i) => ({
       id: i,
-      position: {
-        x: (Math.random() - 0.5) * BOX_W * 0.85,
-        y: 5 + Math.random() * 3,
-        z: (Math.random() - 0.5) * BOX_D * 0.7,
-      },
-      delay: Math.random() * 5000, // stagger over 5 seconds
+      position: { x: (Math.random() - 0.5) * BOX_W * 0.85, y: 5 + Math.random() * 3, z: (Math.random() - 0.5) * BOX_D * 0.7 },
+      delay: Math.random() * 5000,
     }));
   }, [active]);
 
   if (!active) return null;
-  return (
-    <>
-      {instances.map((inst) => (
-        <TwirlInstance key={inst.id} position={inst.position} delay={inst.delay} />
-      ))}
-    </>
-  );
+  return <>{instances.map((inst) => <TwirlInstance key={inst.id} position={inst.position} delay={inst.delay} />)}</>;
 }
 
 /* ============================================================================
- * Full scene
+ * Full 3D scene
  * ========================================================================== */
 
 function Stb15Scene({
   openTiles = ALL_TILES,
   selected = [],
-  dice = [null, null],
-  diceCount = 2,
+  dice = [null, null, null],
+  diceCount = 3,
   diceVisible = false,
   throwSeed = 0,
   throwVec = null,
@@ -663,115 +633,89 @@ function Stb15Scene({
   bigButton = null,
   scatteredSet = { back: '', front: '' },
   tileMessage = '',
-  singleDieEnabled = false,
-  singleDieActive = false,
-  onToggleSingleDie,
+  can2Dice = false,
+  can1Die = false,
+  using2Dice = false,
+  using1Die = false,
+  onToggle2Dice,
+  onToggle1Die,
   celebrating = false,
 }) {
   const inboxLetters = useMemo(
     () => lettersFromMessage(tileMessage || config.hidden_message, 15),
     [tileMessage, config.hidden_message],
   );
-  const backLetters = useMemo(() => lettersFromMessage(scatteredSet.back, 8), [scatteredSet.back]);
+  const backLetters  = useMemo(() => lettersFromMessage(scatteredSet.back, 8),  [scatteredSet.back]);
   const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 7), [scatteredSet.front]);
   const activePalettes = useMemo(
     () => (Array.isArray(config.dice_palettes) ? config.dice_palettes.filter((p) => p.active && p.body && p.pip) : []),
     [config.dice_palettes],
   );
 
-  const diceSum = (dice[0] || 0) + (dice[1] || 0);
+  const totalDice = diceCount === 1 ? dice[0] : diceCount === 2 ? (dice[0] || 0) + (dice[1] || 0) : (dice[0] || 0) + (dice[1] || 0) + (dice[2] || 0);
+  const showSum = diceCount === 1 ? dice[0] !== null : diceCount === 2 ? (dice[0] !== null && dice[1] !== null) : (dice[0] !== null && dice[1] !== null && dice[2] !== null);
 
   return (
     <>
       <ambientLight intensity={0.55} />
-      <directionalLight
-        position={[4, 8, 4]}
-        intensity={1.0}
-        castShadow
-        shadow-mapSize-width={512}
-        shadow-mapSize-height={512}
-        shadow-camera-left={-8}
-        shadow-camera-right={8}
-        shadow-camera-top={6}
-        shadow-camera-bottom={-6}
-      />
+      <directionalLight position={[4, 8, 4]} intensity={1.0} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={8} shadow-camera-bottom={-8} />
       <directionalLight position={[-5, 4, -2]} intensity={0.3} />
 
       <Physics gravity={[0, -22, 0]}>
-        {/* Cabinet environment sits below the box */}
         <CabinetEnvironment />
-
         <BoxFrame />
         <BoxColliders />
 
-        {ALL_TILES.map((v, i) => {
-          const x = TILE_START_X + i * TILE_SPACING;
-          return (
-            <Tile
-              key={v}
-              value={v}
-              x={x}
-              closed={!openTiles.includes(v)}
-              selected={selected.includes(v)}
-              onClick={onTileTap}
-              inkColour={config.ink_colour}
-              letter={inboxLetters[v - 1]}
-              interactive={interactive}
-            />
-          );
-        })}
+        {ALL_TILES.map((v, i) => (
+          <Tile
+            key={v}
+            value={v}
+            x={TILE_START_X + i * TILE_SPACING}
+            closed={!openTiles.includes(v)}
+            selected={selected.includes(v)}
+            onClick={onTileTap}
+            inkColour={config.ink_colour}
+            letter={inboxLetters[v - 1]}
+            interactive={interactive}
+          />
+        ))}
 
         <ScatteredRow letters={backLetters}  baseZ={-3.4} inkColour={config.ink_colour} seed={1.3} count={8} size={1.0}  spread={4.2} />
         <ScatteredRow letters={frontLetters} baseZ={2.45} inkColour={config.ink_colour} seed={4.7} count={7} size={0.66} spread={2.6} />
 
-        {/* Dice — render second die only in 2-die mode */}
-        <PhysicsDie
-          throwSeed={throwSeed}
-          throwVec={throwVec}
-          indexOffset={0}
-          onSettled={onDieSettled}
-          diceColour={config.dice_colour}
-          pipColour={config.pip_colour}
-          palettes={activePalettes}
-          visible={diceVisible}
-        />
-        <PhysicsDie
-          throwSeed={throwSeed}
-          throwVec={throwVec}
-          indexOffset={1}
-          onSettled={diceCount === 2 ? onDieSettled : undefined}
-          diceColour={config.dice_colour}
-          pipColour={config.pip_colour}
-          palettes={activePalettes}
-          visible={diceVisible && diceCount === 2}
-        />
+        {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
+        <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
+        <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={1} onSettled={diceCount >= 2 ? onDieSettled : undefined} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible && diceCount >= 2} />
+        <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={2} onSettled={diceCount >= 3 ? onDieSettled : undefined} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible && diceCount >= 3} />
 
-        {/* Score display */}
-        {dice[0] && (diceCount === 1 ? true : dice[1]) && (
-          <Text
-            position={[-3.2, 0.06, 0.75]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            fontSize={0.5}
-            color="#ffffff"
-            anchorX="left"
-            anchorY="middle"
-            renderOrder={5}
-          >
-            {`${diceCount === 1 ? dice[0] : diceSum}`}
+        {/* Dice sum display */}
+        {showSum && (
+          <Text position={[-3.2, 0.06, 0.75]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
+            {`${totalDice}`}
           </Text>
         )}
 
-        {/* Single-die toggle button */}
-        <SingleDieToggle
-          enabled={singleDieEnabled}
-          active={singleDieActive}
-          onToggle={onToggleSingleDie}
+        {/* "2 DICE" toggle — left button on the front lip, unlocks when 10-15 shut */}
+        <DiceToggleButton
+          label="2 DICE"
+          enabled={can2Dice}
+          active={using2Dice}
+          onToggle={onToggle2Dice}
           inkColour={config.ink_colour}
+          posX={BOX_W / 2 - 3.1}
+        />
+
+        {/* "1 DIE" toggle — right button, unlocks when 4-15 shut */}
+        <DiceToggleButton
+          label="1 DIE"
+          enabled={can1Die}
+          active={using1Die}
+          onToggle={onToggle1Die}
+          inkColour={config.ink_colour}
+          posX={BOX_W / 2 - 1.5}
         />
 
         {bigButton}
-
-        {/* Win twirl celebration */}
         <TwirlCelebration active={celebrating} />
       </Physics>
     </>
@@ -779,24 +723,14 @@ function Stb15Scene({
 }
 
 /* ============================================================================
- * Canvas shell
+ * Canvas shell — zoomed out camera for 15 tiles
  * ========================================================================== */
 
 function Stb15CanvasShell({ children, onPointerDown, onPointerUp, tableColour = '#d3f3ea' }) {
   return (
     <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
-      <div
-        className="relative"
-        style={{ aspectRatio: '6 / 5', touchAction: 'none' }}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-      >
-        <Canvas
-          shadows
-          dpr={[1, 2]}
-          camera={{ position: [0, 8.8, 6.2], fov: 44 }}
-          gl={{ antialias: true, alpha: true }}
-        >
+      <div className="relative" style={{ aspectRatio: '6 / 5', touchAction: 'none' }} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 8.8, 6.2], fov: 44 }} gl={{ antialias: true, alpha: true }}>
           <Suspense fallback={null}>{children}</Suspense>
         </Canvas>
       </div>
@@ -810,56 +744,53 @@ function Stb15CanvasShell({ children, onPointerDown, onPointerUp, tableColour = 
 
 export function ShutTheBox15Game({ showStatus = true }) {
   const { refresh: refreshBasket, account } = useBasket();
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [config, setConfig]             = useState(DEFAULT_CONFIG);
   const [scatteredSet, setScatteredSet] = useState({ back: '', front: '' });
-  const [tableColour, setTableColour] = useState('#d3f3ea');
-  const [tileMessage, setTileMessage] = useState('I_MISS_YOU_SO_MUCH!!');
-  const [game, setGame] = useState(null);
-  const [openTiles, setOpenTiles] = useState([...ALL_TILES]);
-  const [selected, setSelected] = useState([]);
-  const [dice, setDice] = useState([null, null]);
-  const [throwSeed, setThrowSeed] = useState(0);
-  const [throwVec, setThrowVec] = useState(null);
-  const [phase, setPhase] = useState('idle');
-  const [message, setMessage] = useState('');
-  const [winModal, setWinModal] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [singleDieActive, setSingleDieActive] = useState(false);
-  const [celebrating, setCelebrating] = useState(false);
-  const settledRef = useRef([null, null]);
+  const [tableColour, setTableColour]   = useState('#d3f3ea');
+  const [tileMessage, setTileMessage]   = useState('I_MISS_YOU_SO_MUCH!!');
+  const [game, setGame]                 = useState(null);
+  const [openTiles, setOpenTiles]       = useState([...ALL_TILES]);
+  const [selected, setSelected]         = useState([]);
+  const [dice, setDice]                 = useState([null, null, null]);
+  const [throwSeed, setThrowSeed]       = useState(0);
+  const [throwVec, setThrowVec]         = useState(null);
+  const [phase, setPhase]               = useState('idle');
+  const [message, setMessage]           = useState('');
+  const [winModal, setWinModal]         = useState(null);
+  const [busy, setBusy]                 = useState(false);
+  const [error, setError]               = useState(null);
+  const [using2Dice, setUsing2Dice]     = useState(false);
+  const [using1Die, setUsing1Die]       = useState(false);
+  const [celebrating, setCelebrating]   = useState(false);
+  const settledRef = useRef([null, null, null]);
 
-  // Whether all high tiles (7-15) are shut — enables the single-die toggle
-  const singleDieEnabled = useMemo(
-    () => HIGH_TILES.every((t) => !openTiles.includes(t)),
-    [openTiles],
-  );
+  // Unlock conditions
+  const can2Dice = useMemo(() => TILES_FOR_2_DICE.every((t) => !openTiles.includes(t)), [openTiles]);
+  const can1Die  = useMemo(() => TILES_FOR_1_DIE.every((t)  => !openTiles.includes(t)), [openTiles]);
 
   // Effective dice count
-  const diceCount = singleDieActive && singleDieEnabled ? 1 : 2;
+  const diceCount = using1Die && can1Die ? 1 : using2Dice && can2Dice ? 2 : 3;
 
-  const diceSum = diceCount === 1
-    ? (dice[0] || 0)
-    : (dice[0] || 0) + (dice[1] || 0);
+  const diceSum = useMemo(() => {
+    if (diceCount === 1) return dice[0] || 0;
+    if (diceCount === 2) return (dice[0] || 0) + (dice[1] || 0);
+    return (dice[0] || 0) + (dice[1] || 0) + (dice[2] || 0);
+  }, [dice, diceCount]);
   const selectedSum = useMemo(() => selected.reduce((a, b) => a + b, 0), [selected]);
   const canConfirm = phase === 'rolled' && selectedSum === diceSum && selected.length > 0;
+
+  // Revoke higher-mode toggles if conditions become false (shouldn't happen but safety)
+  useEffect(() => { if (!can2Dice) { setUsing2Dice(false); } }, [can2Dice]);
+  useEffect(() => { if (!can1Die)  { setUsing1Die(false);  } }, [can1Die]);
 
   useEffect(() => {
     api.getStb15Config().then((c) => {
       if (!c) return;
       setConfig(c);
       const sets = Array.isArray(c.scattered_sets) ? c.scattered_sets.filter((s) => s.active) : [];
-      if (sets.length > 0) {
-        const pick = sets[Math.floor(Math.random() * sets.length)];
-        setScatteredSet({ back: pick.back || '', front: pick.front || '' });
-      }
+      if (sets.length > 0) setScatteredSet({ back: sets[Math.floor(Math.random() * sets.length)].back || '', front: sets[Math.floor(Math.random() * sets.length)].front || '' });
       const tableSlots = Array.isArray(c.table_colours) ? c.table_colours.filter((t) => t.active && t.colour) : [];
-      if (tableSlots.length > 0) {
-        const pick = tableSlots[Math.floor(Math.random() * tableSlots.length)];
-        setTableColour(pick.colour);
-      } else {
-        setTableColour(c.table_colour || '#d3f3ea');
-      }
+      setTableColour(tableSlots.length > 0 ? tableSlots[Math.floor(Math.random() * tableSlots.length)].colour : c.table_colour || '#d3f3ea');
       setTileMessage(pickTileMessage(c));
     }).catch(() => {});
   }, []);
@@ -867,39 +798,34 @@ export function ShutTheBox15Game({ showStatus = true }) {
   async function newGame() {
     if (busy) return;
     setBusy(true); setError(null); setMessage('');
-    setCelebrating(false); setSingleDieActive(false);
+    setCelebrating(false); setUsing2Dice(false); setUsing1Die(false);
     try {
       const g = await api.stb15Start();
       setGame(g);
       setOpenTiles([...ALL_TILES]);
       setSelected([]);
-      setDice([null, null]);
+      setDice([null, null, null]);
       setThrowSeed(0);
       setPhase('idle');
-      settledRef.current = [null, null];
+      settledRef.current = [null, null, null];
       setTileMessage(pickTileMessage(config));
-    } catch (e) {
-      setError(e.message);
-    } finally { setBusy(false); }
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
   }
 
   function onDieSettled(index, value) {
-    // In single-die mode, only die 0 matters; ignore die 1 callbacks
-    if (diceCount === 1 && index === 1) return;
+    // Ignore dice beyond the current count
+    if (index >= diceCount) return;
     if (settledRef.current[index] !== null) return;
-
-    settledRef.current = settledRef.current.slice();
+    settledRef.current = [...settledRef.current];
     settledRef.current[index] = value;
 
-    const bothSettled = diceCount === 1
-      ? settledRef.current[0] !== null
-      : settledRef.current[0] !== null && settledRef.current[1] !== null;
-
-    if (bothSettled) {
-      const d1 = settledRef.current[0];
-      const d2 = diceCount === 2 ? settledRef.current[1] : 0;
-      setDice([d1, diceCount === 2 ? d2 : null]);
-      const target = diceCount === 1 ? d1 : d1 + d2;
+    const allSettled = Array.from({ length: diceCount }, (_, i) => settledRef.current[i]).every((v) => v !== null);
+    if (allSettled) {
+      const d = settledRef.current;
+      const newDice = [d[0], diceCount >= 2 ? d[1] : null, diceCount >= 3 ? d[2] : null];
+      setDice(newDice);
+      const target = (d[0] || 0) + (diceCount >= 2 ? d[1] || 0 : 0) + (diceCount >= 3 ? d[2] || 0 : 0);
       if (!hasValidClose(openTiles, target)) {
         setPhase('over');
         setMessage(`No valid combination for ${target}. Game over!`);
@@ -914,15 +840,15 @@ export function ShutTheBox15Game({ showStatus = true }) {
     if (!game || phase === 'rolled' || phase === 'rolling' || busy) return;
     setMessage('');
     setPhase('rolling');
-    setDice([null, null]);
-    settledRef.current = [null, null];
+    setDice([null, null, null]);
+    settledRef.current = [null, null, null];
     setThrowVec(swipeVec);
     setThrowSeed((s) => s + 1);
   }
 
   function tapTile(v) {
     if (phase !== 'rolled') return;
-    setSelected((sel) => (sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v]));
+    setSelected((sel) => sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v]);
   }
 
   async function confirmClose() {
@@ -930,8 +856,8 @@ export function ShutTheBox15Game({ showStatus = true }) {
     const newOpen = openTiles.filter((t) => !selected.includes(t));
     setOpenTiles(newOpen);
     setSelected([]);
-    setDice([null, null]);
-    settledRef.current = [null, null];
+    setDice([null, null, null]);
+    settledRef.current = [null, null, null];
     if (newOpen.length === 0) {
       setPhase('won');
       setMessage('You shut the box!');
@@ -953,31 +879,19 @@ export function ShutTheBox15Game({ showStatus = true }) {
     if (game && phase !== 'won') {
       try { await api.stb15End({ game_id: game.id, result: 'abandoned', final_tiles_open: openTiles }); } catch {}
     }
-    setGame(null);
-    setOpenTiles([...ALL_TILES]);
-    setSelected([]);
-    setDice([null, null]);
-    setThrowSeed(0);
-    settledRef.current = [null, null];
-    setPhase('idle');
-    setMessage('');
-    setCelebrating(false);
-    setSingleDieActive(false);
+    setGame(null); setOpenTiles([...ALL_TILES]); setSelected([]);
+    setDice([null, null, null]); setThrowSeed(0);
+    settledRef.current = [null, null, null];
+    setPhase('idle'); setMessage(''); setCelebrating(false);
+    setUsing2Dice(false); setUsing1Die(false);
   }
 
   // Auto-close on sum match
   useEffect(() => {
-    if (phase !== 'rolled') return;
-    if (selected.length === 0) return;
-    if (selectedSum !== diceSum) return;
+    if (phase !== 'rolled' || selected.length === 0 || selectedSum !== diceSum) return;
     const t = setTimeout(() => { confirmClose(); }, 650);
     return () => clearTimeout(t);
   }, [selected, selectedSum, diceSum, phase]);
-
-  // Auto-disable single die if high tiles become open again (shouldn't happen, but safety)
-  useEffect(() => {
-    if (!singleDieEnabled) setSingleDieActive(false);
-  }, [singleDieEnabled]);
 
   const swipeStart = useRef(null);
   function onPointerDown(e) {
@@ -985,21 +899,16 @@ export function ShutTheBox15Game({ showStatus = true }) {
     swipeStart.current = { x: e.clientX, y: e.clientY, t: performance.now() };
   }
   function onPointerUp(e) {
-    const s = swipeStart.current;
-    swipeStart.current = null;
+    const s = swipeStart.current; swipeStart.current = null;
     if (!s) return;
-    const dx = e.clientX - s.x;
-    const dy = e.clientY - s.y;
-    const dt = Math.max(1, performance.now() - s.t);
-    const speed = Math.sqrt(dx * dx + dy * dy) / dt;
+    const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    const speed = Math.sqrt(dx * dx + dy * dy) / Math.max(1, performance.now() - s.t);
     if (Math.abs(dx) > 40 && Math.abs(dy) < Math.abs(dx) * 0.8 && speed > 0.25) {
       triggerRoll({ x: dx, y: dy });
     }
   }
 
-  if (error) {
-    return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>;
-  }
+  if (error) return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>;
 
   let bigButton = null;
   if (!game) {
@@ -1028,9 +937,12 @@ export function ShutTheBox15Game({ showStatus = true }) {
           bigButton={bigButton}
           scatteredSet={scatteredSet}
           tileMessage={tileMessage}
-          singleDieEnabled={singleDieEnabled}
-          singleDieActive={singleDieActive}
-          onToggleSingleDie={() => setSingleDieActive((v) => !v)}
+          can2Dice={can2Dice}
+          can1Die={can1Die}
+          using2Dice={using2Dice}
+          using1Die={using1Die}
+          onToggle2Dice={() => { setUsing2Dice((v) => !v); setUsing1Die(false); }}
+          onToggle1Die={() => { setUsing1Die((v) => !v); setUsing2Dice(false); }}
           celebrating={celebrating}
         />
       </Stb15CanvasShell>
@@ -1039,9 +951,9 @@ export function ShutTheBox15Game({ showStatus = true }) {
         <p className="text-center text-xs text-neutral-500">Swipe right to roll.. it's all in the fingers.</p>
       )}
 
-      {singleDieEnabled && game && phase !== 'won' && phase !== 'over' && (
+      {(can2Dice || can1Die) && game && phase !== 'won' && phase !== 'over' && (
         <p className="text-center text-xs text-teal-600 font-medium">
-          Tiles 7–15 are shut — single die available!
+          {can1Die ? 'Tiles 4–15 shut — single die unlocked!' : 'Tiles 10–15 shut — 2-dice mode unlocked!'}
         </p>
       )}
 
@@ -1071,12 +983,8 @@ function Stb15WinModal({ pts, balance, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-          Congratulations!
-        </p>
-        <p className="mt-3 text-center text-3xl font-extrabold leading-none text-pink-500">
-          +{pts} POINTS
-        </p>
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Congratulations!</p>
+        <p className="mt-3 text-center text-3xl font-extrabold leading-none text-pink-500">+{pts} POINTS</p>
         <div className="mt-5 rounded-xl bg-neutral-100 px-4 py-3 text-center text-sm font-medium text-neutral-700">
           You shut the box — all 15 tiles!
         </div>
@@ -1085,10 +993,7 @@ function Stb15WinModal({ pts, balance, onClose }) {
             Your balance: <span className="font-semibold text-neutral-900">{balance.toLocaleString()} pts</span>
           </p>
         )}
-        <button
-          onClick={onClose}
-          className="mt-6 block w-full rounded-xl bg-teal-300 py-3 text-base font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95"
-        >
+        <button onClick={onClose} className="mt-6 block w-full rounded-xl bg-teal-300 py-3 text-base font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95">
           Continue
         </button>
       </div>
@@ -1113,5 +1018,4 @@ export default function ShutTheBox15Page() {
   );
 }
 
-// Preload the twirl model
 useGLTF.preload(TWIRL_URL);
