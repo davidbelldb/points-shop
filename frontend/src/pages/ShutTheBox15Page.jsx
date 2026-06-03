@@ -960,7 +960,7 @@ function Stb15Scene({
     [tileMessage, config.hidden_message],
   );
   const backLetters  = useMemo(() => lettersFromMessage(scatteredSet.back, 10),  [scatteredSet.back]);
-  const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 9), [scatteredSet.front]);
+  const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 10), [scatteredSet.front]);
 
   // Layout positions driven by scene props (fall back to defaults if not yet loaded)
   const propMap = useMemo(() => Object.fromEntries(sceneProps.map((p) => [p.key, p])), [sceneProps]);
@@ -1025,7 +1025,7 @@ function Stb15Scene({
         </group>
 
         <ScatteredRow letters={backLetters}  baseZ={backTilesZ}  xOffset={backTilesX}  inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}         spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} xOffset={frontTilesX} inkColour={config.ink_colour} seed={4.7} count={9}  size={frontTilesSize} spread={4.5} />
+        <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} xOffset={frontTilesX} inkColour={config.ink_colour} seed={4.7} count={10} size={frontTilesSize} spread={4.8} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />

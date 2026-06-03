@@ -173,7 +173,7 @@ export default function AdminShutTheBox15Section({ bare = false }) {
 
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Scattered tile messages</p>
-        <p className="text-xs text-neutral-500">5 sets — picked at random from <em>active</em> sets on page load. 10 tiles behind, 9 in front. Use <code>_</code> for blank.</p>
+        <p className="text-xs text-neutral-500">5 sets — picked at random from <em>active</em> sets on page load. 10 tiles behind, 10 in front. Use <code>_</code> for blank.</p>
         <div className="space-y-2">
           {(cfg.scattered_sets || []).map((s) => (
             <ScatteredSetEditor key={s.ord} set={s} busy={busy} onSave={(patch) => saveSet(s.ord, patch)} />
@@ -433,7 +433,7 @@ function ScatteredSetEditor({ set, busy, onSave }) {
       </div>
       <div className="flex gap-2">
         <input value={back} onChange={(e) => setBack(e.target.value.slice(0, 10))} maxLength={10} className={inputCls + ' font-mono tracking-widest'} placeholder="Behind (10)" />
-        <input value={front} onChange={(e) => setFront(e.target.value.slice(0, 9))} maxLength={9} className={inputCls + ' font-mono tracking-widest'} placeholder="Front (9)" />
+        <input value={front} onChange={(e) => setFront(e.target.value.slice(0, 10))} maxLength={10} className={inputCls + ' font-mono tracking-widest'} placeholder="Front (10)" />
         <button onClick={() => onSave({ back, front })} disabled={busy || !dirty} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
       </div>
     </div>
