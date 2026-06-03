@@ -393,7 +393,7 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
 const BTN_PANEL_W = 4.0;
 const BTN_PANEL_D = 0.81;
 const BTN_PANEL_H = 0.22;
-const BTN_PANEL_Z = 4.8;   // far forward, clearly below scattered tiles in view
+const BTN_PANEL_Z = 3.4;   // just forward of front scatter tiles
 const BTN_PANEL_Y = 0.09;
 
 function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die }) {
@@ -700,7 +700,7 @@ const SCENE_MODELS = [
     // Centred behind the box so it's visible top-centre from the camera.
     position: [0, SURFACE_TOP_Y, -5.8],
     rotation: [-Math.PI / 2, 0, 0.15],
-    scale: 0.085,
+    scale: 0.34,
   },
 ];
 
@@ -727,20 +727,21 @@ function SceneModels() {
  * Static decorative twirl instances on the surface
  * ========================================================================== */
 
-// Six decorative twirl placements: behind, in front, left, right at various angles.
+// Six decorative twirl placements — chocolate bars lying flat on the granite surface.
+// Only Y rotation varies so each bar faces a different direction naturally.
 const TWIRL_PLACEMENTS = [
   // Behind the box — left
-  { pos: [-3.2, SURFACE_TOP_Y, -5.5], rot: [0.4,  0.6,  0.2],  scale: 0.40 },
+  { pos: [-3.2, SURFACE_TOP_Y, -3.6], rot: [0, 0.4,  0], scale: 0.40 },
   // Behind the box — right
-  { pos: [ 3.8, SURFACE_TOP_Y, -5.0], rot: [-0.2, -0.9,  0.1],  scale: 0.35 },
-  // Behind the box — far center (near the bottle)
-  { pos: [-1.6, SURFACE_TOP_Y, -6.2], rot: [ 0.1,  1.3, -0.3],  scale: 0.32 },
+  { pos: [ 3.8, SURFACE_TOP_Y, -3.2], rot: [0, -1.1, 0], scale: 0.38 },
+  // Behind the box — centre (near the bottle base)
+  { pos: [-1.4, SURFACE_TOP_Y, -4.5], rot: [0,  2.0, 0], scale: 0.35 },
   // In front of the box — left
-  { pos: [-3.5, SURFACE_TOP_Y,  3.8], rot: [ 0.3, -0.5,  0.15], scale: 0.38 },
+  { pos: [-3.0, SURFACE_TOP_Y,  2.4], rot: [0, -0.3, 0], scale: 0.38 },
   // In front of the box — right
-  { pos: [ 3.2, SURFACE_TOP_Y,  4.0], rot: [ 0.5,  0.7, -0.2],  scale: 0.36 },
-  // Far left of the box
-  { pos: [-6.0, SURFACE_TOP_Y, -0.8], rot: [ 0.6,  0.3,  0.4],  scale: 0.42 },
+  { pos: [ 3.2, SURFACE_TOP_Y,  2.6], rot: [0,  1.5, 0], scale: 0.36 },
+  // Far left side of box
+  { pos: [-5.8, SURFACE_TOP_Y, -0.5], rot: [0,  0.9, 0], scale: 0.42 },
 ];
 
 function DecorativeTwirls() {
@@ -839,8 +840,8 @@ function Stb15Scene({
           />
         ))}
 
-        <ScatteredRow letters={backLetters}  baseZ={-4.2} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={3.2}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.66} spread={3.0} />
+        <ScatteredRow letters={backLetters}  baseZ={-2.6} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
+        <ScatteredRow letters={frontLetters} baseZ={2.3}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.66} spread={3.0} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -885,7 +886,7 @@ function Stb15CanvasShell({ children, onPointerDown, onPointerUp, tableColour = 
   return (
     <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
       <div className="relative" style={{ aspectRatio: '6 / 5', touchAction: 'none' }} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 9.5, 7.5], fov: 46 }} gl={{ antialias: true, alpha: true }}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 8.8, 6.5], fov: 44 }} gl={{ antialias: true, alpha: true }}>
           <Suspense fallback={null}>{children}</Suspense>
         </Canvas>
       </div>
