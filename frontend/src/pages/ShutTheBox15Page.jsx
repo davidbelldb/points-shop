@@ -698,8 +698,8 @@ const SCENE_MODELS = [
     // OBJ is Z-up; rotate -90° around X to stand upright in Three.js Y-up space.
     // Scale: OBJ height ~21.15 → target ~1.8 world units  (21.15 * 0.085 ≈ 1.8)
     // Centred behind the box so it's visible top-centre from the camera.
-    position: [0, SURFACE_TOP_Y, -5.8],
-    rotation: [-Math.PI / 2, 0, 0.15],
+    position: [-5.2, SURFACE_TOP_Y, -3.0],
+    rotation: [-Math.PI / 2, 0, 0.4],
     scale: 0.34,
   },
 ];
@@ -731,17 +731,17 @@ function SceneModels() {
 // Only Y rotation varies so each bar faces a different direction naturally.
 const TWIRL_PLACEMENTS = [
   // Behind the box — left
-  { pos: [-3.2, SURFACE_TOP_Y, -3.6], rot: [0, 0.4,  0], scale: 0.40 },
+  { pos: [-3.2, SURFACE_TOP_Y, -3.6], rot: [0, 0.4,  0], scale: 1.60 },
   // Behind the box — right
-  { pos: [ 3.8, SURFACE_TOP_Y, -3.2], rot: [0, -1.1, 0], scale: 0.38 },
+  { pos: [ 3.8, SURFACE_TOP_Y, -3.2], rot: [0, -1.1, 0], scale: 1.52 },
   // Behind the box — centre (near the bottle base)
-  { pos: [-1.4, SURFACE_TOP_Y, -4.5], rot: [0,  2.0, 0], scale: 0.35 },
+  { pos: [-1.4, SURFACE_TOP_Y, -4.5], rot: [0,  2.0, 0], scale: 1.40 },
   // In front of the box — left
-  { pos: [-3.0, SURFACE_TOP_Y,  2.4], rot: [0, -0.3, 0], scale: 0.38 },
+  { pos: [-3.0, SURFACE_TOP_Y,  2.4], rot: [0, -0.3, 0], scale: 1.52 },
   // In front of the box — right
-  { pos: [ 3.2, SURFACE_TOP_Y,  2.6], rot: [0,  1.5, 0], scale: 0.36 },
+  { pos: [ 3.2, SURFACE_TOP_Y,  2.6], rot: [0,  1.5, 0], scale: 1.44 },
   // Far left side of box
-  { pos: [-5.8, SURFACE_TOP_Y, -0.5], rot: [0,  0.9, 0], scale: 0.42 },
+  { pos: [-5.8, SURFACE_TOP_Y, -0.5], rot: [0,  0.9, 0], scale: 1.68 },
 ];
 
 function DecorativeTwirls() {
@@ -775,6 +775,50 @@ function TwirlCelebration({ active }) {
 }
 
 /* ============================================================================
+ * Debug win button — temporary, sits on surface to the right of the button panel
+ * ========================================================================== */
+
+function DebugWinButton({ onDebugWin, inkColour }) {
+  const { woodTex } = useStb15Textures();
+  const meshRef = useRef();
+  const pressedRef = useRef(false);
+  const offsetY = useRef(0);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+    const target = pressedRef.current ? -0.04 : 0;
+    offsetY.current += (target - offsetY.current) * Math.min(delta * 18, 1);
+    meshRef.current.position.y = offsetY.current;
+  });
+
+  return (
+    <group position={[3.2, BTN_PANEL_Y, BTN_PANEL_Z]}>
+      <mesh
+        ref={meshRef}
+        onPointerDown={(e) => { e.stopPropagation(); pressedRef.current = true; }}
+        onPointerUp={(e) => { e.stopPropagation(); pressedRef.current = false; onDebugWin?.(); }}
+        onPointerLeave={() => { pressedRef.current = false; }}
+        castShadow receiveShadow
+      >
+        <boxGeometry args={[1.6, BTN_PANEL_H, BTN_PANEL_D]} />
+        <meshStandardMaterial map={woodTex || null} roughness={0.5} emissive="#ff4400" emissiveIntensity={0.25} />
+      </mesh>
+      <Text
+        position={[0, BTN_PANEL_H / 2 + 0.01, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.14}
+        color="#ffffff"
+        anchorX="center"
+        anchorY="middle"
+        renderOrder={10}
+      >
+        ★ SIMULATE WIN
+      </Text>
+    </group>
+  );
+}
+
+/* ============================================================================
  * Full 3D scene
  * ========================================================================== */
 
@@ -800,6 +844,7 @@ function Stb15Scene({
   onToggle2Dice,
   onToggle1Die,
   celebrating = false,
+  onDebugWin,
 }) {
   const inboxLetters = useMemo(
     () => lettersFromMessage(tileMessage || config.hidden_message, 15),
@@ -841,7 +886,7 @@ function Stb15Scene({
         ))}
 
         <ScatteredRow letters={backLetters}  baseZ={-2.6} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={2.3}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.66} spread={3.0} />
+        <ScatteredRow letters={frontLetters} baseZ={2.3}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.825} spread={3.0} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -870,6 +915,9 @@ function Stb15Scene({
 
         {/* OBJ/MTL prop models on the surface */}
         <SceneModels />
+
+        {/* DEBUG — temporary win simulator button, remove once verified */}
+        {onDebugWin && <DebugWinButton onDebugWin={onDebugWin} inkColour={config.ink_colour} />}
 
         {bigButton}
         <TwirlCelebration active={celebrating} />
@@ -1031,6 +1079,25 @@ export function ShutTheBox15Game({ showStatus = true }) {
     }
   }
 
+  async function debugSimulateWin() {
+    if (!game || phase === 'won') return;
+    setOpenTiles([]);
+    setSelected([]);
+    setDice([null, null, null]);
+    settledRef.current = [null, null, null];
+    setPhase('won');
+    setMessage('You shut the box!');
+    setCelebrating(true);
+    setBusy(true);
+    try {
+      const res = await api.stb15End({ game_id: game.id, result: 'win', final_tiles_open: [] });
+      if (refreshBasket) await refreshBasket();
+      setMessage(`You shut the box! +${res.credited_pts} pts.`);
+      setWinModal({ pts: res.credited_pts ?? 64 });
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   async function resetGame() {
     if (game && phase !== 'won') {
       try { await api.stb15End({ game_id: game.id, result: 'abandoned', final_tiles_open: openTiles }); } catch {}
@@ -1100,6 +1167,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
           onToggle2Dice={() => { setUsing2Dice((v) => !v); setUsing1Die(false); }}
           onToggle1Die={() => { setUsing1Die((v) => !v); setUsing2Dice(false); }}
           celebrating={celebrating}
+          onDebugWin={game && phase !== 'won' ? debugSimulateWin : null}
         />
       </Stb15CanvasShell>
 
