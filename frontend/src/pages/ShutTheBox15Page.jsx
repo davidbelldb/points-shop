@@ -396,7 +396,7 @@ const BTN_PANEL_H = 0.22;
 const BTN_PANEL_Z_DEFAULT = 4.0;
 const BTN_PANEL_Y = 0.09;
 
-function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelZ = BTN_PANEL_Z_DEFAULT, panelRotY = 0 }) {
+function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelX = 0, panelZ = BTN_PANEL_Z_DEFAULT, panelRotY = 0 }) {
   const { buttonsTex } = useStb15Textures();
   const meshRef = useRef();
   const pressedRef = useRef(null); // 'left' | 'right' | null
@@ -426,7 +426,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
   const halfW = BTN_PANEL_W / 4; // half of each side
 
   return (
-    <group position={[0, BTN_PANEL_Y, panelZ]} rotation={[0, panelRotY, 0]}>
+    <group position={[panelX, BTN_PANEL_Y, panelZ]} rotation={[0, panelRotY, 0]}>
       {/* Main visible panel — glows teal when either side is active */}
       <mesh ref={meshRef} castShadow receiveShadow>
         <boxGeometry args={[BTN_PANEL_W, BTN_PANEL_H, BTN_PANEL_D]} />
@@ -933,6 +933,7 @@ function Stb15Scene({
   const frontTilesZ    = propMap.tiles_front?.pos_z ?? 2.3;
   const frontTilesX    = propMap.tiles_front?.pos_x ?? 0;
   const frontTilesSize = propMap.tiles_front?.scale ?? 0.825;
+  const btnPanelX      = propMap.btn_panel?.pos_x   ?? 0;
   const btnPanelZ      = propMap.btn_panel?.pos_z   ?? BTN_PANEL_Z_DEFAULT;
   const btnPanelRotY   = (propMap.btn_panel?.rot_y_deg ?? 0) * DEG;
   const boxPropX       = propMap.box?.pos_x ?? 0;
@@ -1010,6 +1011,7 @@ function Stb15Scene({
           can1Die={can1Die}
           using1Die={using1Die}
           onToggle1Die={onToggle1Die}
+          panelX={btnPanelX}
           panelZ={btnPanelZ}
           panelRotY={btnPanelRotY}
         />
