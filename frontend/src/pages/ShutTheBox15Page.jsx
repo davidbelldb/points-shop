@@ -38,7 +38,7 @@ const TWIRL_URL            = '/twirl.glb';
 
 // Box dimensions — wider for 15 tiles
 const BOX_W = 7.4;
-const BOX_D = 3.0;
+const BOX_D = 4.2;
 const WALL_H = 0.65;
 const WALL_THICK = 0.22;
 const TILE_W = 0.36;
@@ -393,7 +393,7 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
 const BTN_PANEL_W = 4.0;
 const BTN_PANEL_D = 0.81;
 const BTN_PANEL_H = 0.22;
-const BTN_PANEL_Z = 3.4;   // just forward of front scatter tiles
+const BTN_PANEL_Z = 4.0;   // clear of deeper box front lip + scatter tiles
 const BTN_PANEL_Y = 0.09;
 
 function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die }) {
@@ -691,6 +691,16 @@ const SURFACE_TOP_Y = -0.05;
 // All scene props go here — add a new entry per /models/<folder>
 const SCENE_MODELS = [
   {
+    id: 'kettle',
+    dir: '/models/kettle/',
+    obj: 'cgaxis_models_116_09_obj_electric_kettle.obj',
+    mtl: 'cgaxis_models_116_09_obj.mtl',
+    // Kettle is already Y-up. Height ~10.27 units → scale 0.15 ≈ 1.54 world units tall.
+    position: [4.8, SURFACE_TOP_Y, -3.8],
+    rotation: [0, -0.6, 0],
+    scale: 0.15,
+  },
+  {
     id: 'bottle',
     dir: '/models/bottle/',
     obj: '14042_750_mL_Wine_Bottle_r_v1_L3.obj',
@@ -698,7 +708,7 @@ const SCENE_MODELS = [
     // OBJ is Z-up; rotate -90° around X to stand upright in Three.js Y-up space.
     // Scale: OBJ height ~21.15 → target ~1.8 world units  (21.15 * 0.085 ≈ 1.8)
     // Centred behind the box so it's visible top-centre from the camera.
-    position: [6.0, SURFACE_TOP_Y, 2.3],
+    position: [3.8, SURFACE_TOP_Y, 2.6],
     rotation: [-Math.PI / 2, 0, -0.3],
     scale: 0.34,
   },
@@ -727,9 +737,10 @@ function SceneModels() {
  * Static decorative twirl instances on the surface
  * ========================================================================== */
 
-// Single static twirl — top left, behind the bottle
+// Two static twirls — top-left behind bottle, bottom-left corner
 const TWIRL_PLACEMENTS = [
-  { pos: [-6.2, SURFACE_TOP_Y, -4.2], rot: [0, 1.1, 0], scale: 1.60 },
+  { pos: [-6.2, SURFACE_TOP_Y, -4.2], rot: [0,  1.1, 0], scale: 1.60 },
+  { pos: [-5.0, SURFACE_TOP_Y,  3.8], rot: [0, -0.4, 0], scale: 1.55 },
 ];
 
 function DecorativeTwirls() {
@@ -873,8 +884,8 @@ function Stb15Scene({
           />
         ))}
 
-        <ScatteredRow letters={backLetters}  baseZ={-3.4} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={2.3}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.825} spread={3.0} />
+        <ScatteredRow letters={backLetters}  baseZ={-4.8} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
+        <ScatteredRow letters={frontLetters} baseZ={2.3}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.825} spread={4.5} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -922,7 +933,7 @@ function Stb15CanvasShell({ children, onPointerDown, onPointerUp, tableColour = 
   return (
     <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
       <div className="relative" style={{ aspectRatio: '6 / 5', touchAction: 'none' }} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 8.8, 6.5], fov: 44 }} gl={{ antialias: true, alpha: true }}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 10.5, 7.8], fov: 46 }} gl={{ antialias: true, alpha: true }}>
           <Suspense fallback={null}>{children}</Suspense>
         </Canvas>
       </div>
