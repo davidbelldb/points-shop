@@ -9,6 +9,7 @@ import AdminAudioSection from './AdminAudioSection.jsx';
 import AdminGamesSection from './AdminGamesSection.jsx';
 import AdminWheelSection from './AdminWheelSection.jsx';
 import AdminShutTheBoxSection from './AdminShutTheBoxSection.jsx';
+import AdminShutTheBox15Section from './AdminShutTheBox15Section.jsx';
 import AdminDuckySection from './AdminDuckySection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
@@ -141,6 +142,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Shut Katie's Box" storageKey="admin::stb">
         <AdminShutTheBoxSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Shut the Box 15" storageKey="admin::stb15">
+        <AdminShutTheBox15Section bare />
       </AdminCollapsible>
 
       <AdminCollapsible title="Ducky Derby" storageKey="admin::ducky">
