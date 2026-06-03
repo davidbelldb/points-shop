@@ -21,6 +21,7 @@ export default function AdminShutTheBox15Section({ bare = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [sceneProps, setSceneProps] = useState([]);
 
   const [inkC, setInkC] = useState('');
   const [title, setTitle] = useState('');
@@ -28,11 +29,15 @@ export default function AdminShutTheBox15Section({ bare = false }) {
 
   async function load() {
     try {
-      const c = await api.admin.getStb15Config();
+      const [c, props] = await Promise.all([
+        api.admin.getStb15Config(),
+        api.admin.getStb15Props(),
+      ]);
       setCfg(c);
       setInkC(c.ink_colour ?? '');
       setTitle(c.homepage_title ?? '');
       setSubtitle(c.homepage_subtitle ?? '');
+      if (Array.isArray(props)) setSceneProps(props);
     } catch (e) { setError(e.message); }
   }
   useEffect(() => { load(); }, []);
@@ -99,6 +104,17 @@ export default function AdminShutTheBox15Section({ bare = false }) {
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
+  async function saveProp(key, patch) {
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      const updated = await api.admin.updateStb15Prop(key, patch);
+      setSceneProps((prev) => prev.map((p) => (p.key === key ? updated : p)));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
   }
 
   function commitColour(field, value) {
@@ -227,6 +243,21 @@ export default function AdminShutTheBox15Section({ bare = false }) {
           </div>
         </div>
       </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">3D scene objects</p>
+        <p className="text-xs text-neutral-500">
+          Position (X / Z) and scale for each prop on the granite surface. X is left/right, Z is back/front (negative = behind box). Rotation is Y-axis in degrees. Changes take effect on next page load.
+        </p>
+        {sceneProps.length === 0 && <p className="text-xs text-neutral-400">No props found — run DB migration 070.</p>}
+        <div className="space-y-2">
+          {sceneProps.map((p) => (
+            <ScenePropEditor key={p.key} prop={p} busy={busy} onSave={(patch) => saveProp(p.key, patch)} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 
@@ -353,6 +384,63 @@ function ScatteredSetEditor({ set, busy, onSave }) {
         <input value={back} onChange={(e) => setBack(e.target.value.slice(0, 10))} maxLength={10} className={inputCls + ' font-mono tracking-widest'} placeholder="Behind (10)" />
         <input value={front} onChange={(e) => setFront(e.target.value.slice(0, 9))} maxLength={9} className={inputCls + ' font-mono tracking-widest'} placeholder="Front (9)" />
         <button onClick={() => onSave({ back, front })} disabled={busy || !dirty} className="rounded-md bg-amber-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-30">Save</button>
+      </div>
+    </div>
+  );
+}
+
+function ScenePropEditor({ prop, busy, onSave }) {
+  const [posX, setPosX]     = useState(String(prop.pos_x ?? 0));
+  const [posZ, setPosZ]     = useState(String(prop.pos_z ?? 0));
+  const [rotY, setRotY]     = useState(String(prop.rot_y_deg ?? 0));
+  const [scale, setScale]   = useState(String(prop.scale ?? 1));
+  useEffect(() => {
+    setPosX(String(prop.pos_x ?? 0));
+    setPosZ(String(prop.pos_z ?? 0));
+    setRotY(String(prop.rot_y_deg ?? 0));
+    setScale(String(prop.scale ?? 1));
+  }, [prop]);
+
+  const numInput = 'w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono';
+
+  function commit() {
+    onSave({
+      pos_x:     parseFloat(posX)  || 0,
+      pos_z:     parseFloat(posZ)  || 0,
+      rot_y_deg: parseFloat(rotY)  || 0,
+      scale:     parseFloat(scale) || 1,
+    });
+  }
+
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-neutral-700">{prop.label}</span>
+        <button
+          onClick={() => onSave({ active: !prop.active })}
+          disabled={busy}
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${prop.active ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {prop.active ? 'Visible' : 'Hidden'}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-neutral-500">X (left/right)</span>
+          <input value={posX} onChange={(e) => setPosX(e.target.value)} onBlur={commit} className={numInput} step="0.1" type="number" />
+        </label>
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-neutral-500">Z (back/front)</span>
+          <input value={posZ} onChange={(e) => setPosZ(e.target.value)} onBlur={commit} className={numInput} step="0.1" type="number" />
+        </label>
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-neutral-500">Rotation °</span>
+          <input value={rotY} onChange={(e) => setRotY(e.target.value)} onBlur={commit} className={numInput} step="1" type="number" />
+        </label>
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-neutral-500">Scale</span>
+          <input value={scale} onChange={(e) => setScale(e.target.value)} onBlur={commit} className={numInput} step="0.01" type="number" />
+        </label>
       </div>
     </div>
   );

@@ -66,9 +66,50 @@ function validateScatteredPatch(patch) {
   return null;
 }
 
+async function getProps() {
+  const { rows } = await query(`SELECT * FROM stb15_scene_props ORDER BY key`);
+  return rows;
+}
+
 export default async function stb15Routes(fastify) {
   fastify.get('/api/games/shut-the-box-15/config', async () => {
     return await getConfig();
+  });
+
+  fastify.get('/api/games/shut-the-box-15/props', async () => {
+    return await getProps();
+  });
+
+  // Admin — list all props
+  fastify.get('/api/admin/shut-the-box-15/props', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    return await getProps();
+  });
+
+  // Admin — update one prop by key
+  fastify.patch('/api/admin/shut-the-box-15/props/:key', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    const { key } = req.params;
+    const patch = req.body ?? {};
+    const updates = [];
+    const values = [];
+    if ('pos_x'     in patch) { values.push(Number(patch.pos_x));     updates.push(`pos_x = $${values.length}`); }
+    if ('pos_z'     in patch) { values.push(Number(patch.pos_z));     updates.push(`pos_z = $${values.length}`); }
+    if ('rot_y_deg' in patch) { values.push(Number(patch.rot_y_deg)); updates.push(`rot_y_deg = $${values.length}`); }
+    if ('scale'     in patch) { values.push(Number(patch.scale));     updates.push(`scale = $${values.length}`); }
+    if ('active'    in patch) {
+      if (typeof patch.active !== 'boolean') return reply.code(400).send({ error: 'active must be boolean' });
+      values.push(patch.active); updates.push(`active = $${values.length}`);
+    }
+    if (!updates.length) return reply.code(400).send({ error: 'nothing to update' });
+    updates.push(`updated_at = NOW()`);
+    values.push(key);
+    const { rows } = await query(
+      `UPDATE stb15_scene_props SET ${updates.join(', ')} WHERE key = $${values.length} RETURNING *`,
+      values,
+    );
+    if (!rows.length) return reply.code(404).send({ error: 'prop not found' });
+    return rows[0];
   });
 
   fastify.post('/api/games/shut-the-box-15/start', async (req) => {

@@ -293,7 +293,7 @@ function Tile({ value, x, closed, selected, onClick, inkColour, letter, interact
   });
 
   return (
-    <group ref={groupRef} position={[x, 0.08, -0.8]}>
+    <group ref={groupRef} position={[x, 0.08, -1.1]}>
       <mesh
         position={[0, TILE_H / 2, 0]}
         castShadow
@@ -393,10 +393,10 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
 const BTN_PANEL_W = 4.0;
 const BTN_PANEL_D = 0.81;
 const BTN_PANEL_H = 0.22;
-const BTN_PANEL_Z = 4.0;   // clear of deeper box front lip + scatter tiles
+const BTN_PANEL_Z_DEFAULT = 4.0;
 const BTN_PANEL_Y = 0.09;
 
-function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die }) {
+function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelZ = BTN_PANEL_Z_DEFAULT }) {
   const { buttonsTex } = useStb15Textures();
   const meshRef = useRef();
   const pressedRef = useRef(null); // 'left' | 'right' | null
@@ -426,7 +426,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
   const halfW = BTN_PANEL_W / 4; // half of each side
 
   return (
-    <group position={[0, BTN_PANEL_Y, BTN_PANEL_Z]}>
+    <group position={[0, BTN_PANEL_Y, panelZ]}>
       {/* Main visible panel — glows teal when either side is active */}
       <mesh ref={meshRef} castShadow receiveShadow>
         <boxGeometry args={[BTN_PANEL_W, BTN_PANEL_H, BTN_PANEL_D]} />
@@ -569,7 +569,7 @@ function BoxFrame() {
         <meshStandardMaterial map={woodTex || null} roughness={0.6} />
       </RoundedBox>
       {/* Tile rod */}
-      <mesh position={[0, 0.08, -0.8]} rotation={[0, 0, Math.PI / 2]}>
+      <mesh position={[0, 0.08, -1.1]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.03, 0.03, BOX_W - WALL_THICK * 2 - 0.1, 16]} />
         <meshStandardMaterial map={woodTex || null} roughness={0.5} />
       </mesh>
@@ -689,46 +689,47 @@ function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], s
 const SURFACE_TOP_Y = -0.05;
 
 // All scene props go here — add a new entry per /models/<folder>
-const SCENE_MODELS = [
-  {
-    id: 'kettle',
-    dir: '/models/kettle/',
-    obj: 'cgaxis_models_116_09_obj_electric_kettle.obj',
-    mtl: 'cgaxis_models_116_09_obj.mtl',
-    // Kettle is already Y-up. Height ~10.27 units → scale 0.15 ≈ 1.54 world units tall.
-    position: [4.8, SURFACE_TOP_Y, -3.8],
-    rotation: [0, -0.6, 0],
-    scale: 0.15,
-  },
-  {
-    id: 'bottle',
+// Static per-model constants (file paths + fixed base rotation).
+// pos_x / pos_z / rot_y / scale come from the DB via props state.
+const PROP_DEFINITIONS = {
+  bottle: {
     dir: '/models/bottle/',
     obj: '14042_750_mL_Wine_Bottle_r_v1_L3.obj',
     mtl: '14042_750_mL_Wine_Bottle_r_v1_L3.mtl',
-    // OBJ is Z-up; rotate -90° around X to stand upright in Three.js Y-up space.
-    // Scale: OBJ height ~21.15 → target ~1.8 world units  (21.15 * 0.085 ≈ 1.8)
-    // Centred behind the box so it's visible top-centre from the camera.
-    position: [3.8, SURFACE_TOP_Y, 2.6],
-    rotation: [-Math.PI / 2, 0, -0.3],
-    scale: 0.34,
+    baseRotX: -Math.PI / 2,   // OBJ is Z-up; needs -90° to stand upright
   },
-];
+  kettle: {
+    dir: '/models/kettle/',
+    obj: 'cgaxis_models_116_09_obj_electric_kettle.obj',
+    mtl: 'cgaxis_models_116_09_obj.mtl',
+    baseRotX: 0,               // Already Y-up
+  },
+  // twirl_1 and twirl_2 are GLB, handled separately in DecorativeTwirls
+};
 
-function SceneModels() {
+// sceneProps: array of rows from stb15_scene_props (keyed by .key)
+function SceneModels({ sceneProps = [] }) {
+  const propMap = useMemo(() => Object.fromEntries(sceneProps.map((p) => [p.key, p])), [sceneProps]);
+
   return (
     <>
-      {SCENE_MODELS.map((m) => (
-        <Suspense key={m.id} fallback={null}>
-          <ObjModel
-            dir={m.dir}
-            obj={m.obj}
-            mtl={m.mtl}
-            position={m.position}
-            rotation={m.rotation}
-            scale={m.scale}
-          />
-        </Suspense>
-      ))}
+      {Object.entries(PROP_DEFINITIONS).map(([key, def]) => {
+        const p = propMap[key];
+        if (!p || !p.active) return null;
+        const rotY = (p.rot_y_deg ?? 0) * (Math.PI / 180);
+        return (
+          <Suspense key={key} fallback={null}>
+            <ObjModel
+              dir={def.dir}
+              obj={def.obj}
+              mtl={def.mtl}
+              position={[p.pos_x, SURFACE_TOP_Y, p.pos_z]}
+              rotation={[def.baseRotX, rotY, 0]}
+              scale={p.scale}
+            />
+          </Suspense>
+        );
+      })}
     </>
   );
 }
@@ -737,24 +738,36 @@ function SceneModels() {
  * Static decorative twirl instances on the surface
  * ========================================================================== */
 
-// Two static twirls — top-left behind bottle, bottom-left corner
-const TWIRL_PLACEMENTS = [
-  { pos: [-6.2, SURFACE_TOP_Y, -4.2], rot: [0,  1.1, 0], scale: 1.60 },
-  { pos: [-5.0, SURFACE_TOP_Y,  3.8], rot: [0, -0.4, 0], scale: 1.55 },
-];
+// Twirl keys in the props table that represent static chocolate bar instances
+const TWIRL_PROP_KEYS = ['twirl_1', 'twirl_2'];
 
-function DecorativeTwirls() {
+function DecorativeTwirls({ sceneProps = [] }) {
   const { scene } = useGLTF(TWIRL_URL);
+
+  const activeTwirls = useMemo(
+    () => sceneProps.filter((p) => TWIRL_PROP_KEYS.includes(p.key) && p.active),
+    [sceneProps],
+  );
+
   const clones = useMemo(
-    () => TWIRL_PLACEMENTS.map(() => scene.clone(true)),
-    [scene],
+    () => activeTwirls.map(() => scene.clone(true)),
+    [scene, activeTwirls.length],
   );
 
   return (
     <>
-      {TWIRL_PLACEMENTS.map((p, i) => (
-        <primitive key={i} object={clones[i]} position={p.pos} rotation={p.rot} scale={p.scale} />
-      ))}
+      {activeTwirls.map((p, i) => {
+        const rotY = (p.rot_y_deg ?? 0) * (Math.PI / 180);
+        return (
+          <primitive
+            key={p.key}
+            object={clones[i]}
+            position={[p.pos_x, SURFACE_TOP_Y, p.pos_z]}
+            rotation={[0, rotY, 0]}
+            scale={p.scale}
+          />
+        );
+      })}
     </>
   );
 }
@@ -777,7 +790,7 @@ function TwirlCelebration({ active }) {
  * Debug win button — temporary, sits on surface to the right of the button panel
  * ========================================================================== */
 
-function DebugWinButton({ onDebugWin, inkColour }) {
+function DebugWinButton({ onDebugWin, inkColour, panelZ = BTN_PANEL_Z_DEFAULT }) {
   const { woodTex } = useStb15Textures();
   const meshRef = useRef();
   const pressedRef = useRef(false);
@@ -791,7 +804,7 @@ function DebugWinButton({ onDebugWin, inkColour }) {
   });
 
   return (
-    <group position={[3.2, BTN_PANEL_Y, BTN_PANEL_Z]}>
+    <group position={[3.2, BTN_PANEL_Y, panelZ]}>
       <mesh
         ref={meshRef}
         onPointerDown={(e) => { e.stopPropagation(); pressedRef.current = true; }}
@@ -844,6 +857,7 @@ function Stb15Scene({
   onToggle1Die,
   celebrating = false,
   onDebugWin,
+  sceneProps = [],
 }) {
   const inboxLetters = useMemo(
     () => lettersFromMessage(tileMessage || config.hidden_message, 15),
@@ -851,6 +865,13 @@ function Stb15Scene({
   );
   const backLetters  = useMemo(() => lettersFromMessage(scatteredSet.back, 10),  [scatteredSet.back]);
   const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 9), [scatteredSet.front]);
+
+  // Layout positions driven by scene props (fall back to defaults if not yet loaded)
+  const propMap = useMemo(() => Object.fromEntries(sceneProps.map((p) => [p.key, p])), [sceneProps]);
+  const backTilesZ   = propMap.tiles_back?.pos_z  ?? -4.8;
+  const frontTilesZ  = propMap.tiles_front?.pos_z ?? 2.3;
+  const frontTilesSize = propMap.tiles_front?.scale ?? 0.825;
+  const btnPanelZ    = propMap.btn_panel?.pos_z   ?? BTN_PANEL_Z_DEFAULT;
   const activePalettes = useMemo(
     () => (Array.isArray(config.dice_palettes) ? config.dice_palettes.filter((p) => p.active && p.body && p.pip) : []),
     [config.dice_palettes],
@@ -884,8 +905,8 @@ function Stb15Scene({
           />
         ))}
 
-        <ScatteredRow letters={backLetters}  baseZ={-4.8} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={2.3}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.825} spread={4.5} />
+        <ScatteredRow letters={backLetters}  baseZ={backTilesZ}  inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}         spread={4.8} />
+        <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} inkColour={config.ink_colour} seed={4.7} count={9}  size={frontTilesSize} spread={4.5} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -894,7 +915,7 @@ function Stb15Scene({
 
         {/* Dice sum display */}
         {showSum && (
-          <Text position={[-3.2, 0.06, 0.75]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
+          <Text position={[-3.2, 0.06, 1.4]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
             {`${totalDice}`}
           </Text>
         )}
@@ -907,16 +928,17 @@ function Stb15Scene({
           can1Die={can1Die}
           using1Die={using1Die}
           onToggle1Die={onToggle1Die}
+          panelZ={btnPanelZ}
         />
 
         {/* Static decorative twirl props on the surface */}
-        <DecorativeTwirls />
+        <DecorativeTwirls sceneProps={sceneProps} />
 
         {/* OBJ/MTL prop models on the surface */}
-        <SceneModels />
+        <SceneModels sceneProps={sceneProps} />
 
         {/* DEBUG — temporary win simulator button, remove once verified */}
-        {onDebugWin && <DebugWinButton onDebugWin={onDebugWin} inkColour={config.ink_colour} />}
+        {onDebugWin && <DebugWinButton onDebugWin={onDebugWin} inkColour={config.ink_colour} panelZ={btnPanelZ} />}
 
         {bigButton}
         <TwirlCelebration active={celebrating} />
@@ -965,6 +987,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
   const [using2Dice, setUsing2Dice]     = useState(false);
   const [using1Die, setUsing1Die]       = useState(false);
   const [celebrating, setCelebrating]   = useState(false);
+  const [sceneProps, setSceneProps]     = useState([]);
   const settledRef = useRef([null, null, null]);
 
   // Unlock conditions
@@ -985,6 +1008,10 @@ export function ShutTheBox15Game({ showStatus = true }) {
   // Revoke higher-mode toggles if conditions become false (shouldn't happen but safety)
   useEffect(() => { if (!can2Dice) { setUsing2Dice(false); } }, [can2Dice]);
   useEffect(() => { if (!can1Die)  { setUsing1Die(false);  } }, [can1Die]);
+
+  useEffect(() => {
+    api.getStb15Props().then((rows) => { if (Array.isArray(rows)) setSceneProps(rows); }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.getStb15Config().then((c) => {
@@ -1167,6 +1194,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
           onToggle1Die={() => { setUsing1Die((v) => !v); setUsing2Dice(false); }}
           celebrating={celebrating}
           onDebugWin={game && phase !== 'won' ? debugSimulateWin : null}
+          sceneProps={sceneProps}
         />
       </Stb15CanvasShell>
 
