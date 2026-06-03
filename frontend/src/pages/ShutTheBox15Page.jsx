@@ -33,7 +33,7 @@ const DEFAULT_CONFIG = {
 const GRANITE_TEX_URL      = '/textures/granite.png?v=1';
 const WOOD_TEX_URL         = '/textures/wood_table_worn.jpg?v=4';
 const VELVET_TEX_URL       = '/textures/velour_velvet_diff.jpg?v=3';
-const WOODEN_BUTTONS_URL   = '/textures/wooden_buttons.png?v=1';
+const WOODEN_BUTTONS_URL   = '/textures/wooden_buttons.jpg?v=1';
 const TWIRL_URL            = '/twirl.glb';
 
 // Box dimensions — wider for 15 tiles
