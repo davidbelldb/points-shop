@@ -17,7 +17,7 @@ const ALL_TILES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 // Tiles that must ALL be shut for each staged dice reduction (player option)
 const TILES_FOR_2_DICE = [10, 11, 12, 13, 14, 15];   // shut these → may switch to 2 dice
-const TILES_FOR_1_DIE  = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // shut these → may switch to 1 die
+const TILES_FOR_1_DIE  = [7, 8, 9, 10, 11, 12, 13, 14, 15]; // shut these → may switch to 1 die
 
 const DEFAULT_CONFIG = {
   felt_colour: '#15b8a6',
@@ -1361,7 +1361,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
       {(can2Dice || can1Die) && game && phase !== 'won' && phase !== 'over' && (
         <p className="text-center text-xs text-teal-600 font-medium">
-          {can1Die ? 'Tiles 4–15 shut — single die unlocked!' : 'Tiles 10–15 shut — 2-dice mode unlocked!'}
+          {can1Die ? 'Tiles 7–15 shut — single die unlocked!' : 'Tiles 10–15 shut — 2-dice mode unlocked!'}
         </p>
       )}
 
