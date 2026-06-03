@@ -284,7 +284,7 @@ export default function AdminShutTheBox15Section({ bare = false }) {
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">3D scene objects</p>
         <p className="text-xs text-neutral-500">
-          Position (X / Z) and scale for each prop on the granite surface. X is left/right, Z is back/front (negative = behind box). Rotation is Y-axis in degrees. Changes take effect on next page load.
+          Position (X / Z), rotation (X/Y/Z °), and scale for each prop. X is left/right, Z is back/front (negative = behind box). 3D model rows show full rotation controls; layout rows (box, tiles, button panel) show only position/scale. Changes apply on next page load.
         </p>
         {sceneProps.length === 0 && <p className="text-xs text-neutral-400">No props found — run DB migration 070.</p>}
         <div className="space-y-2">
@@ -454,8 +454,8 @@ function ScenePropEditor({ prop, busy, onSave }) {
     });
   }
 
-  // 'box' and layout keys don't use rotation
-  const isLayout = ['box', 'tiles_back', 'tiles_front', 'btn_panel'].includes(prop.key);
+  // Only pure layout rows (no 3D model) skip rotation controls
+  const isLayout = ['box', 'tiles_back', 'tiles_front'].includes(prop.key);
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2">

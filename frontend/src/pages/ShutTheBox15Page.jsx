@@ -361,7 +361,7 @@ function ScatteredTile({ letter, position, rotationY, inkColour, size = 1 }) {
   );
 }
 
-function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, spread = 3.7 }) {
+function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, spread = 3.7, xOffset = 0 }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => {
@@ -371,7 +371,7 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
           <ScatteredTile
             key={i}
             letter={letters[i] || ''}
-            position={[t * spread + Math.cos((seed + i) * 4.3) * 0.08, 0, baseZ + jitter * 0.18 * size]}
+            position={[xOffset + t * spread + Math.cos((seed + i) * 4.3) * 0.08, 0, baseZ + jitter * 0.18 * size]}
             rotationY={jitter * 0.45}
             inkColour={inkColour}
             size={size}
@@ -396,7 +396,7 @@ const BTN_PANEL_H = 0.22;
 const BTN_PANEL_Z_DEFAULT = 4.0;
 const BTN_PANEL_Y = 0.09;
 
-function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelZ = BTN_PANEL_Z_DEFAULT }) {
+function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelZ = BTN_PANEL_Z_DEFAULT, panelRotY = 0 }) {
   const { buttonsTex } = useStb15Textures();
   const meshRef = useRef();
   const pressedRef = useRef(null); // 'left' | 'right' | null
@@ -426,7 +426,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
   const halfW = BTN_PANEL_W / 4; // half of each side
 
   return (
-    <group position={[0, BTN_PANEL_Y, panelZ]}>
+    <group position={[0, BTN_PANEL_Y, panelZ]} rotation={[0, panelRotY, 0]}>
       {/* Main visible panel — glows teal when either side is active */}
       <mesh ref={meshRef} castShadow receiveShadow>
         <boxGeometry args={[BTN_PANEL_W, BTN_PANEL_H, BTN_PANEL_D]} />
@@ -674,17 +674,61 @@ function TwirlInstance({ position, delay }) {
  * The component suspends while loading (wrap in <Suspense>).
  * ========================================================================== */
 
+// ObjModel uses sequential manual loading (MTL → preload → OBJ) rather than
+// useLoader, which caches the OBJ result before materials are applied and can
+// produce wrong textures when multiple models share the same component.
 function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }) {
-  const materials = useLoader(MTLLoader, `${dir}${mtl}`, (loader) => {
-    loader.setResourcePath(dir);
-  });
-  // preload() must be called in the render body (before OBJLoader) so textures resolve
-  materials.preload();
-  const object = useLoader(OBJLoader, `${dir}${obj}`, (loader) => {
-    loader.setMaterials(materials);
-  });
-  const clone = useMemo(() => object.clone(), [object]);
+  const [loaded, setLoaded] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const mtlLoader = new MTLLoader();
+    mtlLoader.setResourcePath(dir);
+    mtlLoader.load(`${dir}${mtl}`, (mats) => {
+      if (cancelled) return;
+      mats.preload();
+      const objLoader = new OBJLoader();
+      objLoader.setMaterials(mats);
+      objLoader.load(`${dir}${obj}`, (object) => {
+        if (!cancelled) setLoaded(object);
+      });
+    });
+    return () => { cancelled = true; };
+  }, [dir, obj, mtl]);
+
+  if (!loaded) return null;
+  return <primitive object={loaded} position={position} rotation={rotation} scale={scale} />;
+}
+
+// GlbModel — for .glb files (uses useGLTF + Suspense)
+function GlbModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }) {
+  const { scene } = useGLTF(url);
+  const clone = useMemo(() => scene.clone(true), [scene]);
   return <primitive object={clone} position={position} rotation={rotation} scale={scale} />;
+}
+
+// ProceduralBanana — TubeGeometry along a curved spline
+function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }) {
+  const curve = useMemo(() => {
+    const pts = [];
+    for (let i = 0; i <= 20; i++) {
+      const t = (i / 20) * Math.PI * 0.62;
+      pts.push(new THREE.Vector3(Math.cos(t) * 1.0 - 0.85, Math.sin(t) * 0.55, 0));
+    }
+    return new THREE.CatmullRomCurve3(pts);
+  }, []);
+  return (
+    <group position={position} rotation={rotation} scale={scale}>
+      <mesh castShadow receiveShadow>
+        <tubeGeometry args={[curve, 20, 0.09, 8, false]} />
+        <meshStandardMaterial color="#F4D03F" roughness={0.85} />
+      </mesh>
+      <mesh position={[0.16, 0.54, 0]} castShadow>
+        <sphereGeometry args={[0.07, 8, 8]} />
+        <meshStandardMaterial color="#7D6608" roughness={0.9} />
+      </mesh>
+    </group>
+  );
 }
 
 // Surface top Y in world space = SURFACE_Y (group offset) + SURF_H/2
@@ -696,23 +740,17 @@ const SURFACE_TOP_Y = -0.05;
 // pos_x / pos_z / rot_y / scale come from the DB via props state.
 // Static model definitions — file paths only.
 // Full rotation (X/Y/Z in degrees) comes from the DB via stb15_scene_props.
+// type: 'obj' = OBJ+MTL file pair | 'glb' = single GLB | 'procedural' = built-in geometry
 const PROP_DEFINITIONS = {
-  bottle: {
-    dir: '/models/bottle/',
-    obj: '14042_750_mL_Wine_Bottle_r_v1_L3.obj',
-    mtl: '14042_750_mL_Wine_Bottle_r_v1_L3.mtl',
-  },
-  kettle: {
-    dir: '/models/kettle/',
-    obj: 'cgaxis_models_116_09_obj_electric_kettle.obj',
-    mtl: 'cgaxis_models_116_09_obj.mtl',
-  },
+  bottle: { type: 'obj', dir: '/models/bottle/', obj: '14042_750_mL_Wine_Bottle_r_v1_L3.obj', mtl: '14042_750_mL_Wine_Bottle_r_v1_L3.mtl' },
+  kettle: { type: 'obj', dir: '/models/kettle/', obj: 'cgaxis_models_116_09_obj_electric_kettle.obj', mtl: 'cgaxis_models_116_09_obj.mtl' },
+  cup:    { type: 'glb', url: '/cup.glb' },
+  banana: { type: 'procedural', component: 'banana' },
   // twirl_1 / twirl_2 are GLB — handled by DecorativeTwirls
 };
 
 const DEG = Math.PI / 180;
 
-// sceneProps: array of rows from stb15_scene_props (keyed by .key)
 function SceneModels({ sceneProps = [] }) {
   const propMap = useMemo(() => Object.fromEntries(sceneProps.map((p) => [p.key, p])), [sceneProps]);
 
@@ -721,23 +759,20 @@ function SceneModels({ sceneProps = [] }) {
       {Object.entries(PROP_DEFINITIONS).map(([key, def]) => {
         const p = propMap[key];
         if (!p || !p.active) return null;
-        const rot = [
-          (p.rot_x_deg ?? 0) * DEG,
-          (p.rot_y_deg ?? 0) * DEG,
-          (p.rot_z_deg ?? 0) * DEG,
-        ];
-        return (
-          <Suspense key={key} fallback={null}>
-            <ObjModel
-              dir={def.dir}
-              obj={def.obj}
-              mtl={def.mtl}
-              position={[p.pos_x, SURFACE_TOP_Y, p.pos_z]}
-              rotation={rot}
-              scale={p.scale}
-            />
-          </Suspense>
-        );
+        const pos = [p.pos_x, SURFACE_TOP_Y, p.pos_z];
+        const rot = [(p.rot_x_deg ?? 0) * DEG, (p.rot_y_deg ?? 0) * DEG, (p.rot_z_deg ?? 0) * DEG];
+        const sc  = p.scale ?? 1;
+
+        if (def.type === 'obj') {
+          return <ObjModel key={key} dir={def.dir} obj={def.obj} mtl={def.mtl} position={pos} rotation={rot} scale={sc} />;
+        }
+        if (def.type === 'glb') {
+          return <Suspense key={key} fallback={null}><GlbModel url={def.url} position={pos} rotation={rot} scale={sc} /></Suspense>;
+        }
+        if (def.type === 'procedural' && def.component === 'banana') {
+          return <ProceduralBanana key={key} position={pos} rotation={rot} scale={sc} />;
+        }
+        return null;
       })}
     </>
   );
@@ -894,9 +929,12 @@ function Stb15Scene({
   // Layout positions driven by scene props (fall back to defaults if not yet loaded)
   const propMap = useMemo(() => Object.fromEntries(sceneProps.map((p) => [p.key, p])), [sceneProps]);
   const backTilesZ     = propMap.tiles_back?.pos_z  ?? -4.8;
+  const backTilesX     = propMap.tiles_back?.pos_x  ?? 0;
   const frontTilesZ    = propMap.tiles_front?.pos_z ?? 2.3;
+  const frontTilesX    = propMap.tiles_front?.pos_x ?? 0;
   const frontTilesSize = propMap.tiles_front?.scale ?? 0.825;
   const btnPanelZ      = propMap.btn_panel?.pos_z   ?? BTN_PANEL_Z_DEFAULT;
+  const btnPanelRotY   = (propMap.btn_panel?.rot_y_deg ?? 0) * DEG;
   const boxPropX       = propMap.box?.pos_x ?? 0;
   const boxPropZ       = propMap.box?.pos_z ?? 0;
   const boxPropScale   = propMap.box?.scale ?? 1;
@@ -922,6 +960,11 @@ function Stb15Scene({
       />
 
       <Physics gravity={[0, -22, 0]}>
+        {/* Invisible ground collider matching the granite surface — keeps falling objects on top */}
+        <RigidBody type="fixed" colliders={false}>
+          <CuboidCollider args={[25, 0.07, 25]} position={[0, SURFACE_Y, 0]} />
+        </RigidBody>
+
         <CabinetEnvironment />
 
         {/* Box + tiles wrapped in admin-positionable group */}
@@ -944,8 +987,8 @@ function Stb15Scene({
           ))}
         </group>
 
-        <ScatteredRow letters={backLetters}  baseZ={backTilesZ}  inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}         spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} inkColour={config.ink_colour} seed={4.7} count={9}  size={frontTilesSize} spread={4.5} />
+        <ScatteredRow letters={backLetters}  baseZ={backTilesZ}  xOffset={backTilesX}  inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}         spread={4.8} />
+        <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} xOffset={frontTilesX} inkColour={config.ink_colour} seed={4.7} count={9}  size={frontTilesSize} spread={4.5} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -968,6 +1011,7 @@ function Stb15Scene({
           using1Die={using1Die}
           onToggle1Die={onToggle1Die}
           panelZ={btnPanelZ}
+          panelRotY={btnPanelRotY}
         />
 
         {/* Static decorative twirl props on the surface */}
@@ -1309,3 +1353,4 @@ export default function ShutTheBox15Page() {
 }
 
 useGLTF.preload(TWIRL_URL);
+useGLTF.preload('/cup.glb');
