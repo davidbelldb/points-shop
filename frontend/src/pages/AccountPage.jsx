@@ -9,7 +9,7 @@ import PushToggle from '../components/PushToggle.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import Confetti from '../components/Confetti.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
-import { daysUntil } from '../lib/countdown.js';
+import { daysUntil, countdownClock } from '../lib/countdown.js';
 
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none';
@@ -62,7 +62,9 @@ export default function AccountPage() {
 
   return (
     <div className="space-y-5">
-      {daysUntil(settings.banner_countdown_date) === 0 && <Confetti />}
+      {daysUntil(settings.banner_countdown_date) === 0
+        && countdownClock(settings.banner_countdown_date, settings.banner_countdown_time) === null
+        && <Confetti />}
 
       {/* Page title \u2014 always full width */}
       <div className="flex items-center justify-between">

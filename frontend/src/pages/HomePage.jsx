@@ -11,7 +11,7 @@ import Confetti from '../components/Confetti.jsx';
 import AudioNotesSection from '../components/AudioNotesSection.jsx';
 import CalendarUpcomingSection from '../components/CalendarUpcomingSection.jsx';
 import StoriesStrip from '../components/stories/StoriesStrip.jsx';
-import { daysUntil } from '../lib/countdown.js';
+import { daysUntil, countdownClock } from '../lib/countdown.js';
 
 // Replace the {name} token with the account's name so the admin can write e.g.
 // "Welcome back {name}" and it follows a rename from Katie -> Kate automatically.
@@ -48,7 +48,9 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
-      {daysUntil(settings.banner_countdown_date) === 0 && <Confetti />}
+      {daysUntil(settings.banner_countdown_date) === 0
+        && countdownClock(settings.banner_countdown_date, settings.banner_countdown_time) === null
+        && <Confetti />}
 
       {/* \u2500\u2500 Full-width top strip (unchanged on all viewports) \u2500\u2500 */}
       <AudioNotesSection />
