@@ -143,14 +143,14 @@ export default function BasketDrawer({ open, onClose }) {
               <img src="/sphincter-pink.svg" alt="" className="h-16 w-16" />
             </div>
             <div>
-              <p className="font-semibold text-white">It's looking remarkably clean up in here</p>
-              <p className="mt-1 text-sm text-white">Probably the perfect time to put occupy it with something...</p>
+              <p className="font-semibold text-white">It's a bit clean in here</p>
+              <p className="mt-1 text-sm text-white">Probably the perfect time to put something in it...</p>
             </div>
             <button
               onClick={onClose}
               className="rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-amber-900"
             >
-              Close safe pocket
+              Close
             </button>
           </div>
         )}
