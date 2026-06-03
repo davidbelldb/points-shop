@@ -710,10 +710,14 @@ function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], s
   }, [loaded, colorOverride]);
 
   if (!loaded) return null;
-  return <primitive object={loaded} position={position} rotation={rotation} scale={scale} />;
+  return (
+    <RigidBody type="fixed" colliders="hull" position={position} rotation={rotation}>
+      <primitive object={loaded} scale={scale} />
+    </RigidBody>
+  );
 }
 
-// GlbModel — colorOverride applied after clone
+// GlbModel — colorOverride applied after clone; fixed hull collider so objects land on it
 function GlbModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
   const { scene } = useGLTF(url);
   const clone = useMemo(() => {
@@ -728,10 +732,14 @@ function GlbModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, 
     }
     return c;
   }, [scene, colorOverride]);
-  return <primitive object={clone} position={position} rotation={rotation} scale={scale} />;
+  return (
+    <RigidBody type="fixed" colliders="hull" position={position} rotation={rotation}>
+      <primitive object={clone} scale={scale} />
+    </RigidBody>
+  );
 }
 
-// ProceduralBanana — colorOverride overrides the body colour
+// ProceduralBanana — hull collider so twirls land on it
 function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
   const curve = useMemo(() => {
     const pts = [];
@@ -742,16 +750,18 @@ function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 
     return new THREE.CatmullRomCurve3(pts);
   }, []);
   return (
-    <group position={position} rotation={rotation} scale={scale}>
-      <mesh castShadow receiveShadow>
-        <tubeGeometry args={[curve, 20, 0.09, 8, false]} />
-        <meshStandardMaterial color={colorOverride || '#F4D03F'} roughness={0.85} />
-      </mesh>
-      <mesh position={[0.16, 0.54, 0]} castShadow>
-        <sphereGeometry args={[0.07, 8, 8]} />
-        <meshStandardMaterial color="#7D6608" roughness={0.9} />
-      </mesh>
-    </group>
+    <RigidBody type="fixed" colliders="hull" position={position} rotation={rotation} scale={scale}>
+      <group>
+        <mesh castShadow receiveShadow>
+          <tubeGeometry args={[curve, 20, 0.09, 8, false]} />
+          <meshStandardMaterial color={colorOverride || '#F4D03F'} roughness={0.85} />
+        </mesh>
+        <mesh position={[0.16, 0.54, 0]} castShadow>
+          <sphereGeometry args={[0.07, 8, 8]} />
+          <meshStandardMaterial color="#7D6608" roughness={0.9} />
+        </mesh>
+      </group>
+    </RigidBody>
   );
 }
 
