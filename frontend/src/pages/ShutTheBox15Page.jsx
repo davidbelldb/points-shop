@@ -659,7 +659,7 @@ function TwirlInstance({ position, delay }) {
 
   return (
     <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
-      <primitive object={clonedScene} scale={0.35} />
+      <primitive object={clonedScene} scale={1.4} />
     </RigidBody>
   );
 }
@@ -698,8 +698,8 @@ const SCENE_MODELS = [
     // OBJ is Z-up; rotate -90° around X to stand upright in Three.js Y-up space.
     // Scale: OBJ height ~21.15 → target ~1.8 world units  (21.15 * 0.085 ≈ 1.8)
     // Centred behind the box so it's visible top-centre from the camera.
-    position: [-5.2, SURFACE_TOP_Y, -3.0],
-    rotation: [-Math.PI / 2, 0, 0.4],
+    position: [6.0, SURFACE_TOP_Y, 2.3],
+    rotation: [-Math.PI / 2, 0, -0.3],
     scale: 0.34,
   },
 ];
@@ -727,21 +727,9 @@ function SceneModels() {
  * Static decorative twirl instances on the surface
  * ========================================================================== */
 
-// Six decorative twirl placements — chocolate bars lying flat on the granite surface.
-// Only Y rotation varies so each bar faces a different direction naturally.
+// Single static twirl — top left, behind the bottle
 const TWIRL_PLACEMENTS = [
-  // Behind the box — left
-  { pos: [-3.2, SURFACE_TOP_Y, -3.6], rot: [0, 0.4,  0], scale: 1.60 },
-  // Behind the box — right
-  { pos: [ 3.8, SURFACE_TOP_Y, -3.2], rot: [0, -1.1, 0], scale: 1.52 },
-  // Behind the box — centre (near the bottle base)
-  { pos: [-1.4, SURFACE_TOP_Y, -4.5], rot: [0,  2.0, 0], scale: 1.40 },
-  // In front of the box — left
-  { pos: [-3.0, SURFACE_TOP_Y,  2.4], rot: [0, -0.3, 0], scale: 1.52 },
-  // In front of the box — right
-  { pos: [ 3.2, SURFACE_TOP_Y,  2.6], rot: [0,  1.5, 0], scale: 1.44 },
-  // Far left side of box
-  { pos: [-5.8, SURFACE_TOP_Y, -0.5], rot: [0,  0.9, 0], scale: 1.68 },
+  { pos: [-6.2, SURFACE_TOP_Y, -4.2], rot: [0, 1.1, 0], scale: 1.60 },
 ];
 
 function DecorativeTwirls() {
@@ -885,7 +873,7 @@ function Stb15Scene({
           />
         ))}
 
-        <ScatteredRow letters={backLetters}  baseZ={-2.6} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
+        <ScatteredRow letters={backLetters}  baseZ={-3.4} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
         <ScatteredRow letters={frontLetters} baseZ={2.3}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.825} spread={3.0} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
