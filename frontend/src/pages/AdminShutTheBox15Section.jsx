@@ -26,6 +26,10 @@ export default function AdminShutTheBox15Section({ bare = false }) {
   const [inkC, setInkC] = useState('');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
+  const [camX, setCamX] = useState('0');
+  const [camY, setCamY] = useState('10.5');
+  const [camZ, setCamZ] = useState('7.8');
+  const [camFov, setCamFov] = useState('46');
 
   async function load() {
     try {
@@ -37,6 +41,10 @@ export default function AdminShutTheBox15Section({ bare = false }) {
       setInkC(c.ink_colour ?? '');
       setTitle(c.homepage_title ?? '');
       setSubtitle(c.homepage_subtitle ?? '');
+      setCamX(String(c.camera_pos_x ?? 0));
+      setCamY(String(c.camera_pos_y ?? 10.5));
+      setCamZ(String(c.camera_pos_z ?? 7.8));
+      setCamFov(String(c.camera_fov ?? 46));
       if (Array.isArray(props)) setSceneProps(props);
     } catch (e) { setError(e.message); }
   }
@@ -193,6 +201,33 @@ export default function AdminShutTheBox15Section({ bare = false }) {
         <div className="space-y-2">
           {(cfg.dice_palettes || []).map((p) => (
             <DicePaletteEditor key={p.ord} slot={p} busy={busy} onSave={(patch) => saveDicePalette(p.ord, patch)} />
+          ))}
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Camera</p>
+        <p className="text-xs text-neutral-500">Position the camera above the scene. X is left/right, Y is height, Z is distance toward you. FOV widens or narrows the view. Changes apply on page reload.</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          {[
+            { label: 'Pos X', val: camX, set: setCamX, field: 'camera_pos_x' },
+            { label: 'Pos Y (height)', val: camY, set: setCamY, field: 'camera_pos_y' },
+            { label: 'Pos Z (distance)', val: camZ, set: setCamZ, field: 'camera_pos_z' },
+            { label: 'FOV °', val: camFov, set: setCamFov, field: 'camera_fov' },
+          ].map(({ label, val, set, field }) => (
+            <label key={field} className="flex items-center justify-between gap-2">
+              <span className="text-neutral-500">{label}</span>
+              <input
+                value={val}
+                type="number"
+                step="0.1"
+                onChange={(e) => set(e.target.value)}
+                onBlur={() => save({ [field]: parseFloat(val) || 0 })}
+                className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono"
+              />
+            </label>
           ))}
         </div>
       </div>
@@ -390,15 +425,20 @@ function ScatteredSetEditor({ set, busy, onSave }) {
 }
 
 function ScenePropEditor({ prop, busy, onSave }) {
-  const [posX, setPosX]     = useState(String(prop.pos_x ?? 0));
-  const [posZ, setPosZ]     = useState(String(prop.pos_z ?? 0));
-  const [rotY, setRotY]     = useState(String(prop.rot_y_deg ?? 0));
-  const [scale, setScale]   = useState(String(prop.scale ?? 1));
+  const [posX, setPosX]   = useState(String(prop.pos_x     ?? 0));
+  const [posZ, setPosZ]   = useState(String(prop.pos_z     ?? 0));
+  const [rotX, setRotX]   = useState(String(prop.rot_x_deg ?? 0));
+  const [rotY, setRotY]   = useState(String(prop.rot_y_deg ?? 0));
+  const [rotZ, setRotZ]   = useState(String(prop.rot_z_deg ?? 0));
+  const [scale, setScale] = useState(String(prop.scale     ?? 1));
+
   useEffect(() => {
-    setPosX(String(prop.pos_x ?? 0));
-    setPosZ(String(prop.pos_z ?? 0));
+    setPosX(String(prop.pos_x     ?? 0));
+    setPosZ(String(prop.pos_z     ?? 0));
+    setRotX(String(prop.rot_x_deg ?? 0));
     setRotY(String(prop.rot_y_deg ?? 0));
-    setScale(String(prop.scale ?? 1));
+    setRotZ(String(prop.rot_z_deg ?? 0));
+    setScale(String(prop.scale    ?? 1));
   }, [prop]);
 
   const numInput = 'w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono';
@@ -407,10 +447,15 @@ function ScenePropEditor({ prop, busy, onSave }) {
     onSave({
       pos_x:     parseFloat(posX)  || 0,
       pos_z:     parseFloat(posZ)  || 0,
+      rot_x_deg: parseFloat(rotX)  || 0,
       rot_y_deg: parseFloat(rotY)  || 0,
+      rot_z_deg: parseFloat(rotZ)  || 0,
       scale:     parseFloat(scale) || 1,
     });
   }
+
+  // 'box' and layout keys don't use rotation
+  const isLayout = ['box', 'tiles_back', 'tiles_front', 'btn_panel'].includes(prop.key);
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2">
@@ -433,10 +478,20 @@ function ScenePropEditor({ prop, busy, onSave }) {
           <span className="text-neutral-500">Z (back/front)</span>
           <input value={posZ} onChange={(e) => setPosZ(e.target.value)} onBlur={commit} className={numInput} step="0.1" type="number" />
         </label>
-        <label className="flex items-center justify-between gap-2">
-          <span className="text-neutral-500">Rotation °</span>
-          <input value={rotY} onChange={(e) => setRotY(e.target.value)} onBlur={commit} className={numInput} step="1" type="number" />
-        </label>
+        {!isLayout && (<>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Rot X °</span>
+            <input value={rotX} onChange={(e) => setRotX(e.target.value)} onBlur={commit} className={numInput} step="1" type="number" />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Rot Y °</span>
+            <input value={rotY} onChange={(e) => setRotY(e.target.value)} onBlur={commit} className={numInput} step="1" type="number" />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Rot Z °</span>
+            <input value={rotZ} onChange={(e) => setRotZ(e.target.value)} onBlur={commit} className={numInput} step="1" type="number" />
+          </label>
+        </>)}
         <label className="flex items-center justify-between gap-2">
           <span className="text-neutral-500">Scale</span>
           <input value={scale} onChange={(e) => setScale(e.target.value)} onBlur={commit} className={numInput} step="0.01" type="number" />

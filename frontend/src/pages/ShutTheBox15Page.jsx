@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { Text, RoundedBox, useTexture, useGLTF } from '@react-three/drei';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
@@ -461,31 +461,35 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
         <meshStandardMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* "2 DICE" label — left half, always solid white */}
-      <Text
-        position={[-BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.175}
-        color="#ffffff"
-        anchorX="center"
-        anchorY="middle"
-        renderOrder={10}
-      >
-        {using2Dice ? '2 DICE ✓' : '2 DICE'}
-      </Text>
+      {/* "2 DICE" label — only visible when unlocked */}
+      {can2Dice && (
+        <Text
+          position={[-BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.175}
+          color="#ffffff"
+          anchorX="center"
+          anchorY="middle"
+          renderOrder={10}
+        >
+          {using2Dice ? '2 DICE ✓' : '2 DICE'}
+        </Text>
+      )}
 
-      {/* "1 DIE" label — right half, always solid white */}
-      <Text
-        position={[BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.175}
-        color="#ffffff"
-        anchorX="center"
-        anchorY="middle"
-        renderOrder={10}
-      >
-        {using1Die ? '1 DIE ✓' : '1 DIE'}
-      </Text>
+      {/* "1 DIE" label — only visible when unlocked */}
+      {can1Die && (
+        <Text
+          position={[BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.175}
+          color="#ffffff"
+          anchorX="center"
+          anchorY="middle"
+          renderOrder={10}
+        >
+          {using1Die ? '1 DIE ✓' : '1 DIE'}
+        </Text>
+      )}
     </group>
   );
 }
@@ -516,13 +520,13 @@ function BigBoxButton({ label, onClick, disabled, inkColour }) {
         onPointerLeave={() => { pressedRef.current = false; }}
         castShadow receiveShadow
       >
-        <boxGeometry args={[2.7, 0.25, 0.7]} />
+        <boxGeometry args={[3.4, 0.32, 1.0]} />
         <meshStandardMaterial map={woodTex} roughness={0.55} />
       </mesh>
       <Text
-        position={[0, 0.18, 0]}
+        position={[0, 0.22, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.32}
+        fontSize={0.42}
         color={inkColour}
         anchorX="center"
         anchorY="middle"
@@ -674,13 +678,12 @@ function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], s
   const materials = useLoader(MTLLoader, `${dir}${mtl}`, (loader) => {
     loader.setResourcePath(dir);
   });
+  // preload() must be called in the render body (before OBJLoader) so textures resolve
+  materials.preload();
   const object = useLoader(OBJLoader, `${dir}${obj}`, (loader) => {
-    materials.preload();
     loader.setMaterials(materials);
   });
-
   const clone = useMemo(() => object.clone(), [object]);
-
   return <primitive object={clone} position={position} rotation={rotation} scale={scale} />;
 }
 
@@ -691,21 +694,23 @@ const SURFACE_TOP_Y = -0.05;
 // All scene props go here — add a new entry per /models/<folder>
 // Static per-model constants (file paths + fixed base rotation).
 // pos_x / pos_z / rot_y / scale come from the DB via props state.
+// Static model definitions — file paths only.
+// Full rotation (X/Y/Z in degrees) comes from the DB via stb15_scene_props.
 const PROP_DEFINITIONS = {
   bottle: {
     dir: '/models/bottle/',
     obj: '14042_750_mL_Wine_Bottle_r_v1_L3.obj',
     mtl: '14042_750_mL_Wine_Bottle_r_v1_L3.mtl',
-    baseRotX: -Math.PI / 2,   // OBJ is Z-up; needs -90° to stand upright
   },
   kettle: {
     dir: '/models/kettle/',
     obj: 'cgaxis_models_116_09_obj_electric_kettle.obj',
     mtl: 'cgaxis_models_116_09_obj.mtl',
-    baseRotX: 0,               // Already Y-up
   },
-  // twirl_1 and twirl_2 are GLB, handled separately in DecorativeTwirls
+  // twirl_1 / twirl_2 are GLB — handled by DecorativeTwirls
 };
+
+const DEG = Math.PI / 180;
 
 // sceneProps: array of rows from stb15_scene_props (keyed by .key)
 function SceneModels({ sceneProps = [] }) {
@@ -716,7 +721,11 @@ function SceneModels({ sceneProps = [] }) {
       {Object.entries(PROP_DEFINITIONS).map(([key, def]) => {
         const p = propMap[key];
         if (!p || !p.active) return null;
-        const rotY = (p.rot_y_deg ?? 0) * (Math.PI / 180);
+        const rot = [
+          (p.rot_x_deg ?? 0) * DEG,
+          (p.rot_y_deg ?? 0) * DEG,
+          (p.rot_z_deg ?? 0) * DEG,
+        ];
         return (
           <Suspense key={key} fallback={null}>
             <ObjModel
@@ -724,7 +733,7 @@ function SceneModels({ sceneProps = [] }) {
               obj={def.obj}
               mtl={def.mtl}
               position={[p.pos_x, SURFACE_TOP_Y, p.pos_z]}
-              rotation={[def.baseRotX, rotY, 0]}
+              rotation={rot}
               scale={p.scale}
             />
           </Suspense>
@@ -756,18 +765,19 @@ function DecorativeTwirls({ sceneProps = [] }) {
 
   return (
     <>
-      {activeTwirls.map((p, i) => {
-        const rotY = (p.rot_y_deg ?? 0) * (Math.PI / 180);
-        return (
-          <primitive
-            key={p.key}
-            object={clones[i]}
-            position={[p.pos_x, SURFACE_TOP_Y, p.pos_z]}
-            rotation={[0, rotY, 0]}
-            scale={p.scale}
-          />
-        );
-      })}
+      {activeTwirls.map((p, i) => (
+        <primitive
+          key={p.key}
+          object={clones[i]}
+          position={[p.pos_x, SURFACE_TOP_Y, p.pos_z]}
+          rotation={[
+            (p.rot_x_deg ?? 0) * DEG,
+            (p.rot_y_deg ?? 0) * DEG,
+            (p.rot_z_deg ?? 0) * DEG,
+          ]}
+          scale={p.scale}
+        />
+      ))}
     </>
   );
 }
@@ -777,7 +787,7 @@ function TwirlCelebration({ active }) {
     if (!active) return [];
     return Array.from({ length: 20 }).map((_, i) => ({
       id: i,
-      position: { x: (Math.random() - 0.5) * BOX_W * 0.85, y: 5 + Math.random() * 3, z: (Math.random() - 0.5) * BOX_D * 0.7 },
+      position: { x: (Math.random() - 0.5) * 18, y: 6 + Math.random() * 4, z: (Math.random() - 0.5) * 14 },
       delay: Math.random() * 5000,
     }));
   }, [active]);
@@ -831,6 +841,21 @@ function DebugWinButton({ onDebugWin, inkColour, panelZ = BTN_PANEL_Z_DEFAULT })
 }
 
 /* ============================================================================
+ * Camera controller — reads position/fov from config and applies imperatively
+ * ========================================================================== */
+
+function CameraSetup({ posX = 0, posY = 10.5, posZ = 7.8, fov = 46 }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    camera.position.set(posX, posY, posZ);
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+    camera.lookAt(0, 0, 0);
+  }, [posX, posY, posZ, fov]);
+  return null;
+}
+
+/* ============================================================================
  * Full 3D scene
  * ========================================================================== */
 
@@ -868,10 +893,13 @@ function Stb15Scene({
 
   // Layout positions driven by scene props (fall back to defaults if not yet loaded)
   const propMap = useMemo(() => Object.fromEntries(sceneProps.map((p) => [p.key, p])), [sceneProps]);
-  const backTilesZ   = propMap.tiles_back?.pos_z  ?? -4.8;
-  const frontTilesZ  = propMap.tiles_front?.pos_z ?? 2.3;
+  const backTilesZ     = propMap.tiles_back?.pos_z  ?? -4.8;
+  const frontTilesZ    = propMap.tiles_front?.pos_z ?? 2.3;
   const frontTilesSize = propMap.tiles_front?.scale ?? 0.825;
-  const btnPanelZ    = propMap.btn_panel?.pos_z   ?? BTN_PANEL_Z_DEFAULT;
+  const btnPanelZ      = propMap.btn_panel?.pos_z   ?? BTN_PANEL_Z_DEFAULT;
+  const boxPropX       = propMap.box?.pos_x ?? 0;
+  const boxPropZ       = propMap.box?.pos_z ?? 0;
+  const boxPropScale   = propMap.box?.scale ?? 1;
   const activePalettes = useMemo(
     () => (Array.isArray(config.dice_palettes) ? config.dice_palettes.filter((p) => p.active && p.body && p.pip) : []),
     [config.dice_palettes],
@@ -886,24 +914,35 @@ function Stb15Scene({
       <directionalLight position={[4, 8, 4]} intensity={1.0} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={8} shadow-camera-bottom={-8} />
       <directionalLight position={[-5, 4, -2]} intensity={0.3} />
 
+      <CameraSetup
+        posX={config.camera_pos_x ?? 0}
+        posY={config.camera_pos_y ?? 10.5}
+        posZ={config.camera_pos_z ?? 7.8}
+        fov={config.camera_fov ?? 46}
+      />
+
       <Physics gravity={[0, -22, 0]}>
         <CabinetEnvironment />
-        <BoxFrame />
-        <BoxColliders />
 
-        {ALL_TILES.map((v, i) => (
-          <Tile
-            key={v}
-            value={v}
-            x={TILE_START_X + i * TILE_SPACING}
-            closed={!openTiles.includes(v)}
-            selected={selected.includes(v)}
-            onClick={onTileTap}
-            inkColour={config.ink_colour}
-            letter={inboxLetters[v - 1]}
-            interactive={interactive}
-          />
-        ))}
+        {/* Box + tiles wrapped in admin-positionable group */}
+        <group position={[boxPropX, 0, boxPropZ]} scale={boxPropScale}>
+          <BoxFrame />
+          <BoxColliders />
+
+          {ALL_TILES.map((v, i) => (
+            <Tile
+              key={v}
+              value={v}
+              x={TILE_START_X + i * TILE_SPACING}
+              closed={!openTiles.includes(v)}
+              selected={selected.includes(v)}
+              onClick={onTileTap}
+              inkColour={config.ink_colour}
+              letter={inboxLetters[v - 1]}
+              interactive={interactive}
+            />
+          ))}
+        </group>
 
         <ScatteredRow letters={backLetters}  baseZ={backTilesZ}  inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}         spread={4.8} />
         <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} inkColour={config.ink_colour} seed={4.7} count={9}  size={frontTilesSize} spread={4.5} />

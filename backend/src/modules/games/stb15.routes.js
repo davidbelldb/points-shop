@@ -95,7 +95,9 @@ export default async function stb15Routes(fastify) {
     const values = [];
     if ('pos_x'     in patch) { values.push(Number(patch.pos_x));     updates.push(`pos_x = $${values.length}`); }
     if ('pos_z'     in patch) { values.push(Number(patch.pos_z));     updates.push(`pos_z = $${values.length}`); }
+    if ('rot_x_deg' in patch) { values.push(Number(patch.rot_x_deg)); updates.push(`rot_x_deg = $${values.length}`); }
     if ('rot_y_deg' in patch) { values.push(Number(patch.rot_y_deg)); updates.push(`rot_y_deg = $${values.length}`); }
+    if ('rot_z_deg' in patch) { values.push(Number(patch.rot_z_deg)); updates.push(`rot_z_deg = $${values.length}`); }
     if ('scale'     in patch) { values.push(Number(patch.scale));     updates.push(`scale = $${values.length}`); }
     if ('active'    in patch) {
       if (typeof patch.active !== 'boolean') return reply.code(400).send({ error: 'active must be boolean' });
@@ -158,6 +160,7 @@ export default async function stb15Routes(fastify) {
       'homepage_visible', 'homepage_title', 'homepage_subtitle', 'homepage_days',
       'felt_colour', 'frame_colour', 'tile_colour', 'ink_colour', 'hidden_message',
       'dice_colour', 'pip_colour', 'table_colour',
+      'camera_pos_x', 'camera_pos_y', 'camera_pos_z', 'camera_fov',
     ];
     const updates = [];
     const values = [];

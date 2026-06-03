@@ -12,5 +12,5 @@ newmtl Material__0
 	Kd 1.0000 1.0000 1.0000
 	Ks 0.4500 0.4500 0.4500
 	Ke 0.0000 0.0000 0.0000
-	map_Ka 14042_750 mL_Wine_Bottle_dfinal.jpg
-	map_Kd 14042_750 mL_Wine_Bottle_dfinal.jpg
+	map_Ka 14042_750_mL_Wine_Bottle_dfinal.jpg
+	map_Kd 14042_750_mL_Wine_Bottle_dfinal.jpg
