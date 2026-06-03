@@ -54,11 +54,11 @@ function validatePatch(patch) {
 }
 
 function validateScatteredPatch(patch) {
-  if ('back' in patch && (typeof patch.back !== 'string' || patch.back.length > 8)) {
-    return 'back must be 0-8 characters (use _ for blank)';
+  if ('back' in patch && (typeof patch.back !== 'string' || patch.back.length > 10)) {
+    return 'back must be 0-10 characters (use _ for blank)';
   }
-  if ('front' in patch && (typeof patch.front !== 'string' || patch.front.length > 7)) {
-    return 'front must be 0-7 characters (use _ for blank)';
+  if ('front' in patch && (typeof patch.front !== 'string' || patch.front.length > 9)) {
+    return 'front must be 0-9 characters (use _ for blank)';
   }
   if ('active' in patch && typeof patch.active !== 'boolean') {
     return 'active must be a boolean';

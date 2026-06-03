@@ -28,10 +28,11 @@ const DEFAULT_CONFIG = {
   hidden_message: 'I_MISS_YOU_SO_MUCH!!',
 };
 
-const GRANITE_TEX_URL  = '/textures/granite.png?v=1';
-const WOOD_TEX_URL     = '/textures/wood_table_worn.jpg?v=4';
-const VELVET_TEX_URL   = '/textures/velour_velvet_diff.jpg?v=3';
-const TWIRL_URL        = '/twirl.glb';
+const GRANITE_TEX_URL      = '/textures/granite.png?v=1';
+const WOOD_TEX_URL         = '/textures/wood_table_worn.jpg?v=4';
+const VELVET_TEX_URL       = '/textures/velour_velvet_diff.jpg?v=3';
+const WOODEN_BUTTONS_URL   = '/textures/wooden_buttons.png?v=1';
+const TWIRL_URL            = '/twirl.glb';
 
 // Box dimensions — wider for 15 tiles
 const BOX_W = 7.4;
@@ -56,8 +57,9 @@ const CAB_PANEL_D = 0.18;
  * ========================================================================== */
 
 function useStb15Textures() {
-  const [graniteTex, woodTex, velvetTex] = useTexture([GRANITE_TEX_URL, WOOD_TEX_URL, VELVET_TEX_URL]);
+  const [graniteTex, woodTex, velvetTex, buttonsTex] = useTexture([GRANITE_TEX_URL, WOOD_TEX_URL, VELVET_TEX_URL, WOODEN_BUTTONS_URL]);
 
+  // Tiling textures
   [graniteTex, woodTex, velvetTex].forEach((tex) => {
     if (tex && tex.colorSpace !== THREE.SRGBColorSpace) {
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -66,12 +68,19 @@ function useStb15Textures() {
       tex.needsUpdate = true;
     }
   });
-  // Granite tiles across a big surface
   if (graniteTex) graniteTex.repeat.set(8, 6);
-  // Wood repeats
   if (woodTex) woodTex.repeat.set(2, 1.5);
 
-  return { graniteTex, woodTex, velvetTex };
+  // Buttons texture — single instance, no tiling
+  if (buttonsTex && buttonsTex.colorSpace !== THREE.SRGBColorSpace) {
+    buttonsTex.colorSpace = THREE.SRGBColorSpace;
+    buttonsTex.wrapS = buttonsTex.wrapT = THREE.ClampToEdgeWrapping;
+    buttonsTex.repeat.set(1, 1);
+    buttonsTex.anisotropy = 4;
+    buttonsTex.needsUpdate = true;
+  }
+
+  return { graniteTex, woodTex, velvetTex, buttonsTex };
 }
 
 /* ============================================================================
@@ -372,14 +381,23 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
 }
 
 /* ============================================================================
- * Dice-count toggle buttons (3D, on front lip)
- * Two buttons: "2 DICE" (unlocks when 10-15 shut) and "1 DIE" (unlocks when 4-15 shut)
+ * Combined dice-count toggle panel — single wooden_buttons.png mesh
+ * Left half = "2 DICE" (unlocks when 10-15 shut)
+ * Right half = "1 DIE"  (unlocks when 4-15 shut)
+ * Texture is applied once across the full panel, no tiling.
  * ========================================================================== */
 
-function DiceToggleButton({ label, enabled, active, onToggle, inkColour, posX }) {
-  const { woodTex } = useStb15Textures();
+// Panel sits flat, further toward front of scene
+const BTN_PANEL_W = 4.0;   // world units — texture ratio 2048:416 ≈ 4.93, close enough at this width
+const BTN_PANEL_D = 0.81;  // depth (Z extent of the panel face)
+const BTN_PANEL_H = 0.22;  // thickness (Y)
+const BTN_PANEL_Z = BOX_D / 2 + WALL_THICK / 2 + 1.1; // further forward than before
+const BTN_PANEL_Y = 0.09;
+
+function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die }) {
+  const { buttonsTex } = useStb15Textures();
   const meshRef = useRef();
-  const pressedRef = useRef(false);
+  const pressedRef = useRef(null); // 'left' | 'right' | null
   const offsetY = useRef(0);
 
   useFrame((_, delta) => {
@@ -389,38 +407,78 @@ function DiceToggleButton({ label, enabled, active, onToggle, inkColour, posX })
     meshRef.current.position.y = offsetY.current;
   });
 
-  const posZ = BOX_D / 2 + WALL_THICK / 2 + 0.35;
+  function handlePointerDown(e, side) {
+    const enabled = side === 'left' ? can2Dice : can1Die;
+    if (!enabled) return;
+    e.stopPropagation();
+    pressedRef.current = side;
+  }
+  function handlePointerUp(e, side) {
+    if (pressedRef.current !== side) return;
+    e.stopPropagation();
+    pressedRef.current = null;
+    if (side === 'left' && can2Dice) onToggle2Dice?.();
+    if (side === 'right' && can1Die)  onToggle1Die?.();
+  }
+
+  const halfW = BTN_PANEL_W / 4; // half of each side
 
   return (
-    <group position={[posX, 0.09, posZ]}>
-      <mesh
-        ref={meshRef}
-        onPointerDown={(e) => { if (enabled) { e.stopPropagation(); pressedRef.current = true; } }}
-        onPointerUp={(e) => { if (enabled) { e.stopPropagation(); pressedRef.current = false; onToggle?.(); } }}
-        onPointerLeave={() => { pressedRef.current = false; }}
-        castShadow receiveShadow
-      >
-        <boxGeometry args={[1.3, 0.18, 0.55]} />
-        <meshStandardMaterial
-          map={woodTex || null}
-          roughness={0.55}
-          emissive={active ? '#15b8a6' : '#000'}
-          emissiveIntensity={active ? 0.45 : 0}
-        />
+    <group position={[0, BTN_PANEL_Y, BTN_PANEL_Z]}>
+      {/* Main visible panel with the wooden texture */}
+      <mesh ref={meshRef} castShadow receiveShadow>
+        <boxGeometry args={[BTN_PANEL_W, BTN_PANEL_H, BTN_PANEL_D]} />
+        <meshStandardMaterial map={buttonsTex || null} roughness={0.45} metalness={0.05} />
       </mesh>
+
+      {/* Invisible left click zone (2 DICE) */}
+      <mesh
+        position={[-BTN_PANEL_W / 4, 0, 0]}
+        onPointerDown={(e) => handlePointerDown(e, 'left')}
+        onPointerUp={(e) => handlePointerUp(e, 'left')}
+        onPointerLeave={() => { if (pressedRef.current === 'left') pressedRef.current = null; }}
+      >
+        <boxGeometry args={[BTN_PANEL_W / 2 - 0.05, BTN_PANEL_H + 0.02, BTN_PANEL_D + 0.02]} />
+        <meshStandardMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Invisible right click zone (1 DIE) */}
+      <mesh
+        position={[BTN_PANEL_W / 4, 0, 0]}
+        onPointerDown={(e) => handlePointerDown(e, 'right')}
+        onPointerUp={(e) => handlePointerUp(e, 'right')}
+        onPointerLeave={() => { if (pressedRef.current === 'right') pressedRef.current = null; }}
+      >
+        <boxGeometry args={[BTN_PANEL_W / 2 - 0.05, BTN_PANEL_H + 0.02, BTN_PANEL_D + 0.02]} />
+        <meshStandardMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* "2 DICE" label — left half */}
       <Text
-        position={[0, 0.15, 0]}
+        position={[-BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.13}
-        color={inkColour}
+        fontSize={0.175}
+        color="#ffffff"
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.012}
-        outlineColor={enabled ? '#000' : '#555'}
-        fillOpacity={enabled ? 1 : 0.38}
+        fillOpacity={can2Dice ? 1 : 0.35}
         renderOrder={10}
       >
-        {active ? `${label} ✓` : label}
+        {using2Dice ? '2 DICE ✓' : '2 DICE'}
+      </Text>
+
+      {/* "1 DIE" label — right half */}
+      <Text
+        position={[BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.175}
+        color="#ffffff"
+        anchorX="center"
+        anchorY="middle"
+        fillOpacity={can1Die ? 1 : 0.35}
+        renderOrder={10}
+      >
+        {using1Die ? '1 DIE ✓' : '1 DIE'}
       </Text>
     </group>
   );
@@ -600,6 +658,25 @@ function TwirlInstance({ position, delay }) {
   );
 }
 
+/* ============================================================================
+ * Static decorative twirl instances on the surface
+ * ========================================================================== */
+
+function DecorativeTwirls() {
+  const { scene } = useGLTF(TWIRL_URL);
+  const clone1 = useMemo(() => scene.clone(true), [scene]);
+  const clone2 = useMemo(() => scene.clone(true), [scene]);
+
+  return (
+    <>
+      {/* Left side of the scene, tilted casually on the granite */}
+      <primitive object={clone1} position={[-4.8, SURFACE_Y + 0.14, 1.2]} rotation={[0.3, 0.6, 0.2]} scale={0.38} />
+      {/* Right side */}
+      <primitive object={clone2} position={[4.6, SURFACE_Y + 0.14, 0.6]} rotation={[0.1, -0.8, 0.3]} scale={0.38} />
+    </>
+  );
+}
+
 function TwirlCelebration({ active }) {
   const instances = useMemo(() => {
     if (!active) return [];
@@ -645,8 +722,8 @@ function Stb15Scene({
     () => lettersFromMessage(tileMessage || config.hidden_message, 15),
     [tileMessage, config.hidden_message],
   );
-  const backLetters  = useMemo(() => lettersFromMessage(scatteredSet.back, 8),  [scatteredSet.back]);
-  const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 7), [scatteredSet.front]);
+  const backLetters  = useMemo(() => lettersFromMessage(scatteredSet.back, 10),  [scatteredSet.back]);
+  const frontLetters = useMemo(() => lettersFromMessage(scatteredSet.front, 9), [scatteredSet.front]);
   const activePalettes = useMemo(
     () => (Array.isArray(config.dice_palettes) ? config.dice_palettes.filter((p) => p.active && p.body && p.pip) : []),
     [config.dice_palettes],
@@ -680,8 +757,8 @@ function Stb15Scene({
           />
         ))}
 
-        <ScatteredRow letters={backLetters}  baseZ={-3.4} inkColour={config.ink_colour} seed={1.3} count={8} size={1.0}  spread={4.2} />
-        <ScatteredRow letters={frontLetters} baseZ={2.45} inkColour={config.ink_colour} seed={4.7} count={7} size={0.66} spread={2.6} />
+        <ScatteredRow letters={backLetters}  baseZ={-3.4} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
+        <ScatteredRow letters={frontLetters} baseZ={2.45} inkColour={config.ink_colour} seed={4.7} count={9}  size={0.66} spread={3.0} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -695,25 +772,18 @@ function Stb15Scene({
           </Text>
         )}
 
-        {/* "2 DICE" toggle — left button on the front lip, unlocks when 10-15 shut */}
-        <DiceToggleButton
-          label="2 DICE"
-          enabled={can2Dice}
-          active={using2Dice}
-          onToggle={onToggle2Dice}
-          inkColour={config.ink_colour}
-          posX={BOX_W / 2 - 3.1}
+        {/* Combined dice-count panel with wooden_buttons.png texture */}
+        <CombinedDicePanel
+          can2Dice={can2Dice}
+          using2Dice={using2Dice}
+          onToggle2Dice={onToggle2Dice}
+          can1Die={can1Die}
+          using1Die={using1Die}
+          onToggle1Die={onToggle1Die}
         />
 
-        {/* "1 DIE" toggle — right button, unlocks when 4-15 shut */}
-        <DiceToggleButton
-          label="1 DIE"
-          enabled={can1Die}
-          active={using1Die}
-          onToggle={onToggle1Die}
-          inkColour={config.ink_colour}
-          posX={BOX_W / 2 - 1.5}
-        />
+        {/* Static decorative twirl props on the surface */}
+        <DecorativeTwirls />
 
         {bigButton}
         <TwirlCelebration active={celebrating} />
@@ -730,7 +800,7 @@ function Stb15CanvasShell({ children, onPointerDown, onPointerUp, tableColour = 
   return (
     <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
       <div className="relative" style={{ aspectRatio: '6 / 5', touchAction: 'none' }} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 8.8, 6.2], fov: 44 }} gl={{ antialias: true, alpha: true }}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 8.2, 5.7], fov: 41 }} gl={{ antialias: true, alpha: true }}>
           <Suspense fallback={null}>{children}</Suspense>
         </Canvas>
       </div>
