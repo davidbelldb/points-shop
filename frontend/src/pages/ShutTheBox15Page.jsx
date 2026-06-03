@@ -1139,7 +1139,10 @@ export function ShutTheBox15Game({ showStatus = true }) {
       if (!c) return;
       setConfig(c);
       const sets = Array.isArray(c.scattered_sets) ? c.scattered_sets.filter((s) => s.active) : [];
-      if (sets.length > 0) setScatteredSet({ back: sets[Math.floor(Math.random() * sets.length)].back || '', front: sets[Math.floor(Math.random() * sets.length)].front || '' });
+      if (sets.length > 0) {
+        const pick = sets[Math.floor(Math.random() * sets.length)];
+        setScatteredSet({ back: pick.back || '', front: pick.front || '' });
+      }
       const tableSlots = Array.isArray(c.table_colours) ? c.table_colours.filter((t) => t.active && t.colour) : [];
       setTableColour(tableSlots.length > 0 ? tableSlots[Math.floor(Math.random() * tableSlots.length)].colour : c.table_colour || '#d3f3ea');
       setTileMessage(pickTileMessage(c));
