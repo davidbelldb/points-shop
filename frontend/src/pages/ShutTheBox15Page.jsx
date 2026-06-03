@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import { Text, RoundedBox, useTexture, useGLTF } from '@react-three/drei';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import * as THREE from 'three';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
@@ -659,6 +661,64 @@ function TwirlInstance({ position, delay }) {
 }
 
 /* ============================================================================
+ * Generic OBJ+MTL model loader
+ * Usage: <ObjModel dir="/models/bottle/" obj="name.obj" mtl="name.mtl" ... />
+ * The component suspends while loading (wrap in <Suspense>).
+ * ========================================================================== */
+
+function ObjModel({ dir, obj, mtl, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }) {
+  const materials = useLoader(MTLLoader, `${dir}${mtl}`, (loader) => {
+    loader.setResourcePath(dir);
+  });
+  const object = useLoader(OBJLoader, `${dir}${obj}`, (loader) => {
+    materials.preload();
+    loader.setMaterials(materials);
+  });
+
+  const clone = useMemo(() => object.clone(), [object]);
+
+  return <primitive object={clone} position={position} rotation={rotation} scale={scale} />;
+}
+
+// Surface top Y in world space = SURFACE_Y (group offset) + SURF_H/2
+// SURFACE_Y = -0.12, SURF_H = 0.14 → top = -0.12 + 0.07 = -0.05
+const SURFACE_TOP_Y = -0.05;
+
+// All scene props go here — add a new entry per /models/<folder>
+const SCENE_MODELS = [
+  {
+    id: 'bottle',
+    dir: '/models/bottle/',
+    obj: '14042_750_mL_Wine_Bottle_r_v1_L3.obj',
+    mtl: '14042_750_mL_Wine_Bottle_r_v1_L3.mtl',
+    // OBJ is Z-up; rotate -90° around X to stand upright in Three.js Y-up space.
+    // Scale: OBJ height ~21.15 → target ~1.55 world units  (21.15 * 0.073 ≈ 1.54)
+    position: [5.2, SURFACE_TOP_Y, -1.2],
+    rotation: [-Math.PI / 2, 0, 0.3],
+    scale: 0.073,
+  },
+];
+
+function SceneModels() {
+  return (
+    <>
+      {SCENE_MODELS.map((m) => (
+        <Suspense key={m.id} fallback={null}>
+          <ObjModel
+            dir={m.dir}
+            obj={m.obj}
+            mtl={m.mtl}
+            position={m.position}
+            rotation={m.rotation}
+            scale={m.scale}
+          />
+        </Suspense>
+      ))}
+    </>
+  );
+}
+
+/* ============================================================================
  * Static decorative twirl instances on the surface
  * ========================================================================== */
 
@@ -784,6 +844,9 @@ function Stb15Scene({
 
         {/* Static decorative twirl props on the surface */}
         <DecorativeTwirls />
+
+        {/* OBJ/MTL prop models on the surface */}
+        <SceneModels />
 
         {bigButton}
         <TwirlCelebration active={celebrating} />
