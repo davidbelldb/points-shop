@@ -32,7 +32,7 @@ const DEFAULT_CONFIG = {
 
 const GRANITE_TEX_URL      = '/textures/granite.png?v=1';
 const WOOD_TEX_URL         = '/textures/wood_table_worn.jpg?v=4';
-const VELVET_TEX_URL       = '/textures/velour_velvet_diff.jpg?v=3';
+const VELVET_TEX_URL       = '/textures/velour_velvet_new.jpg?v=1';
 const WOODEN_BUTTONS_URL   = '/textures/wooden_buttons.jpg?v=1';
 const TWIRL_URL            = '/twirl.glb';
 
@@ -434,8 +434,8 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
           map={buttonsTex || null}
           roughness={0.45}
           metalness={0.05}
-          emissive={using2Dice || using1Die ? '#15b8a6' : '#000000'}
-          emissiveIntensity={using2Dice || using1Die ? 0.3 : 0}
+          emissive={(can2Dice || can1Die) ? '#e773b0' : '#000000'}
+          emissiveIntensity={(can2Dice || can1Die) ? 0.4 : 0}
         />
       </mesh>
 
@@ -759,7 +759,7 @@ function SceneModels({ sceneProps = [] }) {
       {Object.entries(PROP_DEFINITIONS).map(([key, def]) => {
         const p = propMap[key];
         if (!p || !p.active) return null;
-        const pos = [p.pos_x, SURFACE_TOP_Y, p.pos_z];
+        const pos = [p.pos_x, SURFACE_TOP_Y + (p.pos_y ?? 0), p.pos_z];
         const rot = [(p.rot_x_deg ?? 0) * DEG, (p.rot_y_deg ?? 0) * DEG, (p.rot_z_deg ?? 0) * DEG];
         const sc  = p.scale ?? 1;
 

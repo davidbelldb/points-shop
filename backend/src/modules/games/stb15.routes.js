@@ -94,6 +94,7 @@ export default async function stb15Routes(fastify) {
     const updates = [];
     const values = [];
     if ('pos_x'     in patch) { values.push(Number(patch.pos_x));     updates.push(`pos_x = $${values.length}`); }
+    if ('pos_y'     in patch) { values.push(Number(patch.pos_y));     updates.push(`pos_y = $${values.length}`); }
     if ('pos_z'     in patch) { values.push(Number(patch.pos_z));     updates.push(`pos_z = $${values.length}`); }
     if ('rot_x_deg' in patch) { values.push(Number(patch.rot_x_deg)); updates.push(`rot_x_deg = $${values.length}`); }
     if ('rot_y_deg' in patch) { values.push(Number(patch.rot_y_deg)); updates.push(`rot_y_deg = $${values.length}`); }

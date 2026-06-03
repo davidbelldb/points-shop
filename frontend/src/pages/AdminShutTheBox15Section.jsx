@@ -425,16 +425,18 @@ function ScatteredSetEditor({ set, busy, onSave }) {
 }
 
 function ScenePropEditor({ prop, busy, onSave }) {
-  const [posX, setPosX]   = useState(String(prop.pos_x     ?? 0));
-  const [posZ, setPosZ]   = useState(String(prop.pos_z     ?? 0));
+  const [posX, setPosX]   = useState(String(prop.pos_x ?? 0));
+  const [posY, setPosY]   = useState(String(prop.pos_y ?? 0));
+  const [posZ, setPosZ]   = useState(String(prop.pos_z ?? 0));
   const [rotX, setRotX]   = useState(String(prop.rot_x_deg ?? 0));
   const [rotY, setRotY]   = useState(String(prop.rot_y_deg ?? 0));
   const [rotZ, setRotZ]   = useState(String(prop.rot_z_deg ?? 0));
   const [scale, setScale] = useState(String(prop.scale     ?? 1));
 
   useEffect(() => {
-    setPosX(String(prop.pos_x     ?? 0));
-    setPosZ(String(prop.pos_z     ?? 0));
+    setPosX(String(prop.pos_x ?? 0));
+    setPosY(String(prop.pos_y ?? 0));
+    setPosZ(String(prop.pos_z ?? 0));
     setRotX(String(prop.rot_x_deg ?? 0));
     setRotY(String(prop.rot_y_deg ?? 0));
     setRotZ(String(prop.rot_z_deg ?? 0));
@@ -446,6 +448,7 @@ function ScenePropEditor({ prop, busy, onSave }) {
   function commit() {
     onSave({
       pos_x:     parseFloat(posX)  || 0,
+      pos_y:     parseFloat(posY)  || 0,
       pos_z:     parseFloat(posZ)  || 0,
       rot_x_deg: parseFloat(rotX)  || 0,
       rot_y_deg: parseFloat(rotY)  || 0,
@@ -473,6 +476,10 @@ function ScenePropEditor({ prop, busy, onSave }) {
         <label className="flex items-center justify-between gap-2">
           <span className="text-neutral-500">X (left/right)</span>
           <input value={posX} onChange={(e) => setPosX(e.target.value)} onBlur={commit} className={numInput} step="0.1" type="number" />
+        </label>
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-neutral-500">Y (height)</span>
+          <input value={posY} onChange={(e) => setPosY(e.target.value)} onBlur={commit} className={numInput} step="0.05" type="number" />
         </label>
         <label className="flex items-center justify-between gap-2">
           <span className="text-neutral-500">Z (back/front)</span>
