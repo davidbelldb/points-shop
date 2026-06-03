@@ -755,37 +755,6 @@ function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 
   );
 }
 
-// GlbModel — for .glb files (uses useGLTF + Suspense)
-function GlbModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }) {
-  const { scene } = useGLTF(url);
-  const clone = useMemo(() => scene.clone(true), [scene]);
-  return <primitive object={clone} position={position} rotation={rotation} scale={scale} />;
-}
-
-// ProceduralBanana — TubeGeometry along a curved spline
-function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }) {
-  const curve = useMemo(() => {
-    const pts = [];
-    for (let i = 0; i <= 20; i++) {
-      const t = (i / 20) * Math.PI * 0.62;
-      pts.push(new THREE.Vector3(Math.cos(t) * 1.0 - 0.85, Math.sin(t) * 0.55, 0));
-    }
-    return new THREE.CatmullRomCurve3(pts);
-  }, []);
-  return (
-    <group position={position} rotation={rotation} scale={scale}>
-      <mesh castShadow receiveShadow>
-        <tubeGeometry args={[curve, 20, 0.09, 8, false]} />
-        <meshStandardMaterial color="#F4D03F" roughness={0.85} />
-      </mesh>
-      <mesh position={[0.16, 0.54, 0]} castShadow>
-        <sphereGeometry args={[0.07, 8, 8]} />
-        <meshStandardMaterial color="#7D6608" roughness={0.9} />
-      </mesh>
-    </group>
-  );
-}
-
 // Surface top Y in world space = SURFACE_Y (group offset) + SURF_H/2
 // SURFACE_Y = -0.12, SURF_H = 0.14 → top = -0.12 + 0.07 = -0.05
 const SURFACE_TOP_Y = -0.05;
