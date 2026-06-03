@@ -389,11 +389,11 @@ function ScatteredRow({ letters, baseZ, inkColour, seed, count = 8, size = 1, sp
  * Texture is applied once across the full panel, no tiling.
  * ========================================================================== */
 
-// Panel sits flat, further toward front of scene
-const BTN_PANEL_W = 4.0;   // world units — texture ratio 2048:416 ≈ 4.93, close enough at this width
-const BTN_PANEL_D = 0.81;  // depth (Z extent of the panel face)
-const BTN_PANEL_H = 0.22;  // thickness (Y)
-const BTN_PANEL_Z = BOX_D / 2 + WALL_THICK / 2 + 1.1; // further forward than before
+// Panel sits flat — pushed well forward so it clears the front scattered tiles
+const BTN_PANEL_W = 4.0;
+const BTN_PANEL_D = 0.81;
+const BTN_PANEL_H = 0.22;
+const BTN_PANEL_Z = 4.8;   // far forward, clearly below scattered tiles in view
 const BTN_PANEL_Y = 0.09;
 
 function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die }) {
@@ -427,10 +427,16 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
 
   return (
     <group position={[0, BTN_PANEL_Y, BTN_PANEL_Z]}>
-      {/* Main visible panel with the wooden texture */}
+      {/* Main visible panel — glows teal when either side is active */}
       <mesh ref={meshRef} castShadow receiveShadow>
         <boxGeometry args={[BTN_PANEL_W, BTN_PANEL_H, BTN_PANEL_D]} />
-        <meshStandardMaterial map={buttonsTex || null} roughness={0.45} metalness={0.05} />
+        <meshStandardMaterial
+          map={buttonsTex || null}
+          roughness={0.45}
+          metalness={0.05}
+          emissive={using2Dice || using1Die ? '#15b8a6' : '#000000'}
+          emissiveIntensity={using2Dice || using1Die ? 0.3 : 0}
+        />
       </mesh>
 
       {/* Invisible left click zone (2 DICE) */}
@@ -455,7 +461,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
         <meshStandardMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* "2 DICE" label — left half */}
+      {/* "2 DICE" label — left half, always solid white */}
       <Text
         position={[-BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -463,13 +469,12 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
         color="#ffffff"
         anchorX="center"
         anchorY="middle"
-        fillOpacity={can2Dice ? 1 : 0.35}
         renderOrder={10}
       >
         {using2Dice ? '2 DICE ✓' : '2 DICE'}
       </Text>
 
-      {/* "1 DIE" label — right half */}
+      {/* "1 DIE" label — right half, always solid white */}
       <Text
         position={[BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -477,7 +482,6 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
         color="#ffffff"
         anchorX="center"
         anchorY="middle"
-        fillOpacity={can1Die ? 1 : 0.35}
         renderOrder={10}
       >
         {using1Die ? '1 DIE ✓' : '1 DIE'}
@@ -692,10 +696,11 @@ const SCENE_MODELS = [
     obj: '14042_750_mL_Wine_Bottle_r_v1_L3.obj',
     mtl: '14042_750_mL_Wine_Bottle_r_v1_L3.mtl',
     // OBJ is Z-up; rotate -90° around X to stand upright in Three.js Y-up space.
-    // Scale: OBJ height ~21.15 → target ~1.55 world units  (21.15 * 0.073 ≈ 1.54)
-    position: [5.2, SURFACE_TOP_Y, -1.2],
-    rotation: [-Math.PI / 2, 0, 0.3],
-    scale: 0.073,
+    // Scale: OBJ height ~21.15 → target ~1.8 world units  (21.15 * 0.085 ≈ 1.8)
+    // Centred behind the box so it's visible top-centre from the camera.
+    position: [0, SURFACE_TOP_Y, -5.8],
+    rotation: [-Math.PI / 2, 0, 0.15],
+    scale: 0.085,
   },
 ];
 
@@ -722,17 +727,34 @@ function SceneModels() {
  * Static decorative twirl instances on the surface
  * ========================================================================== */
 
+// Six decorative twirl placements: behind, in front, left, right at various angles.
+const TWIRL_PLACEMENTS = [
+  // Behind the box — left
+  { pos: [-3.2, SURFACE_TOP_Y, -5.5], rot: [0.4,  0.6,  0.2],  scale: 0.40 },
+  // Behind the box — right
+  { pos: [ 3.8, SURFACE_TOP_Y, -5.0], rot: [-0.2, -0.9,  0.1],  scale: 0.35 },
+  // Behind the box — far center (near the bottle)
+  { pos: [-1.6, SURFACE_TOP_Y, -6.2], rot: [ 0.1,  1.3, -0.3],  scale: 0.32 },
+  // In front of the box — left
+  { pos: [-3.5, SURFACE_TOP_Y,  3.8], rot: [ 0.3, -0.5,  0.15], scale: 0.38 },
+  // In front of the box — right
+  { pos: [ 3.2, SURFACE_TOP_Y,  4.0], rot: [ 0.5,  0.7, -0.2],  scale: 0.36 },
+  // Far left of the box
+  { pos: [-6.0, SURFACE_TOP_Y, -0.8], rot: [ 0.6,  0.3,  0.4],  scale: 0.42 },
+];
+
 function DecorativeTwirls() {
   const { scene } = useGLTF(TWIRL_URL);
-  const clone1 = useMemo(() => scene.clone(true), [scene]);
-  const clone2 = useMemo(() => scene.clone(true), [scene]);
+  const clones = useMemo(
+    () => TWIRL_PLACEMENTS.map(() => scene.clone(true)),
+    [scene],
+  );
 
   return (
     <>
-      {/* Left side of the scene, tilted casually on the granite */}
-      <primitive object={clone1} position={[-4.8, SURFACE_Y + 0.14, 1.2]} rotation={[0.3, 0.6, 0.2]} scale={0.38} />
-      {/* Right side */}
-      <primitive object={clone2} position={[4.6, SURFACE_Y + 0.14, 0.6]} rotation={[0.1, -0.8, 0.3]} scale={0.38} />
+      {TWIRL_PLACEMENTS.map((p, i) => (
+        <primitive key={i} object={clones[i]} position={p.pos} rotation={p.rot} scale={p.scale} />
+      ))}
     </>
   );
 }
@@ -817,8 +839,8 @@ function Stb15Scene({
           />
         ))}
 
-        <ScatteredRow letters={backLetters}  baseZ={-3.4} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={2.45} inkColour={config.ink_colour} seed={4.7} count={9}  size={0.66} spread={3.0} />
+        <ScatteredRow letters={backLetters}  baseZ={-4.2} inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}  spread={4.8} />
+        <ScatteredRow letters={frontLetters} baseZ={3.2}  inkColour={config.ink_colour} seed={4.7} count={9}  size={0.66} spread={3.0} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -863,7 +885,7 @@ function Stb15CanvasShell({ children, onPointerDown, onPointerUp, tableColour = 
   return (
     <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
       <div className="relative" style={{ aspectRatio: '6 / 5', touchAction: 'none' }} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 8.2, 5.7], fov: 41 }} gl={{ antialias: true, alpha: true }}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 9.5, 7.5], fov: 46 }} gl={{ antialias: true, alpha: true }}>
           <Suspense fallback={null}>{children}</Suspense>
         </Canvas>
       </div>
