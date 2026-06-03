@@ -141,7 +141,7 @@ function makePipTexture(value, pipColour) {
   return tex;
 }
 
-const DIE_SIZE = 0.385;
+const DIE_SIZE = 0.424;
 const DIE_HALF = DIE_SIZE / 2;
 const PIP_OFFSET = DIE_HALF + 0.006;
 const PIP_PLANE = DIE_SIZE * 0.78;
@@ -1025,7 +1025,7 @@ function Stb15Scene({
         </group>
 
         <ScatteredRow letters={backLetters}  baseZ={backTilesZ}  xOffset={backTilesX}  inkColour={config.ink_colour} seed={1.3} count={10} size={1.0}         spread={4.8} />
-        <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} xOffset={frontTilesX} inkColour={config.ink_colour} seed={4.7} count={10} size={frontTilesSize} spread={4.8} />
+        <ScatteredRow letters={frontLetters} baseZ={frontTilesZ} xOffset={frontTilesX} inkColour={config.ink_colour} seed={4.7} count={10} size={frontTilesSize} spread={4.4} />
 
         {/* 3 dice — die index 1 visible only in 2+ mode, die index 2 visible only in 3-dice mode */}
         <PhysicsDie throwSeed={throwSeed} throwVec={throwVec} indexOffset={0} onSettled={onDieSettled} diceColour={config.dice_colour} pipColour={config.pip_colour} palettes={activePalettes} visible={diceVisible} />
@@ -1034,7 +1034,7 @@ function Stb15Scene({
 
         {/* Dice sum display */}
         {showSum && (
-          <Text position={[-3.2, 0.06, 0.3]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
+          <Text position={[-3.2, 0.06, 0.75]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
             {`${totalDice}`}
           </Text>
         )}
