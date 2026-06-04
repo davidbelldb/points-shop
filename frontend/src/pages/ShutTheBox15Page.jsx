@@ -803,6 +803,38 @@ function StlModel(props) {
   );
 }
 
+// FallingClip — dynamic clip that drops from a spawn point when tile 14 is closed
+function FallingClipInner({ position, scale = 0.0133 }) {
+  const geometry = useLoader(STLLoader, '/models/clip/pince_part1-v3.STL');
+  const geo = useMemo(() => {
+    const g = geometry.clone();
+    g.computeVertexNormals();
+    g.computeBoundingBox();
+    const centre = new THREE.Vector3();
+    g.boundingBox.getCenter(centre);
+    g.translate(-centre.x, -centre.y, -centre.z);
+    return g;
+  }, [geometry]);
+  const bodyRef = useRef();
+  useEffect(() => {
+    if (!bodyRef.current) return;
+    const r = () => Math.random();
+    bodyRef.current.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
+    bodyRef.current.setLinvel({ x: (r() - 0.5) * 1.5, y: -2 - r() * 3, z: (r() - 0.5) * 1.5 }, true);
+    bodyRef.current.setAngvel({ x: (r() - 0.5) * 20, y: (r() - 0.5) * 20, z: (r() - 0.5) * 20 }, true);
+  }, []);
+  return (
+    <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
+      <mesh geometry={geo} scale={scale} castShadow>
+        <meshStandardMaterial color="#b0a090" roughness={0.55} metalness={0.1} />
+      </mesh>
+    </RigidBody>
+  );
+}
+function FallingClip(props) {
+  return <Suspense fallback={null}><FallingClipInner {...props} /></Suspense>;
+}
+
 // ProceduralBanana — hull collider so twirls land on it
 function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
   const curve = useMemo(() => {
@@ -1023,6 +1055,7 @@ function Stb15Scene({
   celebrating = false,
   onDebugWin,
   sceneProps = [],
+  drops = [],
 }) {
   const inboxLetters = useMemo(
     () => lettersFromMessage(tileMessage || config.hidden_message, 15),
@@ -1130,6 +1163,13 @@ function Stb15Scene({
         {/* DEBUG — temporary win simulator button, remove once verified */}
         {onDebugWin && <DebugWinButton onDebugWin={onDebugWin} inkColour={config.ink_colour} panelZ={btnPanelZ} />}
 
+        {/* Tile-close drops — twirl on 15, clip on 14 */}
+        {drops.map((drop) =>
+          drop.type === 'twirl'
+            ? <TwirlInstance key={drop.id} position={drop.position} delay={0} />
+            : <FallingClip key={drop.id} position={drop.position} scale={0.0133} />
+        )}
+
         {bigButton}
         <TwirlCelebration active={celebrating} />
       </Physics>
@@ -1178,7 +1218,9 @@ export function ShutTheBox15Game({ showStatus = true }) {
   const [using1Die, setUsing1Die]       = useState(false);
   const [celebrating, setCelebrating]   = useState(false);
   const [sceneProps, setSceneProps]     = useState([]);
+  const [drops, setDrops]               = useState([]);
   const settledRef = useRef([null, null, null]);
+  const activeScatteredSetsRef = useRef([]);
 
   // Unlock conditions
   const can2Dice = useMemo(() => TILES_FOR_2_DICE.every((t) => !openTiles.includes(t)), [openTiles]);
@@ -1208,6 +1250,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
       if (!c) return;
       setConfig(c);
       const sets = Array.isArray(c.scattered_sets) ? c.scattered_sets.filter((s) => s.active) : [];
+      activeScatteredSetsRef.current = sets;
       if (sets.length > 0) {
         const pick = sets[Math.floor(Math.random() * sets.length)];
         setScatteredSet({ back: pick.back || '', front: pick.front || '' });
@@ -1222,6 +1265,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
     if (busy) return;
     setBusy(true); setError(null); setMessage('');
     setCelebrating(false); setUsing2Dice(false); setUsing1Die(false);
+    setDrops([]);
     try {
       const g = await api.stb15Start();
       setGame(g);
@@ -1232,6 +1276,12 @@ export function ShutTheBox15Game({ showStatus = true }) {
       setPhase('idle');
       settledRef.current = [null, null, null];
       setTileMessage(pickTileMessage(config));
+      // Pick a fresh scattered tile set for this game
+      const sets = activeScatteredSetsRef.current;
+      if (sets.length > 0) {
+        const pick = sets[Math.floor(Math.random() * sets.length)];
+        setScatteredSet({ back: pick.back || '', front: pick.front || '' });
+      }
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
@@ -1277,6 +1327,19 @@ export function ShutTheBox15Game({ showStatus = true }) {
   async function confirmClose() {
     if (!canConfirm) return;
     const newOpen = openTiles.filter((t) => !selected.includes(t));
+
+    // Spawn drops for special tiles being closed this turn
+    const newDrops = [];
+    if (selected.includes(15)) {
+      const sp = sceneProps.find((p) => p.key === 'spawn_twirl');
+      newDrops.push({ id: `twirl-${Date.now()}`, type: 'twirl', position: { x: sp?.pos_x ?? 0, y: sp?.pos_y ?? 6, z: sp?.pos_z ?? 0 } });
+    }
+    if (selected.includes(14)) {
+      const sp = sceneProps.find((p) => p.key === 'spawn_clip');
+      newDrops.push({ id: `clip-${Date.now()}`, type: 'clip', position: { x: sp?.pos_x ?? 0, y: sp?.pos_y ?? 6, z: sp?.pos_z ?? 0 } });
+    }
+    if (newDrops.length > 0) setDrops((d) => [...d, ...newDrops]);
+
     setOpenTiles(newOpen);
     setSelected([]);
     setDice([null, null, null]);
@@ -1325,7 +1388,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
     setDice([null, null, null]); setThrowSeed(0);
     settledRef.current = [null, null, null];
     setPhase('idle'); setMessage(''); setCelebrating(false);
-    setUsing2Dice(false); setUsing1Die(false);
+    setUsing2Dice(false); setUsing1Die(false); setDrops([]);
   }
 
   // Auto-close on sum match
@@ -1383,6 +1446,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
           can1Die={can1Die}
           using2Dice={using2Dice}
           using1Die={using1Die}
+          drops={drops}
           onToggle2Dice={() => { setUsing2Dice((v) => !v); setUsing1Die(false); }}
           onToggle1Die={() => { setUsing1Die((v) => !v); setUsing2Dice(false); }}
           celebrating={celebrating}
