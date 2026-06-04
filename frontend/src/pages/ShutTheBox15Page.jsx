@@ -780,6 +780,11 @@ function StlModelInner({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale 
   const geo = useMemo(() => {
     const g = geometry.clone();
     g.computeVertexNormals();
+    // Auto-centre — STL files from CAD tools are rarely origin-centred
+    g.computeBoundingBox();
+    const centre = new THREE.Vector3();
+    g.boundingBox.getCenter(centre);
+    g.translate(-centre.x, -centre.y, -centre.z);
     return g;
   }, [geometry]);
   return (
