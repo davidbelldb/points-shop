@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { Text, RoundedBox, useTexture, useGLTF } from '@react-three/drei';
+import { Text, RoundedBox, useTexture, useGLTF, useHelper } from '@react-three/drei';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
@@ -30,6 +30,10 @@ const DEFAULT_CONFIG = {
   table_colour: '#d3f3ea',
   hidden_message: 'I_MISS_YOU_SO_MUCH!!',
 };
+
+// Default camera — also the double-tap reset target
+const DEFAULT_CAM = { x: 0.5, y: 11.2, z: 5, fov: 41 };
+const CAM_CLAMP   = { xMin: -6, xMax: 7, yMin: 4, yMax: 22, zMin: 1, zMax: 14 };
 
 const GRANITE_TEX_URL      = '/textures/granite.png?v=1';
 const WOOD_TEX_URL         = '/textures/wood_table_worn.jpg?v=4';
@@ -1013,18 +1017,77 @@ function DebugWinButton({ onDebugWin, inkColour, panelZ = BTN_PANEL_Z_DEFAULT })
 }
 
 /* ============================================================================
- * Camera controller — reads position/fov from config and applies imperatively
+ * Camera controller — smooth lerp to a shared target ref; supports gestures
  * ========================================================================== */
 
-function CameraSetup({ posX = 0, posY = 10.5, posZ = 7.8, fov = 46 }) {
+function CameraController({ targetRef }) {
   const { camera } = useThree();
+  const tmpVec = useMemo(() => new THREE.Vector3(), []);
+
+  // Snap to target on first mount
   useEffect(() => {
-    camera.position.set(posX, posY, posZ);
-    camera.fov = fov;
+    const t = targetRef.current;
+    camera.position.set(t.x, t.y, t.z);
+    camera.fov = t.fov;
     camera.updateProjectionMatrix();
     camera.lookAt(0, 0, 0);
-  }, [posX, posY, posZ, fov]);
+  }, []);
+
+  useFrame((_, delta) => {
+    const t = targetRef.current;
+    const s = Math.min(delta * 8, 1);
+    camera.position.lerp(tmpVec.set(t.x, t.y, t.z), s);
+    camera.fov += (t.fov - camera.fov) * s;
+    camera.updateProjectionMatrix();
+    camera.lookAt(0, 0, 0);
+  });
+
   return null;
+}
+
+/* ============================================================================
+ * Scene lighting — smoothly transitions between day and night modes.
+ * Night = 18:00–06:00: dark ambient + warm overhead point lamp + blue accent.
+ * Day  = 06:00–18:00: existing daylight directional setup + subtle blue fill.
+ * showHelpers renders Three.js PointLightHelper wireframes (dev / admin mode).
+ * ========================================================================== */
+
+function SceneLighting({ isNight, showHelpers }) {
+  const ambientRef = useRef();
+  const sun1Ref    = useRef();
+  const sun2Ref    = useRef();
+  const lampRef    = useRef();
+  const blueRef    = useRef();
+
+  // Light helpers — visible only when showHelpers is truthy
+  useHelper(showHelpers && lampRef, THREE.PointLightHelper, 0.6, '#ffee88');
+  useHelper(showHelpers && blueRef, THREE.PointLightHelper, 0.6, '#4488ff');
+
+  const tgt = isNight
+    ? { ambient: 0.04, sun1: 0, sun2: 0, lamp: 28, blue: 3 }
+    : { ambient: 0.55, sun1: 1.0, sun2: 0.3, lamp: 0, blue: 0.8 };
+
+  useFrame((_, delta) => {
+    const s = Math.min(delta * 1.2, 1); // ~1 s transition
+    if (ambientRef.current) ambientRef.current.intensity += (tgt.ambient - ambientRef.current.intensity) * s;
+    if (sun1Ref.current)    sun1Ref.current.intensity    += (tgt.sun1   - sun1Ref.current.intensity)    * s;
+    if (sun2Ref.current)    sun2Ref.current.intensity    += (tgt.sun2   - sun2Ref.current.intensity)    * s;
+    if (lampRef.current)    lampRef.current.intensity    += (tgt.lamp   - lampRef.current.intensity)    * s;
+    if (blueRef.current)    blueRef.current.intensity    += (tgt.blue   - blueRef.current.intensity)    * s;
+  });
+
+  return (
+    <>
+      <ambientLight ref={ambientRef} intensity={isNight ? 0.04 : 0.55} color={isNight ? '#0d0d1a' : '#ffffff'} />
+      {/* Day — two directional lights */}
+      <directionalLight ref={sun1Ref} position={[4, 8, 4]} intensity={isNight ? 0 : 1.0} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={8} shadow-camera-bottom={-8} />
+      <directionalLight ref={sun2Ref} position={[-5, 4, -2]} intensity={isNight ? 0 : 0.3} />
+      {/* Overhead lamp — dominant at night, off during day */}
+      <pointLight ref={lampRef} position={[0, 9, 0]} intensity={isNight ? 28 : 0} color="#fff5e0" castShadow distance={20} decay={2} shadow-mapSize-width={512} shadow-mapSize-height={512} />
+      {/* Blue accent — vivid at night, subtle fill during day */}
+      <pointLight ref={blueRef} position={[-5, 6, -3]} intensity={isNight ? 3 : 0.8} color={isNight ? '#2244aa' : '#88aaff'} distance={16} decay={2} />
+    </>
+  );
 }
 
 /* ============================================================================
@@ -1056,6 +1119,9 @@ function Stb15Scene({
   onDebugWin,
   sceneProps = [],
   drops = [],
+  isNight = false,
+  showHelpers = false,
+  cameraTargetRef,
 }) {
   const inboxLetters = useMemo(
     () => lettersFromMessage(tileMessage || config.hidden_message, 15),
@@ -1085,18 +1151,14 @@ function Stb15Scene({
   const totalDice = diceCount === 1 ? dice[0] : diceCount === 2 ? (dice[0] || 0) + (dice[1] || 0) : (dice[0] || 0) + (dice[1] || 0) + (dice[2] || 0);
   const showSum = diceCount === 1 ? dice[0] !== null : diceCount === 2 ? (dice[0] !== null && dice[1] !== null) : (dice[0] !== null && dice[1] !== null && dice[2] !== null);
 
+  // Fallback target ref if none passed in (e.g. static viewer)
+  const fallbackCamRef = useRef({ ...DEFAULT_CAM });
+  const activeCamRef = cameraTargetRef ?? fallbackCamRef;
+
   return (
     <>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[4, 8, 4]} intensity={1.0} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={8} shadow-camera-bottom={-8} />
-      <directionalLight position={[-5, 4, -2]} intensity={0.3} />
-
-      <CameraSetup
-        posX={config.camera_pos_x ?? 0}
-        posY={config.camera_pos_y ?? 10.5}
-        posZ={config.camera_pos_z ?? 7.8}
-        fov={config.camera_fov ?? 46}
-      />
+      <SceneLighting isNight={isNight} showHelpers={showHelpers} />
+      <CameraController targetRef={activeCamRef} />
 
       <Physics gravity={[0, -22, 0]}>
         {/* Invisible ground collider matching the granite surface — keeps falling objects on top */}
@@ -1181,11 +1243,19 @@ function Stb15Scene({
  * Canvas shell — zoomed out camera for 15 tiles
  * ========================================================================== */
 
-function Stb15CanvasShell({ children, onPointerDown, onPointerUp, tableColour = '#d3f3ea' }) {
+function Stb15CanvasShell({ children, onPointerDown, onPointerUp, onTouchStart, onTouchMove, onTouchEnd, tableColour = '#d3f3ea' }) {
   return (
     <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
-      <div className="relative" style={{ aspectRatio: '6 / 5', touchAction: 'none' }} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 10.5, 7.8], fov: 46 }} gl={{ antialias: true, alpha: true }}>
+      <div
+        className="relative"
+        style={{ aspectRatio: '6 / 5', touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [DEFAULT_CAM.x, DEFAULT_CAM.y, DEFAULT_CAM.z], fov: DEFAULT_CAM.fov }} gl={{ antialias: true, alpha: true }}>
           <Suspense fallback={null}>{children}</Suspense>
         </Canvas>
       </div>
@@ -1221,6 +1291,67 @@ export function ShutTheBox15Game({ showStatus = true }) {
   const [drops, setDrops]               = useState([]);
   const settledRef = useRef([null, null, null]);
   const activeScatteredSetsRef = useRef([]);
+
+  // Night mode — 18:00–06:00
+  const [isNight, setIsNight] = useState(() => { const h = new Date().getHours(); return h >= 18 || h < 6; });
+  useEffect(() => {
+    const check = () => { const h = new Date().getHours(); setIsNight(h >= 18 || h < 6); };
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Camera target ref — mutated by gesture handlers, read by CameraController each frame
+  const cameraTargetRef = useRef({ ...DEFAULT_CAM });
+
+  // Gesture state
+  const gestureRef     = useRef(null);  // active two-finger gesture
+  const lastTapRef     = useRef(0);
+  const isMultiTouch   = useRef(false);
+
+  function handleTouchStart(e) {
+    if (e.touches.length >= 2) {
+      isMultiTouch.current = true;
+      const t1 = e.touches[0], t2 = e.touches[1];
+      gestureRef.current = {
+        midX:     (t1.clientX + t2.clientX) / 2,
+        midY:     (t1.clientY + t2.clientY) / 2,
+        dist:     Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
+        startCam: { ...cameraTargetRef.current },
+      };
+    } else if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - lastTapRef.current < 320) {
+        // Double-tap → reset camera
+        cameraTargetRef.current = { ...DEFAULT_CAM };
+        lastTapRef.current = 0;
+      } else {
+        lastTapRef.current = now;
+      }
+    }
+  }
+
+  function handleTouchMove(e) {
+    const g = gestureRef.current;
+    if (!g || e.touches.length < 2) return;
+    e.preventDefault();
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const newMidX = (t1.clientX + t2.clientX) / 2;
+    const newMidY = (t1.clientY + t2.clientY) / 2;
+    const newDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    const PAN  = 0.018;
+    const ZOOM = 0.035;
+    const c = cameraTargetRef.current;
+    c.x = Math.max(CAM_CLAMP.xMin, Math.min(CAM_CLAMP.xMax, g.startCam.x - (newMidX - g.midX) * PAN));
+    c.z = Math.max(CAM_CLAMP.zMin, Math.min(CAM_CLAMP.zMax, g.startCam.z - (newMidY - g.midY) * PAN));
+    c.y = Math.max(CAM_CLAMP.yMin, Math.min(CAM_CLAMP.yMax, g.startCam.y + (g.dist - newDist) * ZOOM));
+  }
+
+  function handleTouchEnd(e) {
+    if (e.touches.length < 2) {
+      gestureRef.current = null;
+      if (e.touches.length === 0) isMultiTouch.current = false;
+    }
+  }
 
   // Unlock conditions
   const can2Dice = useMemo(() => TILES_FOR_2_DICE.every((t) => !openTiles.includes(t)), [openTiles]);
@@ -1400,7 +1531,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
   const swipeStart = useRef(null);
   function onPointerDown(e) {
-    if (phase !== 'idle' || !game) return;
+    if (phase !== 'idle' || !game || isMultiTouch.current) return;
     swipeStart.current = { x: e.clientX, y: e.clientY, t: performance.now() };
   }
   function onPointerUp(e) {
@@ -1426,7 +1557,14 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
   return (
     <div className="space-y-3">
-      <Stb15CanvasShell onPointerDown={onPointerDown} onPointerUp={onPointerUp} tableColour={tableColour}>
+      <Stb15CanvasShell
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        tableColour={tableColour}
+      >
         <Stb15Scene
           openTiles={openTiles}
           selected={selected}
@@ -1447,6 +1585,9 @@ export function ShutTheBox15Game({ showStatus = true }) {
           using2Dice={using2Dice}
           using1Die={using1Die}
           drops={drops}
+          isNight={isNight}
+          showHelpers={config.show_debug_win}
+          cameraTargetRef={cameraTargetRef}
           onToggle2Dice={() => { setUsing2Dice((v) => !v); setUsing1Die(false); }}
           onToggle1Die={() => { setUsing1Die((v) => !v); setUsing2Dice(false); }}
           celebrating={celebrating}
