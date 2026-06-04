@@ -926,7 +926,8 @@ function SceneModels({ sceneProps = [] }) {
 // Twirl keys in the props table that represent static chocolate bar instances
 const TWIRL_PROP_KEYS = ['twirl_1', 'twirl_2'];
 
-function DecorativeTwirls({ sceneProps = [] }) {
+function DecorativeTwirls({ sceneProps = [], isNight = false }) {
+  if (isNight) return null;
   const { scene } = useGLTF(TWIRL_URL);
 
   const activeTwirls = useMemo(
@@ -1063,6 +1064,8 @@ function SceneLighting({ isNight, showHelpers, nightConfig = {} }) {
   const blueIntensity = nightConfig.night_blue_intensity ?? 3;
   const lampColour    = nightConfig.night_lamp_colour    ?? '#fff5e0';
   const blueColour    = nightConfig.night_blue_colour    ?? '#2244aa';
+  const lampX         = nightConfig.night_lamp_x         ?? 0;
+  const lampZ         = nightConfig.night_lamp_z         ?? 0;
 
   // Light helpers — visible only when showHelpers is truthy
   useHelper(showHelpers && lampRef, THREE.PointLightHelper, 0.6, '#ffee88');
@@ -1086,7 +1089,7 @@ function SceneLighting({ isNight, showHelpers, nightConfig = {} }) {
       <ambientLight ref={ambientRef} intensity={isNight ? 0.04 : 0.55} color={isNight ? '#0d0d1a' : '#ffffff'} />
       <directionalLight ref={sun1Ref} position={[4, 8, 4]} intensity={isNight ? 0 : 1.0} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={8} shadow-camera-bottom={-8} />
       <directionalLight ref={sun2Ref} position={[-5, 4, -2]} intensity={isNight ? 0 : 0.3} />
-      <pointLight ref={lampRef} position={[0, 9, 0]} intensity={isNight ? lampIntensity : 0} color={lampColour} castShadow distance={20} decay={2} shadow-mapSize-width={512} shadow-mapSize-height={512} />
+      <pointLight ref={lampRef} position={[lampX, 9, lampZ]} intensity={isNight ? lampIntensity : 0} color={lampColour} castShadow distance={20} decay={2} shadow-mapSize-width={512} shadow-mapSize-height={512} />
       <pointLight ref={blueRef} position={[-5, 6, -3]} intensity={isNight ? blueIntensity : 0.8} color={isNight ? blueColour : '#88aaff'} distance={16} decay={2} />
     </>
   );
@@ -1218,8 +1221,8 @@ function Stb15Scene({
           panelRotY={btnPanelRotY}
         />
 
-        {/* Static decorative twirl props on the surface */}
-        <DecorativeTwirls sceneProps={sceneProps} />
+        {/* Static decorative twirl props — hidden in night mode (baked texture) */}
+        <DecorativeTwirls sceneProps={sceneProps} isNight={isNight} />
 
         {/* OBJ/MTL prop models on the surface */}
         <SceneModels sceneProps={sceneProps} />
@@ -1235,7 +1238,7 @@ function Stb15Scene({
         )}
 
         {bigButton}
-        <TwirlCelebration active={celebrating} />
+        <TwirlCelebration active={celebrating && !isNight} />
       </Physics>
     </>
   );
@@ -1470,7 +1473,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
     // Spawn drops for special tiles being closed this turn
     const newDrops = [];
-    if (selected.includes(15)) {
+    if (selected.includes(15) && !isNight) {
       const sp = sceneProps.find((p) => p.key === 'spawn_twirl');
       newDrops.push({ id: `twirl-${Date.now()}`, type: 'twirl', position: { x: sp?.pos_x ?? 0, y: sp?.pos_y ?? 6, z: sp?.pos_z ?? 0 } });
     }
@@ -1487,7 +1490,21 @@ export function ShutTheBox15Game({ showStatus = true }) {
     if (newOpen.length === 0) {
       setPhase('won');
       setMessage('You shut the box!');
-      setCelebrating(true);
+      setCelebrating(true); // TwirlCelebration is already guarded by !isNight
+      // Night win — 30 black clips rain down instead of twirls
+      if (isNight) {
+        const nightClips = Array.from({ length: 30 }, (_, i) => ({
+          id: `nightwin-${Date.now()}-${i}`,
+          type: 'clip',
+          position: {
+            x: (Math.random() - 0.5) * 14,
+            y: 5 + Math.random() * 5,
+            z: (Math.random() - 0.5) * 10,
+          },
+          colorOverride: '#000000',
+        }));
+        setDrops((d) => [...d, ...nightClips]);
+      }
       setBusy(true);
       try {
         const res = await api.stb15End({ game_id: game.id, result: 'win', final_tiles_open: [] });

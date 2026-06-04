@@ -171,7 +171,7 @@ export default async function stb15Routes(fastify) {
       'camera_pos_x', 'camera_pos_y', 'camera_pos_z', 'camera_fov',
       'show_debug_win',
       'night_mode_force', 'night_start_hour', 'night_end_hour',
-      'night_lamp_intensity', 'night_lamp_colour',
+      'night_lamp_intensity', 'night_lamp_colour', 'night_lamp_x', 'night_lamp_z',
       'night_blue_intensity', 'night_blue_colour',
     ];
     const updates = [];

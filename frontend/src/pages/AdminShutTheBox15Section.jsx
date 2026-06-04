@@ -35,6 +35,8 @@ export default function AdminShutTheBox15Section({ bare = false }) {
   const [nightEndHour,       setNightEndHour]        = useState('6');
   const [nightLampIntensity, setNightLampIntensity]  = useState('28');
   const [nightLampColour,    setNightLampColour]     = useState('#fff5e0');
+  const [nightLampX,         setNightLampX]          = useState('0');
+  const [nightLampZ,         setNightLampZ]          = useState('0');
   const [nightBlueIntensity, setNightBlueIntensity]  = useState('3');
   const [nightBlueColour,    setNightBlueColour]     = useState('#2244aa');
 
@@ -56,6 +58,8 @@ export default function AdminShutTheBox15Section({ bare = false }) {
       setNightEndHour(String(c.night_end_hour ?? 6));
       setNightLampIntensity(String(c.night_lamp_intensity ?? 28));
       setNightLampColour(c.night_lamp_colour ?? '#fff5e0');
+      setNightLampX(String(c.night_lamp_x ?? 0));
+      setNightLampZ(String(c.night_lamp_z ?? 0));
       setNightBlueIntensity(String(c.night_blue_intensity ?? 3));
       setNightBlueColour(c.night_blue_colour ?? '#2244aa');
       if (Array.isArray(props)) setSceneProps(props);
@@ -314,6 +318,28 @@ export default function AdminShutTheBox15Section({ bare = false }) {
                 maxLength={7}
               />
             </div>
+          </label>
+
+          {/* Lamp position */}
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Lamp X (left/right)</span>
+            <input
+              type="number" step="0.1"
+              value={nightLampX}
+              onChange={(e) => setNightLampX(e.target.value)}
+              onBlur={() => save({ night_lamp_x: parseFloat(nightLampX) || 0 })}
+              className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Lamp Z (front/back)</span>
+            <input
+              type="number" step="0.1"
+              value={nightLampZ}
+              onChange={(e) => setNightLampZ(e.target.value)}
+              onBlur={() => save({ night_lamp_z: parseFloat(nightLampZ) || 0 })}
+              className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono"
+            />
           </label>
 
           {/* Blue accent */}
