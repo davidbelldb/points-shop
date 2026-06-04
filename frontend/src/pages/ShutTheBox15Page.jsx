@@ -1573,20 +1573,20 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
   if (error) return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>;
 
+  // Must be declared before bigButton so effectiveConfig isn't in TDZ when used below
+  const effectiveConfig = useMemo(
+    () => isNight ? { ...config, ink_colour: config.night_ink_colour || '#d4882a' } : config,
+    [config, isNight],
+  );
+
+  const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
+
   let bigButton = null;
   if (!game) {
     bigButton = <BigBoxButton label="START" onClick={newGame} disabled={busy} inkColour={effectiveConfig.ink_colour} />;
   } else if (phase === 'won' || phase === 'over') {
     bigButton = <BigBoxButton label="TRY AGAIN" onClick={newGame} disabled={busy} inkColour={effectiveConfig.ink_colour} />;
   }
-
-  const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
-
-  // In night mode swap ink to a warm lamp-tinted colour so text looks lit, not self-glowing
-  const effectiveConfig = useMemo(
-    () => isNight ? { ...config, ink_colour: config.night_ink_colour || '#d4882a' } : config,
-    [config, isNight],
-  );
 
   return (
     <div className="space-y-3">
