@@ -1052,23 +1052,28 @@ function CameraController({ targetRef }) {
  * showHelpers renders Three.js PointLightHelper wireframes (dev / admin mode).
  * ========================================================================== */
 
-function SceneLighting({ isNight, showHelpers }) {
+function SceneLighting({ isNight, showHelpers, nightConfig = {} }) {
   const ambientRef = useRef();
   const sun1Ref    = useRef();
   const sun2Ref    = useRef();
   const lampRef    = useRef();
   const blueRef    = useRef();
 
+  const lampIntensity = nightConfig.night_lamp_intensity ?? 28;
+  const blueIntensity = nightConfig.night_blue_intensity ?? 3;
+  const lampColour    = nightConfig.night_lamp_colour    ?? '#fff5e0';
+  const blueColour    = nightConfig.night_blue_colour    ?? '#2244aa';
+
   // Light helpers — visible only when showHelpers is truthy
   useHelper(showHelpers && lampRef, THREE.PointLightHelper, 0.6, '#ffee88');
   useHelper(showHelpers && blueRef, THREE.PointLightHelper, 0.6, '#4488ff');
 
   const tgt = isNight
-    ? { ambient: 0.04, sun1: 0, sun2: 0, lamp: 28, blue: 3 }
+    ? { ambient: 0.04, sun1: 0, sun2: 0, lamp: lampIntensity, blue: blueIntensity }
     : { ambient: 0.55, sun1: 1.0, sun2: 0.3, lamp: 0, blue: 0.8 };
 
   useFrame((_, delta) => {
-    const s = Math.min(delta * 1.2, 1); // ~1 s transition
+    const s = Math.min(delta * 1.2, 1);
     if (ambientRef.current) ambientRef.current.intensity += (tgt.ambient - ambientRef.current.intensity) * s;
     if (sun1Ref.current)    sun1Ref.current.intensity    += (tgt.sun1   - sun1Ref.current.intensity)    * s;
     if (sun2Ref.current)    sun2Ref.current.intensity    += (tgt.sun2   - sun2Ref.current.intensity)    * s;
@@ -1079,13 +1084,10 @@ function SceneLighting({ isNight, showHelpers }) {
   return (
     <>
       <ambientLight ref={ambientRef} intensity={isNight ? 0.04 : 0.55} color={isNight ? '#0d0d1a' : '#ffffff'} />
-      {/* Day — two directional lights */}
       <directionalLight ref={sun1Ref} position={[4, 8, 4]} intensity={isNight ? 0 : 1.0} castShadow shadow-mapSize-width={512} shadow-mapSize-height={512} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={8} shadow-camera-bottom={-8} />
       <directionalLight ref={sun2Ref} position={[-5, 4, -2]} intensity={isNight ? 0 : 0.3} />
-      {/* Overhead lamp — dominant at night, off during day */}
-      <pointLight ref={lampRef} position={[0, 9, 0]} intensity={isNight ? 28 : 0} color="#fff5e0" castShadow distance={20} decay={2} shadow-mapSize-width={512} shadow-mapSize-height={512} />
-      {/* Blue accent — vivid at night, subtle fill during day */}
-      <pointLight ref={blueRef} position={[-5, 6, -3]} intensity={isNight ? 3 : 0.8} color={isNight ? '#2244aa' : '#88aaff'} distance={16} decay={2} />
+      <pointLight ref={lampRef} position={[0, 9, 0]} intensity={isNight ? lampIntensity : 0} color={lampColour} castShadow distance={20} decay={2} shadow-mapSize-width={512} shadow-mapSize-height={512} />
+      <pointLight ref={blueRef} position={[-5, 6, -3]} intensity={isNight ? blueIntensity : 0.8} color={isNight ? blueColour : '#88aaff'} distance={16} decay={2} />
     </>
   );
 }
@@ -1157,7 +1159,7 @@ function Stb15Scene({
 
   return (
     <>
-      <SceneLighting isNight={isNight} showHelpers={showHelpers} />
+      <SceneLighting isNight={isNight} showHelpers={showHelpers} nightConfig={config} />
       <CameraController targetRef={activeCamRef} />
 
       <Physics gravity={[0, -22, 0]}>
@@ -1292,13 +1294,20 @@ export function ShutTheBox15Game({ showStatus = true }) {
   const settledRef = useRef([null, null, null]);
   const activeScatteredSetsRef = useRef([]);
 
-  // Night mode — 18:00–06:00
-  const [isNight, setIsNight] = useState(() => { const h = new Date().getHours(); return h >= 18 || h < 6; });
+  // Night mode — driven by config (force flag or configured hours)
+  function computeIsNight(cfg) {
+    if (cfg?.night_mode_force) return true;
+    const h = new Date().getHours();
+    const start = cfg?.night_start_hour ?? 18;
+    const end   = cfg?.night_end_hour   ?? 6;
+    return start > end ? (h >= start || h < end) : (h >= start && h < end);
+  }
+  const [isNight, setIsNight] = useState(false);
   useEffect(() => {
-    const check = () => { const h = new Date().getHours(); setIsNight(h >= 18 || h < 6); };
-    const id = setInterval(check, 60_000);
+    setIsNight(computeIsNight(config));
+    const id = setInterval(() => setIsNight(computeIsNight(config)), 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [config.night_mode_force, config.night_start_hour, config.night_end_hour]);
 
   // Camera target ref — mutated by gesture handlers, read by CameraController each frame
   const cameraTargetRef = useRef({ ...DEFAULT_CAM });

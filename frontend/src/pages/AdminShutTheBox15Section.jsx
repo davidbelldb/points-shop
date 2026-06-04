@@ -31,6 +31,13 @@ export default function AdminShutTheBox15Section({ bare = false }) {
   const [camZ, setCamZ] = useState('7.8');
   const [camFov, setCamFov] = useState('46');
 
+  const [nightStartHour,     setNightStartHour]     = useState('18');
+  const [nightEndHour,       setNightEndHour]        = useState('6');
+  const [nightLampIntensity, setNightLampIntensity]  = useState('28');
+  const [nightLampColour,    setNightLampColour]     = useState('#fff5e0');
+  const [nightBlueIntensity, setNightBlueIntensity]  = useState('3');
+  const [nightBlueColour,    setNightBlueColour]     = useState('#2244aa');
+
   async function load() {
     try {
       const [c, props] = await Promise.all([
@@ -45,6 +52,12 @@ export default function AdminShutTheBox15Section({ bare = false }) {
       setCamY(String(c.camera_pos_y ?? 10.5));
       setCamZ(String(c.camera_pos_z ?? 7.8));
       setCamFov(String(c.camera_fov ?? 46));
+      setNightStartHour(String(c.night_start_hour ?? 18));
+      setNightEndHour(String(c.night_end_hour ?? 6));
+      setNightLampIntensity(String(c.night_lamp_intensity ?? 28));
+      setNightLampColour(c.night_lamp_colour ?? '#fff5e0');
+      setNightBlueIntensity(String(c.night_blue_intensity ?? 3));
+      setNightBlueColour(c.night_blue_colour ?? '#2244aa');
       if (Array.isArray(props)) setSceneProps(props);
     } catch (e) { setError(e.message); }
   }
@@ -229,6 +242,107 @@ export default function AdminShutTheBox15Section({ bare = false }) {
               />
             </label>
           ))}
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      {/* ── Night Lighting ─────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Night Lighting</p>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Force-on toggle overrides the clock — use it to preview night mode at any time of day.
+            </p>
+          </div>
+          <button
+            onClick={() => save({ night_mode_force: !cfg.night_mode_force })}
+            disabled={busy}
+            className={`rounded-full px-3 py-1 text-xs font-semibold shrink-0 ${cfg.night_mode_force ? 'bg-indigo-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+          >
+            {cfg.night_mode_force ? '🌙 Night ON' : '☀️ Day (auto)'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          {/* Hours */}
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Start hour (0–23)</span>
+            <input
+              type="number" min="0" max="23" step="1"
+              value={nightStartHour}
+              onChange={(e) => setNightStartHour(e.target.value)}
+              onBlur={() => save({ night_start_hour: parseInt(nightStartHour, 10) || 18 })}
+              className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">End hour (0–23)</span>
+            <input
+              type="number" min="0" max="23" step="1"
+              value={nightEndHour}
+              onChange={(e) => setNightEndHour(e.target.value)}
+              onBlur={() => save({ night_end_hour: parseInt(nightEndHour, 10) || 6 })}
+              className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono"
+            />
+          </label>
+
+          {/* Lamp */}
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Lamp brightness</span>
+            <input
+              type="number" min="0" max="100" step="1"
+              value={nightLampIntensity}
+              onChange={(e) => setNightLampIntensity(e.target.value)}
+              onBlur={() => save({ night_lamp_intensity: parseFloat(nightLampIntensity) || 28 })}
+              className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Bulb colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(nightLampColour) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: nightLampColour }} />
+              )}
+              <input
+                value={nightLampColour}
+                onChange={(e) => setNightLampColour(e.target.value)}
+                onBlur={() => { if (HEX_RE.test(nightLampColour)) save({ night_lamp_colour: nightLampColour }); }}
+                className="w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none font-mono"
+                placeholder="#fff5e0"
+                maxLength={7}
+              />
+            </div>
+          </label>
+
+          {/* Blue accent */}
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Blue brightness</span>
+            <input
+              type="number" min="0" max="20" step="0.5"
+              value={nightBlueIntensity}
+              onChange={(e) => setNightBlueIntensity(e.target.value)}
+              onBlur={() => save({ night_blue_intensity: parseFloat(nightBlueIntensity) || 3 })}
+              className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none text-right font-mono"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Blue colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(nightBlueColour) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: nightBlueColour }} />
+              )}
+              <input
+                value={nightBlueColour}
+                onChange={(e) => setNightBlueColour(e.target.value)}
+                onBlur={() => { if (HEX_RE.test(nightBlueColour)) save({ night_blue_colour: nightBlueColour }); }}
+                className="w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none font-mono"
+                placeholder="#2244aa"
+                maxLength={7}
+              />
+            </div>
+          </label>
         </div>
       </div>
 
