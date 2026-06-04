@@ -808,7 +808,7 @@ function StlModel(props) {
 }
 
 // FallingClip — dynamic clip that drops from a spawn point when tile 14 is closed
-function FallingClipInner({ position, scale = 0.0133 }) {
+function FallingClipInner({ position, scale = 0.0133, colorOverride = null }) {
   const geometry = useLoader(STLLoader, '/models/clip/pince_part1-v3.STL');
   const geo = useMemo(() => {
     const g = geometry.clone();
@@ -830,7 +830,7 @@ function FallingClipInner({ position, scale = 0.0133 }) {
   return (
     <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
       <mesh geometry={geo} scale={scale} castShadow>
-        <meshStandardMaterial color="#b0a090" roughness={0.55} metalness={0.1} />
+        <meshStandardMaterial color={colorOverride || '#b0a090'} roughness={0.55} metalness={0.1} />
       </mesh>
     </RigidBody>
   );
@@ -1229,7 +1229,7 @@ function Stb15Scene({
         {drops.map((drop) =>
           drop.type === 'twirl'
             ? <TwirlInstance key={drop.id} position={drop.position} delay={0} />
-            : <FallingClip key={drop.id} position={drop.position} scale={0.0133} />
+            : <FallingClip key={drop.id} position={drop.position} scale={0.0133} colorOverride={drop.colorOverride} />
         )}
 
         {bigButton}
@@ -1467,7 +1467,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
     }
     if (selected.includes(14)) {
       const sp = sceneProps.find((p) => p.key === 'spawn_clip');
-      newDrops.push({ id: `clip-${Date.now()}`, type: 'clip', position: { x: sp?.pos_x ?? 0, y: sp?.pos_y ?? 6, z: sp?.pos_z ?? 0 } });
+      newDrops.push({ id: `clip-${Date.now()}`, type: 'clip', position: { x: sp?.pos_x ?? 0, y: sp?.pos_y ?? 6, z: sp?.pos_z ?? 0 }, colorOverride: sp?.color_override || null });
     }
     if (newDrops.length > 0) setDrops((d) => [...d, ...newDrops]);
 
