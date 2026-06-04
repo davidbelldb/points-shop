@@ -1581,6 +1581,12 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
   const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
 
+  // In night mode swap ink to a warm lamp-tinted colour so text looks lit, not self-glowing
+  const effectiveConfig = useMemo(
+    () => isNight ? { ...config, ink_colour: config.night_ink_colour || '#d4882a' } : config,
+    [config, isNight],
+  );
+
   return (
     <div className="space-y-3">
       <Stb15CanvasShell
@@ -1601,7 +1607,7 @@ export function ShutTheBox15Game({ showStatus = true }) {
           throwVec={throwVec}
           onTileTap={tapTile}
           onDieSettled={onDieSettled}
-          config={config}
+          config={effectiveConfig}
           interactive
           bigButton={bigButton}
           scatteredSet={scatteredSet}

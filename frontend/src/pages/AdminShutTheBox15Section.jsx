@@ -39,6 +39,7 @@ export default function AdminShutTheBox15Section({ bare = false }) {
   const [nightLampZ,         setNightLampZ]          = useState('0');
   const [nightBlueIntensity, setNightBlueIntensity]  = useState('3');
   const [nightBlueColour,    setNightBlueColour]     = useState('#2244aa');
+  const [nightInkColour,     setNightInkColour]      = useState('#d4882a');
 
   async function load() {
     try {
@@ -62,6 +63,7 @@ export default function AdminShutTheBox15Section({ bare = false }) {
       setNightLampZ(String(c.night_lamp_z ?? 0));
       setNightBlueIntensity(String(c.night_blue_intensity ?? 3));
       setNightBlueColour(c.night_blue_colour ?? '#2244aa');
+      setNightInkColour(c.night_ink_colour ?? '#d4882a');
       if (Array.isArray(props)) setSceneProps(props);
     } catch (e) { setError(e.message); }
   }
@@ -365,6 +367,23 @@ export default function AdminShutTheBox15Section({ bare = false }) {
                 onBlur={() => { if (HEX_RE.test(nightBlueColour)) save({ night_blue_colour: nightBlueColour }); }}
                 className="w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none font-mono"
                 placeholder="#2244aa"
+                maxLength={7}
+              />
+            </div>
+          </label>
+          {/* Tile ink colour */}
+          <label className="col-span-2 flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Tile text colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(nightInkColour) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: nightInkColour }} />
+              )}
+              <input
+                value={nightInkColour}
+                onChange={(e) => setNightInkColour(e.target.value)}
+                onBlur={() => { if (HEX_RE.test(nightInkColour)) save({ night_ink_colour: nightInkColour }); }}
+                className="w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none font-mono"
+                placeholder="#d4882a"
                 maxLength={7}
               />
             </div>
