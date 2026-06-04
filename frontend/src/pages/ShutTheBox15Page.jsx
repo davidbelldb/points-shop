@@ -846,6 +846,7 @@ const PROP_DEFINITIONS = {
   banana: { type: 'procedural', component: 'banana' },
   key:    { type: 'obj', dir: '/models/key/', obj: 'standard_key.obj', mtl: 'key.mtl' },
   clip:   { type: 'stl', url: '/models/clip/pince_part1-v3.STL' },
+  clip_2: { type: 'stl', url: '/models/clip/pince_part1-v3.STL' },
   // twirl_1 / twirl_2 are GLB — handled by DecorativeTwirls
 };
 
