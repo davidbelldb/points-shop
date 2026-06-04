@@ -14,13 +14,7 @@ sneakypoints.com {
     handle {
         root * /srv
         try_files {path} /index.html
-        file_server {
-            mime .stl model/stl
-            mime .STL model/stl
-            mime .glb model/gltf-binary
-            mime .obj text/plain
-            mime .mtl text/plain
-        }
+        file_server
     }
 }
 
