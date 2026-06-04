@@ -5,6 +5,7 @@ import { Text, RoundedBox, useTexture, useGLTF } from '@react-three/drei';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
@@ -772,6 +773,31 @@ function GlbModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, 
   );
 }
 
+// StlModel — loads a .STL file; returns a single mesh with hull collider.
+// colorOverride sets the mesh colour; defaults to a neutral warm grey.
+function StlModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
+  const [geometry, setGeometry] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    new STLLoader().load(url, (geo) => {
+      if (cancelled) return;
+      geo.computeVertexNormals();
+      setGeometry(geo);
+    });
+    return () => { cancelled = true; };
+  }, [url]);
+
+  if (!geometry) return null;
+  return (
+    <RigidBody type="fixed" colliders="hull" position={position} rotation={rotation}>
+      <mesh geometry={geometry} scale={scale} castShadow receiveShadow>
+        <meshStandardMaterial color={colorOverride || '#b0a090'} roughness={0.55} metalness={0.1} />
+      </mesh>
+    </RigidBody>
+  );
+}
+
 // ProceduralBanana — hull collider so twirls land on it
 function ProceduralBanana({ position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
   const curve = useMemo(() => {
@@ -814,6 +840,7 @@ const PROP_DEFINITIONS = {
   cup:    { type: 'glb', url: '/cup.glb' },
   banana: { type: 'procedural', component: 'banana' },
   key:    { type: 'obj', dir: '/models/key/', obj: 'standard_key.obj', mtl: 'key.mtl' },
+  clip:   { type: 'stl', url: '/models/clip/pince_part1-v3.STL' },
   // twirl_1 / twirl_2 are GLB — handled by DecorativeTwirls
 };
 
@@ -840,6 +867,9 @@ function SceneModels({ sceneProps = [] }) {
         }
         if (def.type === 'procedural' && def.component === 'banana') {
           return <ProceduralBanana key={key} position={pos} rotation={rot} scale={sc} colorOverride={co} />;
+        }
+        if (def.type === 'stl') {
+          return <StlModel key={key} url={def.url} position={pos} rotation={rot} scale={sc} colorOverride={co} />;
         }
         return null;
       })}
