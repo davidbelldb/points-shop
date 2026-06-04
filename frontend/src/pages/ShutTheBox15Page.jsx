@@ -34,7 +34,7 @@ const DEFAULT_CONFIG = {
 const GRANITE_TEX_URL      = '/textures/granite.png?v=1';
 const WOOD_TEX_URL         = '/textures/wood_table_worn.jpg?v=4';
 const VELVET_TEX_URL       = '/textures/velour_velvet_diff.jpg?v=3';
-const WOODEN_BUTTONS_URL   = '/textures/wooden_buttons.jpg?v=1';
+const WOODEN_BUTTONS_URL   = '/textures/wooden_buttons.jpg?v=2';
 const TWIRL_URL            = '/twirl.glb';
 
 // Box dimensions — wider for 15 tiles
@@ -773,28 +773,28 @@ function GlbModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, 
   );
 }
 
-// StlModel — loads a .STL file; returns a single mesh with hull collider.
+// StlModel — loads a .STL file via useLoader (Suspense-compatible, same pattern as GLB).
 // colorOverride sets the mesh colour; defaults to a neutral warm grey.
-function StlModel({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
-  const [geometry, setGeometry] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    new STLLoader().load(url, (geo) => {
-      if (cancelled) return;
-      geo.computeVertexNormals();
-      setGeometry(geo);
-    });
-    return () => { cancelled = true; };
-  }, [url]);
-
-  if (!geometry) return null;
+function StlModelInner({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1, colorOverride = null }) {
+  const geometry = useLoader(STLLoader, url);
+  const geo = useMemo(() => {
+    const g = geometry.clone();
+    g.computeVertexNormals();
+    return g;
+  }, [geometry]);
   return (
     <RigidBody type="fixed" colliders="hull" position={position} rotation={rotation}>
-      <mesh geometry={geometry} scale={scale} castShadow receiveShadow>
+      <mesh geometry={geo} scale={scale} castShadow receiveShadow>
         <meshStandardMaterial color={colorOverride || '#b0a090'} roughness={0.55} metalness={0.1} />
       </mesh>
     </RigidBody>
+  );
+}
+function StlModel(props) {
+  return (
+    <Suspense fallback={null}>
+      <StlModelInner {...props} />
+    </Suspense>
   );
 }
 
