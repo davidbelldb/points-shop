@@ -418,7 +418,7 @@ const BTN_PANEL_H = 0.22;
 const BTN_PANEL_Z_DEFAULT = 4.0;
 const BTN_PANEL_Y = 0.09;
 
-function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelX = 0, panelZ = BTN_PANEL_Z_DEFAULT, panelRotY = 0 }) {
+function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using1Die, onToggle1Die, panelX = 0, panelZ = BTN_PANEL_Z_DEFAULT, panelRotY = 0, inkColour = '#ffffff' }) {
   const { buttonsTex } = useStb15Textures();
   const innerGroupRef = useRef();
   const pressedRef = useRef(null); // 'left' | 'right' | null
@@ -504,7 +504,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
             position={[-BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
             rotation={[-Math.PI / 2, 0, 0]}
             fontSize={0.175}
-            color="#ffffff"
+            color={inkColour}
             anchorX="center"
             anchorY="middle"
             renderOrder={10}
@@ -519,7 +519,7 @@ function CombinedDicePanel({ can2Dice, using2Dice, onToggle2Dice, can1Die, using
             position={[BTN_PANEL_W / 4, BTN_PANEL_H / 2 + 0.01, 0]}
             rotation={[-Math.PI / 2, 0, 0]}
             fontSize={0.175}
-            color="#ffffff"
+            color={inkColour}
             anchorX="center"
             anchorY="middle"
             renderOrder={10}
@@ -1203,7 +1203,7 @@ function Stb15Scene({
 
         {/* Dice sum display */}
         {showSum && (
-          <Text position={[-3.2, 0.06, 0.75]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color="#ffffff" anchorX="left" anchorY="middle" renderOrder={5}>
+          <Text position={[-3.2, 0.06, 0.75]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.5} color={config.ink_colour} anchorX="left" anchorY="middle" renderOrder={5}>
             {`${totalDice}`}
           </Text>
         )}
@@ -1219,6 +1219,7 @@ function Stb15Scene({
           panelX={btnPanelX}
           panelZ={btnPanelZ}
           panelRotY={btnPanelRotY}
+          inkColour={config.ink_colour}
         />
 
         {/* Static decorative twirl props — hidden in night mode (baked texture) */}
@@ -1574,9 +1575,9 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
   let bigButton = null;
   if (!game) {
-    bigButton = <BigBoxButton label="START" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
+    bigButton = <BigBoxButton label="START" onClick={newGame} disabled={busy} inkColour={effectiveConfig.ink_colour} />;
   } else if (phase === 'won' || phase === 'over') {
-    bigButton = <BigBoxButton label="TRY AGAIN" onClick={newGame} disabled={busy} inkColour={config.ink_colour} />;
+    bigButton = <BigBoxButton label="TRY AGAIN" onClick={newGame} disabled={busy} inkColour={effectiveConfig.ink_colour} />;
   }
 
   const diceVisible = phase === 'rolling' || phase === 'rolled' || phase === 'over' || phase === 'won';
