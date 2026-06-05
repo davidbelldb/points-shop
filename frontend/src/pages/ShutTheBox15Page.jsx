@@ -814,28 +814,43 @@ const DUCK_URLS = [
   '/models/ducks/duck_7.stl', '/models/ducks/duck_8.stl', '/models/ducks/duck_9.stl',
 ];
 
-// FallingDuck — picks a random duck STL and drops it into the scene
-function FallingDuckInner({ url, position, scale = 1.0, colorOverride = null }) {
+// FallingDuck — picks a random duck STL and drops it into the scene.
+// Geometry is auto-centred AND normalised to a unit bounding sphere so that
+// scale=1 ≈ 1 Three.js unit regardless of the CAD source units.
+function FallingDuckInner({ url, position, scale = 0.3, colorOverride = null }) {
   const geometry = useLoader(STLLoader, url);
   const geo = useMemo(() => {
     const g = geometry.clone();
     g.computeVertexNormals();
+    // Centre
     g.computeBoundingBox();
     const centre = new THREE.Vector3();
     g.boundingBox.getCenter(centre);
     g.translate(-centre.x, -centre.y, -centre.z);
+    // Normalise to unit bounding sphere so scale is predictable
+    g.computeBoundingSphere();
+    const r = g.boundingSphere?.radius || 1;
+    const inv = 1 / r;
+    g.scale(inv, inv, inv);
     return g;
   }, [geometry]);
+
   const bodyRef = useRef();
+
+  // Use setTimeout so rapier has at least one frame to register the body
   useEffect(() => {
-    if (!bodyRef.current) return;
-    const r = () => Math.random();
-    bodyRef.current.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
-    bodyRef.current.setLinvel({ x: (r() - 0.5) * 1.5, y: -2 - r() * 3, z: (r() - 0.5) * 1.5 }, true);
-    bodyRef.current.setAngvel({ x: (r() - 0.5) * 20, y: (r() - 0.5) * 20, z: (r() - 0.5) * 20 }, true);
+    const t = setTimeout(() => {
+      if (!bodyRef.current) return;
+      const rand = () => Math.random();
+      bodyRef.current.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
+      bodyRef.current.setLinvel({ x: (rand() - 0.5) * 2, y: -3 - rand() * 3, z: (rand() - 0.5) * 2 }, true);
+      bodyRef.current.setAngvel({ x: (rand() - 0.5) * 18, y: (rand() - 0.5) * 18, z: (rand() - 0.5) * 18 }, true);
+    }, 50);
+    return () => clearTimeout(t);
   }, []);
+
   return (
-    <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
+    <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.25} angularDamping={0.4} position={[position.x, position.y, position.z]}>
       <mesh geometry={geo} scale={scale} castShadow>
         <meshStandardMaterial color={colorOverride || '#f5c842'} roughness={0.6} metalness={0.0} />
       </mesh>
@@ -859,11 +874,14 @@ function FallingClipInner({ position, scale = 0.0133, colorOverride = null }) {
   }, [geometry]);
   const bodyRef = useRef();
   useEffect(() => {
-    if (!bodyRef.current) return;
-    const r = () => Math.random();
-    bodyRef.current.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
-    bodyRef.current.setLinvel({ x: (r() - 0.5) * 1.5, y: -2 - r() * 3, z: (r() - 0.5) * 1.5 }, true);
-    bodyRef.current.setAngvel({ x: (r() - 0.5) * 20, y: (r() - 0.5) * 20, z: (r() - 0.5) * 20 }, true);
+    const t = setTimeout(() => {
+      if (!bodyRef.current) return;
+      const r = () => Math.random();
+      bodyRef.current.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
+      bodyRef.current.setLinvel({ x: (r() - 0.5) * 1.5, y: -2 - r() * 3, z: (r() - 0.5) * 1.5 }, true);
+      bodyRef.current.setAngvel({ x: (r() - 0.5) * 20, y: (r() - 0.5) * 20, z: (r() - 0.5) * 20 }, true);
+    }, 50);
+    return () => clearTimeout(t);
   }, []);
   return (
     <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
