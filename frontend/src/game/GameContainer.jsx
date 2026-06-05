@@ -18,16 +18,20 @@ import { Player }        from './entities/Player.js';
 import { Renderer }      from './renderer/Renderer.js';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
-// ─── Sprite manifest ──────────────────────────────────────────────────────────
+// ─── Asset manifest ───────────────────────────────────────────────────────────
 // Vite resolves these import URLs at build time → hashed, tree-shaken, CDN-safe.
-import katieIdleUrl   from './assets/katie_idle.png';
-import katieWalk01Url from './assets/katie_walk_01.png';
-import katieWalk02Url from './assets/katie_walk_02.png';
+import katieIdleUrl    from '../assets/sprites/katie_idle.png';
+import katieWalk01Url  from '../assets/sprites/katie_walk_01.png';
+import katieWalk02Url  from '../assets/sprites/katie_walk_02.png';
+import katieJumpUrl    from '../assets/sprites/katie_jump.png';
+import background01Url from '../assets/backgrounds/background_01.png';
 
 const SPRITE_MANIFEST = {
   katie_idle:    katieIdleUrl,
   katie_walk_01: katieWalk01Url,
   katie_walk_02: katieWalk02Url,
+  katie_jump:    katieJumpUrl,
+  bg_01:         background01Url,
 };
 
 // ─── HUD overlay ─────────────────────────────────────────────────────────────
@@ -101,7 +105,7 @@ export default function GameContainer() {
           input.consumeFrame();
         },
         render(_dt) {
-          renderer.draw({ player });
+          renderer.draw({ player, background: sprites.get('bg_01') });
 
           // Mirror state to HUD at ~10 fps
           frameCount++;

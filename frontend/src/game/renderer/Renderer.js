@@ -52,8 +52,9 @@ export function project(x, z, jumpY = 0) {
 }
 
 function spriteKeyFor(entity) {
+  if (!entity.grounded)                                    return 'katie_jump';
   const moving = Math.abs(entity.vx) > 8 || Math.abs(entity.vz) > 8;
-  if (!entity.grounded || !moving) return 'katie_idle';
+  if (!moving)                                             return 'katie_idle';
   return Math.floor(entity.animTime / WALK_FRAME_DURATION) % 2 === 0
     ? 'katie_walk_01'
     : 'katie_walk_02';
@@ -72,15 +73,45 @@ export class Renderer {
     const { ctx } = this;
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    this._drawFacade();
-    this._drawPavement();
-    this._drawKerb();
+    if (scene.background) {
+      this._drawBackgroundImage(scene.background);
+    } else {
+      this._drawFacade();
+      this._drawPavement();
+      this._drawKerb();
+    }
 
     const entities = [scene.player, ...(scene.entities ?? [])];
     entities.sort((a, b) => a.z - b.z);
 
     for (const e of entities) this._drawEntityShadow(e);
     for (const e of entities) this._drawEntity(e);
+  }
+
+  /**
+   * Draw a background image cover-fit to the canvas.
+   * The image is centred and cropped symmetrically — no stretching.
+   */
+  _drawBackgroundImage(img) {
+    const { ctx } = this;
+    const canvasAR = CANVAS_WIDTH  / CANVAS_HEIGHT;
+    const imageAR  = img.width     / img.height;
+
+    let sx, sy, sw, sh;
+    if (imageAR > canvasAR) {
+      // Image is wider — fit height, crop sides
+      sh = img.height;
+      sw = img.height * canvasAR;
+      sx = (img.width - sw) / 2;
+      sy = 0;
+    } else {
+      // Image is taller — fit width, crop top/bottom
+      sw = img.width;
+      sh = img.width / canvasAR;
+      sx = 0;
+      sy = (img.height - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 
   // ── Building facade ──────────────────────────────────────────────────────────
