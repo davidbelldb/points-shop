@@ -2,22 +2,35 @@
  * GameContainer
  *
  * React wrapper for the beat-em-up engine.
- * Owns the <canvas> ref and wires together:
- *   InputManager → Player.update() → Renderer.draw()
- * via GameLoop.
+ * Wires together:  InputManager → Player.update() → Renderer.draw()
+ * via GameLoop, with sprite assets preloaded before the first frame.
  *
- * Everything is cleaned up on unmount so React Strict Mode double-invocation
- * and hot reloads work correctly.
+ * Sprite URLs are resolved by Vite at build time (hashed, CDN-ready).
+ * The game loop only starts once every image has loaded so we never
+ * render a frame with a missing sprite.
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { GameLoop }    from './engine/GameLoop.js';
-import { InputManager } from './engine/InputManager.js';
-import { Player }      from './entities/Player.js';
-import { Renderer }    from './renderer/Renderer.js';
+import { GameLoop }      from './engine/GameLoop.js';
+import { InputManager }  from './engine/InputManager.js';
+import { SpriteManager } from './engine/SpriteManager.js';
+import { Player }        from './entities/Player.js';
+import { Renderer }      from './renderer/Renderer.js';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
-// ─── HUD overlay (pure React, drawn on top of canvas) ────────────────────────
+// ─── Sprite manifest ──────────────────────────────────────────────────────────
+// Vite resolves these import URLs at build time → hashed, tree-shaken, CDN-safe.
+import katieIdleUrl   from './assets/katie_idle.png';
+import katieWalk01Url from './assets/katie_walk_01.png';
+import katieWalk02Url from './assets/katie_walk_02.png';
+
+const SPRITE_MANIFEST = {
+  katie_idle:    katieIdleUrl,
+  katie_walk_01: katieWalk01Url,
+  katie_walk_02: katieWalk02Url,
+};
+
+// ─── HUD overlay ─────────────────────────────────────────────────────────────
 
 function HUD({ player }) {
   if (!player) return null;
@@ -25,9 +38,7 @@ function HUD({ player }) {
     <div className="absolute top-3 left-3 text-xs font-mono text-white/80 space-y-0.5 pointer-events-none select-none">
       <div>X: <span className="text-green-400">{Math.round(player.x)}</span></div>
       <div>Z: <span className="text-blue-400">{Math.round(player.z)}</span></div>
-      <div>
-        jumpY: <span className="text-yellow-400">{Math.round(player.jumpY)}</span>
-      </div>
+      <div>jumpY: <span className="text-yellow-400">{Math.round(player.jumpY)}</span></div>
       <div className="mt-1 text-white/50">
         {player.grounded ? '● grounded' : '↑ airborne'}
       </div>
@@ -46,58 +57,79 @@ function Controls() {
   );
 }
 
+function LoadingOverlay() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+      <span className="text-white/60 text-sm font-mono tracking-widest animate-pulse">
+        LOADING…
+      </span>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function GameContainer() {
-  const canvasRef  = useRef(null);
-  // Mirror a small subset of player state into React for the HUD
-  const [hudState, setHudState] = useState(null);
+  const canvasRef       = useRef(null);
+  const [hudState,     setHudState]     = useState(null);
+  const [spritesReady, setSpritesReady] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // ── Instantiate engine objects ────────────────────────────────────────────
-    const input    = new InputManager().attach(window);
-    const player   = new Player({ x: 400, z: 100 });
-    const renderer = new Renderer(canvas);
+    let loop;
+    let input;
+    let cancelled = false;
 
-    let frameCount = 0;
+    // ── Preload sprites, then boot the engine ─────────────────────────────────
+    const sprites = new SpriteManager();
 
-    const loop = new GameLoop({
-      update(dt) {
-        player.update(dt, input);
-        input.consumeFrame(); // flush pressed/released after all updates
-      },
-      render(_dt) {
-        renderer.draw({ player });
+    sprites.preload(SPRITE_MANIFEST).then(() => {
+      if (cancelled) return;   // component unmounted while loading
 
-        // Update HUD at ~10fps to avoid re-rendering every frame
-        frameCount++;
-        if (frameCount % 6 === 0) {
-          setHudState({
-            x:        player.x,
-            z:        player.z,
-            jumpY:    player.jumpY,
-            grounded: player.grounded,
-          });
-        }
-      },
+      setSpritesReady(true);
+
+      input            = new InputManager().attach(window);
+      const player     = new Player({ x: 400, z: 100 });
+      const renderer   = new Renderer(canvas, sprites);
+      let   frameCount = 0;
+
+      loop = new GameLoop({
+        update(dt) {
+          player.update(dt, input);
+          input.consumeFrame();
+        },
+        render(_dt) {
+          renderer.draw({ player });
+
+          // Mirror state to HUD at ~10 fps
+          frameCount++;
+          if (frameCount % 6 === 0) {
+            setHudState({
+              x:        player.x,
+              z:        player.z,
+              jumpY:    player.jumpY,
+              grounded: player.grounded,
+            });
+          }
+        },
+      });
+
+      loop.start();
     });
-
-    loop.start();
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {
-      loop.stop();
-      input.detach();
+      cancelled = true;
+      loop?.stop();
+      input?.detach();
     };
   }, []);
 
   return (
     <div
       className="relative flex items-center justify-center w-full h-full bg-black"
-      // Ensure keyboard events reach the window listener when the canvas is clicked
       tabIndex={-1}
     >
       <div className="relative" style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
@@ -108,6 +140,7 @@ export default function GameContainer() {
           className="block rounded-sm"
           style={{ imageRendering: 'pixelated' }}
         />
+        {!spritesReady && <LoadingOverlay />}
         <HUD player={hudState} />
         <Controls />
       </div>

@@ -48,8 +48,12 @@ export class Player {
     this.baseWidth  = PLAYER_BASE_WIDTH;
     this.baseHeight = PLAYER_BASE_HEIGHT;
 
-    // ── Visual tint (placeholder; swapped for sprites in Phase 2) ──────────
-    this.color       = '#4ade80';   // green fill
+    // ── Animation ────────────────────────────────────────────────────────────
+    /** Accumulates while moving; drives walk frame selection in Renderer. */
+    this.animTime = 0;
+
+    // ── Visual tint (fallback if sprites not loaded) ──────────────────────
+    this.color       = '#4ade80';
     this.shadowColor = 'rgba(0,0,0,0.35)';
   }
 
@@ -63,6 +67,7 @@ export class Player {
     this._handleMovement(dt, input);
     this._handleJump(dt, input);
     this._handleCombat(input);
+    this._handleAnimation(dt);
   }
 
   // ── Movement ─────────────────────────────────────────────────────────────────
@@ -130,6 +135,15 @@ export class Player {
   }
 
   // ── Combat ───────────────────────────────────────────────────────────────────
+
+  _handleAnimation(dt) {
+    const isMoving = Math.abs(this.vx) > 8 || Math.abs(this.vz) > 8;
+    if (isMoving) {
+      this.animTime += dt;
+    } else {
+      this.animTime = 0;
+    }
+  }
 
   _handleCombat(input) {
     // Placeholder: just toggle flags — combat logic comes in Phase 3
