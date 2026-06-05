@@ -688,7 +688,7 @@ function TwirlInstance({ position, delay }) {
   const bodyRef = useRef();
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
   const restFrames = useRef(0);
-  const asleep = useRef(false);
+  const frozen = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -701,18 +701,23 @@ function TwirlInstance({ position, delay }) {
     return () => clearTimeout(t);
   }, []);
 
-  // Force sleep once the body has truly come to rest — prevents infinite jitter
   useFrame(() => {
-    if (asleep.current || !bodyRef.current) return;
+    if (!bodyRef.current) return;
+    // Once frozen: keep zeroing velocity every frame so rapier can't re-jitter it
+    if (frozen.current) {
+      bodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, false);
+      bodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, false);
+      return;
+    }
     const lv = bodyRef.current.linvel();
     const av = bodyRef.current.angvel();
-    const still = (lv.x*lv.x + lv.y*lv.y + lv.z*lv.z) < 0.004
-               && (av.x*av.x + av.y*av.y + av.z*av.z) < 0.004;
-    if (still) {
-      restFrames.current += 1;
-      if (restFrames.current > 20) {
+    if (lv.x*lv.x + lv.y*lv.y + lv.z*lv.z < 0.01 &&
+        av.x*av.x + av.y*av.y + av.z*av.z < 0.01) {
+      if (++restFrames.current > 40) {
+        frozen.current = true;
+        bodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, false);
+        bodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, false);
         bodyRef.current.sleep();
-        asleep.current = true;
       }
     } else {
       restFrames.current = 0;
@@ -720,9 +725,10 @@ function TwirlInstance({ position, delay }) {
   });
 
   return (
-    <RigidBody ref={bodyRef} type="dynamic" colliders="hull"
-      restitution={0.05} friction={0.7}
-      linearDamping={1.8} angularDamping={2.0}
+    // cuboid collider is far more stable at rest than hull for thin/twisted shapes
+    <RigidBody ref={bodyRef} type="dynamic" colliders="cuboid"
+      restitution={0.0} friction={0.8}
+      linearDamping={2.5} angularDamping={2.5}
       position={[position.x, position.y, position.z]}
     >
       <primitive object={clonedScene} scale={1.4} />
