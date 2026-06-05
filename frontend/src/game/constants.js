@@ -6,7 +6,7 @@ export const CANVAS_HEIGHT = 450;
 // The "road" is drawn as a trapezoid.
 // Z = 0  → far (horizon),  Z = WORLD_MAX_Z → near (front of screen)
 export const ROAD_TOP_Y    = 130;   // screen-Y of the far horizon line
-export const ROAD_BOTTOM_Y = 390;   // screen-Y of the near edge of the road
+export const ROAD_BOTTOM_Y = 208;   // screen-Y of the near edge of the road
 export const ROAD_LEFT_FAR   = 220; // road left edge at horizon
 export const ROAD_RIGHT_FAR  = 580; // road right edge at horizon
 export const ROAD_LEFT_NEAR  = -60; // road left edge at front (bleeds off screen)
@@ -14,7 +14,7 @@ export const ROAD_RIGHT_NEAR = 860; // road right edge at front
 
 // ─── World Bounds ─────────────────────────────────────────────────────────────
 export const WORLD_MIN_Z = 0;
-export const WORLD_MAX_Z = 200;   // depth units
+export const WORLD_MAX_Z = 60;    // depth units (30% of original — 70% shallower)
 export const WORLD_MIN_X = 20;
 export const WORLD_MAX_X = 780;
 
