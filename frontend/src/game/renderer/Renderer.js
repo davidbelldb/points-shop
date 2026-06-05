@@ -112,6 +112,11 @@ export class Renderer {
       sy = (img.height - sh) / 2;
     }
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // The background image has a yellow kerb line at canvas y≈378–382.
+    // Overdraw it with a colour-matched strip so it doesn't read as a UI boundary.
+    ctx.fillStyle = 'rgb(68, 62, 60)';
+    ctx.fillRect(0, 377, CANVAS_WIDTH, 6);
   }
 
   // ── Building facade ──────────────────────────────────────────────────────────
