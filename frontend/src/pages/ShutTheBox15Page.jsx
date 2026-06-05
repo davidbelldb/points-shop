@@ -808,6 +808,44 @@ function StlModel(props) {
 }
 
 // FallingClip — dynamic clip that drops from a spawn point when tile 14 is closed
+const DUCK_URLS = [
+  '/models/ducks/duck_1.stl', '/models/ducks/duck_2.stl', '/models/ducks/duck_3.stl',
+  '/models/ducks/duck_4.stl', '/models/ducks/duck_5.stl', '/models/ducks/duck_6.stl',
+  '/models/ducks/duck_7.stl', '/models/ducks/duck_8.stl', '/models/ducks/duck_9.stl',
+];
+
+// FallingDuck — picks a random duck STL and drops it into the scene
+function FallingDuckInner({ url, position, scale = 1.0, colorOverride = null }) {
+  const geometry = useLoader(STLLoader, url);
+  const geo = useMemo(() => {
+    const g = geometry.clone();
+    g.computeVertexNormals();
+    g.computeBoundingBox();
+    const centre = new THREE.Vector3();
+    g.boundingBox.getCenter(centre);
+    g.translate(-centre.x, -centre.y, -centre.z);
+    return g;
+  }, [geometry]);
+  const bodyRef = useRef();
+  useEffect(() => {
+    if (!bodyRef.current) return;
+    const r = () => Math.random();
+    bodyRef.current.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
+    bodyRef.current.setLinvel({ x: (r() - 0.5) * 1.5, y: -2 - r() * 3, z: (r() - 0.5) * 1.5 }, true);
+    bodyRef.current.setAngvel({ x: (r() - 0.5) * 20, y: (r() - 0.5) * 20, z: (r() - 0.5) * 20 }, true);
+  }, []);
+  return (
+    <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
+      <mesh geometry={geo} scale={scale} castShadow>
+        <meshStandardMaterial color={colorOverride || '#f5c842'} roughness={0.6} metalness={0.0} />
+      </mesh>
+    </RigidBody>
+  );
+}
+function FallingDuck(props) {
+  return <Suspense fallback={null}><FallingDuckInner {...props} /></Suspense>;
+}
+
 function FallingClipInner({ position, scale = 0.0133, colorOverride = null }) {
   const geometry = useLoader(STLLoader, '/models/clip/pince_part1-v3.STL');
   const geo = useMemo(() => {
@@ -1235,7 +1273,9 @@ function Stb15Scene({
         {drops.map((drop) =>
           drop.type === 'twirl'
             ? <TwirlInstance key={drop.id} position={drop.position} delay={0} />
-            : <FallingClip key={drop.id} position={drop.position} scale={0.0133} colorOverride={drop.colorOverride} />
+            : drop.type === 'duck'
+              ? <FallingDuck key={drop.id} url={drop.url} position={drop.position} scale={drop.scale ?? 1.0} colorOverride={drop.colorOverride} />
+              : <FallingClip key={drop.id} position={drop.position} scale={0.0133} colorOverride={drop.colorOverride} />
         )}
 
         {bigButton}
@@ -1474,6 +1514,20 @@ export function ShutTheBox15Game({ showStatus = true }) {
 
     // Spawn drops for special tiles being closed this turn
     const newDrops = [];
+    const duckTiles = [1, 5, 10].filter((t) => selected.includes(t));
+    duckTiles.forEach(() => {
+      const sp  = sceneProps.find((p) => p.key === 'spawn_duck');
+      const url = DUCK_URLS[Math.floor(Math.random() * DUCK_URLS.length)];
+      newDrops.push({
+        id:            `duck-${Date.now()}-${Math.random()}`,
+        type:          'duck',
+        url,
+        position:      { x: sp?.pos_x ?? 0, y: sp?.pos_y ?? 6, z: sp?.pos_z ?? 0 },
+        scale:         sp?.scale ?? 1.0,
+        colorOverride: sp?.color_override || null,
+      });
+    });
+
     if (selected.includes(15) && !isNight) {
       const sp = sceneProps.find((p) => p.key === 'spawn_twirl');
       newDrops.push({ id: `twirl-${Date.now()}`, type: 'twirl', position: { x: sp?.pos_x ?? 0, y: sp?.pos_y ?? 6, z: sp?.pos_z ?? 0 } });
