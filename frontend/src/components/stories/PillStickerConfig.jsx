@@ -62,12 +62,12 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceRef = useRef(null);
 
-  /* ── Last.fm state ──────────────────────────────────────────────── */
-  const [lastfmUsername, setLastfmUsername] = useState(
-    () => localStorage.getItem('lastfm_username') || ''
-  );
-  const [lastfmFetching, setLastfmFetching] = useState(false);
-  const [lastfmMsg, setLastfmMsg] = useState(null);
+  /* ── Last.fm song search state ─────────────────────────────────── */
+  const [songQuery, setSongQuery] = useState('');
+  const [songResults, setSongResults] = useState([]);
+  const [songSearching, setSongSearching] = useState(false);
+  const [showSongDropdown, setShowSongDropdown] = useState(false);
+  const songDebounceRef = useRef(null);
 
   /* ── Location handlers ──────────────────────────────────────────── */
 
@@ -138,37 +138,39 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
     }
   }
 
-  /* ── Last.fm handlers ───────────────────────────────────────────── */
+  /* ── Last.fm song search handlers ──────────────────────────────── */
 
-  function handleUsernameChange(e) {
+  function handleSongQueryChange(e) {
     const val = e.target.value;
-    setLastfmUsername(val);
-    localStorage.setItem('lastfm_username', val);
-    setLastfmMsg(null);
+    setSongQuery(val);
+    clearTimeout(songDebounceRef.current);
+    if (!val.trim()) { setSongResults([]); setShowSongDropdown(false); return; }
+    songDebounceRef.current = setTimeout(async () => {
+      setSongSearching(true);
+      try {
+        const res = await fetch(
+          `/api/lastfm/search?q=${encodeURIComponent(val.trim())}`,
+          { credentials: 'include' }
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setSongResults(data);
+          setShowSongDropdown(data.length > 0);
+        }
+      } catch {
+        setSongResults([]);
+        setShowSongDropdown(false);
+      } finally {
+        setSongSearching(false);
+      }
+    }, 400);
   }
 
-  async function fetchLastfm() {
-    if (!lastfmUsername.trim()) return;
-    setLastfmFetching(true);
-    setLastfmMsg(null);
-    try {
-      const res = await fetch(
-        `/api/lastfm/now-playing?username=${encodeURIComponent(lastfmUsername.trim())}`,
-        { credentials: 'include' }
-      );
-      const data = await res.json();
-      if (data.playing && data.title) {
-        set({ title: data.title, artist: data.artist ?? '' });
-      } else if (data.error) {
-        setLastfmMsg(data.error);
-      } else {
-        setLastfmMsg('Nothing scrobbling right now.');
-      }
-    } catch {
-      setLastfmMsg('Could not reach Last.fm.');
-    } finally {
-      setLastfmFetching(false);
-    }
+  function pickSongResult(track) {
+    set({ title: track.title, artist: track.artist });
+    setSongQuery('');
+    setSongResults([]);
+    setShowSongDropdown(false);
   }
 
   const canSave = kind === 'location' ? !!draft.text?.trim() : !!draft.title?.trim();
@@ -249,32 +251,39 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
           ) : (
             /* ── Now Playing fields ── */
             <>
-              {/* Last.fm strip */}
-              <div className="space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-                <div className="flex items-center gap-1.5">
-                  <LastfmIcon />
-                  <span className="text-xs font-semibold text-neutral-600">Last.fm</span>
-                  <span className="text-xs text-neutral-400">— fetch what you're scrobbling</span>
+              {/* Last.fm song search */}
+              <div>
+                <label className="text-xs font-semibold text-neutral-500">Search for a song</label>
+                <div className="relative mt-1">
+                  <div className="flex items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 focus-within:border-amber-500">
+                    <LastfmIcon />
+                    <input
+                      value={songQuery}
+                      onChange={handleSongQueryChange}
+                      onFocus={() => songResults.length > 0 && setShowSongDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowSongDropdown(false), 150)}
+                      placeholder="Class Historian…"
+                      className="flex-1 text-sm outline-none bg-transparent"
+                    />
+                    {songSearching && <SpinnerIcon size={14} />}
+                  </div>
+                  {showSongDropdown && songResults.length > 0 && (
+                    <ul className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg">
+                      {songResults.map((t, i) => (
+                        <li key={i}>
+                          <button
+                            type="button"
+                            onMouseDown={() => pickSongResult(t)}
+                            className="flex w-full flex-col px-3 py-2 text-left hover:bg-amber-50"
+                          >
+                            <span className="text-sm font-medium text-neutral-800">{t.title}</span>
+                            <span className="text-xs text-neutral-400">{t.artist}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <input
-                    value={lastfmUsername}
-                    onChange={handleUsernameChange}
-                    onKeyDown={(e) => e.key === 'Enter' && fetchLastfm()}
-                    placeholder="your username"
-                    className="flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={fetchLastfm}
-                    disabled={!lastfmUsername.trim() || lastfmFetching}
-                    className="flex items-center gap-1.5 rounded-md bg-[#d51007] px-3 py-1.5 text-xs font-semibold text-white transition active:scale-95 disabled:opacity-40"
-                  >
-                    {lastfmFetching && <SpinnerIcon size={12} />}
-                    {lastfmFetching ? 'Fetching…' : 'Fetch'}
-                  </button>
-                </div>
-                {lastfmMsg && <p className="text-xs text-neutral-500">{lastfmMsg}</p>}
               </div>
 
               {/* Manual song + artist */}
