@@ -687,6 +687,8 @@ function TwirlInstance({ position, delay }) {
   const { scene } = useGLTF(TWIRL_URL);
   const bodyRef = useRef();
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
+  const restFrames = useRef(0);
+  const asleep = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -699,8 +701,30 @@ function TwirlInstance({ position, delay }) {
     return () => clearTimeout(t);
   }, []);
 
+  // Force sleep once the body has truly come to rest — prevents infinite jitter
+  useFrame(() => {
+    if (asleep.current || !bodyRef.current) return;
+    const lv = bodyRef.current.linvel();
+    const av = bodyRef.current.angvel();
+    const still = (lv.x*lv.x + lv.y*lv.y + lv.z*lv.z) < 0.004
+               && (av.x*av.x + av.y*av.y + av.z*av.z) < 0.004;
+    if (still) {
+      restFrames.current += 1;
+      if (restFrames.current > 20) {
+        bodyRef.current.sleep();
+        asleep.current = true;
+      }
+    } else {
+      restFrames.current = 0;
+    }
+  });
+
   return (
-    <RigidBody ref={bodyRef} type="dynamic" colliders="hull" restitution={0.4} friction={0.5} linearDamping={0.3} angularDamping={0.5} position={[position.x, position.y, position.z]}>
+    <RigidBody ref={bodyRef} type="dynamic" colliders="hull"
+      restitution={0.05} friction={0.7}
+      linearDamping={1.8} angularDamping={2.0}
+      position={[position.x, position.y, position.z]}
+    >
       <primitive object={clonedScene} scale={1.4} />
     </RigidBody>
   );
