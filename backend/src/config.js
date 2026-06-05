@@ -17,11 +17,7 @@ export const config = {
     privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
     subject: process.env.VAPID_SUBJECT ?? 'mailto:admin@sneakypoints.com',
   },
-  spotify: {
-    clientId: process.env.SPOTIFY_CLIENT_ID ?? '',
-    clientSecret: process.env.SPOTIFY_CLIENT_SECRET ?? '',
-    // Must match the redirect URI registered in your Spotify Developer Dashboard.
-    // Production: https://yourdomain.com/api/spotify/callback
-    redirectUri: process.env.SPOTIFY_REDIRECT_URI ?? 'http://localhost:3001/api/spotify/callback',
+  lastfm: {
+    apiKey: process.env.LASTFM_API_KEY ?? '',
   },
 };

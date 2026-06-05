@@ -3,7 +3,7 @@ import StickerContent from './StickerContent.jsx';
 
 /* Shared bottom-sheet config for the two "pill" sticker types:
    - Location: typed place name + GPS snap + Nominatim search autocomplete.
-   - Now Playing: manual song/artist + optional Spotify "fetch current track" strip. */
+   - Now Playing: manual song/artist + Last.fm "fetch current track" strip. */
 
 const COLORS = ['#ffffff', '#000000', '#f43f5e', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#14b8a6'];
 
@@ -38,11 +38,12 @@ function SpinnerIcon({ size = 16 }) {
   );
 }
 
-function SpotifyIcon() {
+// Last.fm's recognisable red scrobble-wave mark, simplified.
+function LastfmIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="12" fill="#1DB954" />
-      <path d="M17.9 10.9C14.7 9 9.35 8.8 6.3 9.75c-.5.15-1-.15-1.15-.6-.15-.5.15-1 .6-1.15 3.55-1.05 9.4-.85 13.1 1.35.45.25.6.85.35 1.3-.25.35-.85.5-1.3.25zm-.1 2.8c-.25.35-.7.5-1.05.25-2.7-1.65-6.8-2.15-9.95-1.15-.4.1-.85-.1-.95-.5-.1-.4.1-.85.5-.95 3.65-1.1 8.15-.55 11.25 1.35.3.15.45.65.2 1zm-1.2 2.75c-.2.3-.55.4-.85.2-2.35-1.45-5.3-1.75-8.8-.95-.35.1-.65-.15-.75-.45-.1-.35.15-.65.45-.75 3.8-.85 7.1-.5 9.7 1.1.35.15.4.55.25.85z" fill="white" />
+    <svg width="20" height="14" viewBox="0 0 40 28" fill="#d51007">
+      <path d="M18 22.5 13.5 11.5 11 20.5 7 16 2 28h8l1-3 4 3 6-16.5L24 28h8L26.5 11 22 22.5z" />
+      <path d="M32 6c0-3.3 2.7-6 6-6s6 2.7 6 6-2.7 6-6 6-6-2.7-6-6z" />
     </svg>
   );
 }
@@ -61,35 +62,12 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceRef = useRef(null);
 
-  /* ── Spotify state ──────────────────────────────────────────────── */
-  // null = still checking, false = not connected, true = connected
-  const [spotifyStatus, setSpotifyStatus] = useState(null);
-  const [spotifyFetching, setSpotifyFetching] = useState(false);
-  const [spotifyMsg, setSpotifyMsg] = useState(null);
-
-  // Check connection status on mount (playing kind only).
-  useEffect(() => {
-    if (kind !== 'playing') return;
-    fetch('/api/spotify/status', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((d) => setSpotifyStatus(!!d.connected))
-      .catch(() => setSpotifyStatus(false));
-  }, [kind]);
-
-  // Listen for the postMessage from the OAuth popup window.
-  useEffect(() => {
-    if (kind !== 'playing') return;
-    function onMessage(e) {
-      if (e.data?.type === 'spotify_connected') {
-        setSpotifyStatus(true);
-        setSpotifyMsg(null);
-      } else if (e.data?.type === 'spotify_error') {
-        setSpotifyMsg('Spotify authorisation failed — please try again.');
-      }
-    }
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [kind]);
+  /* ── Last.fm state ──────────────────────────────────────────────── */
+  const [lastfmUsername, setLastfmUsername] = useState(
+    () => localStorage.getItem('lastfm_username') || ''
+  );
+  const [lastfmFetching, setLastfmFetching] = useState(false);
+  const [lastfmMsg, setLastfmMsg] = useState(null);
 
   /* ── Location handlers ──────────────────────────────────────────── */
 
@@ -160,34 +138,37 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
     }
   }
 
-  /* ── Spotify handlers ───────────────────────────────────────────── */
+  /* ── Last.fm handlers ───────────────────────────────────────────── */
 
-  function connectSpotify() {
-    window.open('/api/spotify/auth', 'spotify_auth', 'width=500,height=720,left=200,top=100');
+  function handleUsernameChange(e) {
+    const val = e.target.value;
+    setLastfmUsername(val);
+    localStorage.setItem('lastfm_username', val);
+    setLastfmMsg(null);
   }
 
-  async function fetchNowPlaying() {
-    setSpotifyFetching(true);
-    setSpotifyMsg(null);
+  async function fetchLastfm() {
+    if (!lastfmUsername.trim()) return;
+    setLastfmFetching(true);
+    setLastfmMsg(null);
     try {
-      const res = await fetch('/api/spotify/now-playing', { credentials: 'include' });
+      const res = await fetch(
+        `/api/lastfm/now-playing?username=${encodeURIComponent(lastfmUsername.trim())}`,
+        { credentials: 'include' }
+      );
       const data = await res.json();
       if (data.playing && data.title) {
         set({ title: data.title, artist: data.artist ?? '' });
+      } else if (data.error) {
+        setLastfmMsg(data.error);
       } else {
-        setSpotifyMsg('Nothing playing right now.');
+        setLastfmMsg('Nothing scrobbling right now.');
       }
     } catch {
-      setSpotifyMsg('Could not reach Spotify.');
+      setLastfmMsg('Could not reach Last.fm.');
     } finally {
-      setSpotifyFetching(false);
+      setLastfmFetching(false);
     }
-  }
-
-  async function disconnectSpotify() {
-    await fetch('/api/spotify/disconnect', { method: 'DELETE', credentials: 'include' }).catch(() => {});
-    setSpotifyStatus(false);
-    setSpotifyMsg(null);
   }
 
   const canSave = kind === 'location' ? !!draft.text?.trim() : !!draft.title?.trim();
@@ -268,49 +249,33 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
           ) : (
             /* ── Now Playing fields ── */
             <>
-              {/* Spotify connect/fetch strip */}
-              <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5">
-                <SpotifyIcon />
-                {spotifyStatus === null ? (
-                  <span className="flex-1 text-xs text-neutral-400">Checking Spotify…</span>
-                ) : spotifyStatus ? (
-                  <>
-                    <span className="flex-1 text-xs text-neutral-600">Spotify connected</span>
-                    <button
-                      type="button"
-                      onClick={fetchNowPlaying}
-                      disabled={spotifyFetching}
-                      className="flex items-center gap-1 text-xs font-semibold text-green-700 disabled:opacity-50"
-                    >
-                      {spotifyFetching && <SpinnerIcon size={12} />}
-                      {spotifyFetching ? 'Fetching…' : 'Fetch playing'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={disconnectSpotify}
-                      title="Disconnect Spotify"
-                      className="ml-1 text-base leading-none text-neutral-300 hover:text-red-400"
-                    >
-                      ×
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex-1 text-xs text-neutral-600">Auto-fill from Spotify</span>
-                    <button
-                      type="button"
-                      onClick={connectSpotify}
-                      className="text-xs font-semibold text-green-700"
-                    >
-                      Connect
-                    </button>
-                  </>
-                )}
+              {/* Last.fm strip */}
+              <div className="space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                <div className="flex items-center gap-1.5">
+                  <LastfmIcon />
+                  <span className="text-xs font-semibold text-neutral-600">Last.fm</span>
+                  <span className="text-xs text-neutral-400">— fetch what you're scrobbling</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={lastfmUsername}
+                    onChange={handleUsernameChange}
+                    onKeyDown={(e) => e.key === 'Enter' && fetchLastfm()}
+                    placeholder="your username"
+                    className="flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={fetchLastfm}
+                    disabled={!lastfmUsername.trim() || lastfmFetching}
+                    className="flex items-center gap-1.5 rounded-md bg-[#d51007] px-3 py-1.5 text-xs font-semibold text-white transition active:scale-95 disabled:opacity-40"
+                  >
+                    {lastfmFetching && <SpinnerIcon size={12} />}
+                    {lastfmFetching ? 'Fetching…' : 'Fetch'}
+                  </button>
+                </div>
+                {lastfmMsg && <p className="text-xs text-neutral-500">{lastfmMsg}</p>}
               </div>
-
-              {spotifyMsg && (
-                <p className="text-xs text-neutral-500">{spotifyMsg}</p>
-              )}
 
               {/* Manual song + artist */}
               <div className="grid grid-cols-2 gap-2">
@@ -320,7 +285,6 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
                     value={draft.title}
                     onChange={(e) => set({ title: e.target.value })}
                     maxLength={50}
-                    autoFocus
                     placeholder="Class Historian"
                     className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
                   />
