@@ -12,8 +12,8 @@ export const CANVAS_HEIGHT = 450;
 //   y=378 → 392 : kerb
 //   y=392 → 450 : road surface (partial, decorative)
 //
-export const ROAD_TOP_Y    = 300;   // back of pavement (base of building wall)
-export const ROAD_BOTTOM_Y = 378;   // front of pavement / kerb line
+export const ROAD_TOP_Y    = 383;   // back of lane  (top of bottom 15%)
+export const ROAD_BOTTOM_Y = 450;   // front of lane (base of canvas)
 
 // ─── World Bounds ─────────────────────────────────────────────────────────────
 export const WORLD_MIN_Z = 0;

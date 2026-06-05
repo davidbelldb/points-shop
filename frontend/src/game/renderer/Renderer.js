@@ -437,12 +437,6 @@ export class Renderer {
     } else {
       ctx.drawImage(img, sx - drawW / 2, drawY, drawW, drawH);
     }
-    if (entity.attacking || entity.special) {
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle   = entity.attacking ? '#ff3232' : '#6464ff';
-      const rx = facingLeft ? -drawW / 2 : sx - drawW / 2;
-      ctx.fillRect(rx, drawY, drawW, drawH);
-    }
     ctx.restore();
   }
 
