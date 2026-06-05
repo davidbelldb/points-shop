@@ -286,29 +286,6 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
                 </div>
               </div>
 
-              {/* Manual song + artist */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-neutral-500">Song</label>
-                  <input
-                    value={draft.title}
-                    onChange={(e) => set({ title: e.target.value })}
-                    maxLength={50}
-                    placeholder="Class Historian"
-                    className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-neutral-500">Artist</label>
-                  <input
-                    value={draft.artist}
-                    onChange={(e) => set({ artist: e.target.value })}
-                    maxLength={50}
-                    placeholder="BRONCHO"
-                    className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
-                  />
-                </div>
-              </div>
             </>
           )}
 
