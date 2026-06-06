@@ -35,5 +35,11 @@ export const PLAYER_BASE_WIDTH  = 36;
 export const PLAYER_BASE_HEIGHT = 68;
 export const PLAYER_SCALE_FAR   = 0.92; // very subtle scale difference back→front
 
+// ─── Combat ───────────────────────────────────────────────────────────────────
+export const PLAYER_MAX_HP   = 100;
+export const ATTACK_RANGE_X  = 120;  // px  — horizontal hit reach
+export const ATTACK_RANGE_Z  = 40;   // depth units — Z tolerance for a hit
+export const HURT_DURATION   = 0.35; // seconds of hurt-flash / i-frames
+
 // ─── Timing ───────────────────────────────────────────────────────────────────
 export const MAX_DELTA = 1 / 20;

@@ -115,7 +115,11 @@ export default function GameContainer() {
         <CharacterSelectScreen onSelect={goGame} />
       )}
       {phase === 'game' && (
-        <GameScreen sprites={sprites} character={character} />
+        <GameScreen
+          sprites={sprites}
+          character={character}
+          onQuit={() => setPhase('character_select')}
+        />
       )}
     </div>
   );

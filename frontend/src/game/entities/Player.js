@@ -22,6 +22,8 @@ import {
   GRAVITY,
   PLAYER_BASE_WIDTH,
   PLAYER_BASE_HEIGHT,
+  PLAYER_MAX_HP,
+  HURT_DURATION,
 } from '../constants.js';
 import { AnimationController, ANIM } from '../engine/AnimationSystem.js';
 
@@ -45,10 +47,11 @@ export class Player {
     this.anim = new AnimationController();
 
     // ── Combat stats ─────────────────────────────────────────────────────────
-    this.hp      = 100;
-    this.maxHp   = 100;
-    /** Damage dealt by the last hit-frame (consumed by combat system). */
-    this.pendingDamage = 0;
+    this.hp            = PLAYER_MAX_HP;
+    this.maxHp         = PLAYER_MAX_HP;
+    this.pendingDamage = 0;   // consumed by CombatSystem each frame
+    this.hurt          = false;
+    this.hurtTimer     = 0;
 
     // ── Sprite (fallback colour if sprites not loaded) ───────────────────────
     this.baseWidth  = PLAYER_BASE_WIDTH;
@@ -56,12 +59,39 @@ export class Player {
     this.color      = '#4ade80';
   }
 
-  // ── Convenience: expose current sprite key for the Renderer ─────────────────
+  // ── Convenience ──────────────────────────────────────────────────────────────
   get currentSprite() { return this.anim.currentSprite; }
+  get isDead()        { return this.hp <= 0; }
+
+  takeDamage(amount) {
+    if (this.hurt) return;          // i-frames during hurt state
+    this.hp        = Math.max(0, this.hp - amount);
+    this.hurt      = true;
+    this.hurtTimer = HURT_DURATION;
+  }
+
+  resetForRound(x = 200) {
+    this.x          = x;
+    this.z          = 30;
+    this.vx = this.vz = this.vy = 0;
+    this.jumpY      = 0;
+    this.grounded   = true;
+    this.hp         = this.maxHp;
+    this.hurt       = false;
+    this.hurtTimer  = 0;
+    this.pendingDamage = 0;
+    this.anim.play('idle');
+  }
 
   // ── Main update ─────────────────────────────────────────────────────────────
 
   update(dt, input) {
+    // Hurt timer (i-frames)
+    if (this.hurtTimer > 0) {
+      this.hurtTimer -= dt;
+      if (this.hurtTimer <= 0) { this.hurt = false; this.hurtTimer = 0; }
+    }
+
     const { hitActive } = this.anim.update(dt);
     if (hitActive) {
       this.pendingDamage = ANIM[this.anim.animName]?.damage ?? 0;

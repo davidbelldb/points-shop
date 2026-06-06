@@ -439,8 +439,18 @@ export class Renderer {
       ctx.translate(sx, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(img, -drawW / 2, drawY, drawW, drawH);
+      if (entity.hurt) {
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle   = '#ffffff';
+        ctx.fillRect(-drawW / 2, drawY, drawW, drawH);
+      }
     } else {
       ctx.drawImage(img, sx - drawW / 2, drawY, drawW, drawH);
+      if (entity.hurt) {
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle   = '#ffffff';
+        ctx.fillRect(sx - drawW / 2, drawY, drawW, drawH);
+      }
     }
     ctx.restore();
   }
@@ -449,7 +459,7 @@ export class Renderer {
     const { ctx } = this;
     const w = entity.baseWidth  * scale;
     const h = entity.baseHeight * scale;
-    ctx.fillStyle   = entity.color ?? '#4ade80';
+    ctx.fillStyle   = entity.hurt ? '#ffffff' : (entity.color ?? '#4ade80');
     ctx.fillRect(sx - w / 2, sy - h, w, h);
     ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.lineWidth   = Math.max(1, scale * 1.5);
