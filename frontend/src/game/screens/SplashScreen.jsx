@@ -1,30 +1,40 @@
 /**
  * SplashScreen
  *
- * Shows game_splash.png full-frame while assets load in the background.
- * Once ready, prompts "PRESS ANY KEY" and advances on any keydown.
+ * Shows game_splash_01.png for 3 seconds while assets load,
+ * then auto-advances to the title screen.
+ * If assets finish before 3 s the timer still runs out fully.
+ * If assets take longer than 3 s we wait for them before advancing.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import splashUrl from '../../assets/backgrounds/game_splash_01.png';
 
+const SPLASH_DURATION = 3000; // ms
+
 export default function SplashScreen({ ready, onContinue }) {
-  const [blink, setBlink] = useState(true);
+  const timerDone  = useRef(false);
+  const assetsDone = useRef(false);
 
-  // Blink the prompt
+  const tryAdvance = () => {
+    if (timerDone.current && assetsDone.current) onContinue();
+  };
+
+  // 3-second timer
+  useEffect(() => {
+    const id = setTimeout(() => {
+      timerDone.current = true;
+      tryAdvance();
+    }, SPLASH_DURATION);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Watch for assets becoming ready
   useEffect(() => {
     if (!ready) return;
-    const id = setInterval(() => setBlink(b => !b), 500);
-    return () => clearInterval(id);
+    assetsDone.current = true;
+    tryAdvance();
   }, [ready]);
-
-  // Any key advances once ready
-  useEffect(() => {
-    if (!ready) return;
-    const handler = () => onContinue();
-    window.addEventListener('keydown', handler, { once: true });
-    return () => window.removeEventListener('keydown', handler);
-  }, [ready, onContinue]);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-black">
@@ -34,23 +44,6 @@ export default function SplashScreen({ ready, onContinue }) {
         className="w-full h-full object-cover"
         style={{ imageRendering: 'pixelated' }}
       />
-
-      <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
-        {!ready ? (
-          <span
-            className="font-mono text-white/50 text-xs tracking-widest animate-pulse"
-          >
-            LOADING…
-          </span>
-        ) : (
-          <span
-            className="font-mono text-white text-sm tracking-widest"
-            style={{ opacity: blink ? 1 : 0, transition: 'opacity 0.1s', textShadow: '0 0 12px #fff' }}
-          >
-            PRESS ANY KEY
-          </span>
-        )}
-      </div>
     </div>
   );
 }
