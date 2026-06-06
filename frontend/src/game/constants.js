@@ -33,7 +33,7 @@ export const GRAVITY              = 1100;
 // ─── Player Sprite ────────────────────────────────────────────────────────────
 export const PLAYER_BASE_WIDTH  = 36;
 export const PLAYER_BASE_HEIGHT = 68;
-export const PLAYER_SCALE_FAR   = 0.82; // subtle scale difference back→front
+export const PLAYER_SCALE_FAR   = 0.92; // very subtle scale difference back→front
 
 // ─── Timing ───────────────────────────────────────────────────────────────────
 export const MAX_DELTA = 1 / 20;

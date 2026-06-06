@@ -35,7 +35,7 @@ const KERB_TOP    = ROAD_BOTTOM_Y;          // 378
 const KERB_BOTTOM = KERB_TOP + 14;          // 392
 const ROAD_SURFACE_BOTTOM = CANVAS_HEIGHT;  // 450
 
-const SPRITE_DISPLAY_SCALE = 2.0;
+const SPRITE_DISPLAY_SCALE = 2.3;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function lerp(a, b, t) { return a + (b - a) * t; }
