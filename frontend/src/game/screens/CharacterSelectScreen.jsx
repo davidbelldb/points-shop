@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import katieIdleUrl from '../../assets/sprites/katie_idle.png';
+import katieSelectUrl from '../../assets/character_selections/katie_select.png';
 
 const CHARACTERS = [
   {
@@ -83,13 +83,14 @@ export default function CharacterSelectScreen({ onSelect }) {
               >
                 {char.id === 'katie' ? (
                   <img
-                    src={katieIdleUrl}
+                    src={katieSelectUrl}
                     alt="Katie"
                     style={{
+                      width:           '100%',
                       height:          '100%',
                       imageRendering:  'pixelated',
-                      objectFit:       'contain',
-                      objectPosition:  'bottom',
+                      objectFit:       'cover',
+                      objectPosition:  'center',
                     }}
                   />
                 ) : (
