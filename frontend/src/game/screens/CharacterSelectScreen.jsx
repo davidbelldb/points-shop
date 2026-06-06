@@ -23,7 +23,7 @@ const CHARACTERS = [
   {
     id:       'david',
     name:     'DAVID',
-    subtitle: 'Coming Soon™',
+    subtitle: 'The Guitar Geezer',
     color:    '#40c8ff',
   },
 ];

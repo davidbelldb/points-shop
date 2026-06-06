@@ -3,7 +3,7 @@
  *
  * Top-level phase state machine.
  *
- *   splash  →  title  →  character_select  →  game
+ *   splash  →  title  →  character_select  →  costume_select  →  level_select  →  game
  *
  * Asset loading runs in the background during the splash screen so
  * there is zero wait once the player reaches the game itself.
@@ -16,6 +16,7 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 import SplashScreen          from './screens/SplashScreen.jsx';
 import TitleScreen           from './screens/TitleScreen.jsx';
 import CharacterSelectScreen from './screens/CharacterSelectScreen.jsx';
+import CostumeSelectScreen   from './screens/CostumeSelectScreen.jsx';
 import LevelSelectScreen     from './screens/LevelSelectScreen.jsx';
 import GameScreen            from './screens/GameScreen.jsx';
 
@@ -138,6 +139,7 @@ export default function GameContainer() {
   const [phase,     setPhase]     = useState('splash');
   const [sprites,   setSprites]   = useState(null);
   const [character, setCharacter] = useState(null);
+  const [costume,   setCostume]   = useState(null);
   const [level,     setLevel]     = useState(null);
   const [matchKey,  setMatchKey]  = useState(0);
 
@@ -146,10 +148,28 @@ export default function GameContainer() {
     mgr.preload(SPRITE_MANIFEST).then(() => setSprites(mgr));
   }, []);
 
-  const goTitle        = ()      => setPhase('title');
-  const goCharSelect   = ()      => setPhase('character_select');
-  const goLevelSelect  = (char)  => { setCharacter(char); setPhase('level_select'); };
-  const goGame         = (lvl)   => { setLevel(lvl);      setPhase('game'); };
+  const goTitle         = ()       => setPhase('title');
+  const goCharSelect    = ()       => setPhase('character_select');
+  const goCostumeSelect = (char)   => { setCharacter(char);    setPhase('costume_select'); };
+  const goLevelSelect   = (cos)    => { setCostume(cos);       setPhase('level_select'); };
+  const goGame          = (lvl)    => { setLevel(lvl);         setPhase('game'); };
+
+  // Quit from in-game → back to title screen
+  const handleQuit = () => {
+    setCharacter(null);
+    setCostume(null);
+    setLevel(null);
+    setPhase('title');
+  };
+
+  // Rematch → back to character select for a fresh run
+  const handleRematch = () => {
+    setCharacter(null);
+    setCostume(null);
+    setLevel(null);
+    setMatchKey(k => k + 1);
+    setPhase('character_select');
+  };
 
   return (
     <div
@@ -163,7 +183,10 @@ export default function GameContainer() {
         <TitleScreen onStart={goCharSelect} />
       )}
       {phase === 'character_select' && (
-        <CharacterSelectScreen onSelect={goLevelSelect} />
+        <CharacterSelectScreen onSelect={goCostumeSelect} />
+      )}
+      {phase === 'costume_select' && (
+        <CostumeSelectScreen character={character} onSelect={goLevelSelect} />
       )}
       {phase === 'level_select' && (
         <LevelSelectScreen onSelect={goGame} />
@@ -173,9 +196,10 @@ export default function GameContainer() {
           key={matchKey}
           sprites={sprites}
           character={character}
+          costume={costume}
           level={level}
-          onQuit={() => setPhase('level_select')}
-          onRematch={() => setMatchKey(k => k + 1)}
+          onQuit={handleQuit}
+          onRematch={handleRematch}
         />
       )}
     </div>
