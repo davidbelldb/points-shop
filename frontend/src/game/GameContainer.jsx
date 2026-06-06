@@ -49,6 +49,30 @@ import piano07Url        from '../assets/sprites/piano_attack_07.png';
 import piano08Url        from '../assets/sprites/piano_attack_08.png';
 import piano09Url        from '../assets/sprites/piano_attack_09.png';
 import piano10Url        from '../assets/sprites/piano_attack_10.png';
+import davidIdleUrl      from '../assets/sprites/david_idle.png';
+import davidJumpUrl      from '../assets/sprites/david_jump.png';
+import davidWalk01Url    from '../assets/sprites/david_walk_01.png';
+import davidWalk02Url    from '../assets/sprites/david_walk_02.png';
+import davidWalk03Url    from '../assets/sprites/david_walk_03.png';
+import davidPunch01Url   from '../assets/sprites/david_punch_01.png';
+import davidPunch02Url   from '../assets/sprites/david_punch_02.png';
+import davidPunch03Url   from '../assets/sprites/david_punch_03.png';
+import davidKick01Url    from '../assets/sprites/david_kick_01.png';
+import davidKick02Url    from '../assets/sprites/david_kick_02.png';
+import davidPK01Url      from '../assets/sprites/david_power_kick_01.png';
+import davidPK02Url      from '../assets/sprites/david_power_kick_02.png';
+import davidPK03Url      from '../assets/sprites/david_power_kick_03.png';
+import davidPK04Url      from '../assets/sprites/david_power_kick_04.png';
+import davidSp01Url      from '../assets/sprites/david_special_01.png';
+import davidSp02Url      from '../assets/sprites/david_special_02.png';
+import davidSp03Url      from '../assets/sprites/david_special_03.png';
+import davidSp04Url      from '../assets/sprites/david_special_04.png';
+import davidSp05Url      from '../assets/sprites/david_special_05.png';
+import davidSp06Url      from '../assets/sprites/david_special_06.png';
+import davidGt01Url      from '../assets/sprites/david_guitar_01.png';
+import davidGt02Url      from '../assets/sprites/david_guitar_02.png';
+import davidGt03Url      from '../assets/sprites/david_guitar_03.png';
+import davidGt04Url      from '../assets/sprites/david_guitar_04.png';
 import background01Url   from '../assets/backgrounds/background_03.png';
 
 const SPRITE_MANIFEST = {
@@ -81,6 +105,30 @@ const SPRITE_MANIFEST = {
   piano_attack_08:     piano08Url,
   piano_attack_09:     piano09Url,
   piano_attack_10:     piano10Url,
+  david_idle:          davidIdleUrl,
+  david_jump:          davidJumpUrl,
+  david_walk_01:       davidWalk01Url,
+  david_walk_02:       davidWalk02Url,
+  david_walk_03:       davidWalk03Url,
+  david_punch_01:      davidPunch01Url,
+  david_punch_02:      davidPunch02Url,
+  david_punch_03:      davidPunch03Url,
+  david_kick_01:       davidKick01Url,
+  david_kick_02:       davidKick02Url,
+  david_power_kick_01: davidPK01Url,
+  david_power_kick_02: davidPK02Url,
+  david_power_kick_03: davidPK03Url,
+  david_power_kick_04: davidPK04Url,
+  david_special_01:    davidSp01Url,
+  david_special_02:    davidSp02Url,
+  david_special_03:    davidSp03Url,
+  david_special_04:    davidSp04Url,
+  david_special_05:    davidSp05Url,
+  david_special_06:    davidSp06Url,
+  david_guitar_01:     davidGt01Url,
+  david_guitar_02:     davidGt02Url,
+  david_guitar_03:     davidGt03Url,
+  david_guitar_04:     davidGt04Url,
   bg_01:               background01Url,
 };
 

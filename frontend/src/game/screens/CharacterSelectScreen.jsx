@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import katieSelectUrl from '../../assets/character_selections/katie_select.png';
+import davidSelectUrl from '../../assets/character_selections/david_select.png';
 
 const CHARACTERS = [
   {
@@ -81,10 +82,10 @@ export default function CharacterSelectScreen({ onSelect }) {
                   transition: 'all 0.15s',
                 }}
               >
-                {char.id === 'katie' ? (
+                {char.id === 'katie' || char.id === 'david' ? (
                   <img
-                    src={katieSelectUrl}
-                    alt="Katie"
+                    src={char.id === 'katie' ? katieSelectUrl : davidSelectUrl}
+                    alt={char.name}
                     style={{
                       width:           '100%',
                       height:          '100%',

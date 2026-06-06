@@ -1,128 +1,33 @@
 /**
  * AnimationSystem
  *
- * Data-driven animation definitions.  Each entry describes a move's frames,
- * timing, damage, and which frame carries the hitbox.
+ * AnimationController drives a single entity's animation state.
+ * It is initialised with a character definition from Characters.js
+ * so sprite keys and timing are character-specific.
  *
- * Control scheme
- * ──────────────
- *   WASD / Arrows  Move
- *   K              Jump
- *   J              Punch  (3-hit, 8 dmg)
- *   L              Kick   (2-hit, 14 dmg)
- *   U              Power Kick special  (5-hit, 38 dmg)
- *   I              Punch-Kick Combo special  (4-hit, 30 dmg)
- *
- * Animation state machine (in Player.js)
- * ───────────────────────────────────────
- *   idle / walk / jump  → interruptible by any attack
- *   attack animations   → locked until complete, then return to idle/walk
+ * Usage:
+ *   import { CHAR_DEFS } from './Characters.js';
+ *   const anim = new AnimationController(CHAR_DEFS.katie);
+ *   anim.play('punch');
+ *   const { hitActive } = anim.update(dt);
+ *   ctx.drawImage(sprites.get(anim.currentSprite), ...);
  */
 
-/** @typedef {{ frames: string[], frameDuration: number, loop: boolean, cancellable: boolean, damage: number, hitFrame: number }} AnimDef */
-
-/** @type {Record<string, AnimDef>} */
-export const ANIM = {
-  idle: {
-    frames:        ['katie_idle'],
-    frameDuration: 0.15,
-    loop:          true,
-    cancellable:   true,
-    damage:        0,
-    hitFrame:      -1,
-  },
-  walk: {
-    frames:        ['katie_walk_01', 'katie_walk_02', 'katie_walk_03'],
-    frameDuration: 0.13,
-    loop:          false,
-    holdOnLast:    true,   // reaches walk_03 then stays there until key released
-    cancellable:   true,
-    damage:        0,
-    hitFrame:      -1,
-  },
-  jump: {
-    frames:        ['katie_jump'],
-    frameDuration: 0.1,
-    loop:          false,
-    cancellable:   false,
-    damage:        0,
-    hitFrame:      -1,
-  },
-
-  // ── Light attacks ───────────────────────────────────────────────────────────
-  punch: {
-    frames:        ['katie_punch_01', 'katie_punch_02', 'katie_punch_03'],
-    frameDuration: 0.08,
-    loop:          false,
-    cancellable:   false,
-    damage:        8,
-    hitFrame:      1,   // punch_02 is the impact frame
-  },
-  kick: {
-    frames:        ['katie_kick_01', 'katie_kick_02'],
-    frameDuration: 0.10,
-    loop:          false,
-    cancellable:   false,
-    damage:        14,
-    hitFrame:      1,   // kick_02 is the impact frame
-  },
-
-  // ── Special moves ───────────────────────────────────────────────────────────
-  power_kick: {
-    frames:        [
-      'katie_power_kick_01', 'katie_power_kick_02', 'katie_power_kick_03',
-      'katie_power_kick_04', 'katie_power_kick_05',
-    ],
-    frameDuration: 0.10,
-    loop:          false,
-    cancellable:   false,
-    damage:        38,
-    hitFrame:      3,   // power_kick_04 is the impact frame
-  },
-  combo: {
-    frames:        [
-      'punch_kick_combo_01', 'punch_kick_combo_02',
-      'punch_kick_combo_03', 'punch_kick_combo_04',
-    ],
-    frameDuration: 0.09,
-    loop:          false,
-    cancellable:   false,
-    damage:        30,
-    hitFrame:      3,
-  },
-  piano_attack: {
-    frames:        [
-      'piano_attack_01', 'piano_attack_02', 'piano_attack_03',
-      'piano_attack_04', 'piano_attack_05', 'piano_attack_06',
-      'piano_attack_07', 'piano_attack_08', 'piano_attack_09',
-      'piano_attack_10',
-    ],
-    frameDuration: 0.08,
-    loop:          false,
-    cancellable:   false,
-    damage:        52,
-    hitFrame:      7,   // frame 8 is the peak impact
-  },
-};
-
-/**
- * AnimationController – one instance per entity.
- *
- * Drives the current animation forward each frame.
- * Callers read `.currentSprite` for the sprite key to render.
- */
 export class AnimationController {
-  constructor() {
-    this.animName     = 'idle';
-    this.frameIndex   = 0;
-    this.frameTimer   = 0;
-    this.done         = true;   // true when a non-looping anim has finished
-    this._hitFired    = false;  // so damage only fires once per swing
+  /** @param {import('./Characters.js').CharDef} charDef */
+  constructor(charDef) {
+    this._def       = charDef;
+    this.animName   = 'idle';
+    this.frameIndex = 0;
+    this.frameTimer = 0;
+    this.done       = false;
+    this._hitFired  = false;
   }
 
-  /** Start a named animation (ignores if same anim already playing and not done). */
+  // ── Playback ────────────────────────────────────────────────────────────────
+
   play(name) {
-    if (!ANIM[name]) return;
+    if (!this._def.animations[name]) return;
     this.animName   = name;
     this.frameIndex = 0;
     this.frameTimer = 0;
@@ -131,33 +36,37 @@ export class AnimationController {
   }
 
   /**
-   * Advance the animation by dt seconds.
-   * @returns {{ hitActive: boolean }} whether the hit-frame is active this tick
+   * Advance by dt seconds.
+   * @returns {{ hitActive: boolean }}
    */
   update(dt) {
-    const def = ANIM[this.animName];
-    if (!def) return { hitActive: false };
+    const anim = this._def.animations[this.animName];
+    if (!anim) return { hitActive: false };
 
     this.frameTimer += dt;
     let hitActive = false;
 
-    if (this.frameTimer >= def.frameDuration) {
-      this.frameTimer -= def.frameDuration;
+    if (this.frameTimer >= anim.frameDuration) {
+      this.frameTimer -= anim.frameDuration;
       const next = this.frameIndex + 1;
 
-      if (next >= def.frames.length) {
-        if (def.loop) {
+      if (next >= anim.frames.length) {
+        if (anim.loop) {
           this.frameIndex = 0;
-        } else if (def.holdOnLast) {
-          this.frameIndex = def.frames.length - 1; // freeze on last frame, never done
+        } else if (anim.holdOnLast) {
+          this.frameIndex = anim.frames.length - 1; // stay, never done
         } else {
-          this.frameIndex = def.frames.length - 1;
+          this.frameIndex = anim.frames.length - 1;
           this.done       = true;
         }
       } else {
         this.frameIndex = next;
-        // Fire hit on the exact frame transition TO the hitFrame
-        if (this.frameIndex === def.hitFrame && !this._hitFired && def.damage > 0) {
+        // Fire hit exactly once on the hitFrame
+        if (
+          this.frameIndex === anim.hitFrame &&
+          !this._hitFired &&
+          anim.damage > 0
+        ) {
           hitActive      = true;
           this._hitFired = true;
         }
@@ -167,18 +76,20 @@ export class AnimationController {
     return { hitActive };
   }
 
-  /** Sprite key the renderer should display. */
+  // ── Read-only state ─────────────────────────────────────────────────────────
+
+  /** Sprite key to pass to the renderer. */
   get currentSprite() {
-    const def = ANIM[this.animName];
-    return def?.frames[this.frameIndex] ?? 'katie_idle';
+    const anim = this._def.animations[this.animName];
+    return anim?.frames[this.frameIndex] ?? `${this._def.prefix}_idle`;
   }
 
-  /** True when a non-looping animation has played to completion. */
-  get isFinished() { return this.done; }
+  /** True when a non-looping, non-holdOnLast anim has played to the end. */
+  get isFinished()   { return this.done; }
 
-  /** True while an attack animation is running (locks movement/input). */
-  get isAttacking() {
-    const name = this.animName;
-    return name === 'punch' || name === 'kick' || name === 'power_kick' || name === 'combo' || name === 'piano_attack';
-  }
+  /** True while an attack animation is active. */
+  get isAttacking()  { return this._def.animations[this.animName]?.isAttack ?? false; }
+
+  /** Damage value of the current animation (used when hitActive fires). */
+  get currentDamage(){ return this._def.animations[this.animName]?.damage ?? 0; }
 }

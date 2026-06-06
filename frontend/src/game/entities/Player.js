@@ -1,34 +1,26 @@
 /**
- * Player Entity
+ * Player Entity  (human-controlled)
  *
- * Coordinate system
- * ─────────────────
- *  x      – horizontal position along the street
- *  z      – depth into the lane  (0 = back, WORLD_MAX_Z = front)
- *  jumpY  – vertical offset from jumping (px, > 0 = airborne)
- *
- * Animation is driven by AnimationController.  During an attack animation
- * horizontal/depth input is suppressed so swings feel committed.
+ * Takes a characterId ('katie' | 'david') and drives animations,
+ * movement and combat via that character's definition.
  */
 
 import {
   WORLD_MIN_X, WORLD_MAX_X,
   WORLD_MIN_Z, WORLD_MAX_Z,
-  PLAYER_ACCEL,
-  PLAYER_FRICTION,
-  PLAYER_MAX_SPEED_X,
-  PLAYER_MAX_SPEED_Z,
-  PLAYER_JUMP_VELOCITY,
-  GRAVITY,
-  PLAYER_BASE_WIDTH,
-  PLAYER_BASE_HEIGHT,
-  PLAYER_MAX_HP,
-  HURT_DURATION,
+  PLAYER_ACCEL, PLAYER_FRICTION,
+  PLAYER_MAX_SPEED_X, PLAYER_MAX_SPEED_Z,
+  PLAYER_JUMP_VELOCITY, GRAVITY,
+  PLAYER_BASE_WIDTH, PLAYER_BASE_HEIGHT,
+  PLAYER_MAX_HP, HURT_DURATION,
 } from '../constants.js';
-import { AnimationController, ANIM } from '../engine/AnimationSystem.js';
+import { AnimationController } from '../engine/AnimationSystem.js';
+import { CHAR_DEFS }           from '../engine/Characters.js';
 
 export class Player {
-  constructor({ x = 400, z = 30 } = {}) {
+  constructor({ x = 200, z = 30, characterId = 'katie' } = {}) {
+    this._charDef   = CHAR_DEFS[characterId] ?? CHAR_DEFS.katie;
+
     // ── World position ──────────────────────────────────────────────────────
     this.x     = x;
     this.z     = z;
@@ -44,41 +36,38 @@ export class Player {
     this.facingLeft = false;
 
     // ── Animation ────────────────────────────────────────────────────────────
-    this.anim = new AnimationController();
+    this.anim = new AnimationController(this._charDef);
 
-    // ── Combat stats ─────────────────────────────────────────────────────────
+    // ── Combat ───────────────────────────────────────────────────────────────
     this.hp            = PLAYER_MAX_HP;
     this.maxHp         = PLAYER_MAX_HP;
-    this.pendingDamage = 0;   // consumed by CombatSystem each frame
+    this.pendingDamage = 0;
     this.hurt          = false;
     this.hurtTimer     = 0;
 
-    // ── Sprite (fallback colour if sprites not loaded) ───────────────────────
+    // ── Renderer ──────────────────────────────────────────────────────────────
     this.baseWidth  = PLAYER_BASE_WIDTH;
     this.baseHeight = PLAYER_BASE_HEIGHT;
-    this.color      = '#4ade80';
+    this.color      = this._charDef.color;
   }
 
-  // ── Convenience ──────────────────────────────────────────────────────────────
   get currentSprite() { return this.anim.currentSprite; }
   get isDead()        { return this.hp <= 0; }
 
   takeDamage(amount) {
-    if (this.hurt) return;          // i-frames during hurt state
+    if (this.hurt) return;
     this.hp        = Math.max(0, this.hp - amount);
     this.hurt      = true;
     this.hurtTimer = HURT_DURATION;
   }
 
   resetForRound(x = 200) {
-    this.x          = x;
-    this.z          = 30;
+    this.x = x; this.z = 30;
     this.vx = this.vz = this.vy = 0;
-    this.jumpY      = 0;
-    this.grounded   = true;
-    this.hp         = this.maxHp;
-    this.hurt       = false;
-    this.hurtTimer  = 0;
+    this.jumpY    = 0;
+    this.grounded = true;
+    this.hp       = this.maxHp;
+    this.hurt     = false; this.hurtTimer = 0;
     this.pendingDamage = 0;
     this.anim.play('idle');
   }
@@ -86,27 +75,21 @@ export class Player {
   // ── Main update ─────────────────────────────────────────────────────────────
 
   update(dt, input) {
-    // Hurt timer (i-frames)
+    // Hurt i-frames
     if (this.hurtTimer > 0) {
       this.hurtTimer -= dt;
       if (this.hurtTimer <= 0) { this.hurt = false; this.hurtTimer = 0; }
     }
 
     const { hitActive } = this.anim.update(dt);
-    if (hitActive) {
-      this.pendingDamage = ANIM[this.anim.animName]?.damage ?? 0;
-    }
+    if (hitActive) this.pendingDamage = this.anim.currentDamage;
 
-    // Return to idle/walk once an attack finishes
-    if (this.anim.isFinished && this.anim.isAttacking) {
-      this.anim.play('idle');
-    }
+    // Return to idle once an attack finishes
+    if (this.anim.isFinished && this.anim.isAttacking) this.anim.play('idle');
 
-    // Jump state drives anim if not attacking
-    if (!this.anim.isAttacking) {
-      if (!this.grounded) {
-        if (this.anim.animName !== 'jump') this.anim.play('jump');
-      }
+    // Keep jump anim while airborne
+    if (!this.anim.isAttacking && !this.grounded && this.anim.animName !== 'jump') {
+      this.anim.play('jump');
     }
 
     this._handleAttacks(input);
@@ -118,22 +101,23 @@ export class Player {
   // ── Attacks ──────────────────────────────────────────────────────────────────
 
   _handleAttacks(input) {
-    // Only start a new attack when grounded and not mid-attack
     if (this.anim.isAttacking) return;
+    const map = this._charDef.inputMap;
 
-    if (input.isPressed('PIANO'))      { this.anim.play('piano_attack'); return; }
-    if (input.isPressed('POWER_KICK')) { this.anim.play('power_kick');  return; }
-    if (input.isPressed('COMBO'))      { this.anim.play('combo');       return; }
-    if (input.isPressed('PUNCH'))      { this.anim.play('punch');       return; }
-    if (input.isPressed('KICK'))       { this.anim.play('kick');        return; }
+    // Priority: O > U > I > J > L
+    if (input.isPressed('PIANO')      && map.PIANO)      { this.anim.play(map.PIANO);      return; }
+    if (input.isPressed('POWER_KICK') && map.POWER_KICK) { this.anim.play(map.POWER_KICK); return; }
+    if (input.isPressed('COMBO')      && map.COMBO)      { this.anim.play(map.COMBO);      return; }
+    if (input.isPressed('PUNCH')      && map.PUNCH)      { this.anim.play(map.PUNCH);      return; }
+    if (input.isPressed('KICK')       && map.KICK)       { this.anim.play(map.KICK);       return; }
   }
 
   // ── Movement ─────────────────────────────────────────────────────────────────
 
   _handleMovement(dt, input) {
-    // Suppress movement during attack animations
     if (this.anim.isAttacking) {
-      this._applyFriction(dt);
+      this._applyFrictionAxis('x', dt);
+      this._applyFrictionAxis('z', dt);
       this._clampAndApply(dt);
       return;
     }
@@ -161,11 +145,6 @@ export class Player {
     this._clampAndApply(dt);
   }
 
-  _applyFriction(dt) {
-    this._applyFrictionAxis('x', dt);
-    this._applyFrictionAxis('z', dt);
-  }
-
   _applyFrictionAxis(axis, dt) {
     const delta = PLAYER_FRICTION * dt;
     if (Math.abs(this[`v${axis}`]) <= delta) this[`v${axis}`] = 0;
@@ -185,14 +164,11 @@ export class Player {
       this.grounded = false;
       this.anim.play('jump');
     }
-
     if (!this.grounded) {
       this.vy    -= GRAVITY * dt;
       this.jumpY += this.vy * dt;
       if (this.jumpY <= 0) {
-        this.jumpY    = 0;
-        this.vy       = 0;
-        this.grounded = true;
+        this.jumpY = 0; this.vy = 0; this.grounded = true;
         if (this.anim.animName === 'jump') this.anim.play('idle');
       }
     }
@@ -203,18 +179,12 @@ export class Player {
   _handleWalkAnim(input) {
     if (this.anim.isAttacking || !this.grounded) return;
 
-    const heldH  = input.isHeld('LEFT')    || input.isHeld('RIGHT');
-    const freshH = input.isPressed('LEFT')  || input.isPressed('RIGHT');
-    const heldV  = input.isHeld('UP')       || input.isHeld('DOWN');
-    const moving = heldH || heldV;
+    const heldH  = input.isHeld('LEFT')   || input.isHeld('RIGHT');
+    const freshH = input.isPressed('LEFT') || input.isPressed('RIGHT');
+    const moving = heldH || input.isHeld('UP') || input.isHeld('DOWN');
 
     if (moving) {
-      // Fresh horizontal press → restart cycle from walk_01
-      // Also start walk if currently idle/other non-attack anim
-      if (freshH || this.anim.animName !== 'walk') {
-        this.anim.play('walk');
-      }
-      // Otherwise the anim advances naturally to walk_03 and holds there
+      if (freshH || this.anim.animName !== 'walk') this.anim.play('walk');
     } else {
       if (this.anim.animName !== 'idle') this.anim.play('idle');
     }

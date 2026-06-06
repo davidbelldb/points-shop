@@ -209,9 +209,11 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
     const canvas = canvasRef.current;
     if (!canvas || !sprites) return;
 
-    const input    = new InputManager().attach(window);
-    const player   = new Player({ x: 200, z: 30 });
-    const enemy    = new Enemy({ x: 620, z: 30 });
+    const input        = new InputManager().attach(window);
+    const playerCharId = character ?? 'katie';
+    const cpuCharId    = playerCharId === 'katie' ? 'david' : 'katie';
+    const player   = new Player({ x: 200, z: 30, characterId: playerCharId });
+    const enemy    = new Enemy({  x: 620, z: 30, characterId: cpuCharId });
     const renderer = new Renderer(canvas, sprites);
     const combat   = new CombatSystem();
     const rounds   = new RoundManager();
@@ -228,7 +230,7 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
           player.update(dt, input);
           enemy.update(dt, player);
           combat.checkHit(player, [enemy]);
-          // Future: combat.checkHit(enemy, [player]);
+          combat.checkHit(enemy,  [player]);
         }
 
         rounds.update(dt, player, enemy);
