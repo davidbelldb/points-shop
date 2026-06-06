@@ -48,7 +48,7 @@ import piano07Url        from '../assets/sprites/piano_attack_07.png';
 import piano08Url        from '../assets/sprites/piano_attack_08.png';
 import piano09Url        from '../assets/sprites/piano_attack_09.png';
 import piano10Url        from '../assets/sprites/piano_attack_10.png';
-import background01Url   from '../assets/backgrounds/background_01.png';
+import background01Url   from '../assets/backgrounds/background_02.png';
 
 const SPRITE_MANIFEST = {
   katie_idle:          katieIdleUrl,
