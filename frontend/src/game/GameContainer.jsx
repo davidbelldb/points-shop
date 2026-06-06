@@ -16,6 +16,7 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 import SplashScreen          from './screens/SplashScreen.jsx';
 import TitleScreen           from './screens/TitleScreen.jsx';
 import CharacterSelectScreen from './screens/CharacterSelectScreen.jsx';
+import LevelSelectScreen     from './screens/LevelSelectScreen.jsx';
 import GameScreen            from './screens/GameScreen.jsx';
 
 // ─── Asset manifest ───────────────────────────────────────────────────────────
@@ -89,16 +90,17 @@ export default function GameContainer() {
   const [phase,     setPhase]     = useState('splash');
   const [sprites,   setSprites]   = useState(null);
   const [character, setCharacter] = useState(null);
+  const [level,     setLevel]     = useState(null);
 
-  // Load all assets immediately — runs in background behind splash screen
   useEffect(() => {
     const mgr = new SpriteManager();
     mgr.preload(SPRITE_MANIFEST).then(() => setSprites(mgr));
   }, []);
 
-  const goTitle       = ()    => setPhase('title');
-  const goCharSelect  = ()    => setPhase('character_select');
-  const goGame        = (char) => { setCharacter(char); setPhase('game'); };
+  const goTitle        = ()      => setPhase('title');
+  const goCharSelect   = ()      => setPhase('character_select');
+  const goLevelSelect  = (char)  => { setCharacter(char); setPhase('level_select'); };
+  const goGame         = (lvl)   => { setLevel(lvl);      setPhase('game'); };
 
   return (
     <div
@@ -112,13 +114,17 @@ export default function GameContainer() {
         <TitleScreen onStart={goCharSelect} />
       )}
       {phase === 'character_select' && (
-        <CharacterSelectScreen onSelect={goGame} />
+        <CharacterSelectScreen onSelect={goLevelSelect} />
+      )}
+      {phase === 'level_select' && (
+        <LevelSelectScreen onSelect={goGame} />
       )}
       {phase === 'game' && (
         <GameScreen
           sprites={sprites}
           character={character}
-          onQuit={() => setPhase('character_select')}
+          level={level}
+          onQuit={() => setPhase('level_select')}
         />
       )}
     </div>

@@ -178,7 +178,7 @@ function MatchOver({ winner, onRematch, onQuit }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function GameScreen({ sprites, character, onQuit }) {
+export default function GameScreen({ sprites, character, level, onQuit }) {
   const canvasRef = useRef(null);
 
   const [hudState, setHudState] = useState({
@@ -244,7 +244,7 @@ export default function GameScreen({ sprites, character, onQuit }) {
         renderer.draw({
           player,
           entities: [enemy],
-          background: sprites.get('bg_01'),
+          background: sprites.get(level?.bgKey ?? 'bg_01'),
         });
 
         frameCount++;
