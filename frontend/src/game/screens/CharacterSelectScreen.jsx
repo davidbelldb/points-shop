@@ -73,7 +73,7 @@ export default function CharacterSelectScreen({ onSelect }) {
               <div
                 className="relative flex items-end justify-center"
                 style={{
-                  width:     140,
+                  width:     200,
                   height:    200,
                   border:    `2px solid ${selected ? char.color : '#ffffff22'}`,
                   boxShadow: selected ? `0 0 24px ${char.color}88, inset 0 0 12px ${char.color}22` : 'none',
