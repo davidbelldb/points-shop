@@ -23,9 +23,11 @@ const ACTION_MAP = {
   KeyS:       'DOWN',
 
   // Combat
-  KeyJ: 'ATTACK',
-  KeyK: 'JUMP',
-  KeyL: 'SPECIAL',
+  KeyJ: 'PUNCH',       // light punch combo
+  KeyK: 'JUMP',        // jump
+  KeyL: 'KICK',        // kick
+  KeyU: 'POWER_KICK',  // special — jumping spin kick
+  KeyI: 'COMBO',       // special — punch-kick combo
 };
 
 export class InputManager {

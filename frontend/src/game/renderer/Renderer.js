@@ -36,8 +36,6 @@ const KERB_BOTTOM = KERB_TOP + 14;          // 392
 const ROAD_SURFACE_BOTTOM = CANVAS_HEIGHT;  // 450
 
 const SPRITE_DISPLAY_SCALE = 2.0;
-const WALK_FRAME_DURATION  = 0.14;
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -46,18 +44,9 @@ export function project(x, z, jumpY = 0) {
   const t       = Math.max(0, Math.min(1, z / WORLD_MAX_Z));
   const scale   = lerp(PLAYER_SCALE_FAR, 1.0, t);
   const groundY = lerp(ROAD_TOP_Y, ROAD_BOTTOM_Y, t);
-  const sx      = x;                         // flat — no X perspective warp
+  const sx      = x;
   const sy      = groundY - jumpY * scale;
   return { sx, sy, groundY, scale, t };
-}
-
-function spriteKeyFor(entity) {
-  if (!entity.grounded)                                    return 'katie_jump';
-  const moving = Math.abs(entity.vx) > 8 || Math.abs(entity.vz) > 8;
-  if (!moving)                                             return 'katie_idle';
-  return Math.floor(entity.animTime / WALK_FRAME_DURATION) % 2 === 0
-    ? 'katie_walk_01'
-    : 'katie_walk_02';
 }
 
 // ─── Renderer ────────────────────────────────────────────────────────────────
@@ -418,7 +407,7 @@ export class Renderer {
 
   _drawEntity(entity) {
     const { sx, sy, groundY, scale } = project(entity.x, entity.z, entity.jumpY);
-    const key    = spriteKeyFor(entity);
+    const key    = entity.currentSprite ?? 'katie_idle';
     const sprite = this.sprites?.get(key) ?? null;
 
     if (sprite) {
