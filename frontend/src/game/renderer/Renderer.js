@@ -439,18 +439,8 @@ export class Renderer {
       ctx.translate(sx, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(img, -drawW / 2, drawY, drawW, drawH);
-      if (entity.hurt) {
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle   = '#ffffff';
-        ctx.fillRect(-drawW / 2, drawY, drawW, drawH);
-      }
     } else {
       ctx.drawImage(img, sx - drawW / 2, drawY, drawW, drawH);
-      if (entity.hurt) {
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle   = '#ffffff';
-        ctx.fillRect(sx - drawW / 2, drawY, drawW, drawH);
-      }
     }
     ctx.restore();
   }
