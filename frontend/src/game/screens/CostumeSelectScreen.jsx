@@ -36,13 +36,14 @@ const COSTUMES = {
 
 const ACCENT = { katie: '#c060ff', david: '#40c8ff' };
 
-export default function CostumeSelectScreen({ character, onSelect }) {
+export default function CostumeSelectScreen({ character, onSelect, onBack }) {
   const [cursor, setCursor] = useState(0);
   const costumes = COSTUMES[character] ?? COSTUMES.katie;
   const accent   = ACCENT[character] ?? '#fbbf24';
 
   useEffect(() => {
     const handler = (e) => {
+      if (e.code === 'Escape')                           { onBack(); return; }
       if (e.code === 'ArrowLeft'  || e.code === 'KeyA')
         setCursor(c => Math.max(0, c - 1));
       if (e.code === 'ArrowRight' || e.code === 'KeyD')
@@ -54,7 +55,7 @@ export default function CostumeSelectScreen({ character, onSelect }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, costumes, onSelect]);
+  }, [cursor, costumes, onSelect, onBack]);
 
   return (
     <div
@@ -156,7 +157,7 @@ export default function CostumeSelectScreen({ character, onSelect }) {
 
       {/* Footer hint */}
       <p className="text-xs tracking-widest select-none" style={{ color: '#ffffff22' }}>
-        ←/→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT
+        ←/→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT &nbsp;·&nbsp; ESC BACK
       </p>
     </div>
   );

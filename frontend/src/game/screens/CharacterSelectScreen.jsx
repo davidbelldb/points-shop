@@ -28,12 +28,13 @@ const CHARACTERS = [
   },
 ];
 
-export default function CharacterSelectScreen({ onSelect }) {
+export default function CharacterSelectScreen({ onSelect, onBack }) {
   const [cursor, setCursor] = useState(0);
   const [confirm, setConfirm] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
+      if (e.code === 'Escape')                           { onBack(); return; }
       if (e.code === 'ArrowLeft'  || e.code === 'KeyA') setCursor(0);
       if (e.code === 'ArrowRight' || e.code === 'KeyD') setCursor(1);
       if (e.code === 'Enter') {
@@ -43,7 +44,7 @@ export default function CharacterSelectScreen({ onSelect }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, onSelect]);
+  }, [cursor, onSelect, onBack]);
 
   return (
     <div
@@ -137,7 +138,7 @@ export default function CharacterSelectScreen({ onSelect }) {
 
       {/* Controls hint */}
       <p className="text-xs tracking-widest text-white/20 mt-4">
-        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM
+        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM &nbsp;·&nbsp; ESC BACK
       </p>
     </div>
   );

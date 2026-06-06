@@ -53,11 +53,12 @@ export const LEVELS = [
   },
 ];
 
-export default function LevelSelectScreen({ onSelect }) {
+export default function LevelSelectScreen({ onSelect, onBack }) {
   const [cursor, setCursor] = useState(0);
 
   useEffect(() => {
     const handler = (e) => {
+      if (e.code === 'Escape')     { onBack(); return; }
       if (e.code === 'ArrowLeft')  setCursor(c => Math.max(0, c - 1));
       if (e.code === 'ArrowRight') setCursor(c => Math.min(LEVELS.length - 1, c + 1));
       if (e.code === 'ArrowUp')    setCursor(c => c - COLS >= 0 ? c - COLS : c);
@@ -69,7 +70,7 @@ export default function LevelSelectScreen({ onSelect }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, onSelect]);
+  }, [cursor, onSelect, onBack]);
 
   return (
     <div
@@ -177,7 +178,7 @@ export default function LevelSelectScreen({ onSelect }) {
 
       {/* Footer hint */}
       <p className="text-xs tracking-widest select-none" style={{ color: '#ffffff22' }}>
-        ←↑↓→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT
+        ←↑↓→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT &nbsp;·&nbsp; ESC BACK
       </p>
     </div>
   );

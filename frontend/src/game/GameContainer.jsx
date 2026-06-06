@@ -183,13 +183,13 @@ export default function GameContainer() {
         <TitleScreen onStart={goCharSelect} />
       )}
       {phase === 'character_select' && (
-        <CharacterSelectScreen onSelect={goCostumeSelect} />
+        <CharacterSelectScreen onSelect={goCostumeSelect} onBack={goTitle} />
       )}
       {phase === 'costume_select' && (
-        <CostumeSelectScreen character={character} onSelect={goLevelSelect} />
+        <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} />
       )}
       {phase === 'level_select' && (
-        <LevelSelectScreen onSelect={goGame} />
+        <LevelSelectScreen onSelect={goGame} onBack={() => setPhase('costume_select')} />
       )}
       {phase === 'game' && (
         <GameScreen
