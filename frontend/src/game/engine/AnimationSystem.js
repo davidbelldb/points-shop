@@ -88,7 +88,20 @@ export const ANIM = {
     loop:          false,
     cancellable:   false,
     damage:        30,
-    hitFrame:      3,   // combo_04 (roundhouse) is the impact frame
+    hitFrame:      3,
+  },
+  piano_attack: {
+    frames:        [
+      'piano_attack_01', 'piano_attack_02', 'piano_attack_03',
+      'piano_attack_04', 'piano_attack_05', 'piano_attack_06',
+      'piano_attack_07', 'piano_attack_08', 'piano_attack_09',
+      'piano_attack_10',
+    ],
+    frameDuration: 0.08,
+    loop:          false,
+    cancellable:   false,
+    damage:        52,
+    hitFrame:      7,   // frame 8 is the peak impact
   },
 };
 
@@ -166,6 +179,6 @@ export class AnimationController {
   /** True while an attack animation is running (locks movement/input). */
   get isAttacking() {
     const name = this.animName;
-    return name === 'punch' || name === 'kick' || name === 'power_kick' || name === 'combo';
+    return name === 'punch' || name === 'kick' || name === 'power_kick' || name === 'combo' || name === 'piano_attack';
   }
 }

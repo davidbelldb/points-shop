@@ -28,6 +28,7 @@ const ACTION_MAP = {
   KeyL: 'KICK',        // kick
   KeyU: 'POWER_KICK',  // special — jumping spin kick
   KeyI: 'COMBO',       // special — punch-kick combo
+  KeyO: 'PIANO',       // special — piano attack (10-hit)
 };
 
 export class InputManager {

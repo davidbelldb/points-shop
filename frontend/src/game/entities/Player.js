@@ -91,10 +91,11 @@ export class Player {
     // Only start a new attack when grounded and not mid-attack
     if (this.anim.isAttacking) return;
 
-    if (input.isPressed('POWER_KICK')) { this.anim.play('power_kick'); return; }
-    if (input.isPressed('COMBO'))      { this.anim.play('combo');      return; }
-    if (input.isPressed('PUNCH'))      { this.anim.play('punch');      return; }
-    if (input.isPressed('KICK'))       { this.anim.play('kick');       return; }
+    if (input.isPressed('PIANO'))      { this.anim.play('piano_attack'); return; }
+    if (input.isPressed('POWER_KICK')) { this.anim.play('power_kick');  return; }
+    if (input.isPressed('COMBO'))      { this.anim.play('combo');       return; }
+    if (input.isPressed('PUNCH'))      { this.anim.play('punch');       return; }
+    if (input.isPressed('KICK'))       { this.anim.play('kick');        return; }
   }
 
   // ── Movement ─────────────────────────────────────────────────────────────────

@@ -38,6 +38,16 @@ import combo01Url        from '../assets/sprites/punch_kick_combo_01.png';
 import combo02Url        from '../assets/sprites/punch_kick_combo_02.png';
 import combo03Url        from '../assets/sprites/punch_kick_combo_03.png';
 import combo04Url        from '../assets/sprites/punch_kick_combo_04.png';
+import piano01Url        from '../assets/sprites/piano_attack_01.png';
+import piano02Url        from '../assets/sprites/piano_attack_02.png';
+import piano03Url        from '../assets/sprites/piano_attack_03.png';
+import piano04Url        from '../assets/sprites/piano_attack_04.png';
+import piano05Url        from '../assets/sprites/piano_attack_05.png';
+import piano06Url        from '../assets/sprites/piano_attack_06.png';
+import piano07Url        from '../assets/sprites/piano_attack_07.png';
+import piano08Url        from '../assets/sprites/piano_attack_08.png';
+import piano09Url        from '../assets/sprites/piano_attack_09.png';
+import piano10Url        from '../assets/sprites/piano_attack_10.png';
 import background01Url   from '../assets/backgrounds/background_01.png';
 
 const SPRITE_MANIFEST = {
@@ -60,6 +70,16 @@ const SPRITE_MANIFEST = {
   punch_kick_combo_02: combo02Url,
   punch_kick_combo_03: combo03Url,
   punch_kick_combo_04: combo04Url,
+  piano_attack_01:     piano01Url,
+  piano_attack_02:     piano02Url,
+  piano_attack_03:     piano03Url,
+  piano_attack_04:     piano04Url,
+  piano_attack_05:     piano05Url,
+  piano_attack_06:     piano06Url,
+  piano_attack_07:     piano07Url,
+  piano_attack_08:     piano08Url,
+  piano_attack_09:     piano09Url,
+  piano_attack_10:     piano10Url,
   bg_01:               background01Url,
 };
 

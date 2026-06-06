@@ -34,6 +34,7 @@ function Controls() {
       <div>Kick  L</div>
       <div>Power Kick  U</div>
       <div>Combo  I</div>
+      <div>Piano Attack  O</div>
     </div>
   );
 }
