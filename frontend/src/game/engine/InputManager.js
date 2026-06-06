@@ -25,6 +25,7 @@ const ACTION_MAP = {
   // Combat
   KeyJ: 'PUNCH',       // light punch combo
   KeyK: 'JUMP',        // jump
+  Space: 'JUMP',       // space bar also jumps
   KeyL: 'KICK',        // kick
   KeyU: 'POWER_KICK',  // special — jumping spin kick
   KeyI: 'COMBO',       // special — punch-kick combo

@@ -8,7 +8,7 @@
  * The canvas handles the scene.
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GameLoop }      from '../engine/GameLoop.js';
 import { InputManager }  from '../engine/InputManager.js';
 import { CombatSystem }  from '../engine/CombatSystem.js';
@@ -176,11 +176,45 @@ function MatchOver({ winner, onRematch, onQuit }) {
   );
 }
 
+// ─── Pause overlay ────────────────────────────────────────────────────────────
+
+function PauseOverlay({ onResume, onQuit }) {
+  return (
+    <div
+      className="absolute inset-0 flex flex-col items-center justify-center gap-8 pointer-events-auto select-none"
+      style={{ background: 'rgba(0,0,0,0.70)', zIndex: 40, fontFamily: 'monospace' }}
+    >
+      <p
+        className="text-4xl font-black tracking-[0.3em]"
+        style={{ color: '#fff', textShadow: '0 0 20px #fff6' }}
+      >
+        PAUSED
+      </p>
+      <div className="flex gap-6">
+        <button
+          onClick={onResume}
+          className="px-6 py-2 text-sm tracking-widest font-bold border-2 border-white/50 text-white hover:bg-white/10 transition"
+        >
+          RESUME
+        </button>
+        <button
+          onClick={onQuit}
+          className="px-6 py-2 text-sm tracking-widest font-bold border-2 border-white/20 text-white/50 hover:bg-white/10 transition"
+        >
+          QUIT
+        </button>
+      </div>
+      <p className="text-xs tracking-widest" style={{ color: '#ffffff44' }}>ESC to resume</p>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function GameScreen({ sprites, character, level, onQuit }) {
-  const canvasRef = useRef(null);
-
+export default function GameScreen({ sprites, character, level, onQuit, onRematch }) {
+  const canvasRef  = useRef(null);
+  const pausedRef  = useRef(false);   // read inside rAF loop — no re-render cost
+  const [paused,   setPaused]   = useState(false);
   const [hudState, setHudState] = useState({
     playerHp:  100,
     enemyHp:   100,
@@ -192,19 +226,18 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
     winner:    null,
   });
 
-  // Stable rematch callback — signals parent or resets internally
-  const handleRematch = useCallback(() => {
-    setHudState(s => ({
-      ...s,
-      playerHp: 100, enemyHp: 100,
-      scores: { player: 0, enemy: 0 },
-      round: 1,
-      overlay: { text: '3', style: 'number' },
-      matchOver: false,
-      winner: null,
-    }));
+  // ESC toggles pause (separate listener so it doesn't go through InputManager)
+  useEffect(() => {
+    const onEsc = (e) => {
+      if (e.code !== 'Escape') return;
+      pausedRef.current = !pausedRef.current;
+      setPaused(p => !p);
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
   }, []);
 
+  // Game loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !sprites) return;
@@ -223,9 +256,8 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
 
     const loop = new GameLoop({
       update(dt) {
-        if (matchDone) return;
+        if (pausedRef.current || matchDone) return;
 
-        // Only allow player input while fighting
         if (rounds.isFighting) {
           player.update(dt, input);
           enemy.update(dt, player);
@@ -234,10 +266,7 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
         }
 
         rounds.update(dt, player, enemy);
-
-        if (rounds.isOver && !matchDone) {
-          matchDone = true;
-        }
+        if (rounds.isOver && !matchDone) matchDone = true;
 
         input.consumeFrame();
       },
@@ -245,19 +274,19 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
       render(_dt) {
         renderer.draw({
           player,
-          entities: [enemy],
+          entities:   [enemy],
           background: sprites.get(level?.bgKey ?? 'bg_01'),
         });
 
         frameCount++;
         if (frameCount % 3 === 0) {
           setHudState({
-            playerHp:  player.hp,
-            enemyHp:   enemy.hp,
-            maxHp:     player.maxHp,
-            scores:    { ...rounds.scores },
-            round:     rounds.round,
-            overlay:   rounds.overlayText
+            playerHp: player.hp,
+            enemyHp:  enemy.hp,
+            maxHp:    player.maxHp,
+            scores:   { ...rounds.scores },
+            round:    rounds.round,
+            overlay:  rounds.overlayText
               ? { text: rounds.overlayText, style: rounds.overlayStyle }
               : null,
             matchOver: rounds.isOver,
@@ -269,15 +298,12 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
 
     loop.start();
     return () => { loop.stop(); input.detach(); };
-  }, [sprites]);
+  }, [sprites]);   // sprites is stable — this only runs once per mount
 
-  // Rematch: re-mount by changing a key (simplest reset approach)
-  const [matchKey, setMatchKey] = useState(0);
-  const rematch = () => { handleRematch(); setMatchKey(k => k + 1); };
+  const resume = () => { pausedRef.current = false; setPaused(false); };
 
   return (
     <div
-      key={matchKey}
       className="relative overflow-hidden"
       style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
     >
@@ -297,25 +323,28 @@ export default function GameScreen({ sprites, character, level, onQuit }) {
         round={hudState.round}
       />
 
-      {hudState.overlay && !hudState.matchOver && (
+      {hudState.overlay && !hudState.matchOver && !paused && (
         <Overlay text={hudState.overlay.text} style={hudState.overlay.style} />
+      )}
+
+      {paused && !hudState.matchOver && (
+        <PauseOverlay onResume={resume} onQuit={onQuit} />
       )}
 
       {hudState.matchOver && (
         <MatchOver
           winner={hudState.winner}
-          onRematch={rematch}
+          onRematch={onRematch}
           onQuit={onQuit}
         />
       )}
 
-      {/* Controls hint */}
       <div
         className="absolute bottom-2 right-3 text-right pointer-events-none select-none leading-5"
         style={{ fontFamily: 'monospace', fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)' }}
       >
-        <div>Move WASD / ↑↓←→ · Jump K</div>
-        <div>Punch J · Kick L · Power U · Combo I · Piano O</div>
+        <div>Move WASD/↑↓←→ · Jump K/Space · ESC Pause</div>
+        <div>Punch J · Kick L · Power U · Combo I · Special O</div>
       </div>
     </div>
   );

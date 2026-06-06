@@ -139,6 +139,7 @@ export default function GameContainer() {
   const [sprites,   setSprites]   = useState(null);
   const [character, setCharacter] = useState(null);
   const [level,     setLevel]     = useState(null);
+  const [matchKey,  setMatchKey]  = useState(0);
 
   useEffect(() => {
     const mgr = new SpriteManager();
@@ -169,10 +170,12 @@ export default function GameContainer() {
       )}
       {phase === 'game' && (
         <GameScreen
+          key={matchKey}
           sprites={sprites}
           character={character}
           level={level}
           onQuit={() => setPhase('level_select')}
+          onRematch={() => setMatchKey(k => k + 1)}
         />
       )}
     </div>
