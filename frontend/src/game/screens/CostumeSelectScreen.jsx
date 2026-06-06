@@ -15,7 +15,7 @@ const COSTUMES = {
   katie: [
     {
       id:        'katie_dino_dress',
-      name:      'DINO DUCHESS',
+      name:      'DINO DRESS',
       available: true,
       image:     katieDinoUrl,
     },
