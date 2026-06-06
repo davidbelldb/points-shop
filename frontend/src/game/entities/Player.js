@@ -82,7 +82,7 @@ export class Player {
     this._handleAttacks(input);
     this._handleMovement(dt, input);
     this._handleJump(dt, input);
-    this._handleWalkAnim();
+    this._handleWalkAnim(input);
   }
 
   // ── Attacks ──────────────────────────────────────────────────────────────────
@@ -169,12 +169,23 @@ export class Player {
 
   // ── Walk animation ───────────────────────────────────────────────────────────
 
-  _handleWalkAnim() {
+  _handleWalkAnim(input) {
     if (this.anim.isAttacking || !this.grounded) return;
-    const moving = Math.abs(this.vx) > 8 || Math.abs(this.vz) > 8;
-    const inWalk = this.anim.animName === 'walk';
-    const inIdle = this.anim.animName === 'idle';
-    if (moving  && !inWalk) this.anim.play('walk');
-    if (!moving && !inIdle) this.anim.play('idle');
+
+    const heldH  = input.isHeld('LEFT')    || input.isHeld('RIGHT');
+    const freshH = input.isPressed('LEFT')  || input.isPressed('RIGHT');
+    const heldV  = input.isHeld('UP')       || input.isHeld('DOWN');
+    const moving = heldH || heldV;
+
+    if (moving) {
+      // Fresh horizontal press → restart cycle from walk_01
+      // Also start walk if currently idle/other non-attack anim
+      if (freshH || this.anim.animName !== 'walk') {
+        this.anim.play('walk');
+      }
+      // Otherwise the anim advances naturally to walk_03 and holds there
+    } else {
+      if (this.anim.animName !== 'idle') this.anim.play('idle');
+    }
   }
 }

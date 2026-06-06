@@ -34,7 +34,8 @@ export const ANIM = {
   walk: {
     frames:        ['katie_walk_01', 'katie_walk_02', 'katie_walk_03'],
     frameDuration: 0.13,
-    loop:          true,
+    loop:          false,
+    holdOnLast:    true,   // reaches walk_03 then stays there until key released
     cancellable:   true,
     damage:        0,
     hitFrame:      -1,
@@ -134,6 +135,8 @@ export class AnimationController {
       if (next >= def.frames.length) {
         if (def.loop) {
           this.frameIndex = 0;
+        } else if (def.holdOnLast) {
+          this.frameIndex = def.frames.length - 1; // freeze on last frame, never done
         } else {
           this.frameIndex = def.frames.length - 1;
           this.done       = true;

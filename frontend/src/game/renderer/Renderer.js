@@ -35,7 +35,11 @@ const KERB_TOP    = ROAD_BOTTOM_Y;          // 378
 const KERB_BOTTOM = KERB_TOP + 14;          // 392
 const ROAD_SURFACE_BOTTOM = CANVAS_HEIGHT;  // 450
 
-const SPRITE_DISPLAY_SCALE = 2.3;
+const SPRITE_DISPLAY_SCALE = 2.53;  // base display scale (10% up from 2.3)
+
+// Fraction of sprite height where the feet land.
+// Aligns foot to groundY so the character doesn't float above their shadow.
+const SPRITE_FOOT_RATIO = 0.93;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -391,16 +395,21 @@ export class Renderer {
   // ── Entity rendering ──────────────────────────────────────────────────────────
 
   _drawEntityShadow(entity) {
+    // Only draw shadow when airborne — on the ground it creates a floating illusion
+    if (!entity.jumpY || entity.jumpY <= 0) return;
+
     const { ctx }  = this;
     const { sx, groundY, scale } = project(entity.x, entity.z, 0);
     const sw = entity.baseWidth * scale * 1.2;
     const sh = sw * 0.2;
 
+    // Shadow fades and shrinks as the entity rises
+    const heightRatio = Math.max(0, 1 - entity.jumpY / 200);
     ctx.save();
-    ctx.globalAlpha = 0.45 * scale;
+    ctx.globalAlpha = 0.45 * scale * heightRatio;
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.ellipse(sx, groundY, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx, groundY, (sw / 2) * heightRatio, (sh / 2) * heightRatio, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -421,7 +430,9 @@ export class Renderer {
     const { ctx } = this;
     const drawH = PLAYER_BASE_HEIGHT * SPRITE_DISPLAY_SCALE * scale;
     const drawW = drawH * (img.width / img.height);
-    const drawY = groundY - drawH - (entity.jumpY * scale * SPRITE_DISPLAY_SCALE * 0.5);
+    // Anchor the foot (SPRITE_FOOT_RATIO down the sprite) to groundY, then lift by jumpY
+    const jumpOffset = entity.jumpY * scale * SPRITE_DISPLAY_SCALE * 0.5;
+    const drawY = groundY - drawH * SPRITE_FOOT_RATIO - jumpOffset;
 
     ctx.save();
     if (facingLeft) {
