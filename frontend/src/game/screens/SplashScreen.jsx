@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import splashUrl from '../../assets/backgrounds/game_splash.png';
+import splashUrl from '../../assets/backgrounds/game_splash_01.png';
 
 export default function SplashScreen({ ready, onContinue }) {
   const [blink, setBlink] = useState(true);
