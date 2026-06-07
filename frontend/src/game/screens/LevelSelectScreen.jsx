@@ -29,13 +29,13 @@ export const LEVELS = [
   },
   {
     id:        'blinco',
-    name:      'BLINCO BLIGHT',
+    name:      'BATTLE ON BLINCO',
     available: false,
     thumb:     null,
   },
   {
     id:        'bishops',
-    name:      'BISHOPS BLUDGEONY',
+    name:      'COMING SOON',
     available: false,
     thumb:     null,
   },
