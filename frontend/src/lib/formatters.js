@@ -8,6 +8,8 @@ export function formatLedgerReason(reason) {
   if (reason.startsWith('wheel-of-misfortune:'))     return 'Wheel of Misfortune award';
   if (reason.startsWith('giftsweeper:turn-'))         return 'Giftsweeper turn cost';
   if (reason.startsWith('giftsweeper:'))             return 'Giftsweeper award';
+  if (reason.startsWith('shut-the-box-15:win-'))       return "Shut the Bigger Box - shut!";
+  if (reason.startsWith('shut-the-box-15:'))           return "Shut the Bigger Box";
   if (reason.startsWith('shut-the-box:win-'))         return "Shut Katie's Box - shut!";
   if (reason.startsWith('shut-the-box:'))             return "Shut Katie's Box";
   if (reason.startsWith('ducky:stake-'))              return 'Ducky Derby bet';
