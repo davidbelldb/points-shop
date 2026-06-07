@@ -173,6 +173,23 @@ export default function AccountPage() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-2">
             <ThemeToggle />
           </section>
+
+          {account.email === 'davidbell.db@googlemail.com' && (
+            <Link
+              to="/admin"
+              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                </div>
+                <p className="text-sm font-medium">Admin</p>
+              </div>
+              <span className="text-neutral-400">→</span>
+            </Link>
+          )}
         </div>
 
         {/* RIGHT column \u2014 activity feed, orders, rewards */}
