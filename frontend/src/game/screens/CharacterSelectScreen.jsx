@@ -14,18 +14,8 @@ import katieSelectUrl from '../../assets/character_selections/katie_select.png';
 import davidSelectUrl from '../../assets/character_selections/david_select.png';
 
 const CHARACTERS = [
-  {
-    id:       'katie',
-    name:     'KATIE',
-    subtitle: 'The Dino Duchess',
-    color:    '#c060ff',
-  },
-  {
-    id:       'david',
-    name:     'DAVID',
-    subtitle: 'The Guitar Geezer',
-    color:    '#40c8ff',
-  },
+  { id: 'katie', name: 'KATIE', color: '#c060ff' },
+  { id: 'david', name: 'DAVID', color: '#40c8ff' },
 ];
 
 export default function CharacterSelectScreen({ onSelect, onBack }) {
@@ -60,77 +50,65 @@ export default function CharacterSelectScreen({ onSelect, onBack }) {
       </h2>
 
       {/* Character cards */}
-      <div className="flex gap-16 items-end">
+      <div className="flex gap-16">
         {CHARACTERS.map((char, i) => {
           const selected = cursor === i;
           return (
             <div
               key={char.id}
-              onClick={() => { setCursor(i); }}
+              onClick={() => setCursor(i)}
               onDoubleClick={() => { setCursor(i); setConfirm(true); setTimeout(() => onSelect(char.id), 400); }}
-              className="flex flex-col items-center gap-3 cursor-pointer select-none"
-              style={{ opacity: confirm && !selected ? 0.3 : 1, transition: 'opacity 0.3s' }}
+              className="relative overflow-hidden cursor-pointer select-none"
+              style={{
+                width:      200,
+                height:     240,
+                border:     `2px solid ${selected ? char.color : '#ffffff22'}`,
+                boxShadow:  selected ? `0 0 24px ${char.color}88, inset 0 0 12px ${char.color}22` : 'none',
+                background: selected ? `${char.color}0d` : '#0d0d0d',
+                opacity:    confirm && !selected ? 0.3 : 1,
+                transition: 'all 0.15s',
+              }}
             >
-              {/* Portrait frame */}
-              <div
-                className="relative flex items-end justify-center"
+              {/* Portrait image */}
+              <img
+                src={char.id === 'katie' ? katieSelectUrl : davidSelectUrl}
+                alt={char.name}
                 style={{
-                  width:     200,
-                  height:    200,
-                  border:    `2px solid ${selected ? char.color : '#ffffff22'}`,
-                  boxShadow: selected ? `0 0 24px ${char.color}88, inset 0 0 12px ${char.color}22` : 'none',
-                  background: selected ? `${char.color}11` : 'transparent',
-                  transition: 'all 0.15s',
+                  width:          '100%',
+                  height:         '100%',
+                  imageRendering: 'pixelated',
+                  objectFit:      'cover',
+                  objectPosition: 'center',
                 }}
+              />
+
+              {/* Name bar — inside bottom of card */}
+              <div
+                className="absolute bottom-0 left-0 right-0 px-2 py-1.5 text-center"
+                style={{ background: 'rgba(0,0,0,0.82)' }}
               >
-                {char.id === 'katie' || char.id === 'david' ? (
-                  <img
-                    src={char.id === 'katie' ? katieSelectUrl : davidSelectUrl}
-                    alt={char.name}
-                    style={{
-                      width:           '100%',
-                      height:          '100%',
-                      imageRendering:  'pixelated',
-                      objectFit:       'cover',
-                      objectPosition:  'center',
-                    }}
-                  />
-                ) : (
-                  /* David placeholder square */
-                  <div
-                    style={{
-                      width:      80,
-                      height:     80,
-                      background: char.color,
-                      marginBottom: 16,
-                      boxShadow:  `0 0 20px ${char.color}`,
-                    }}
-                  />
-                )}
-
-                {/* Selection arrow */}
-                {selected && (
-                  <div
-                    className="absolute -bottom-6 text-lg"
-                    style={{ color: char.color, textShadow: `0 0 8px ${char.color}` }}
-                  >
-                    ▲
-                  </div>
-                )}
-              </div>
-
-              {/* Name */}
-              <div className="flex flex-col items-center gap-2 mt-6">
                 <span
                   className="uppercase"
-                  style={{ fontSize: '0.65rem', letterSpacing: '0.2em', color: selected ? char.color : '#ffffff66', textShadow: selected ? `0 0 10px ${char.color}` : 'none' }}
+                  style={{
+                    fontSize:   '0.5rem',
+                    letterSpacing: '0.2em',
+                    color:      selected ? char.color : '#ffffffcc',
+                    textShadow: selected ? `0 0 8px ${char.color}` : 'none',
+                  }}
                 >
                   {char.name}
                 </span>
-                <span style={{ fontSize: '0.45rem', letterSpacing: '0.1em', color: '#ffffff33' }}>
-                  {char.subtitle}
-                </span>
               </div>
+
+              {/* Selected indicator */}
+              {selected && (
+                <div
+                  className="absolute top-1.5 right-1.5"
+                  style={{ fontSize: '0.6rem', color: char.color, textShadow: `0 0 6px ${char.color}` }}
+                >
+                  ▶
+                </div>
+              )}
             </div>
           );
         })}

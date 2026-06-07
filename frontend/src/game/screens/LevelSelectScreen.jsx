@@ -151,7 +151,7 @@ export default function LevelSelectScreen({ onSelect, onBack }) {
               >
                 <span
                   className="uppercase"
-                  style={{ fontSize: '0.45rem', letterSpacing: '0.08em' }}
+                  style={{ fontSize: '0.38rem', letterSpacing: '0.08em' }}
                   style={{
                     color:      lvl.available
                       ? (selected ? accent : '#ffffffcc')

@@ -130,7 +130,7 @@ export default function CostumeSelectScreen({ character, onSelect, onBack }) {
               >
                 <span
                   className="uppercase block text-center"
-                  style={{ fontSize: '0.45rem', letterSpacing: '0.1em' }}
+                  style={{ fontSize: '0.38rem', letterSpacing: '0.1em' }}
                   style={{
                     color:      costume.available
                       ? (selected ? accent : '#ffffffcc')
