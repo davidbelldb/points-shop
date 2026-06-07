@@ -99,11 +99,11 @@ export default function App() {
       {!hideHeader && <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
         <div className="flex w-full items-center justify-between gap-2 px-3 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-2">
-            {/* Hamburger — mobile only; sidebar handles nav on md+ */}
+            {/* Hamburger — mobile only normally; always shown on game route (no SideNav there) */}
             <button
               onClick={() => setMenuOpen((o) => !o)}
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100 md:hidden"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100 ${isFullGame ? '' : 'md:hidden'}`}
             >
               {/* transformBox:'view-box' makes transformOrigin relative to the SVG
                   viewport, not each line's own bounding box — fixes off-centre rotation. */}
@@ -138,8 +138,8 @@ export default function App() {
                 />
               </svg>
             </button>
-            {/* Logo/name — hidden on md+ because sidebar carries branding */}
-            <Link to="/" className="flex min-w-0 items-center gap-2 md:hidden">
+            {/* Logo/name — hidden on md+ normally; always shown on game route (no SideNav there) */}
+            <Link to="/" className={`flex min-w-0 items-center gap-2 ${isFullGame ? '' : 'md:hidden'}`}>
               {logoUrl ? (
                 <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
               ) : null}
