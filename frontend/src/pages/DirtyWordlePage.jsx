@@ -171,13 +171,13 @@ function LeaderboardModal({ onClose, today }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-800 shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-700">
-          <h2 className="font-bold text-base tracking-tight text-neutral-800 dark:text-white">Leaderboard</h2>
+        {/* Header — no divider, pink title */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Leaderboard</h2>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition text-lg leading-none">✕</button>
         </div>
 
-        <div className="p-5 space-y-6 max-h-[80vh] overflow-y-auto">
+        <div className="px-5 pb-3 space-y-6 max-h-[80vh] overflow-y-auto">
           {loading && <p className="text-sm text-center text-neutral-400">Loading...</p>}
           {!loading && !data && <p className="text-sm text-center text-neutral-400">Couldn't load leaderboard.</p>}
 
@@ -258,7 +258,7 @@ function LeaderboardModal({ onClose, today }) {
         </div>
 
         <div className="px-5 pb-5">
-          <button onClick={onClose} className="w-full rounded-xl border border-neutral-400 bg-neutral-100 py-3 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-200 active:scale-95 dark:border-neutral-500 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600">
+          <button onClick={onClose} className="w-full rounded-xl bg-[#61dbbb] py-3 text-sm font-semibold text-[#0d3d2e] transition hover:opacity-90 active:scale-95">
             Close
           </button>
         </div>
