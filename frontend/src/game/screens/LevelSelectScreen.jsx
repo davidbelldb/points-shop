@@ -22,14 +22,14 @@ export const LEVELS = [
     thumb:     bg03Url,
   },
   {
-    id:        'king_street',
-    name:      'KING STREET RAGE',
+    id:        'coming_soon_4',
+    name:      'COMING SOON',
     available: false,
     thumb:     null,
   },
   {
-    id:        'blinco',
-    name:      'BATTLE ON BLINCO',
+    id:        'coming_soon_5',
+    name:      'COMING SOON',
     available: false,
     thumb:     null,
   },
