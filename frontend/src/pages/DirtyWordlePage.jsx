@@ -339,7 +339,7 @@ export default function DirtyWordlePage() {
             {won ? (
               <>
                 <h2 className="text-xl font-bold tracking-tight" style={{ color: '#61dbbb' }}>
-                  You got it!
+                  Good work, {user?.name ?? 'you'}!
                 </h2>
                 <p className="text-sm text-neutral-600 dark:text-neutral-300">
                   {winMessage()}
