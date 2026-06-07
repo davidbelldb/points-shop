@@ -1,10 +1,8 @@
 /**
  * Dirty Wordle
  *
- * Daily 5-letter adult word game. Same word for both players each day,
- * resets at midnight UTC. Points awarded on win, scaled by guesses taken.
- *
- * Points: 1 guess=12, 2=10, 3=8, 4=6, 5=4, 6=2
+ * Daily 5-letter adult word game. Same word for both players each day.
+ * Points: 1=44, 2=36, 3=28, 4=16, 5=8, 6=4
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -27,7 +25,7 @@ const WORDS = [
 
 const WORD_LENGTH  = 5;
 const MAX_GUESSES  = 6;
-const PTS_BY_GUESS = [12, 10, 8, 6, 4, 2];
+const PTS_BY_GUESS = [44, 36, 28, 16, 8, 4];
 
 const KEYBOARD_ROWS = [
   ['Q','W','E','R','T','Y','U','I','O','P'],
@@ -38,7 +36,7 @@ const KEYBOARD_ROWS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC — used as storage key
+  return new Date().toISOString().slice(0, 10);
 }
 
 function formatUKDate() {
@@ -57,12 +55,9 @@ function evaluateGuess(guess, target) {
   const result    = Array(WORD_LENGTH).fill('absent');
   const targetArr = target.split('');
   const guessArr  = guess.split('');
-
   for (let i = 0; i < WORD_LENGTH; i++) {
     if (guessArr[i] === targetArr[i]) {
-      result[i]    = 'correct';
-      targetArr[i] = null;
-      guessArr[i]  = null;
+      result[i] = 'correct'; targetArr[i] = null; guessArr[i] = null;
     }
   }
   for (let i = 0; i < WORD_LENGTH; i++) {
@@ -74,27 +69,37 @@ function evaluateGuess(guess, target) {
   return result;
 }
 
+// ─── Mini colour grid (shared between result modal and leaderboard) ───────────
+
+function ColourGrid({ grid, cellSize = 32 }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {grid.map((row, ri) => (
+        <div key={ri} style={{ display: 'flex', gap: 4 }}>
+          {row.map((state, ci) => (
+            <div
+              key={ci}
+              style={{
+                width: cellSize, height: cellSize,
+                borderRadius: 4,
+                background:
+                  state === 'correct' ? '#61dbbb'
+                  : state === 'present' ? '#ed70bd'
+                  : '#525252',
+              }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Tile ─────────────────────────────────────────────────────────────────────
 
-const TILE_BG = {
-  correct: '#61dbbb',
-  present: '#ed70bd',
-  absent:  '#525252',
-  active:  'transparent',
-  empty:   'transparent',
-};
-const TILE_BORDER = {
-  correct: '#61dbbb',
-  present: '#ed70bd',
-  absent:  '#525252',
-  active:  '#737373',
-  empty:   '#d4d4d4',
-};
-const TILE_TEXT = {
-  correct: '#0d3d2e',
-  present: '#fff',
-  absent:  '#fff',
-};
+const TILE_BG     = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: 'transparent', empty: 'transparent' };
+const TILE_BORDER = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: '#737373',     empty: '#d4d4d4' };
+const TILE_TEXT   = { correct: '#0d3d2e', present: '#fff',    absent: '#fff' };
 
 function Tile({ letter, state, delay = 0, revealed }) {
   const isColoured = ['correct','present','absent'].includes(state);
@@ -102,17 +107,14 @@ function Tile({ letter, state, delay = 0, revealed }) {
     <div
       style={{
         width: 56, height: 56,
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        fontSize:        22,
-        fontWeight:      700,
-        border:          `2px solid ${TILE_BORDER[state]}`,
-        borderRadius:    6,
-        background:      TILE_BG[state],
-        color:           isColoured ? TILE_TEXT[state] : 'inherit',
-        transition:      revealed ? `background 0.15s ${delay}ms, border-color 0.15s ${delay}ms` : 'border-color 0.1s',
-        transform:       letter && !revealed ? 'scale(1.08)' : 'scale(1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 22, fontWeight: 700,
+        border: `2px solid ${TILE_BORDER[state]}`,
+        borderRadius: 6,
+        background: TILE_BG[state],
+        color: isColoured ? TILE_TEXT[state] : 'inherit',
+        transition: revealed ? `background 0.15s ${delay}ms, border-color 0.15s ${delay}ms` : 'border-color 0.1s',
+        transform: letter && !revealed ? 'scale(1.08)' : 'scale(1)',
         transitionProperty: revealed ? 'background, border-color' : 'transform, border-color',
       }}
     >
@@ -129,25 +131,14 @@ const KEY_TEXT = { correct: '#0d3d2e', present: '#fff',    absent: '#fff' };
 function Key({ label, state, onPress }) {
   const wide = label === 'ENTER' || label === '⌫';
   const bg   = KEY_BG[state];
-  const col  = KEY_TEXT[state];
-
   return (
     <button
       onPointerDown={(e) => { e.preventDefault(); onPress(label); }}
       style={{
-        height:       52,
-        minWidth:     wide ? 56 : 36,
-        padding:      wide ? '0 6px' : 0,
-        borderRadius: 6,
-        fontWeight:   700,
-        fontSize:     wide ? 11 : 15,
-        border:       'none',
-        background:   bg,
-        color:        bg ? col : undefined,
-        cursor:       'pointer',
-        userSelect:   'none',
-        touchAction:  'none',
-        transition:   'background 0.15s',
+        height: 52, minWidth: wide ? 56 : 36, padding: wide ? '0 6px' : 0,
+        borderRadius: 6, fontWeight: 700, fontSize: wide ? 11 : 15,
+        border: 'none', background: bg, color: bg ? KEY_TEXT[state] : undefined,
+        cursor: 'pointer', userSelect: 'none', touchAction: 'none', transition: 'background 0.15s',
       }}
       className={!bg ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-600 dark:text-neutral-100' : ''}
     >
@@ -160,6 +151,118 @@ function Key({ label, state, onPress }) {
 
 const TEAL_BTN  = 'flex-1 inline-flex items-center justify-center rounded-xl bg-[#61dbbb] px-4 py-3 text-sm font-semibold text-[#0d3d2e] transition hover:opacity-90 active:scale-95';
 const GHOST_BTN = 'flex-1 inline-flex items-center justify-center rounded-xl border border-neutral-400 bg-neutral-100 px-4 py-3 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-200 active:scale-95 dark:border-neutral-500 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600';
+
+// ─── Leaderboard modal ────────────────────────────────────────────────────────
+
+function LeaderboardModal({ onClose, today }) {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.dirtyWordleLeaderboard(today)
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [today]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-800 shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-700">
+          <h2 className="font-bold text-base tracking-tight text-neutral-800 dark:text-white">Leaderboard</h2>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition text-lg leading-none">✕</button>
+        </div>
+
+        <div className="p-5 space-y-6 max-h-[80vh] overflow-y-auto">
+          {loading && <p className="text-sm text-center text-neutral-400">Loading...</p>}
+          {!loading && !data && <p className="text-sm text-center text-neutral-400">Couldn't load leaderboard.</p>}
+
+          {data && (
+            <>
+              {/* ── Today's grids ── */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">
+                  Today — {formatUKDate()}
+                </p>
+
+                {data.today.length === 0 ? (
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-2">
+                    Neither of you has played today yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {data.today.map(player => (
+                      <div
+                        key={player.name}
+                        className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 p-3 flex flex-col items-center gap-2"
+                      >
+                        <p className="text-sm font-semibold text-neutral-800 dark:text-white">{player.name}</p>
+                        <ColourGrid grid={player.guess_grid} cellSize={24} />
+                        <div className="text-center space-y-0.5">
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                            {player.won
+                              ? `${player.guesses_taken}/${MAX_GUESSES}`
+                              : `X/${MAX_GUESSES}`}
+                          </p>
+                          {player.pts > 0 && (
+                            <span
+                              className="inline-block rounded-lg px-2 py-0.5 text-xs font-semibold"
+                              style={{ background: '#61dbbb', color: '#0d3d2e' }}
+                            >
+                              +{player.pts} pts
+                            </span>
+                          )}
+                          {!player.won && (
+                            <p className="text-xs" style={{ color: '#ed70bd' }}>No points</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── All-time stats ── */}
+              {data.allTime.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">All time</p>
+                  <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+                    {/* Header row */}
+                    <div className="grid grid-cols-4 bg-neutral-100 dark:bg-neutral-900 px-3 py-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                      <span>Player</span>
+                      <span className="text-center">Wins</span>
+                      <span className="text-center">Avg</span>
+                      <span className="text-center">Pts</span>
+                    </div>
+                    {data.allTime.map((player, i) => (
+                      <div
+                        key={player.name}
+                        className={`grid grid-cols-4 px-3 py-2.5 text-sm items-center ${i % 2 === 0 ? 'bg-white dark:bg-neutral-800' : 'bg-neutral-50 dark:bg-neutral-850'}`}
+                      >
+                        <span className="font-semibold text-neutral-800 dark:text-white">{player.name}</span>
+                        <span className="text-center font-bold" style={{ color: '#61dbbb' }}>{player.wins}</span>
+                        <span className="text-center text-neutral-600 dark:text-neutral-300">{player.avg_guesses}</span>
+                        <span className="text-center text-neutral-600 dark:text-neutral-300">{player.total_pts}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-neutral-400 text-center mt-1">Avg = average guesses on wins</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="px-5 pb-5">
+          <button onClick={onClose} className="w-full rounded-xl border border-neutral-400 bg-neutral-100 py-3 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-200 active:scale-95 dark:border-neutral-500 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -174,20 +277,22 @@ export default function DirtyWordlePage() {
   };
   const saved = loadSaved();
 
-  const [guesses,        setGuesses]        = useState(saved.guesses      ?? []);
-  const [currentGuess,   setCurrentGuess]   = useState('');
-  const [gameOver,       setGameOver]       = useState(saved.gameOver     ?? false);
-  const [won,            setWon]            = useState(saved.won          ?? false);
-  const [ptsEarned,      setPtsEarned]      = useState(saved.ptsEarned    ?? null);
-  const [shake,          setShake]          = useState(false);
-  const [copied,         setCopied]         = useState(false);
-  const [modalDismissed, setModalDismissed] = useState(saved.modalAcked   ?? false);
+  const [guesses,          setGuesses]          = useState(saved.guesses      ?? []);
+  const [currentGuess,     setCurrentGuess]     = useState('');
+  const [gameOver,         setGameOver]         = useState(saved.gameOver     ?? false);
+  const [won,              setWon]              = useState(saved.won          ?? false);
+  const [ptsEarned,        setPtsEarned]        = useState(saved.ptsEarned    ?? null);
+  const [shake,            setShake]            = useState(false);
+  const [copied,           setCopied]           = useState(false);
+  const [modalDismissed,   setModalDismissed]   = useState(saved.modalAcked   ?? false);
+  const [resultSaved,      setResultSaved]      = useState(saved.resultSaved  ?? false);
+  const [showLeaderboard,  setShowLeaderboard]  = useState(false);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({
-      guesses, gameOver, won, ptsEarned, modalAcked: modalDismissed,
+      guesses, gameOver, won, ptsEarned, modalAcked: modalDismissed, resultSaved,
     }));
-  }, [guesses, gameOver, won, ptsEarned, modalDismissed, storageKey]);
+  }, [guesses, gameOver, won, ptsEarned, modalDismissed, resultSaved, storageKey]);
 
   const letterStates = useMemo(() => {
     const s = {};
@@ -196,9 +301,7 @@ export default function DirtyWordlePage() {
       guess.split('').forEach((letter, i) => {
         const next = result[i];
         const curr = s[letter];
-        if (!curr || next === 'correct' || (next === 'present' && curr === 'absent')) {
-          s[letter] = next;
-        }
+        if (!curr || next === 'correct' || (next === 'present' && curr === 'absent')) s[letter] = next;
       });
     }
     return s;
@@ -217,13 +320,20 @@ export default function DirtyWordlePage() {
     setGuesses(newGuesses);
     setCurrentGuess('');
     if (isWon)  setWon(true);
-    if (isOver) setGameOver(true);
+    if (isOver) {
+      setGameOver(true);
+      // Build full guess grid for the server
+      const grid = newGuesses.map(g => evaluateGuess(g, target));
+      const fallbackPts = isWon ? (PTS_BY_GUESS[newGuesses.length - 1] ?? 4) : 0;
 
-    if (isWon) {
-      const fallbackPts = PTS_BY_GUESS[newGuesses.length - 1] ?? 2;
-      api.dirtyWordleWin(newGuesses.length, today)
-        .then(r => setPtsEarned(r.pts))
-        .catch(() => setPtsEarned(fallbackPts));
+      api.dirtyWordleResult({
+        date: today,
+        won: isWon,
+        guesses_taken: newGuesses.length,
+        guess_grid: grid,
+      })
+        .then(r => { setPtsEarned(isWon ? r.pts : 0); setResultSaved(true); })
+        .catch(() => { setPtsEarned(fallbackPts); setResultSaved(false); });
     }
   }, [currentGuess, guesses, target, today]);
 
@@ -231,9 +341,7 @@ export default function DirtyWordlePage() {
     if (gameOver) return;
     if (key === 'ENTER')                    { submitGuess(); return; }
     if (key === '⌫' || key === 'BACKSPACE') { setCurrentGuess(g => g.slice(0, -1)); return; }
-    if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) {
-      setCurrentGuess(g => g + key);
-    }
+    if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) setCurrentGuess(g => g + key);
   }, [gameOver, submitGuess, currentGuess]);
 
   useEffect(() => {
@@ -247,11 +355,8 @@ export default function DirtyWordlePage() {
     return () => window.removeEventListener('keydown', handler);
   }, [onKey]);
 
-  // Emoji grid stays in the copied text — that's intentional
   const emojiGrid = guesses.map(g =>
-    evaluateGuess(g, target)
-      .map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛')
-      .join('')
+    evaluateGuess(g, target).map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('')
   ).join('\n');
   const shareText = `Dirty Wordle ${today}\n${won ? guesses.length : 'X'}/${MAX_GUESSES}\n\n${emojiGrid}`;
 
@@ -269,7 +374,8 @@ export default function DirtyWordlePage() {
     return 'Close call — but you did it!';
   };
 
-  const showModal = gameOver && !modalDismissed;
+  const showModal  = gameOver && !modalDismissed;
+  const resultGrid = guesses.map(g => evaluateGuess(g, target));
 
   return (
     <div className="flex flex-col items-center gap-4 py-4 px-2">
@@ -277,7 +383,13 @@ export default function DirtyWordlePage() {
       <div className="w-full max-w-sm flex items-center justify-between">
         <Link to="/games" className="text-sm text-neutral-500">← Games</Link>
         <h1 className="font-bold text-lg tracking-wide">Dirty Wordle</h1>
-        <div className="w-14" />
+        <button
+          onClick={() => setShowLeaderboard(true)}
+          className="text-sm font-medium px-2 py-1 rounded-lg transition"
+          style={{ color: '#61dbbb' }}
+        >
+          Board
+        </button>
       </div>
 
       <p className="text-xs text-neutral-400">{formatUKDate()} — New dirty word at midnight</p>
@@ -289,27 +401,15 @@ export default function DirtyWordlePage() {
           const isCurrent = rowIdx === guesses.length && !gameOver;
           const word      = submitted ? guesses[rowIdx] : isCurrent ? currentGuess : '';
           const result    = submitted ? evaluateGuess(word, target) : null;
-
           return (
             <div
               key={rowIdx}
-              style={{
-                display: 'flex', gap: 6,
-                animation: isCurrent && shake ? 'wordle-shake 0.5s ease-in-out' : 'none',
-              }}
+              style={{ display: 'flex', gap: 6, animation: isCurrent && shake ? 'wordle-shake 0.5s ease-in-out' : 'none' }}
             >
               {Array.from({ length: WORD_LENGTH }, (_, colIdx) => {
                 const letter = word[colIdx] ?? '';
                 const state  = result ? result[colIdx] : letter ? 'active' : 'empty';
-                return (
-                  <Tile
-                    key={colIdx}
-                    letter={letter}
-                    state={state}
-                    delay={colIdx * 80}
-                    revealed={submitted}
-                  />
-                );
+                return <Tile key={colIdx} letter={letter} state={state} delay={colIdx * 80} revealed={submitted} />;
               })}
             </div>
           );
@@ -321,12 +421,7 @@ export default function DirtyWordlePage() {
         {KEYBOARD_ROWS.map((row, i) => (
           <div key={i} style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
             {row.map(key => (
-              <Key
-                key={key}
-                label={key}
-                state={letterStates[key] ?? 'unused'}
-                onPress={onKey}
-              />
+              <Key key={key} label={key} state={letterStates[key] ?? 'unused'} onPress={onKey} />
             ))}
           </div>
         ))}
@@ -341,9 +436,7 @@ export default function DirtyWordlePage() {
                 <h2 className="text-xl font-bold tracking-tight" style={{ color: '#61dbbb' }}>
                   Good work, {user?.name ?? 'you'}!
                 </h2>
-                <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                  {winMessage()}
-                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-300">{winMessage()}</p>
               </>
             ) : (
               <>
@@ -351,60 +444,33 @@ export default function DirtyWordlePage() {
                   Sad times, {user?.name ?? 'you'}
                 </h2>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  The word was{' '}
-                  <span className="font-bold" style={{ color: '#ed70bd' }}>
-                    {target}
-                  </span>
+                  The word was <span className="font-bold" style={{ color: '#ed70bd' }}>{target}</span>
                 </p>
               </>
             )}
 
-            {/* Colour grid — only the rows played */}
-            <div className="flex flex-col items-center gap-1.5 py-1">
-              {guesses.map((guess, rowIdx) => {
-                const result = evaluateGuess(guess, target);
-                return (
-                  <div key={rowIdx} style={{ display: 'flex', gap: 5 }}>
-                    {result.map((state, colIdx) => (
-                      <div
-                        key={colIdx}
-                        style={{
-                          width: 32, height: 32,
-                          borderRadius: 5,
-                          background:
-                            state === 'correct' ? '#61dbbb'
-                            : state === 'present' ? '#ed70bd'
-                            : '#525252',
-                        }}
-                      />
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+            <ColourGrid grid={resultGrid} cellSize={32} />
 
             <p className="text-xs text-neutral-400">
               {won ? guesses.length : 'X'}/{MAX_GUESSES}
-              {ptsEarned != null && (
-                <span
-                  className="ml-2 rounded-lg px-2 py-0.5 text-xs font-semibold"
-                  style={{ background: '#61dbbb', color: '#0d3d2e' }}
-                >
+              {ptsEarned != null && ptsEarned > 0 && (
+                <span className="ml-2 rounded-lg px-2 py-0.5 text-xs font-semibold" style={{ background: '#61dbbb', color: '#0d3d2e' }}>
                   +{ptsEarned} pts
                 </span>
               )}
             </p>
 
             <div className="flex flex-row gap-2">
-              <button onClick={() => setModalDismissed(true)} className={GHOST_BTN}>
-                Close
-              </button>
-              <button onClick={copyResult} className={TEAL_BTN}>
-                {copied ? 'Copied!' : 'Copy result'}
-              </button>
+              <button onClick={() => setModalDismissed(true)} className={GHOST_BTN}>Close</button>
+              <button onClick={copyResult} className={TEAL_BTN}>{copied ? 'Copied!' : 'Copy result'}</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Leaderboard modal */}
+      {showLeaderboard && (
+        <LeaderboardModal onClose={() => setShowLeaderboard(false)} today={today} />
       )}
 
       <style>{`

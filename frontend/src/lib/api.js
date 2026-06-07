@@ -160,8 +160,10 @@ export const api = {
   duckyForm: () => request('/games/ducky/form'),
   cambsRageWin: (difficulty, matchId) =>
     request('/games/cambs-rage/win', { method: 'POST', body: JSON.stringify({ difficulty, matchId }) }),
-  dirtyWordleWin: (guesses, date) =>
-    request('/games/dirty-wordle/win', { method: 'POST', body: JSON.stringify({ guesses, date }) }),
+  dirtyWordleResult: (payload) =>
+    request('/games/dirty-wordle/result', { method: 'POST', body: JSON.stringify(payload) }),
+  dirtyWordleLeaderboard: (date) =>
+    request(`/games/dirty-wordle/leaderboard?date=${date}`),
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
