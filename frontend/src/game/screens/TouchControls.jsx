@@ -13,41 +13,36 @@
 
 import { useState, useCallback } from 'react';
 
-// ─── Touch capability detection (evaluated once) ──────────────────────────────
-
 const IS_TOUCH =
   typeof window !== 'undefined' &&
   ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
-// ─── Button style helpers ─────────────────────────────────────────────────────
+// ─── SVG arrow icons ──────────────────────────────────────────────────────────
 
-const BASE_BTN = {
-  pointerEvents:      'auto',
-  touchAction:        'none',
-  userSelect:         'none',
-  WebkitUserSelect:   'none',
+function ArrowUp()    { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2 L14 12 L2 12 Z"/></svg>; }
+function ArrowDown()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 14 L14 4 L2 4 Z"/></svg>; }
+function ArrowLeft()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 8 L12 2 L12 14 Z"/></svg>; }
+function ArrowRight() { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 8 L4 2 L4 14 Z"/></svg>; }
+
+// ─── Base styles ──────────────────────────────────────────────────────────────
+
+const BASE = {
+  pointerEvents:           'auto',
+  touchAction:             'none',
+  userSelect:              'none',
+  WebkitUserSelect:        'none',
   WebkitTapHighlightColor: 'transparent',
-  border:             '2px solid rgba(255,255,255,0.30)',
-  borderRadius:       8,
-  color:              'rgba(255,255,255,0.85)',
-  fontFamily:         'var(--font-pixel)',
-  fontSize:           '0.38rem',
-  letterSpacing:      '0.05em',
-  cursor:             'pointer',
-  display:            'flex',
-  alignItems:         'center',
-  justifyContent:     'center',
-  padding:            0,
-  transition:         'background 0.06s, opacity 0.06s',
+  cursor:                  'pointer',
+  display:                 'flex',
+  alignItems:              'center',
+  justifyContent:          'center',
+  padding:                 0,
+  transition:              'background 0.05s, box-shadow 0.05s, opacity 0.05s, border-color 0.05s',
 };
-
-function makeBtn(bg = 'rgba(0,0,0,0.40)') {
-  return { ...BASE_BTN, background: bg };
-}
 
 // ─── Individual button ────────────────────────────────────────────────────────
 
-function TBtn({ action, label, style, inputRef, activeBg = 'rgba(255,255,255,0.28)' }) {
+function TBtn({ action, label, style, inputRef, color = 'rgba(255,255,255,0.6)', round = false }) {
   const [active, setActive] = useState(false);
 
   const down = useCallback((e) => {
@@ -63,12 +58,26 @@ function TBtn({ action, label, style, inputRef, activeBg = 'rgba(255,255,255,0.2
     inputRef.current?.injectRelease(action);
   }, [action, inputRef]);
 
+  const idleBorder  = color.replace(/[\d.]+\)$/, '0.35)');
+  const activeBorder = color.replace(/[\d.]+\)$/, '0.95)');
+
   return (
     <button
       style={{
-        ...makeBtn(active ? activeBg : 'rgba(0,0,0,0.40)'),
-        opacity: active ? 1 : 0.72,
-        boxShadow: active ? `0 0 12px ${activeBg}` : 'none',
+        ...BASE,
+        borderRadius:    round ? '50%' : 10,
+        border:          `2px solid ${active ? activeBorder : idleBorder}`,
+        background:      active
+          ? color.replace(/[\d.]+\)$/, '0.28)')
+          : 'rgba(6,6,14,0.70)',
+        boxShadow:       active
+          ? `0 0 14px ${color.replace(/[\d.]+\)$/, '0.60)')}, inset 0 0 8px ${color.replace(/[\d.]+\)$/, '0.15)')}`
+          : `0 2px 8px rgba(0,0,0,0.55)`,
+        color:           active ? '#fff' : color.replace(/[\d.]+\)$/, '0.80)'),
+        opacity:         active ? 1 : 0.80,
+        fontFamily:      'var(--font-pixel)',
+        fontSize:        '0.40rem',
+        letterSpacing:   '0.05em',
         ...style,
       }}
       onPointerDown={down}
@@ -84,43 +93,55 @@ function TBtn({ action, label, style, inputRef, activeBg = 'rgba(255,255,255,0.2
 // ─── D-Pad ────────────────────────────────────────────────────────────────────
 
 function DPad({ inputRef }) {
-  const SZ  = 40;  // button size
-  const GAP = 2;
-  const PAD = SZ + GAP;  // total cell size
+  const SZ  = 58;
+  const GAP = 5;
+  const PAD = SZ + GAP;
+  const W   = PAD * 3 - GAP;
 
   return (
-    <div style={{ position: 'relative', width: PAD * 3 - GAP, height: PAD * 3 - GAP }}>
+    /* outer container — pointer-events: none so the gaps are pass-through */
+    <div style={{ position: 'relative', width: W, height: W }}>
+
+      {/* subtle disc backdrop */}
+      <div style={{
+        position:   'absolute',
+        inset:       -8,
+        borderRadius: '50%',
+        background:  'radial-gradient(circle, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0) 70%)',
+        pointerEvents: 'none',
+      }} />
+
       {/* UP */}
-      <TBtn
-        action="UP" label="▲" inputRef={inputRef}
-        activeBg="rgba(255,255,255,0.3)"
-        style={{ position: 'absolute', left: PAD, top: 0, width: SZ, height: SZ }}
+      <TBtn action="UP" label={<ArrowUp />} inputRef={inputRef}
+        color="rgba(255,255,255,0.65)"
+        style={{ position: 'absolute', left: PAD, top: 0, width: SZ, height: SZ, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }}
       />
       {/* LEFT */}
-      <TBtn
-        action="LEFT" label="◄" inputRef={inputRef}
-        activeBg="rgba(255,255,255,0.3)"
-        style={{ position: 'absolute', left: 0, top: PAD, width: SZ, height: SZ }}
+      <TBtn action="LEFT" label={<ArrowLeft />} inputRef={inputRef}
+        color="rgba(255,255,255,0.65)"
+        style={{ position: 'absolute', left: 0, top: PAD, width: SZ, height: SZ, borderTopRightRadius: 6, borderBottomRightRadius: 6 }}
       />
-      {/* Centre pip — decorative, no action */}
+      {/* Centre — decorative only */}
       <div style={{
-        position: 'absolute', left: PAD, top: PAD, width: SZ, height: SZ,
-        background: 'rgba(255,255,255,0.06)',
-        border: '2px solid rgba(255,255,255,0.14)',
-        borderRadius: 8,
+        position:      'absolute',
+        left:           PAD,
+        top:            PAD,
+        width:          SZ,
+        height:         SZ,
+        background:    'rgba(255,255,255,0.04)',
+        border:        '2px solid rgba(255,255,255,0.10)',
+        borderRadius:   6,
         pointerEvents: 'none',
       }} />
       {/* RIGHT */}
-      <TBtn
-        action="RIGHT" label="►" inputRef={inputRef}
-        activeBg="rgba(255,255,255,0.3)"
-        style={{ position: 'absolute', left: PAD * 2, top: PAD, width: SZ, height: SZ }}
+      <TBtn action="RIGHT" label={<ArrowRight />} inputRef={inputRef}
+        color="rgba(255,255,255,0.65)"
+        style={{ position: 'absolute', left: PAD * 2, top: PAD, width: SZ, height: SZ, borderTopLeftRadius: 6, borderBottomLeftRadius: 6 }}
       />
       {/* DOWN */}
-      <TBtn
-        action="DOWN" label="▼" inputRef={inputRef}
-        activeBg="rgba(255,255,255,0.3)"
-        style={{ position: 'absolute', left: PAD, top: PAD * 2, width: SZ, height: SZ }}
+      <TBtn action="DOWN" label={<ArrowDown />} inputRef={inputRef}
+        color="rgba(255,255,255,0.65)"
+        style={{ position: 'absolute', left: PAD, top: PAD * 2, width: SZ, height: SZ, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}
       />
     </div>
   );
@@ -128,36 +149,36 @@ function DPad({ inputRef }) {
 
 // ─── Attack buttons ───────────────────────────────────────────────────────────
 
-function AttackButtons({ inputRef }) {
-  const W = 46;   // button width
-  const H = 34;   // button height
-  const G = 4;    // gap
+// [action, label, neon-colour]
+const ATTACK_BTNS = [
+  ['JUMP',       'K',   'rgba(96,165,250,1)'],   // blue
+  ['BLOCK',      'BLK', 'rgba(250,204,21,1)'],   // yellow
+  ['PUNCH',      'J',   'rgba(248,113,113,1)'],   // red
+  ['KICK',       'L',   'rgba(251,146,60,1)'],    // orange
+  ['POWER_KICK', 'U',   'rgba(167,139,250,1)'],   // purple
+  ['COMBO',      'I',   'rgba(52,211,153,1)'],    // green
+];
 
-  // [action, label, tint-colour]
-  const BTNS = [
-    ['JUMP',       'K',     'rgba(96,165,250,0.55)'],  // blue
-    ['BLOCK',      'BLK',   'rgba(250,204,21,0.55)'],  // yellow
-    ['PUNCH',      'J',     'rgba(248,113,113,0.55)'], // red
-    ['KICK',       'L',     'rgba(251,146,60,0.55)'],  // orange
-    ['POWER_KICK', 'U',     'rgba(167,139,250,0.55)'], // purple
-    ['COMBO',      'I',     'rgba(52,211,153,0.55)'],  // green
-  ];
+function AttackButtons({ inputRef }) {
+  const D = 62;   // circle diameter
+  const G = 6;    // gap
 
   return (
     <div style={{
       display:             'grid',
-      gridTemplateColumns: `repeat(2, ${W}px)`,
-      gridTemplateRows:    `repeat(3, ${H}px)`,
-      gap:                 G,
+      gridTemplateColumns: `repeat(2, ${D}px)`,
+      gridTemplateRows:    `repeat(3, ${D}px)`,
+      gap:                  G,
     }}>
-      {BTNS.map(([action, label, activeBg]) => (
+      {ATTACK_BTNS.map(([action, label, color]) => (
         <TBtn
           key={action}
           action={action}
           label={label}
-          activeBg={activeBg}
+          color={color}
           inputRef={inputRef}
-          style={{ width: W, height: H }}
+          round
+          style={{ width: D, height: D, fontSize: label.length > 2 ? '0.36rem' : '0.48rem' }}
         />
       ))}
     </div>
@@ -165,13 +186,17 @@ function AttackButtons({ inputRef }) {
 }
 
 function SpecialButton({ inputRef }) {
+  const D = 62;
+  const G = 6;
+  const W = D * 2 + G;
+
   return (
     <TBtn
       action="PIANO"
-      label="O  SPECIAL"
-      activeBg="rgba(251,191,36,0.55)"
+      label="◈  SPECIAL"
+      color="rgba(251,191,36,1)"
       inputRef={inputRef}
-      style={{ width: 96 + 4, height: 34 }}
+      style={{ width: W, height: 40, fontSize: '0.38rem', letterSpacing: '0.12em', borderRadius: 10 }}
     />
   );
 }
@@ -185,16 +210,16 @@ export default function TouchControls({ inputRef }) {
     <div
       style={{
         position:      'absolute',
-        inset:         0,
+        inset:          0,
         pointerEvents: 'none',
-        zIndex:        50,
+        zIndex:         50,
       }}
     >
       {/* D-pad — bottom left */}
       <div style={{
         position:      'absolute',
-        left:          12,
-        bottom:        12,
+        left:           14,
+        bottom:         18,
         pointerEvents: 'none',
       }}>
         <DPad inputRef={inputRef} />
@@ -202,14 +227,14 @@ export default function TouchControls({ inputRef }) {
 
       {/* Attack grid + special — bottom right */}
       <div style={{
-        position:       'absolute',
-        right:          12,
-        bottom:         12,
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'flex-end',
-        gap:            4,
-        pointerEvents:  'none',
+        position:      'absolute',
+        right:          14,
+        bottom:         18,
+        display:       'flex',
+        flexDirection: 'column',
+        alignItems:    'flex-end',
+        gap:            6,
+        pointerEvents: 'none',
       }}>
         <SpecialButton inputRef={inputRef} />
         <AttackButtons inputRef={inputRef} />
