@@ -3,11 +3,11 @@
  *
  * Top-level phase state machine.
  *
- *   splash → title → character_select → costume_select → level_select → vs_screen → game
+ *   splash → title → difficulty_select → character_select → costume_select → level_select → vs_screen → game
  *
  * Asset loading runs in the background during the splash screen.
  * A single AudioManager instance is shared across all phases.
- *   • Menu music plays during: title, character_select, costume_select, level_select
+ *   • Menu music plays during: title, difficulty_select, character_select, costume_select, level_select
  *   • VS stinger plays when vs_screen opens
  *   • Battle music is managed by GameScreen
  */
@@ -17,13 +17,14 @@ import { SpriteManager }  from './engine/SpriteManager.js';
 import { AudioManager }   from './engine/AudioManager.js';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
-import SplashScreen          from './screens/SplashScreen.jsx';
-import TitleScreen           from './screens/TitleScreen.jsx';
-import CharacterSelectScreen from './screens/CharacterSelectScreen.jsx';
-import CostumeSelectScreen   from './screens/CostumeSelectScreen.jsx';
-import LevelSelectScreen     from './screens/LevelSelectScreen.jsx';
-import VSScreen              from './screens/VSScreen.jsx';
-import GameScreen            from './screens/GameScreen.jsx';
+import SplashScreen            from './screens/SplashScreen.jsx';
+import TitleScreen             from './screens/TitleScreen.jsx';
+import DifficultySelectScreen  from './screens/DifficultySelectScreen.jsx';
+import CharacterSelectScreen   from './screens/CharacterSelectScreen.jsx';
+import CostumeSelectScreen     from './screens/CostumeSelectScreen.jsx';
+import LevelSelectScreen       from './screens/LevelSelectScreen.jsx';
+import VSScreen                from './screens/VSScreen.jsx';
+import GameScreen              from './screens/GameScreen.jsx';
 
 // ─── Asset manifest ───────────────────────────────────────────────────────────
 import katieIdleUrl      from '../assets/sprites/katie_idle.png';
@@ -146,18 +147,19 @@ const SPRITE_MANIFEST = {
   bg_01:               background01Url,
 };
 
-const MENU_PHASES = new Set(['title', 'character_select', 'costume_select', 'level_select']);
+const MENU_PHASES = new Set(['title', 'difficulty_select', 'character_select', 'costume_select', 'level_select']);
 
 // ─── Phase machine ────────────────────────────────────────────────────────────
 
 export default function GameContainer() {
-  const [phase,     setPhase]     = useState('splash');
-  const [sprites,   setSprites]   = useState(null);
-  const [character, setCharacter] = useState(null);
-  const [costume,   setCostume]   = useState(null);
-  const [level,     setLevel]     = useState(null);
-  const [matchKey,  setMatchKey]  = useState(0);
-  const [scale,     setScale]     = useState(1);
+  const [phase,      setPhase]      = useState('splash');
+  const [sprites,    setSprites]    = useState(null);
+  const [difficulty, setDifficulty] = useState('easy');
+  const [character,  setCharacter]  = useState(null);
+  const [costume,    setCostume]    = useState(null);
+  const [level,      setLevel]      = useState(null);
+  const [matchKey,   setMatchKey]   = useState(0);
+  const [scale,      setScale]      = useState(1);
 
   const wrapperRef = useRef(null);
   // Single AudioManager instance shared across all phases
@@ -193,10 +195,11 @@ export default function GameContainer() {
   }, [phase]);
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
-  const goTitle         = ()    => setPhase('title');
-  const goCharSelect    = ()    => setPhase('character_select');
-  const goCostumeSelect = (c)   => { setCharacter(c); setPhase('costume_select'); };
-  const goLevelSelect   = (cos) => { setCostume(cos); setPhase('level_select'); };
+  const goTitle            = ()     => setPhase('title');
+  const goDifficultySelect = ()     => setPhase('difficulty_select');
+  const goCharSelect       = (diff) => { setDifficulty(diff); setPhase('character_select'); };
+  const goCostumeSelect    = (c)    => { setCharacter(c); setPhase('costume_select'); };
+  const goLevelSelect      = (cos)  => { setCostume(cos); setPhase('level_select'); };
 
   // After level select → VS screen (with stinger)
   const goVsScreen = (lvl) => {
@@ -214,11 +217,11 @@ export default function GameContainer() {
     setPhase('title');
   };
 
-  // Rematch → fresh run from character select
+  // Rematch → back to difficulty select so everything can be changed
   const handleRematch = () => {
     setCharacter(null); setCostume(null); setLevel(null);
     setMatchKey(k => k + 1);
-    setPhase('character_select');
+    setPhase('difficulty_select');
   };
 
   const cpuCharId = character === 'katie' ? 'david' : 'katie';
@@ -243,10 +246,17 @@ export default function GameContainer() {
           <SplashScreen ready={!!sprites} onContinue={goTitle} />
         )}
         {phase === 'title' && (
-          <TitleScreen onStart={goCharSelect} audio={audioRef.current} />
+          <TitleScreen onStart={goDifficultySelect} audio={audioRef.current} />
+        )}
+        {phase === 'difficulty_select' && (
+          <DifficultySelectScreen
+            onSelect={goCharSelect}
+            onBack={goTitle}
+            audio={audioRef.current}
+          />
         )}
         {phase === 'character_select' && (
-          <CharacterSelectScreen onSelect={goCostumeSelect} onBack={goTitle} audio={audioRef.current} />
+          <CharacterSelectScreen onSelect={goCostumeSelect} onBack={() => setPhase('difficulty_select')} audio={audioRef.current} />
         )}
         {phase === 'costume_select' && (
           <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} audio={audioRef.current} />
@@ -269,6 +279,7 @@ export default function GameContainer() {
             character={character}
             costume={costume}
             level={level}
+            difficulty={difficulty}
             audio={audioRef.current}
             onQuit={handleQuit}
             onRematch={handleRematch}

@@ -20,15 +20,43 @@ import {
 import { AnimationController } from '../engine/AnimationSystem.js';
 import { CHAR_DEFS }           from '../engine/Characters.js';
 
-const ENEMY_SPEED      = 55;    // px/s patrol speed
-const KNOCKBACK_FORCE  = 300;   // px/s applied on hit
-const MELEE_DISTANCE   = ATTACK_RANGE_X * 0.75;
-const ATTACK_COOLDOWN_MIN = 1.2;  // seconds between CPU attacks
-const ATTACK_COOLDOWN_MAX = 2.2;
+const KNOCKBACK_FORCE = 300;
+const MELEE_DISTANCE  = ATTACK_RANGE_X * 0.75;
+
+// Per-difficulty tuning
+// Easy   — slow, long pauses, only basic attacks
+// Medium — quicker, full attack set
+// Hard   — aggressive, very short cooldown, full attack set
+const DIFF_CONFIG = {
+  easy: {
+    speed:         45,
+    cooldownMin:   1.4,
+    cooldownMax:   2.6,
+    filterAttacks: (attacks) => attacks.filter(a => ['punch', 'kick'].includes(a)),
+  },
+  medium: {
+    speed:         70,
+    cooldownMin:   0.8,
+    cooldownMax:   1.5,
+    filterAttacks: (attacks) => attacks,
+  },
+  hard: {
+    speed:         95,
+    cooldownMin:   0.35,
+    cooldownMax:   0.80,
+    filterAttacks: (attacks) => attacks,
+  },
+};
 
 export class Enemy {
-  constructor({ x = 620, z = 30, characterId = 'david' } = {}) {
-    this._charDef = CHAR_DEFS[characterId] ?? CHAR_DEFS.david;
+  constructor({ x = 620, z = 30, characterId = 'david', difficulty = 'easy' } = {}) {
+    this._charDef   = CHAR_DEFS[characterId] ?? CHAR_DEFS.david;
+    const diff      = DIFF_CONFIG[difficulty] ?? DIFF_CONFIG.easy;
+    this._speed     = diff.speed;
+    this._cooldownMin = diff.cooldownMin;
+    this._cooldownMax = diff.cooldownMax;
+    // Build the allowed attack pool for this difficulty
+    this._attacks   = diff.filterAttacks([...this._charDef.cpuAttacks]);
 
     this.x     = x;
     this.z     = z;
@@ -52,7 +80,7 @@ export class Enemy {
     this.color      = this._charDef.color;
 
     this.anim = new AnimationController(this._charDef);
-    this._attackCooldown = ATTACK_COOLDOWN_MIN;
+    this._attackCooldown = this._cooldownMin;
   }
 
   get currentSprite() { return this.anim.currentSprite; }
@@ -78,7 +106,7 @@ export class Enemy {
     this.hurt      = false; this.hurtTimer = 0;
     this.pendingDamage = 0;
     this.hitCombo  = 0; this.hitComboTimer = 0;
-    this._attackCooldown = ATTACK_COOLDOWN_MIN;
+    this._attackCooldown = this._cooldownMin;
     this.anim.play('idle');
   }
 
@@ -132,7 +160,7 @@ export class Enemy {
 
     // Move toward player unless already in melee range
     if (Math.abs(dx) > MELEE_DISTANCE) {
-      this.vx = Math.sign(dx) * ENEMY_SPEED;
+      this.vx = Math.sign(dx) * this._speed;
     } else {
       this.vx = 0;
     }
@@ -150,11 +178,10 @@ export class Enemy {
       const inRangeX = Math.abs(dx) < ATTACK_RANGE_X;
       const inRangeZ = Math.abs(player.z - this.z) < ATTACK_RANGE_Z;
       if (inRangeX && inRangeZ) {
-        const attacks = this._charDef.cpuAttacks;
-        this.anim.play(attacks[Math.floor(Math.random() * attacks.length)]);
+        this.anim.play(this._attacks[Math.floor(Math.random() * this._attacks.length)]);
       }
       this._attackCooldown =
-        ATTACK_COOLDOWN_MIN + Math.random() * (ATTACK_COOLDOWN_MAX - ATTACK_COOLDOWN_MIN);
+        this._cooldownMin + Math.random() * (this._cooldownMax - this._cooldownMin);
     }
   }
 

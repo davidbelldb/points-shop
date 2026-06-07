@@ -135,7 +135,7 @@ export const CHAR_DEFS = {
       PIANO:      'guitar',   // O key → David's guitar attack
     },
 
-    cpuAttacks: ['punch', 'kick', 'power_kick', 'special'],
+    cpuAttacks: ['punch', 'kick', 'power_kick', 'special', 'guitar'],
 
     animations: {
       idle: {

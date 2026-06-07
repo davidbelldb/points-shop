@@ -236,7 +236,7 @@ function PauseOverlay({ onResume, onQuit }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function GameScreen({ sprites, character, level, audio, onQuit, onRematch }) {
+export default function GameScreen({ sprites, character, level, difficulty = 'easy', audio, onQuit, onRematch }) {
   const canvasRef  = useRef(null);
   const inputRef   = useRef(null);   // exposed to TouchControls
   const pausedRef  = useRef(false);
@@ -275,8 +275,8 @@ export default function GameScreen({ sprites, character, level, audio, onQuit, o
 
     const playerCharId = character ?? 'katie';
     const cpuCharId    = playerCharId === 'katie' ? 'david' : 'katie';
-    const player   = new Player({ x: 200, z: 30, characterId: playerCharId });
-    const enemy    = new Enemy({  x: 620, z: 30, characterId: cpuCharId });
+    const player = new Player({ x: 200, z: 30, characterId: playerCharId });
+    const enemy  = new Enemy({  x: 620, z: 30, characterId: cpuCharId, difficulty });
     const renderer = new Renderer(canvas, sprites);
     const combat   = new CombatSystem();
     const rounds   = new RoundManager();
