@@ -90,7 +90,7 @@ export default function CharacterSelectScreen({ onSelect, onBack }) {
                 <span
                   className="uppercase"
                   style={{
-                    fontSize:   '0.5rem',
+                    fontSize:   '0.38rem',
                     letterSpacing: '0.2em',
                     color:      selected ? char.color : '#ffffffcc',
                     textShadow: selected ? `0 0 8px ${char.color}` : 'none',
