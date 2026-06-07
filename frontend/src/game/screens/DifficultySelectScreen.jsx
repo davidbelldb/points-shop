@@ -15,21 +15,18 @@ const DIFFICULTIES = [
     id:     'easy',
     name:   'EASY',
     flavor: 'A WALK IN THE PARK',
-    icon:   '😌',
     color:  '#4ade80',
   },
   {
     id:     'medium',
     name:   'MEDIUM',
     flavor: 'THINGS ARE GETTING REAL',
-    icon:   '😤',
     color:  '#fbbf24',
   },
   {
     id:     'hard',
     name:   'GOOD LUCK',
     flavor: "YOU'RE GONNA NEED IT",
-    icon:   '💀',
     color:  '#ef4444',
   },
 ];
@@ -111,18 +108,6 @@ export default function DifficultySelectScreen({ onSelect, onBack, audio }) {
                 transition: 'all 0.13s',
               }}
             >
-              {/* Icon */}
-              <span
-                style={{
-                  fontSize:   '2.4rem',
-                  lineHeight: 1,
-                  filter:     sel ? `drop-shadow(0 0 10px ${diff.color})` : 'none',
-                  transition: 'filter 0.13s',
-                }}
-              >
-                {diff.icon}
-              </span>
-
               {/* Name */}
               <span
                 className="uppercase"

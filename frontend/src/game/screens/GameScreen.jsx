@@ -234,6 +234,10 @@ function PauseOverlay({ onResume, onQuit }) {
   );
 }
 
+// Frozen input: all queries return false — used during countdown / round-end
+// so entities can't move but animations still advance.
+const FROZEN_INPUT = { isHeld: () => false, isPressed: () => false, isReleased: () => false };
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function GameScreen({ sprites, character, level, difficulty = 'easy', audio, onQuit, onRematch }) {
@@ -293,11 +297,13 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
       update(dt) {
         if (pausedRef.current || matchDone) return;
 
-        // Always update entities so KO animations play after isFighting → false
-        player.update(dt, input);
-        enemy.update(dt, player);
+        // isFighting gates movement + combat; entities always update so KO
+        // animations play through round-end pauses.
+        const active = rounds.isFighting;
+        player.update(dt, active ? input : FROZEN_INPUT);
+        enemy.update(dt, player, active);
 
-        if (rounds.isFighting) {
+        if (active) {
           if (!musicStarted) {
             audio?.startBattleMusic();
             musicStarted = true;

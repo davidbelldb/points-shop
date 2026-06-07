@@ -110,7 +110,7 @@ export class Enemy {
     this.anim.play('idle');
   }
 
-  update(dt, player) {
+  update(dt, player, active = true) {
     // KO state — play ko anim, freeze all other logic
     if (this.isDead) {
       this.hurt = false;
@@ -137,8 +137,17 @@ export class Enemy {
 
     if (this.anim.isFinished && this.anim.isAttacking) this.anim.play('idle');
 
-    this._updateAI(dt, player);
-    this._updateWalkAnim();
+    if (active) {
+      this._updateAI(dt, player);
+      this._updateWalkAnim();
+    } else {
+      // Frozen (countdown / round-end) — halt and stand idle
+      this.vx = 0;
+      this.vz = 0;
+      if (!this.anim.isAttacking && this.anim.animName !== 'idle') {
+        this.anim.play('idle');
+      }
+    }
   }
 
   // ── CPU AI ───────────────────────────────────────────────────────────────────
