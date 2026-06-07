@@ -176,6 +176,27 @@ function Overlay({ text, style: overlayStyle }) {
 }
 
 function MatchOver({ winner, onRematch, onQuit }) {
+  const [sel, setSel] = useState(0); // 0 = Rematch, 1 = Quit
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') setSel(0);
+      if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') setSel(1);
+      if (e.code === 'Enter') { if (sel === 0) onRematch(); else onQuit(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [sel, onRematch, onQuit]);
+
+  const btnStyle = (active) => ({
+    fontSize: '0.55rem', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.1s',
+    padding: '8px 24px',
+    border:      active ? '2px solid rgba(255,255,255,0.80)' : '2px solid rgba(255,255,255,0.20)',
+    color:       active ? '#fff' : 'rgba(255,255,255,0.4)',
+    background:  active ? 'rgba(255,255,255,0.10)' : 'transparent',
+    textShadow:  active ? '0 0 10px #fff8' : 'none',
+  });
+
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-8 pointer-events-auto select-none"
@@ -185,26 +206,38 @@ function MatchOver({ winner, onRematch, onQuit }) {
         {winner === 'player' ? 'KATIE WINS!' : 'DAVID WINS!'}
       </p>
       <div className="flex gap-6">
-        <button
-          onClick={onRematch}
-          className="px-6 py-2 border-2 border-white/40 text-white hover:bg-white/10 transition"
-          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
-        >
-          REMATCH
-        </button>
-        <button
-          onClick={onQuit}
-          className="px-6 py-2 border-2 border-white/20 text-white/50 hover:bg-white/10 transition"
-          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
-        >
-          QUIT
-        </button>
+        <button onClick={onRematch} style={btnStyle(sel === 0)}>REMATCH</button>
+        <button onClick={onQuit}    style={btnStyle(sel === 1)}>QUIT</button>
       </div>
+      <p style={{ fontSize: '0.4rem', letterSpacing: '0.15em', color: '#ffffff33' }}>
+        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM
+      </p>
     </div>
   );
 }
 
 function PauseOverlay({ onResume, onQuit }) {
+  const [sel, setSel] = useState(0); // 0 = Resume, 1 = Quit
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') setSel(0);
+      if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') setSel(1);
+      if (e.code === 'Enter') { if (sel === 0) onResume(); else onQuit(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [sel, onResume, onQuit]);
+
+  const btnStyle = (active) => ({
+    fontSize: '0.55rem', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.1s',
+    padding: '8px 24px',
+    border:      active ? '2px solid rgba(255,255,255,0.80)' : '2px solid rgba(255,255,255,0.20)',
+    color:       active ? '#fff' : 'rgba(255,255,255,0.4)',
+    background:  active ? 'rgba(255,255,255,0.10)' : 'transparent',
+    textShadow:  active ? '0 0 10px #fff8' : 'none',
+  });
+
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-8 pointer-events-auto select-none"
@@ -214,22 +247,12 @@ function PauseOverlay({ onResume, onQuit }) {
         PAUSED
       </p>
       <div className="flex gap-6">
-        <button
-          onClick={onResume}
-          className="px-6 py-2 border-2 border-white/50 text-white hover:bg-white/10 transition"
-          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
-        >
-          RESUME
-        </button>
-        <button
-          onClick={onQuit}
-          className="px-6 py-2 border-2 border-white/20 text-white/50 hover:bg-white/10 transition"
-          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
-        >
-          QUIT
-        </button>
+        <button onClick={onResume} style={btnStyle(sel === 0)}>RESUME</button>
+        <button onClick={onQuit}   style={btnStyle(sel === 1)}>QUIT</button>
       </div>
-      <p style={{ fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffff44' }}>ESC TO RESUME</p>
+      <p style={{ fontSize: '0.4rem', letterSpacing: '0.15em', color: '#ffffff33' }}>
+        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM &nbsp;·&nbsp; ESC RESUME
+      </p>
     </div>
   );
 }
