@@ -32,8 +32,7 @@ export const CHAR_DEFS = {
       idle: {
         frames:        ['katie_idle'],
         frameDuration: 0.15,
-        loop:          false,
-        holdOnLast:    true,
+        loop:          true,
         isAttack:      false,
         damage:        0,
         hitFrame:      -1,
@@ -41,8 +40,7 @@ export const CHAR_DEFS = {
       walk: {
         frames:        ['katie_walk_01', 'katie_walk_02', 'katie_walk_03'],
         frameDuration: 0.13,
-        loop:          false,
-        holdOnLast:    true,
+        loop:          true,
         isAttack:      false,
         damage:        0,
         hitFrame:      -1,
@@ -127,8 +125,7 @@ export const CHAR_DEFS = {
       idle: {
         frames:        ['david_idle'],
         frameDuration: 0.15,
-        loop:          false,
-        holdOnLast:    true,
+        loop:          true,
         isAttack:      false,
         damage:        0,
         hitFrame:      -1,
@@ -136,8 +133,7 @@ export const CHAR_DEFS = {
       walk: {
         frames:        ['david_walk_01', 'david_walk_02', 'david_walk_03'],
         frameDuration: 0.13,
-        loop:          false,
-        holdOnLast:    true,
+        loop:          true,
         isAttack:      false,
         damage:        0,
         hitFrame:      -1,

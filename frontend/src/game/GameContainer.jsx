@@ -9,7 +9,7 @@
  * there is zero wait once the player reaches the game itself.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SpriteManager } from './engine/SpriteManager.js';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
@@ -142,6 +142,20 @@ export default function GameContainer() {
   const [costume,   setCostume]   = useState(null);
   const [level,     setLevel]     = useState(null);
   const [matchKey,  setMatchKey]  = useState(0);
+  const [scale,     setScale]     = useState(1);
+  const wrapperRef = useRef(null);
+
+  // Responsive scaling — keep internal resolution fixed, scale the container
+  useEffect(() => {
+    const updateScale = () => {
+      if (!wrapperRef.current) return;
+      const { width, height } = wrapperRef.current.getBoundingClientRect();
+      setScale(Math.min(width / CANVAS_WIDTH, height / CANVAS_HEIGHT));
+    };
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
 
   useEffect(() => {
     const mgr = new SpriteManager();
