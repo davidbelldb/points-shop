@@ -33,8 +33,8 @@ function HealthBar({ name, hp, maxHp, align = 'left' }) {
   return (
     <div className={`flex flex-col gap-0.5 ${align === 'right' ? 'items-end' : 'items-start'}`}>
       <span
-        className="text-xs font-black tracking-widest select-none"
-        style={{ fontFamily: 'monospace', color: '#ffffffcc', textShadow: '0 0 6px #000' }}
+        className="select-none"
+        style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffffcc', textShadow: '0 0 6px #000' }}
       >
         {name}
       </span>
@@ -99,11 +99,11 @@ function HUD({ playerHp, enemyHp, maxHp, scores, round }) {
 
       {/* Round counter — centre */}
       <div
-        className="flex flex-col items-center gap-0.5 pt-1"
-        style={{ fontFamily: 'monospace', color: '#ffffff99' }}
+        className="flex flex-col items-center gap-1 pt-1"
+        style={{ fontFamily: 'var(--font-pixel)', color: '#ffffff99' }}
       >
-        <span className="text-xs tracking-widest">ROUND</span>
-        <span className="text-xl font-black" style={{ color: '#fff', textShadow: '0 0 10px #fff8' }}>
+        <span style={{ fontSize: '0.45rem', letterSpacing: '0.2em' }}>ROUND</span>
+        <span style={{ fontSize: '1.2rem', color: '#fff', textShadow: '0 0 10px #fff8' }}>
           {round}
         </span>
       </div>
@@ -130,9 +130,8 @@ function Overlay({ text, style: overlayStyle }) {
     >
       <span
         style={{
-          fontFamily:   'monospace',
-          fontSize:     isFight ? '4.5rem' : isNumber ? '7rem' : '3.5rem',
-          fontWeight:   900,
+          fontFamily:   'var(--font-pixel)',
+          fontSize:     isFight ? '2.8rem' : isNumber ? '4.5rem' : '2rem',
           color:        isFight ? '#fbbf24' : '#ffffff',
           textShadow:   isFight
             ? '0 0 30px #fbbf24, 0 0 60px #f59e0b, 3px 3px 0 #000'
@@ -150,24 +149,25 @@ function MatchOver({ winner, onRematch, onQuit }) {
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-8 pointer-events-auto select-none"
-      style={{ background: 'rgba(0,0,0,0.75)', zIndex: 30, fontFamily: 'monospace' }}
+      style={{ background: 'rgba(0,0,0,0.75)', zIndex: 30, fontFamily: 'var(--font-pixel)' }}
     >
       <p
-        className="text-4xl font-black tracking-widest"
-        style={{ color: '#fbbf24', textShadow: '0 0 30px #fbbf24' }}
+        style={{ fontSize: '1.4rem', letterSpacing: '0.1em', color: '#fbbf24', textShadow: '0 0 30px #fbbf24' }}
       >
         {winner === 'player' ? 'KATIE WINS!' : 'DAVID WINS!'}
       </p>
       <div className="flex gap-6">
         <button
           onClick={onRematch}
-          className="px-6 py-2 text-sm tracking-widest font-bold border-2 border-white/40 text-white hover:bg-white/10 transition"
+          className="px-6 py-2 border-2 border-white/40 text-white hover:bg-white/10 transition"
+          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
         >
           REMATCH
         </button>
         <button
           onClick={onQuit}
-          className="px-6 py-2 text-sm tracking-widest font-bold border-2 border-white/20 text-white/50 hover:bg-white/10 transition"
+          className="px-6 py-2 border-2 border-white/20 text-white/50 hover:bg-white/10 transition"
+          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
         >
           QUIT
         </button>
@@ -182,29 +182,30 @@ function PauseOverlay({ onResume, onQuit }) {
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-8 pointer-events-auto select-none"
-      style={{ background: 'rgba(0,0,0,0.70)', zIndex: 40, fontFamily: 'monospace' }}
+      style={{ background: 'rgba(0,0,0,0.70)', zIndex: 40, fontFamily: 'var(--font-pixel)' }}
     >
       <p
-        className="text-4xl font-black tracking-[0.3em]"
-        style={{ color: '#fff', textShadow: '0 0 20px #fff6' }}
+        style={{ fontSize: '1.8rem', letterSpacing: '0.3em', color: '#fff', textShadow: '0 0 20px #fff6' }}
       >
         PAUSED
       </p>
       <div className="flex gap-6">
         <button
           onClick={onResume}
-          className="px-6 py-2 text-sm tracking-widest font-bold border-2 border-white/50 text-white hover:bg-white/10 transition"
+          className="px-6 py-2 border-2 border-white/50 text-white hover:bg-white/10 transition"
+          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
         >
           RESUME
         </button>
         <button
           onClick={onQuit}
-          className="px-6 py-2 text-sm tracking-widest font-bold border-2 border-white/20 text-white/50 hover:bg-white/10 transition"
+          className="px-6 py-2 border-2 border-white/20 text-white/50 hover:bg-white/10 transition"
+          style={{ fontSize: '0.55rem', letterSpacing: '0.15em' }}
         >
           QUIT
         </button>
       </div>
-      <p className="text-xs tracking-widest" style={{ color: '#ffffff44' }}>ESC to resume</p>
+      <p style={{ fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffff44' }}>ESC TO RESUME</p>
     </div>
   );
 }
@@ -341,7 +342,7 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
 
       <div
         className="absolute bottom-2 right-3 text-right pointer-events-none select-none leading-5"
-        style={{ fontFamily: 'monospace', fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)' }}
+        style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', lineHeight: '1.8', color: 'rgba(255,255,255,0.25)' }}
       >
         <div>Move WASD/↑↓←→ · Jump K/Space · ESC Pause</div>
         <div>Punch J · Kick L · Power U · Combo I · Special O</div>

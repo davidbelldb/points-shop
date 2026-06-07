@@ -24,6 +24,8 @@
   --color-amber-900: #106655;
 }
 
+:root { --font-pixel: 'Press Start 2P', monospace; }
+
 html, body, #root { height: 100%; }
 body { -webkit-tap-highlight-color: transparent; }
 

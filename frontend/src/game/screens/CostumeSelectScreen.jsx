@@ -60,12 +60,12 @@ export default function CostumeSelectScreen({ character, onSelect, onBack }) {
   return (
     <div
       className="w-full h-full flex flex-col items-center justify-center bg-black gap-8"
-      style={{ fontFamily: 'monospace' }}
+      style={{ fontFamily: 'var(--font-pixel)' }}
     >
       {/* Header */}
       <h2
-        className="text-base tracking-[0.4em] uppercase select-none"
-        style={{ color: '#fff', textShadow: '0 0 12px #ffffff66' }}
+        className="uppercase select-none"
+        style={{ fontSize: '0.7rem', letterSpacing: '0.3em', color: '#fff', textShadow: '0 0 12px #ffffff66' }}
       >
         SELECT COSTUME
       </h2>
@@ -129,7 +129,8 @@ export default function CostumeSelectScreen({ character, onSelect, onBack }) {
                 style={{ background: 'rgba(0,0,0,0.82)' }}
               >
                 <span
-                  className="text-xs tracking-wider uppercase block text-center"
+                  className="uppercase block text-center"
+                  style={{ fontSize: '0.45rem', letterSpacing: '0.1em' }}
                   style={{
                     color:      costume.available
                       ? (selected ? accent : '#ffffffcc')
@@ -156,7 +157,7 @@ export default function CostumeSelectScreen({ character, onSelect, onBack }) {
       </div>
 
       {/* Footer hint */}
-      <p className="text-xs tracking-widest select-none" style={{ color: '#ffffff22' }}>
+      <p className="select-none" style={{ fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffff22' }}>
         ←/→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT &nbsp;·&nbsp; ESC BACK
       </p>
     </div>

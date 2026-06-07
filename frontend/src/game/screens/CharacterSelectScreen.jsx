@@ -49,12 +49,12 @@ export default function CharacterSelectScreen({ onSelect, onBack }) {
   return (
     <div
       className="w-full h-full flex flex-col items-center justify-center bg-black gap-10"
-      style={{ fontFamily: "'Courier New', monospace" }}
+      style={{ fontFamily: 'var(--font-pixel)' }}
     >
       {/* Header */}
       <h2
-        className="text-xl tracking-[0.4em] uppercase text-white select-none"
-        style={{ textShadow: '0 0 14px #ffffff66' }}
+        className="uppercase text-white select-none"
+        style={{ fontSize: '0.7rem', letterSpacing: '0.3em', textShadow: '0 0 14px #ffffff66' }}
       >
         SELECT YOUR FIGHTER
       </h2>
@@ -120,14 +120,14 @@ export default function CharacterSelectScreen({ onSelect, onBack }) {
               </div>
 
               {/* Name */}
-              <div className="flex flex-col items-center gap-1 mt-6">
+              <div className="flex flex-col items-center gap-2 mt-6">
                 <span
-                  className="text-base tracking-[0.3em] uppercase"
-                  style={{ color: selected ? char.color : '#ffffff66', textShadow: selected ? `0 0 10px ${char.color}` : 'none' }}
+                  className="uppercase"
+                  style={{ fontSize: '0.65rem', letterSpacing: '0.2em', color: selected ? char.color : '#ffffff66', textShadow: selected ? `0 0 10px ${char.color}` : 'none' }}
                 >
                   {char.name}
                 </span>
-                <span className="text-xs tracking-widest" style={{ color: '#ffffff33' }}>
+                <span style={{ fontSize: '0.45rem', letterSpacing: '0.1em', color: '#ffffff33' }}>
                   {char.subtitle}
                 </span>
               </div>
@@ -137,7 +137,7 @@ export default function CharacterSelectScreen({ onSelect, onBack }) {
       </div>
 
       {/* Controls hint */}
-      <p className="text-xs tracking-widest text-white/20 mt-4">
+      <p className="text-white/20 mt-4" style={{ fontSize: '0.45rem', letterSpacing: '0.15em' }}>
         ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM &nbsp;·&nbsp; ESC BACK
       </p>
     </div>

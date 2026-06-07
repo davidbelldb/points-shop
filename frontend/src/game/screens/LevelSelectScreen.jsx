@@ -75,12 +75,12 @@ export default function LevelSelectScreen({ onSelect, onBack }) {
   return (
     <div
       className="w-full h-full flex flex-col items-center justify-center bg-black gap-6"
-      style={{ fontFamily: 'monospace' }}
+      style={{ fontFamily: 'var(--font-pixel)' }}
     >
       {/* Header */}
       <h2
-        className="text-base tracking-[0.4em] uppercase text-white select-none"
-        style={{ textShadow: '0 0 12px #ffffff66' }}
+        className="uppercase text-white select-none"
+        style={{ fontSize: '0.7rem', letterSpacing: '0.3em', textShadow: '0 0 12px #ffffff66' }}
       >
         SELECT STAGE
       </h2>
@@ -150,7 +150,8 @@ export default function LevelSelectScreen({ onSelect, onBack }) {
                 style={{ background: 'rgba(0,0,0,0.78)' }}
               >
                 <span
-                  className="text-xs tracking-wider uppercase"
+                  className="uppercase"
+                  style={{ fontSize: '0.45rem', letterSpacing: '0.08em' }}
                   style={{
                     color:      lvl.available
                       ? (selected ? accent : '#ffffffcc')
@@ -177,7 +178,7 @@ export default function LevelSelectScreen({ onSelect, onBack }) {
       </div>
 
       {/* Footer hint */}
-      <p className="text-xs tracking-widest select-none" style={{ color: '#ffffff22' }}>
+      <p className="select-none" style={{ fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffff22' }}>
         ←↑↓→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT &nbsp;·&nbsp; ESC BACK
       </p>
     </div>

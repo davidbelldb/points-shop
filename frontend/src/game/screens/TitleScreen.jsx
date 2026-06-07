@@ -36,11 +36,9 @@ export default function TitleScreen({ onStart }) {
       <div className="absolute inset-0 flex items-end justify-center pb-10 pointer-events-none select-none">
         <p
           style={{
-            fontFamily:   "'Courier New', monospace",
-            fontSize:     '1.5rem',
-            fontWeight:   900,
-            letterSpacing:'0.35em',
-            textTransform:'uppercase',
+            fontFamily:   'var(--font-pixel)',
+            fontSize:     '0.7rem',
+            letterSpacing:'0.2em',
             color:        '#ffffff',
             opacity:      blink ? 1 : 0,
             transition:   'opacity 0.15s',
@@ -54,7 +52,7 @@ export default function TitleScreen({ onStart }) {
       {/* Copyright */}
       <p
         className="absolute bottom-2 right-3 text-xs tracking-widest select-none"
-        style={{ fontFamily: 'monospace', color: '#ffffff22' }}
+        style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.4rem', color: '#ffffff22' }}
       >
         © 2026 SNEAKY POINTS
       </p>
