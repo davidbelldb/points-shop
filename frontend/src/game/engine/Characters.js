@@ -54,7 +54,7 @@ export const CHAR_DEFS = {
         hitFrame:      -1,
       },
       walk: {
-        frames:        ['katie_walk_01', 'katie_walk_02', 'katie_walk_03'],
+        frames:        ['katie_walk_01', 'katie_walk_02'],
         frameDuration: 0.13,
         loop:          true,
         isAttack:      false,

@@ -29,7 +29,6 @@ import GameScreen            from './screens/GameScreen.jsx';
 import katieIdleUrl      from '../assets/sprites/katie_idle.png';
 import katieWalk01Url    from '../assets/sprites/katie_walk_01.png';
 import katieWalk02Url    from '../assets/sprites/katie_walk_02.png';
-import katieWalk03Url    from '../assets/sprites/katie_walk_03.png';
 import katieJumpUrl      from '../assets/sprites/katie_jump.png';
 import katiePunch01Url   from '../assets/sprites/katie_punch_01.png';
 import katiePunch02Url   from '../assets/sprites/katie_punch_02.png';
@@ -90,7 +89,6 @@ const SPRITE_MANIFEST = {
   katie_idle:          katieIdleUrl,
   katie_walk_01:       katieWalk01Url,
   katie_walk_02:       katieWalk02Url,
-  katie_walk_03:       katieWalk03Url,
   katie_jump:          katieJumpUrl,
   katie_punch_01:      katiePunch01Url,
   katie_punch_02:      katiePunch02Url,
