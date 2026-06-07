@@ -63,6 +63,20 @@ export default function App() {
   const isFullGame = location.pathname === '/games/streets-of-cambs-rage';
   const bannerOn = settings.banner_enabled === 'true' && (settings.banner_text || '').trim();
 
+  // Hide the header on the game page when in landscape — gives edge-to-edge
+  // canvas. Rotating back to portrait restores the header for navigation.
+  const [isLandscape, setIsLandscape] = useState(
+    () => window.matchMedia('(orientation: landscape)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: landscape)');
+    const handler = (e) => setIsLandscape(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const hideHeader = isFullGame && isLandscape;
+
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
       {/* Persistent sidebar — hidden on the full-screen game route so it
@@ -72,7 +86,7 @@ export default function App() {
       {/* All page content shifts right by sidebar width on md+
           (not on the game route — no sidebar there) */}
       <div className={isFullGame ? 'flex flex-col h-screen' : 'md:pl-56'}>
-      {user?.impersonating && (
+      {!hideHeader && user?.impersonating && (
         <div className="bg-amber-100 border-b border-amber-200">
           <div className="mx-auto flex w-full items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900 lg:px-6">
             <span>Viewing as <strong>{user.username}</strong> (signed in as {user.actual_username})</span>
@@ -80,7 +94,7 @@ export default function App() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
+      {!hideHeader && <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
         <div className="flex w-full items-center justify-between gap-2 px-3 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-2">
             {/* Hamburger — mobile only; sidebar handles nav on md+ */}
@@ -175,7 +189,7 @@ export default function App() {
             </button>
           </div>
         </div>
-      </header>
+      </header>}
       {/* Nav drawer — mobile only */}
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       {/* Basket drawer — all devices */}
