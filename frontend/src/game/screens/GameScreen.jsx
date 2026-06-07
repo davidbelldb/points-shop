@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useGamepadMenu } from '../hooks/useGamepadMenu.js';
 import { GameLoop }        from '../engine/GameLoop.js';
 import { InputManager }    from '../engine/InputManager.js';
 import { GamepadManager }  from '../engine/GamepadManager.js';
@@ -146,36 +147,25 @@ function MatchOver({ winner, pts, onRematch, onQuit }) {
   const [sel, setSel] = useState(0);
   const selRef = useRef(0);
 
+  const doConfirm = () => { if (selRef.current === 0) onRematch(); else onQuit(); };
+
   useEffect(() => {
     const handler = (e) => {
       if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') { selRef.current = 0; setSel(0); }
       if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') { selRef.current = 1; setSel(1); }
-      if (e.code === 'Enter') { if (selRef.current === 0) onRematch(); else onQuit(); }
+      if (e.code === 'Enter') doConfirm();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onRematch, onQuit]);
 
-  // Gamepad navigation
-  useEffect(() => {
-    let raf;
-    const prev = {};
-    const tick = () => {
-      const gp = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
-      if (gp) {
-        const left    = gp.buttons[14]?.pressed || gp.buttons[12]?.pressed || (gp.axes[0] ?? 0) < -0.28;
-        const right   = gp.buttons[15]?.pressed || gp.buttons[13]?.pressed || (gp.axes[0] ?? 0) >  0.28;
-        const confirm = gp.buttons[0]?.pressed;
-        if (left    && !prev.left)    { selRef.current = 0; setSel(0); }
-        if (right   && !prev.right)   { selRef.current = 1; setSel(1); }
-        if (confirm && !prev.confirm) { if (selRef.current === 0) onRematch(); else onQuit(); }
-        prev.left = left; prev.right = right; prev.confirm = confirm;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [onRematch, onQuit]);
+  useGamepadMenu({
+    onLeft:    () => { selRef.current = 0; setSel(0); },
+    onRight:   () => { selRef.current = 1; setSel(1); },
+    onUp:      () => { selRef.current = 0; setSel(0); },
+    onDown:    () => { selRef.current = 1; setSel(1); },
+    onConfirm: doConfirm,
+  });
 
   const btnStyle = (active) => ({
     fontSize: '0.55rem', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.1s', padding: '8px 24px',
@@ -213,38 +203,26 @@ function PauseOverlay({ onResume, onQuit }) {
   const [sel, setSel] = useState(0);
   const selRef = useRef(0);
 
+  const doConfirm = () => { if (selRef.current === 0) onResume(); else onQuit(); };
+
   useEffect(() => {
     const handler = (e) => {
       if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') { selRef.current = 0; setSel(0); }
       if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') { selRef.current = 1; setSel(1); }
-      if (e.code === 'Enter') { if (selRef.current === 0) onResume(); else onQuit(); }
+      if (e.code === 'Enter') doConfirm();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onResume, onQuit]);
 
-  // Gamepad navigation
-  useEffect(() => {
-    let raf;
-    const prev = {};
-    const tick = () => {
-      const gp = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
-      if (gp) {
-        const left    = gp.buttons[14]?.pressed || gp.buttons[12]?.pressed || (gp.axes[0] ?? 0) < -0.28;
-        const right   = gp.buttons[15]?.pressed || gp.buttons[13]?.pressed || (gp.axes[0] ?? 0) >  0.28;
-        const confirm = gp.buttons[0]?.pressed;
-        const start   = gp.buttons[9]?.pressed;
-        if (left    && !prev.left)    { selRef.current = 0; setSel(0); }
-        if (right   && !prev.right)   { selRef.current = 1; setSel(1); }
-        if (confirm && !prev.confirm) { if (selRef.current === 0) onResume(); else onQuit(); }
-        if (start   && !prev.start)   { onResume(); }
-        prev.left = left; prev.right = right; prev.confirm = confirm; prev.start = start;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [onResume, onQuit]);
+  useGamepadMenu({
+    onLeft:    () => { selRef.current = 0; setSel(0); },
+    onRight:   () => { selRef.current = 1; setSel(1); },
+    onUp:      () => { selRef.current = 0; setSel(0); },
+    onDown:    () => { selRef.current = 1; setSel(1); },
+    onConfirm: doConfirm,
+    onStart:   onResume,   // Start always resumes
+  });
 
   const btnStyle = (active) => ({
     fontSize: '0.55rem', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.1s', padding: '8px 24px',

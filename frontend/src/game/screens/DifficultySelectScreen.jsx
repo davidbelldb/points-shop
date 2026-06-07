@@ -8,7 +8,8 @@
  * Click moves cursor; double-click confirms.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useGamepadMenu } from '../hooks/useGamepadMenu.js';
 
 const DIFFICULTIES = [
   {
@@ -34,31 +35,39 @@ const DIFFICULTIES = [
 export default function DifficultySelectScreen({ onSelect, onBack, audio }) {
   const [cursor,  setCursor]  = useState(0);
   const [confirm, setConfirm] = useState(false);
+  const cursorRef = useRef(0);
+
+  const moveCursor = (delta) => {
+    setCursor(c => {
+      const next = Math.max(0, Math.min(DIFFICULTIES.length - 1, c + delta));
+      if (next !== c) { audio?.playMenuMove(); cursorRef.current = next; }
+      return next;
+    });
+  };
+
+  const doConfirm = () => {
+    audio?.playMenuConfirm();
+    setConfirm(true);
+    setTimeout(() => onSelect(DIFFICULTIES[cursorRef.current].id), 350);
+  };
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'Escape') {
-        audio?.playMenuBack();
-        onBack();
-        return;
-      }
-      if ((e.code === 'ArrowLeft' || e.code === 'KeyA') && cursor > 0) {
-        audio?.playMenuMove();
-        setCursor(c => c - 1);
-      }
-      if ((e.code === 'ArrowRight' || e.code === 'KeyD') && cursor < DIFFICULTIES.length - 1) {
-        audio?.playMenuMove();
-        setCursor(c => c + 1);
-      }
-      if (e.code === 'Enter') {
-        audio?.playMenuConfirm();
-        setConfirm(true);
-        setTimeout(() => onSelect(DIFFICULTIES[cursor].id), 350);
-      }
+      if (e.code === 'Escape')                                       { audio?.playMenuBack(); onBack(); return; }
+      if (e.code === 'ArrowLeft'  || e.code === 'KeyA')              moveCursor(-1);
+      if (e.code === 'ArrowRight' || e.code === 'KeyD')              moveCursor(+1);
+      if (e.code === 'Enter')                                        doConfirm();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, onSelect, onBack, audio]);
+  }, [onSelect, onBack, audio]);
+
+  useGamepadMenu({
+    onLeft:    () => moveCursor(-1),
+    onRight:   () => moveCursor(+1),
+    onConfirm: doConfirm,
+    onBack:    () => { audio?.playMenuBack(); onBack(); },
+  });
 
   const pick = (i) => {
     if (cursor !== i) { audio?.playMenuMove(); setCursor(i); }
@@ -153,7 +162,7 @@ export default function DifficultySelectScreen({ onSelect, onBack, audio }) {
         className="select-none"
         style={{ fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffff22' }}
       >
-        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM &nbsp;·&nbsp; ESC BACK
+        D-PAD/←/→ SELECT &nbsp;·&nbsp; A/ENTER CONFIRM &nbsp;·&nbsp; B/ESC BACK
       </p>
     </div>
   );

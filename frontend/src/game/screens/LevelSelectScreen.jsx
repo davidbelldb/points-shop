@@ -8,7 +8,8 @@
  * Click also works — single click moves cursor, double-click selects.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useGamepadMenu } from '../hooks/useGamepadMenu.js';
 import bg03Url from '../../assets/backgrounds/background_03.png';
 
 const COLS = 3;
@@ -55,34 +56,42 @@ export const LEVELS = [
 
 export default function LevelSelectScreen({ onSelect, onBack, audio }) {
   const [cursor, setCursor] = useState(0);
+  const cursorRef = useRef(0);
+
+  const moveCursor = (delta) => {
+    setCursor(c => {
+      const next = Math.max(0, Math.min(LEVELS.length - 1, c + delta));
+      if (next !== c) { audio?.playMenuMove(); cursorRef.current = next; }
+      return next;
+    });
+  };
+
+  const doConfirm = () => {
+    const lvl = LEVELS[cursorRef.current];
+    if (lvl?.available) { audio?.playMenuConfirm(); onSelect(lvl); }
+  };
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'Escape') {
-        audio?.playMenuBack();
-        onBack();
-        return;
-      }
-      if (e.code === 'ArrowLeft'  && cursor > 0) {
-        audio?.playMenuMove(); setCursor(c => c - 1);
-      }
-      if (e.code === 'ArrowRight' && cursor < LEVELS.length - 1) {
-        audio?.playMenuMove(); setCursor(c => c + 1);
-      }
-      if (e.code === 'ArrowUp'   && cursor - COLS >= 0) {
-        audio?.playMenuMove(); setCursor(c => c - COLS);
-      }
-      if (e.code === 'ArrowDown' && cursor + COLS < LEVELS.length) {
-        audio?.playMenuMove(); setCursor(c => c + COLS);
-      }
-      if (e.code === 'Enter') {
-        const lvl = LEVELS[cursor];
-        if (lvl.available) { audio?.playMenuConfirm(); onSelect(lvl); }
-      }
+      if (e.code === 'Escape')      { audio?.playMenuBack(); onBack(); return; }
+      if (e.code === 'ArrowLeft')   moveCursor(-1);
+      if (e.code === 'ArrowRight')  moveCursor(+1);
+      if (e.code === 'ArrowUp')     moveCursor(-COLS);
+      if (e.code === 'ArrowDown')   moveCursor(+COLS);
+      if (e.code === 'Enter')       doConfirm();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, onSelect, onBack, audio]);
+  }, [onSelect, onBack, audio]);
+
+  useGamepadMenu({
+    onLeft:    () => moveCursor(-1),
+    onRight:   () => moveCursor(+1),
+    onUp:      () => moveCursor(-COLS),
+    onDown:    () => moveCursor(+COLS),
+    onConfirm: doConfirm,
+    onBack:    () => { audio?.playMenuBack(); onBack(); },
+  });
 
   return (
     <div
@@ -190,7 +199,7 @@ export default function LevelSelectScreen({ onSelect, onBack, audio }) {
 
       {/* Footer hint */}
       <p className="select-none" style={{ fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffff22' }}>
-        ←↑↓→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT &nbsp;·&nbsp; ESC BACK
+        D-PAD/←↑↓→ NAVIGATE &nbsp;·&nbsp; A/ENTER SELECT &nbsp;·&nbsp; B/ESC BACK
       </p>
     </div>
   );

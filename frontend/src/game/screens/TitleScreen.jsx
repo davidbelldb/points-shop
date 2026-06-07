@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import titleBgUrl from '../../assets/backgrounds/title_screen.png';
+import { useGamepadMenu } from '../hooks/useGamepadMenu.js';
 
 export default function TitleScreen({ onStart, onStart2P, canStart2P, audio }) {
   const [blink, setBlink] = useState(true);
@@ -23,14 +24,16 @@ export default function TitleScreen({ onStart, onStart2P, canStart2P, audio }) {
   // Keyboard + click/tap to start
   useEffect(() => {
     const onKey = (e) => {
-      if (e.code === 'Enter') {
-        audio?.playMenuConfirm();
-        onStart();
-      }
+      if (e.code === 'Enter') { audio?.playMenuConfirm(); onStart(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onStart, audio]);
+
+  // Gamepad — A or Start advances to 1P; no 2P shortcut (needs explicit tap)
+  useGamepadMenu({
+    onConfirm: () => { audio?.playMenuConfirm(); onStart(); },
+  });
 
   // Rain + lightning canvas animation
   useEffect(() => {

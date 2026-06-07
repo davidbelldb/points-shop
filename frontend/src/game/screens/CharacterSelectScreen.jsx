@@ -9,7 +9,8 @@
  * ENTER to confirm.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useGamepadMenu } from '../hooks/useGamepadMenu.js';
 import katieSelectUrl from '../../assets/character_selections/katie_select.png';
 import davidSelectUrl from '../../assets/character_selections/david_select.png';
 
@@ -21,29 +22,36 @@ const CHARACTERS = [
 export default function CharacterSelectScreen({ onSelect, onBack, audio }) {
   const [cursor, setCursor] = useState(0);
   const [confirm, setConfirm] = useState(false);
+  const cursorRef = useRef(0);
+
+  const moveCursor = (next) => {
+    next = Math.max(0, Math.min(CHARACTERS.length - 1, next));
+    if (next !== cursorRef.current) { audio?.playMenuMove(); cursorRef.current = next; setCursor(next); }
+  };
+
+  const doConfirm = () => {
+    audio?.playMenuConfirm();
+    setConfirm(true);
+    setTimeout(() => onSelect(CHARACTERS[cursorRef.current].id), 400);
+  };
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'Escape') {
-        audio?.playMenuBack();
-        onBack();
-        return;
-      }
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
-        if (cursor !== 0) { audio?.playMenuMove(); setCursor(0); }
-      }
-      if (e.code === 'ArrowRight' || e.code === 'KeyD') {
-        if (cursor !== 1) { audio?.playMenuMove(); setCursor(1); }
-      }
-      if (e.code === 'Enter') {
-        audio?.playMenuConfirm();
-        setConfirm(true);
-        setTimeout(() => onSelect(CHARACTERS[cursor].id), 400);
-      }
+      if (e.code === 'Escape')                          { audio?.playMenuBack(); onBack(); return; }
+      if (e.code === 'ArrowLeft'  || e.code === 'KeyA') moveCursor(cursorRef.current - 1);
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') moveCursor(cursorRef.current + 1);
+      if (e.code === 'Enter')                           doConfirm();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, onSelect, onBack, audio]);
+  }, [onSelect, onBack, audio]);
+
+  useGamepadMenu({
+    onLeft:    () => moveCursor(cursorRef.current - 1),
+    onRight:   () => moveCursor(cursorRef.current + 1),
+    onConfirm: doConfirm,
+    onBack:    () => { audio?.playMenuBack(); onBack(); },
+  });
 
   return (
     <div
@@ -125,7 +133,7 @@ export default function CharacterSelectScreen({ onSelect, onBack, audio }) {
 
       {/* Controls hint */}
       <p className="text-white/20 mt-4" style={{ fontSize: '0.45rem', letterSpacing: '0.15em' }}>
-        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM &nbsp;·&nbsp; ESC BACK
+        D-PAD/←/→ SELECT &nbsp;·&nbsp; A/ENTER CONFIRM &nbsp;·&nbsp; B/ESC BACK
       </p>
     </div>
   );

@@ -7,7 +7,8 @@
  * Navigation: ←/→ or A/D · ENTER to confirm · click/double-click
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useGamepadMenu } from '../hooks/useGamepadMenu.js';
 import katieDinoUrl  from '../../assets/character_costumes/katie_dino_dress.png';
 import davidShirtUrl from '../../assets/character_costumes/david_shirt_jeans.png';
 
@@ -40,28 +41,38 @@ export default function CostumeSelectScreen({ character, onSelect, onBack, audio
   const [cursor, setCursor] = useState(0);
   const costumes = COSTUMES[character] ?? COSTUMES.katie;
   const accent   = ACCENT[character] ?? '#fbbf24';
+  const cursorRef = useRef(0);
+
+  const moveCursor = (delta) => {
+    setCursor(c => {
+      const next = Math.max(0, Math.min(costumes.length - 1, c + delta));
+      if (next !== c) { audio?.playMenuMove(); cursorRef.current = next; }
+      return next;
+    });
+  };
+
+  const doConfirm = () => {
+    const c = costumes[cursorRef.current];
+    if (c?.available) { audio?.playMenuConfirm(); onSelect(c); }
+  };
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'Escape') {
-        audio?.playMenuBack();
-        onBack();
-        return;
-      }
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
-        if (cursor > 0) { audio?.playMenuMove(); setCursor(c => Math.max(0, c - 1)); }
-      }
-      if (e.code === 'ArrowRight' || e.code === 'KeyD') {
-        if (cursor < costumes.length - 1) { audio?.playMenuMove(); setCursor(c => Math.min(costumes.length - 1, c + 1)); }
-      }
-      if (e.code === 'Enter') {
-        const c = costumes[cursor];
-        if (c.available) { audio?.playMenuConfirm(); onSelect(c); }
-      }
+      if (e.code === 'Escape')                          { audio?.playMenuBack(); onBack(); return; }
+      if (e.code === 'ArrowLeft'  || e.code === 'KeyA') moveCursor(-1);
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') moveCursor(+1);
+      if (e.code === 'Enter')                           doConfirm();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, costumes, onSelect, onBack, audio]);
+  }, [costumes, onSelect, onBack, audio]);
+
+  useGamepadMenu({
+    onLeft:    () => moveCursor(-1),
+    onRight:   () => moveCursor(+1),
+    onConfirm: doConfirm,
+    onBack:    () => { audio?.playMenuBack(); onBack(); },
+  });
 
   return (
     <div
@@ -163,7 +174,7 @@ export default function CostumeSelectScreen({ character, onSelect, onBack, audio
 
       {/* Footer hint */}
       <p className="select-none" style={{ fontSize: '0.45rem', letterSpacing: '0.15em', color: '#ffffff22' }}>
-        ←/→ NAVIGATE &nbsp;·&nbsp; ENTER SELECT &nbsp;·&nbsp; ESC BACK
+        D-PAD/←/→ NAVIGATE &nbsp;·&nbsp; A/ENTER SELECT &nbsp;·&nbsp; B/ESC BACK
       </p>
     </div>
   );
