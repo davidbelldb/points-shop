@@ -1,36 +1,51 @@
 /**
  * TouchControls
  *
- * On-screen D-pad + attack buttons rendered over the game canvas.
- * Only shown on touch-capable devices.
+ * Virtual analogue stick (left) + circular attack buttons (right).
+ * Only rendered on touch-capable devices.
  *
- * Each button uses pointer-capture so touches that slide off the button
- * are still correctly released.
+ * The analogue stick uses a single pointer-capture zone — slide your thumb
+ * anywhere inside the disc to change direction without lifting.
  *
- * Props:
- *   inputRef — React ref whose .current is the live InputManager instance
+ * Each attack button uses pointer-capture so slides off the button still
+ * trigger a clean release.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 const IS_TOUCH =
   typeof window !== 'undefined' &&
   ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
-// ─── SVG arrow icons ──────────────────────────────────────────────────────────
+// ─── Global selection suppression ─────────────────────────────────────────────
+// Injected once into <head> so iOS never shows the copy/paste callout
+// regardless of hold duration anywhere inside the game overlay.
 
-function ArrowUp()    { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2 L14 12 L2 12 Z"/></svg>; }
-function ArrowDown()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 14 L14 4 L2 4 Z"/></svg>; }
-function ArrowLeft()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 8 L12 2 L12 14 Z"/></svg>; }
-function ArrowRight() { return <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 8 L4 2 L4 14 Z"/></svg>; }
+if (IS_TOUCH && typeof document !== 'undefined') {
+  const id = '__tcNoSelect';
+  if (!document.getElementById(id)) {
+    const s = document.createElement('style');
+    s.id = id;
+    s.textContent = `
+      .tc-overlay, .tc-overlay * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        -webkit-touch-callout: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+}
 
-// ─── Base styles ──────────────────────────────────────────────────────────────
+// ─── Shared button base ───────────────────────────────────────────────────────
 
 const BASE = {
   pointerEvents:           'auto',
   touchAction:             'none',
   userSelect:              'none',
   WebkitUserSelect:        'none',
+  WebkitTouchCallout:      'none',
   WebkitTapHighlightColor: 'transparent',
   cursor:                  'pointer',
   display:                 'flex',
@@ -40,7 +55,7 @@ const BASE = {
   transition:              'background 0.05s, box-shadow 0.05s, opacity 0.05s, border-color 0.05s',
 };
 
-// ─── Individual button ────────────────────────────────────────────────────────
+// ─── Attack / special button ──────────────────────────────────────────────────
 
 function TBtn({ action, label, style, inputRef, color = 'rgba(255,255,255,0.6)', round = false }) {
   const [active, setActive] = useState(false);
@@ -90,58 +105,178 @@ function TBtn({ action, label, style, inputRef, color = 'rgba(255,255,255,0.6)',
   );
 }
 
-// ─── D-Pad ────────────────────────────────────────────────────────────────────
+// ─── Virtual analogue stick ───────────────────────────────────────────────────
 
-function DPad({ inputRef }) {
-  const SZ  = 58;
-  const GAP = 5;
-  const PAD = SZ + GAP;
-  const W   = PAD * 3 - GAP;
+const BASE_R  = 66;   // radius of the outer disc
+const THUMB_R = 26;   // radius of the inner thumb nub
+const DEAD_ZONE = 0.22; // fraction of BASE_R before any direction fires
+
+// Arrow SVGs shown at the 4 compass points inside the disc
+function StickArrow({ dir, lit }) {
+  const rot = { up: 0, right: 90, down: 180, left: 270 }[dir];
+  return (
+    <svg
+      width="12" height="12" viewBox="0 0 12 12"
+      fill={lit ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.18)'}
+      style={{
+        position:   'absolute',
+        transition: 'fill 0.05s',
+        transform:  `rotate(${rot}deg)`,
+        ...({
+          up:    { top: 6,  left: '50%', marginLeft: -6 },
+          right: { right: 6, top: '50%', marginTop: -6 },
+          down:  { bottom: 6, left: '50%', marginLeft: -6 },
+          left:  { left: 6,  top: '50%', marginTop: -6 },
+        }[dir]),
+      }}
+    >
+      <path d="M6 1 L11 10 L1 10 Z" />
+    </svg>
+  );
+}
+
+function VirtualStick({ inputRef }) {
+  const baseRef     = useRef(null);
+  const trackingRef = useRef(false);   // avoids stale closure in move handler
+  const activeKeys  = useRef(new Set());
+
+  const [thumbPos, setThumbPos] = useState({ x: 0, y: 0 });
+  const [isDown,   setIsDown]   = useState(false);
+  const [litDirs,  setLitDirs]  = useState({ up: false, right: false, down: false, left: false });
+
+  function pressKey(key) {
+    if (!activeKeys.current.has(key)) {
+      activeKeys.current.add(key);
+      inputRef.current?.injectPress(key);
+    }
+  }
+  function releaseKey(key) {
+    if (activeKeys.current.has(key)) {
+      activeKeys.current.delete(key);
+      inputRef.current?.injectRelease(key);
+    }
+  }
+  function releaseAll() {
+    activeKeys.current.forEach(k => inputRef.current?.injectRelease(k));
+    activeKeys.current.clear();
+  }
+
+  function applyInput(rawDx, rawDy) {
+    const dist = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
+
+    // Clamp thumb visual to disc edge
+    const clampedDist = Math.min(dist, BASE_R);
+    const angle       = Math.atan2(rawDy, rawDx);
+    const tx          = Math.cos(angle) * clampedDist;
+    const ty          = Math.sin(angle) * clampedDist;
+    setThumbPos({ x: tx, y: ty });
+
+    if (dist < BASE_R * DEAD_ZONE) {
+      releaseAll();
+      setLitDirs({ up: false, right: false, down: false, left: false });
+      return;
+    }
+
+    // Convert angle to 4 cardinal directions (with diagonals activating two)
+    const deg     = angle * (180 / Math.PI);   // -180..180
+    const newUp    = deg > -135 && deg < -45;
+    const newDown  = deg >   45 && deg <  135;
+    const newLeft  = deg > 135 || deg < -135;
+    const newRight = deg >  -45 && deg <   45;
+
+    if (newUp)    pressKey('UP');    else releaseKey('UP');
+    if (newDown)  pressKey('DOWN');  else releaseKey('DOWN');
+    if (newLeft)  pressKey('LEFT');  else releaseKey('LEFT');
+    if (newRight) pressKey('RIGHT'); else releaseKey('RIGHT');
+
+    setLitDirs({ up: newUp, down: newDown, left: newLeft, right: newRight });
+  }
+
+  function getOffset(e) {
+    const rect = baseRef.current.getBoundingClientRect();
+    return {
+      dx: e.clientX - (rect.left + rect.width  / 2),
+      dy: e.clientY - (rect.top  + rect.height / 2),
+    };
+  }
+
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    trackingRef.current = true;
+    setIsDown(true);
+    const { dx, dy } = getOffset(e);
+    applyInput(dx, dy);
+  };
+
+  const onPointerMove = (e) => {
+    if (!trackingRef.current) return;
+    e.preventDefault();
+    const { dx, dy } = getOffset(e);
+    applyInput(dx, dy);
+  };
+
+  const onPointerUp = (e) => {
+    e.preventDefault();
+    trackingRef.current = false;
+    setIsDown(false);
+    setThumbPos({ x: 0, y: 0 });
+    releaseAll();
+    setLitDirs({ up: false, right: false, down: false, left: false });
+  };
+
+  const D = BASE_R * 2;
 
   return (
-    /* outer container — pointer-events: none so the gaps are pass-through */
-    <div style={{ position: 'relative', width: W, height: W }}>
+    <div
+      ref={baseRef}
+      style={{
+        position:            'relative',
+        width:                D,
+        height:               D,
+        borderRadius:        '50%',
+        background:          'rgba(6,6,14,0.55)',
+        border:              `2px solid rgba(255,255,255,${isDown ? 0.22 : 0.10})`,
+        boxShadow:           isDown
+          ? '0 0 24px rgba(255,255,255,0.06), inset 0 0 20px rgba(0,0,0,0.5)'
+          : '0 4px 16px rgba(0,0,0,0.65)',
+        pointerEvents:       'auto',
+        touchAction:         'none',
+        userSelect:          'none',
+        WebkitUserSelect:    'none',
+        WebkitTouchCallout:  'none',
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      {/* Subtle crosshair */}
+      <div style={{ position:'absolute', left:'50%', top:12, bottom:12, width:1, background:'rgba(255,255,255,0.05)', transform:'translateX(-50%)', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', top:'50%', left:12, right:12, height:1, background:'rgba(255,255,255,0.05)', transform:'translateY(-50%)', pointerEvents:'none' }} />
 
-      {/* subtle disc backdrop */}
-      <div style={{
-        position:   'absolute',
-        inset:       -8,
-        borderRadius: '50%',
-        background:  'radial-gradient(circle, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0) 70%)',
-        pointerEvents: 'none',
-      }} />
+      {/* Compass arrows */}
+      <StickArrow dir="up"    lit={litDirs.up} />
+      <StickArrow dir="right" lit={litDirs.right} />
+      <StickArrow dir="down"  lit={litDirs.down} />
+      <StickArrow dir="left"  lit={litDirs.left} />
 
-      {/* UP */}
-      <TBtn action="UP" label={<ArrowUp />} inputRef={inputRef}
-        color="rgba(255,255,255,0.65)"
-        style={{ position: 'absolute', left: PAD, top: 0, width: SZ, height: SZ, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }}
-      />
-      {/* LEFT */}
-      <TBtn action="LEFT" label={<ArrowLeft />} inputRef={inputRef}
-        color="rgba(255,255,255,0.65)"
-        style={{ position: 'absolute', left: 0, top: PAD, width: SZ, height: SZ, borderTopRightRadius: 6, borderBottomRightRadius: 6 }}
-      />
-      {/* Centre — decorative only */}
-      <div style={{
-        position:      'absolute',
-        left:           PAD,
-        top:            PAD,
-        width:          SZ,
-        height:         SZ,
-        background:    'rgba(255,255,255,0.04)',
-        border:        '2px solid rgba(255,255,255,0.10)',
-        borderRadius:   6,
-        pointerEvents: 'none',
-      }} />
-      {/* RIGHT */}
-      <TBtn action="RIGHT" label={<ArrowRight />} inputRef={inputRef}
-        color="rgba(255,255,255,0.65)"
-        style={{ position: 'absolute', left: PAD * 2, top: PAD, width: SZ, height: SZ, borderTopLeftRadius: 6, borderBottomLeftRadius: 6 }}
-      />
-      {/* DOWN */}
-      <TBtn action="DOWN" label={<ArrowDown />} inputRef={inputRef}
-        color="rgba(255,255,255,0.65)"
-        style={{ position: 'absolute', left: PAD, top: PAD * 2, width: SZ, height: SZ, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}
+      {/* Thumb nub */}
+      <div
+        style={{
+          position:    'absolute',
+          left:        '50%',
+          top:         '50%',
+          width:        THUMB_R * 2,
+          height:       THUMB_R * 2,
+          borderRadius: '50%',
+          background:   isDown ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.09)',
+          border:      `2px solid rgba(255,255,255,${isDown ? 0.55 : 0.25})`,
+          boxShadow:    isDown ? '0 0 14px rgba(255,255,255,0.25)' : 'none',
+          transform:   `translate(calc(-50% + ${thumbPos.x}px), calc(-50% + ${thumbPos.y}px))`,
+          transition:   isDown ? 'none' : 'transform 0.18s cubic-bezier(0.34,1.56,0.64,1)',
+          pointerEvents: 'none',
+        }}
       />
     </div>
   );
@@ -149,20 +284,18 @@ function DPad({ inputRef }) {
 
 // ─── Attack buttons ───────────────────────────────────────────────────────────
 
-// [action, label, neon-colour]
 const ATTACK_BTNS = [
-  ['JUMP',       'K',   'rgba(96,165,250,1)'],   // blue
-  ['BLOCK',      'BLK', 'rgba(250,204,21,1)'],   // yellow
-  ['PUNCH',      'J',   'rgba(248,113,113,1)'],   // red
-  ['KICK',       'L',   'rgba(251,146,60,1)'],    // orange
-  ['POWER_KICK', 'U',   'rgba(167,139,250,1)'],   // purple
-  ['COMBO',      'I',   'rgba(52,211,153,1)'],    // green
+  ['JUMP',       'K',   'rgba(96,165,250,1)'],
+  ['BLOCK',      'BLK', 'rgba(250,204,21,1)'],
+  ['PUNCH',      'J',   'rgba(248,113,113,1)'],
+  ['KICK',       'L',   'rgba(251,146,60,1)'],
+  ['POWER_KICK', 'U',   'rgba(167,139,250,1)'],
+  ['COMBO',      'I',   'rgba(52,211,153,1)'],
 ];
 
 function AttackButtons({ inputRef }) {
-  const D = 62;   // circle diameter
-  const G = 6;    // gap
-
+  const D = 62;
+  const G = 6;
   return (
     <div style={{
       display:             'grid',
@@ -186,17 +319,14 @@ function AttackButtons({ inputRef }) {
 }
 
 function SpecialButton({ inputRef }) {
-  const D = 62;
-  const G = 6;
-  const W = D * 2 + G;
-
+  const D = 62, G = 6;
   return (
     <TBtn
       action="PIANO"
       label="◈  SPECIAL"
       color="rgba(251,191,36,1)"
       inputRef={inputRef}
-      style={{ width: W, height: 40, fontSize: '0.38rem', letterSpacing: '0.12em', borderRadius: 10 }}
+      style={{ width: D * 2 + G, height: 40, fontSize: '0.38rem', letterSpacing: '0.12em', borderRadius: 10 }}
     />
   );
 }
@@ -208,28 +338,27 @@ export default function TouchControls({ inputRef }) {
 
   return (
     <div
+      className="tc-overlay"
       style={{
-        position:      'absolute',
-        inset:          0,
-        pointerEvents: 'none',
-        zIndex:         50,
+        position:           'absolute',
+        inset:               0,
+        pointerEvents:      'none',
+        zIndex:              50,
+        userSelect:         'none',
+        WebkitUserSelect:   'none',
+        WebkitTouchCallout: 'none',
       }}
     >
-      {/* D-pad — bottom left */}
-      <div style={{
-        position:      'absolute',
-        left:           14,
-        bottom:         18,
-        pointerEvents: 'none',
-      }}>
-        <DPad inputRef={inputRef} />
+      {/* Analogue stick — bottom left */}
+      <div style={{ position: 'absolute', left: 16, bottom: 20, pointerEvents: 'none' }}>
+        <VirtualStick inputRef={inputRef} />
       </div>
 
       {/* Attack grid + special — bottom right */}
       <div style={{
         position:      'absolute',
-        right:          14,
-        bottom:         18,
+        right:          16,
+        bottom:         20,
         display:       'flex',
         flexDirection: 'column',
         alignItems:    'flex-end',
