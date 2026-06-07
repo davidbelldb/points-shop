@@ -41,7 +41,7 @@ function getTodayDate() {
 }
 
 function getDailyWord() {
-  const epoch = Math.floor(Date.now() / 86_400_000); // days since unix epoch
+  const epoch = Math.floor(Date.now() / 86_400_000);
   return WORDS[epoch % WORDS.length];
 }
 
@@ -50,7 +50,6 @@ function evaluateGuess(guess, target) {
   const targetArr = target.split('');
   const guessArr  = guess.split('');
 
-  // Pass 1 — correct position
   for (let i = 0; i < WORD_LENGTH; i++) {
     if (guessArr[i] === targetArr[i]) {
       result[i]    = 'correct';
@@ -58,7 +57,6 @@ function evaluateGuess(guess, target) {
       guessArr[i]  = null;
     }
   }
-  // Pass 2 — right letter, wrong position
   for (let i = 0; i < WORD_LENGTH; i++) {
     if (guessArr[i] !== null) {
       const idx = targetArr.indexOf(guessArr[i]);
@@ -71,21 +69,27 @@ function evaluateGuess(guess, target) {
 // ─── Tile ─────────────────────────────────────────────────────────────────────
 
 const TILE_BG = {
-  correct: '#16a34a',
-  present: '#d97706',
+  correct: '#61dbbb',
+  present: '#ed70bd',
   absent:  '#525252',
   active:  'transparent',
   empty:   'transparent',
 };
 const TILE_BORDER = {
-  correct: '#16a34a',
-  present: '#d97706',
+  correct: '#61dbbb',
+  present: '#ed70bd',
   absent:  '#525252',
   active:  '#737373',
   empty:   '#d4d4d4',
 };
+const TILE_TEXT = {
+  correct: '#0d3d2e',
+  present: '#fff',
+  absent:  '#fff',
+};
 
 function Tile({ letter, state, delay = 0, revealed }) {
+  const isColoured = ['correct','present','absent'].includes(state);
   return (
     <div
       style={{
@@ -98,7 +102,7 @@ function Tile({ letter, state, delay = 0, revealed }) {
         border:          `2px solid ${TILE_BORDER[state]}`,
         borderRadius:    6,
         background:      TILE_BG[state],
-        color:           ['correct','present','absent'].includes(state) ? '#fff' : 'inherit',
+        color:           isColoured ? TILE_TEXT[state] : 'inherit',
         transition:      revealed ? `background 0.15s ${delay}ms, border-color 0.15s ${delay}ms` : 'border-color 0.1s',
         transform:       letter && !revealed ? 'scale(1.08)' : 'scale(1)',
         transitionProperty: revealed ? 'background, border-color' : 'transform, border-color',
@@ -111,34 +115,31 @@ function Tile({ letter, state, delay = 0, revealed }) {
 
 // ─── Keyboard key ─────────────────────────────────────────────────────────────
 
-const KEY_BG = {
-  correct: '#16a34a',
-  present: '#d97706',
-  absent:  '#525252',
-  unused:  undefined, // uses CSS class
-};
+const KEY_BG   = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', unused: undefined };
+const KEY_TEXT = { correct: '#0d3d2e', present: '#fff',    absent: '#fff' };
 
 function Key({ label, state, onPress }) {
   const wide = label === 'ENTER' || label === '⌫';
   const bg   = KEY_BG[state];
+  const col  = KEY_TEXT[state];
 
   return (
     <button
       onPointerDown={(e) => { e.preventDefault(); onPress(label); }}
       style={{
-        height:          52,
-        minWidth:        wide ? 56 : 36,
-        padding:         wide ? '0 6px' : 0,
-        borderRadius:    6,
-        fontWeight:      700,
-        fontSize:        wide ? 11 : 15,
-        border:          'none',
-        background:      bg,
-        color:           bg ? '#fff' : undefined,
-        cursor:          'pointer',
-        userSelect:      'none',
-        touchAction:     'none',
-        transition:      'background 0.15s',
+        height:       52,
+        minWidth:     wide ? 56 : 36,
+        padding:      wide ? '0 6px' : 0,
+        borderRadius: 6,
+        fontWeight:   700,
+        fontSize:     wide ? 11 : 15,
+        border:       'none',
+        background:   bg,
+        color:        bg ? col : undefined,
+        cursor:       'pointer',
+        userSelect:   'none',
+        touchAction:  'none',
+        transition:   'background 0.15s',
       }}
       className={!bg ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-600 dark:text-neutral-100' : ''}
     >
@@ -147,6 +148,11 @@ function Key({ label, state, onPress }) {
   );
 }
 
+// ─── Button styles ────────────────────────────────────────────────────────────
+
+const TEAL_BTN  = 'inline-flex items-center justify-center rounded-xl bg-[#61dbbb] px-5 py-2 text-sm font-semibold text-[#0d3d2e] transition hover:opacity-90 active:scale-95';
+const GHOST_BTN = 'inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 active:scale-95 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200';
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DirtyWordlePage() {
@@ -154,26 +160,26 @@ export default function DirtyWordlePage() {
   const target     = getDailyWord();
   const storageKey = `dirty-wordle-${today}`;
 
-  // Load persisted state for today
   const loadSaved = () => {
     try { return JSON.parse(localStorage.getItem(storageKey)) ?? {}; } catch { return {}; }
   };
   const saved = loadSaved();
 
-  const [guesses,      setGuesses]      = useState(saved.guesses   ?? []);
-  const [currentGuess, setCurrentGuess] = useState('');
-  const [gameOver,     setGameOver]     = useState(saved.gameOver  ?? false);
-  const [won,          setWon]          = useState(saved.won       ?? false);
-  const [ptsEarned,    setPtsEarned]    = useState(saved.ptsEarned ?? null);
-  const [shake,        setShake]        = useState(false);
-  const [copied,       setCopied]       = useState(false);
+  const [guesses,        setGuesses]        = useState(saved.guesses      ?? []);
+  const [currentGuess,   setCurrentGuess]   = useState('');
+  const [gameOver,       setGameOver]       = useState(saved.gameOver     ?? false);
+  const [won,            setWon]            = useState(saved.won          ?? false);
+  const [ptsEarned,      setPtsEarned]      = useState(saved.ptsEarned    ?? null);
+  const [shake,          setShake]          = useState(false);
+  const [copied,         setCopied]         = useState(false);
+  const [modalDismissed, setModalDismissed] = useState(saved.modalAcked   ?? false);
 
-  // Persist on change
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify({ guesses, gameOver, won, ptsEarned }));
-  }, [guesses, gameOver, won, ptsEarned, storageKey]);
+    localStorage.setItem(storageKey, JSON.stringify({
+      guesses, gameOver, won, ptsEarned, modalAcked: modalDismissed,
+    }));
+  }, [guesses, gameOver, won, ptsEarned, modalDismissed, storageKey]);
 
-  // Best letter state seen across all guesses (for keyboard colouring)
   const letterStates = useMemo(() => {
     const s = {};
     for (const guess of guesses) {
@@ -214,32 +220,31 @@ export default function DirtyWordlePage() {
 
   const onKey = useCallback((key) => {
     if (gameOver) return;
-    if (key === 'ENTER')                          { submitGuess(); return; }
-    if (key === '⌫' || key === 'BACKSPACE')       { setCurrentGuess(g => g.slice(0, -1)); return; }
+    if (key === 'ENTER')                    { submitGuess(); return; }
+    if (key === '⌫' || key === 'BACKSPACE') { setCurrentGuess(g => g.slice(0, -1)); return; }
     if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) {
       setCurrentGuess(g => g + key);
     }
   }, [gameOver, submitGuess, currentGuess]);
 
-  // Physical keyboard support
   useEffect(() => {
     const handler = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if      (e.key === 'Enter')              onKey('ENTER');
-      else if (e.key === 'Backspace')          onKey('BACKSPACE');
-      else if (/^[a-zA-Z]$/.test(e.key))      onKey(e.key.toUpperCase());
+      if      (e.key === 'Enter')         onKey('ENTER');
+      else if (e.key === 'Backspace')     onKey('BACKSPACE');
+      else if (/^[a-zA-Z]$/.test(e.key)) onKey(e.key.toUpperCase());
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onKey]);
 
-  // Share result
+  // Emoji grid stays in the copied text — that's intentional
   const emojiGrid = guesses.map(g =>
     evaluateGuess(g, target)
       .map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛')
       .join('')
   ).join('\n');
-  const shareText = `💦 Dirty Wordle ${today}\n${won ? guesses.length : 'X'}/${MAX_GUESSES}\n\n${emojiGrid}`;
+  const shareText = `Dirty Wordle ${today}\n${won ? guesses.length : 'X'}/${MAX_GUESSES}\n\n${emojiGrid}`;
 
   const copyResult = () => {
     navigator.clipboard?.writeText(shareText).then(() => {
@@ -248,20 +253,21 @@ export default function DirtyWordlePage() {
     });
   };
 
-  // Win messages
   const winMessage = () => {
-    if (guesses.length === 1) return '🤯 First try?! You filthy genius!';
-    if (guesses.length <= 2) return '🔥 Two guesses. Suspiciously good.';
-    if (guesses.length <= 4) return '😏 Got there in the end.';
-    return '😅 Close call but you did it!';
+    if (guesses.length === 1) return 'First try. You filthy genius.';
+    if (guesses.length <= 2)  return 'Two guesses. Suspiciously good.';
+    if (guesses.length <= 4)  return 'Got there in the end.';
+    return 'Close call — but you did it!';
   };
+
+  const showModal = gameOver && !modalDismissed;
 
   return (
     <div className="flex flex-col items-center gap-4 py-4 px-2">
       {/* Header */}
       <div className="w-full max-w-sm flex items-center justify-between">
         <Link to="/games" className="text-sm text-neutral-500">← Games</Link>
-        <h1 className="font-bold text-lg tracking-wide">💦 Dirty Wordle</h1>
+        <h1 className="font-bold text-lg tracking-wide">Dirty Wordle</h1>
         <div className="w-14" />
       </div>
 
@@ -284,8 +290,8 @@ export default function DirtyWordlePage() {
               }}
             >
               {Array.from({ length: WORD_LENGTH }, (_, colIdx) => {
-                const letter   = word[colIdx] ?? '';
-                const state    = result ? result[colIdx] : letter ? 'active' : 'empty';
+                const letter = word[colIdx] ?? '';
+                const state  = result ? result[colIdx] : letter ? 'active' : 'empty';
                 return (
                   <Tile
                     key={colIdx}
@@ -300,34 +306,6 @@ export default function DirtyWordlePage() {
           );
         })}
       </div>
-
-      {/* Game-over card */}
-      {gameOver && (
-        <div className="w-full max-w-sm rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-4 text-center space-y-2 mt-1">
-          {won ? (
-            <>
-              <p className="font-bold text-lg text-emerald-600">{winMessage()}</p>
-              {ptsEarned != null && (
-                <p className="text-sm font-semibold text-amber-700">+{ptsEarned} pts earned</p>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="font-bold text-lg text-red-600">😳 Better luck tomorrow!</p>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                The word was{' '}
-                <span className="font-bold text-neutral-900 dark:text-white">{target}</span>
-              </p>
-            </>
-          )}
-          <button
-            onClick={copyResult}
-            className="mt-1 rounded-xl bg-amber-600 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition-colors"
-          >
-            {copied ? '✓ Copied!' : 'Share result 📋'}
-          </button>
-        </div>
-      )}
 
       {/* On-screen keyboard */}
       <div className="flex flex-col gap-1.5 mt-1">
@@ -344,6 +322,81 @@ export default function DirtyWordlePage() {
           </div>
         ))}
       </div>
+
+      {/* Result modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-neutral-800 p-6 text-center shadow-xl space-y-4">
+            {won ? (
+              <>
+                <h2 className="text-xl font-bold tracking-tight" style={{ color: '#61dbbb' }}>
+                  You got it!
+                </h2>
+                <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                  {winMessage()}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold tracking-tight text-neutral-800 dark:text-white">
+                  Better luck tomorrow
+                </h2>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  The word was{' '}
+                  <span className="font-bold" style={{ color: '#ed70bd' }}>
+                    {target}
+                  </span>
+                </p>
+              </>
+            )}
+
+            {/* Colour grid — only the rows played */}
+            <div className="flex flex-col items-center gap-1.5 py-1">
+              {guesses.map((guess, rowIdx) => {
+                const result = evaluateGuess(guess, target);
+                return (
+                  <div key={rowIdx} style={{ display: 'flex', gap: 5 }}>
+                    {result.map((state, colIdx) => (
+                      <div
+                        key={colIdx}
+                        style={{
+                          width: 32, height: 32,
+                          borderRadius: 5,
+                          background:
+                            state === 'correct' ? '#61dbbb'
+                            : state === 'present' ? '#ed70bd'
+                            : '#525252',
+                        }}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              {won ? guesses.length : 'X'}/{MAX_GUESSES}
+              {ptsEarned != null && (
+                <span
+                  className="ml-2 rounded-lg px-2 py-0.5 text-xs font-semibold"
+                  style={{ background: '#61dbbb', color: '#0d3d2e' }}
+                >
+                  +{ptsEarned} pts
+                </span>
+              )}
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <button onClick={copyResult} className={TEAL_BTN}>
+                {copied ? 'Copied!' : 'Copy result'}
+              </button>
+              <button onClick={() => setModalDismissed(true)} className={GHOST_BTN}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes wordle-shake {
