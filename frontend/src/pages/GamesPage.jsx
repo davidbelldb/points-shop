@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useSettings } from '../lib/SettingsContext.jsx';
-import titleScreenUrl from '../assets/backgrounds/title_screen.png';
 
 // Mirror the card style from StackedCards so CMS + hardcoded cards sit in
 // the same grid without any component nesting.
@@ -30,29 +29,6 @@ function CmsCard({ slide }) {
   return inner;
 }
 
-function StreetsCambsRageCard() {
-  return (
-    <Link to="/games/streets-of-cambs-rage" className="block group">
-      <div className="relative aspect-[16/7] md:aspect-square lg:aspect-[4/3] overflow-hidden rounded-2xl shadow-sm">
-        <img
-          src={titleScreenUrl}
-          alt="Streets of Cambs-Rage"
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-4">
-          <p className="text-lg font-bold leading-tight text-white">Streets of Cambs-Rage</p>
-          <p className="mt-0.5 text-sm text-white/70">Beat 'em up · 1 Player</p>
-        </div>
-        <div className="absolute top-3 right-3 rounded px-2 py-0.5 text-white text-xs font-bold tracking-widest"
-             style={{ background: '#ed70bd' }}>
-          NEW
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 export default function GamesPage() {
   const { settings } = useSettings();
   const [slides, setSlides] = useState(null);
@@ -77,7 +53,6 @@ export default function GamesPage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-        <StreetsCambsRageCard />
         {slides && slides.map((s) => <CmsCard key={s.id} slide={s} />)}
       </div>
 
