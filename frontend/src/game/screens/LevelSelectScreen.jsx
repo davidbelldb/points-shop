@@ -34,8 +34,8 @@ export const LEVELS = [
     thumb:     null,
   },
   {
-    id:        'bar_oh_they_dead',
-    name:      'BAR-OH THEY DEAD',
+    id:        'coming_soon_3',
+    name:      'COMING SOON',
     available: false,
     thumb:     null,
   },
@@ -146,14 +146,12 @@ export default function LevelSelectScreen({ onSelect, onBack, audio }) {
                 />
               )}
 
-              {/* Locked overlay */}
+              {/* Unavailable overlay — no lock icon */}
               {!lvl.available && (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1"
+                  className="absolute inset-0"
                   style={{ background: 'rgba(0,0,0,0.65)' }}
-                >
-                  <span style={{ fontSize: '1.2rem', color: '#ffffff22' }}>🔒</span>
-                </div>
+                />
               )}
 
               {/* Name bar */}

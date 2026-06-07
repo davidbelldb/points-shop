@@ -119,14 +119,12 @@ export default function CostumeSelectScreen({ character, onSelect, onBack, audio
                 />
               )}
 
-              {/* Locked overlay */}
+              {/* Unavailable overlay — no lock icon */}
               {!costume.available && (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center"
+                  className="absolute inset-0"
                   style={{ background: 'rgba(0,0,0,0.72)' }}
-                >
-                  <span style={{ fontSize: '1.4rem', color: '#ffffff22' }}>🔒</span>
-                </div>
+                />
               )}
 
               {/* Name bar */}
