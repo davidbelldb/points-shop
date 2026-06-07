@@ -303,6 +303,14 @@ export default function GameContainer() {
     }
   }, [phase]);
 
+  // Stop all audio when navigating away from the game route
+  useEffect(() => {
+    return () => {
+      audioRef.current?.stopMenuMusic();
+      audioRef.current?.stopBattleMusic();
+    };
+  }, []);
+
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const goTitle            = ()     => setPhase('title');
   const goDifficultySelect = ()     => setPhase('difficulty_select');
