@@ -17,6 +17,8 @@ import {
 import { AnimationController } from '../engine/AnimationSystem.js';
 import { CHAR_DEFS }           from '../engine/Characters.js';
 
+const KNOCKBACK_FORCE = 300; // px/s applied on hit
+
 export class Player {
   constructor({ x = 200, z = 30, characterId = 'katie' } = {}) {
     this._charDef   = CHAR_DEFS[characterId] ?? CHAR_DEFS.katie;
@@ -32,8 +34,9 @@ export class Player {
     this.vy = 0;
 
     // ── State ───────────────────────────────────────────────────────────────
-    this.grounded   = true;
-    this.facingLeft = false;
+    this.grounded    = true;
+    this.facingLeft  = false;
+    this.isBlocking  = false;
 
     // ── Animation ────────────────────────────────────────────────────────────
     this.anim = new AnimationController(this._charDef);
@@ -54,20 +57,24 @@ export class Player {
   get currentSprite() { return this.anim.currentSprite; }
   get isDead()        { return this.hp <= 0; }
 
-  takeDamage(amount) {
+  takeDamage(amount, attackerX = this.x - 1) {
     if (this.hurt) return;
     this.hp        = Math.max(0, this.hp - amount);
     this.hurt      = true;
     this.hurtTimer = HURT_DURATION;
+    // Knockback — push away from attacker
+    const dir = attackerX < this.x ? 1 : -1;
+    this.vx = dir * KNOCKBACK_FORCE;
   }
 
   resetForRound(x = 200) {
     this.x = x; this.z = 30;
     this.vx = this.vz = this.vy = 0;
-    this.jumpY    = 0;
-    this.grounded = true;
-    this.hp       = this.maxHp;
-    this.hurt     = false; this.hurtTimer = 0;
+    this.jumpY      = 0;
+    this.grounded   = true;
+    this.isBlocking = false;
+    this.hp         = this.maxHp;
+    this.hurt       = false; this.hurtTimer = 0;
     this.pendingDamage = 0;
     this.anim.play('idle');
   }
@@ -92,16 +99,28 @@ export class Player {
       this.anim.play('jump');
     }
 
+    this._handleBlocking(input);
     this._handleAttacks(input);
     this._handleMovement(dt, input);
     this._handleJump(dt, input);
     this._handleWalkAnim(input);
   }
 
+  // ── Blocking ─────────────────────────────────────────────────────────────────
+
+  _handleBlocking(input) {
+    // Can only block on the ground and when not mid-attack
+    this.isBlocking = this.grounded && !this.anim.isAttacking && input.isHeld('BLOCK');
+    if (this.isBlocking && this.anim.animName !== 'block') {
+      this.anim.play('block');
+    }
+  }
+
   // ── Attacks ──────────────────────────────────────────────────────────────────
 
   _handleAttacks(input) {
     if (this.anim.isAttacking) return;
+    if (this.isBlocking) return;         // can't attack while blocking
     const map = this._charDef.inputMap;
 
     // Priority: O > U > I > J > L
@@ -159,7 +178,7 @@ export class Player {
   // ── Jump ─────────────────────────────────────────────────────────────────────
 
   _handleJump(dt, input) {
-    if (this.grounded && input.isPressed('JUMP') && !this.anim.isAttacking) {
+    if (this.grounded && input.isPressed('JUMP') && !this.anim.isAttacking && !this.isBlocking) {
       this.vy       = PLAYER_JUMP_VELOCITY;
       this.grounded = false;
       this.anim.play('jump');
@@ -178,10 +197,11 @@ export class Player {
 
   _handleWalkAnim(input) {
     if (this.anim.isAttacking || !this.grounded) return;
+    if (this.isBlocking) return;   // block anim already set in _handleBlocking
 
-    const heldH  = input.isHeld('LEFT')   || input.isHeld('RIGHT');
+    const moving = input.isHeld('LEFT') || input.isHeld('RIGHT')
+                || input.isHeld('UP')   || input.isHeld('DOWN');
     const freshH = input.isPressed('LEFT') || input.isPressed('RIGHT');
-    const moving = heldH || input.isHeld('UP') || input.isHeld('DOWN');
 
     if (moving) {
       if (freshH || this.anim.animName !== 'walk') this.anim.play('walk');

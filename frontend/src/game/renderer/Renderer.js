@@ -60,11 +60,44 @@ export class Renderer {
     this.canvas  = canvas;
     this.ctx     = canvas.getContext('2d');
     this.sprites = sprites;
+
+    // Screen shake state
+    this._shakeIntensity = 0;
+    this._shakeTimeLeft  = 0;
+
+    // Reusable offscreen canvas for hurt-flash tinting
+    this._offscreen    = document.createElement('canvas');
+    this._offscreenCtx = this._offscreen.getContext('2d');
   }
 
-  draw(scene) {
+  /** Called from CombatSystem to trigger a screen shake. */
+  triggerShake(intensity = 6, duration = 0.25) {
+    this._shakeIntensity = intensity;
+    this._shakeTimeLeft  = duration;
+  }
+
+  draw(scene, dt = 1 / 60) {
     const { ctx } = this;
+
+    // ── Update screen shake timer ────────────────────────────────────────────
+    if (this._shakeTimeLeft > 0) {
+      this._shakeTimeLeft -= dt;
+      if (this._shakeTimeLeft <= 0) {
+        this._shakeIntensity = 0;
+        this._shakeTimeLeft  = 0;
+      }
+    }
+
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    ctx.save();
+
+    // Apply shake translate before drawing anything
+    if (this._shakeIntensity > 0 && this._shakeTimeLeft > 0) {
+      const dx = (Math.random() * 2 - 1) * this._shakeIntensity;
+      const dy = (Math.random() * 2 - 1) * this._shakeIntensity;
+      ctx.translate(dx, dy);
+    }
 
     if (scene.background) {
       this._drawBackgroundImage(scene.background);
@@ -79,6 +112,8 @@ export class Renderer {
 
     for (const e of entities) this._drawEntityShadow(e);
     for (const e of entities) this._drawEntity(e);
+
+    ctx.restore();
   }
 
   /**
@@ -433,23 +468,59 @@ export class Renderer {
     // Anchor the foot (SPRITE_FOOT_RATIO down the sprite) to groundY, then lift by jumpY
     const jumpOffset = entity.jumpY * scale * SPRITE_DISPLAY_SCALE * 0.5;
     const drawY = groundY - drawH * SPRITE_FOOT_RATIO - jumpOffset;
+    const drawX = sx - drawW / 2;
 
-    ctx.save();
-    if (facingLeft) {
-      ctx.translate(sx, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, -drawW / 2, drawY, drawW, drawH);
+    if (entity.hurt) {
+      // ── Hurt flash: tint sprite red using offscreen canvas ───────────────────
+      // Resize offscreen only when dimensions change
+      const offW = Math.ceil(drawW);
+      const offH = Math.ceil(drawH);
+      if (this._offscreen.width !== offW || this._offscreen.height !== offH) {
+        this._offscreen.width  = offW;
+        this._offscreen.height = offH;
+      }
+      const off = this._offscreenCtx;
+      off.clearRect(0, 0, offW, offH);
+
+      // Draw sprite to offscreen (unflipped — we flip when compositing to main)
+      off.drawImage(img, 0, 0, offW, offH);
+
+      // Paint semi-transparent red over opaque pixels only (source-atop)
+      off.globalCompositeOperation = 'source-atop';
+      off.fillStyle = 'rgba(255, 0, 0, 0.55)';
+      off.fillRect(0, 0, offW, offH);
+      off.globalCompositeOperation = 'source-over';
+
+      // Composite tinted result to main canvas, applying flip transform here
+      ctx.save();
+      if (facingLeft) {
+        ctx.translate(sx + drawW / 2, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(this._offscreen, 0, drawY, drawW, drawH);
+      } else {
+        ctx.drawImage(this._offscreen, drawX, drawY, drawW, drawH);
+      }
+      ctx.restore();
+
     } else {
-      ctx.drawImage(img, sx - drawW / 2, drawY, drawW, drawH);
+      // ── Normal draw ──────────────────────────────────────────────────────────
+      ctx.save();
+      if (facingLeft) {
+        ctx.translate(sx, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, -drawW / 2, drawY, drawW, drawH);
+      } else {
+        ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   _drawEntityBox(entity, sx, sy, scale) {
     const { ctx } = this;
     const w = entity.baseWidth  * scale;
     const h = entity.baseHeight * scale;
-    ctx.fillStyle   = entity.hurt ? '#ffffff' : (entity.color ?? '#4ade80');
+    ctx.fillStyle   = entity.hurt ? '#ff4444' : (entity.color ?? '#4ade80');
     ctx.fillRect(sx - w / 2, sy - h, w, h);
     ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.lineWidth   = Math.max(1, scale * 1.5);

@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { GameLoop }      from '../engine/GameLoop.js';
 import { InputManager }  from '../engine/InputManager.js';
+import { AudioManager }  from '../engine/AudioManager.js';
 import { CombatSystem }  from '../engine/CombatSystem.js';
 import { RoundManager }  from '../engine/RoundManager.js';
 import { Player }        from '../entities/Player.js';
@@ -244,6 +245,7 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
     if (!canvas || !sprites) return;
 
     const input        = new InputManager().attach(window);
+    const audio        = new AudioManager();
     const playerCharId = character ?? 'katie';
     const cpuCharId    = playerCharId === 'katie' ? 'david' : 'katie';
     const player   = new Player({ x: 200, z: 30, characterId: playerCharId });
@@ -251,6 +253,10 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
     const renderer = new Renderer(canvas, sprites);
     const combat   = new CombatSystem();
     const rounds   = new RoundManager();
+
+    // Wire audio + screen shake callbacks into combat system
+    combat.onAudio = (type) => audio.play(type);
+    combat.onShake = (intensity, duration) => renderer.triggerShake(intensity, duration);
 
     let frameCount = 0;
     let matchDone  = false;
@@ -272,12 +278,12 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
         input.consumeFrame();
       },
 
-      render(_dt) {
+      render(dt) {
         renderer.draw({
           player,
           entities:   [enemy],
           background: sprites.get(level?.bgKey ?? 'bg_01'),
-        });
+        }, dt);
 
         frameCount++;
         if (frameCount % 3 === 0) {
@@ -344,7 +350,7 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
         className="absolute bottom-2 right-3 text-right pointer-events-none select-none leading-5"
         style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.38rem', lineHeight: '1.8', color: 'rgba(255,255,255,0.25)' }}
       >
-        <div>Move WASD/↑↓←→ · Jump K/Space · ESC Pause</div>
+        <div>Move WASD/↑↓←→ · Jump K · Block Space · ESC Pause</div>
         <div>Punch J · Kick L · Power U · Combo I · Special O</div>
       </div>
     </div>

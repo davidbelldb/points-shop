@@ -21,6 +21,7 @@ import { AnimationController } from '../engine/AnimationSystem.js';
 import { CHAR_DEFS }           from '../engine/Characters.js';
 
 const ENEMY_SPEED      = 55;    // px/s patrol speed
+const KNOCKBACK_FORCE  = 300;   // px/s applied on hit
 const MELEE_DISTANCE   = ATTACK_RANGE_X * 0.75;
 const ATTACK_COOLDOWN_MIN = 1.2;  // seconds between CPU attacks
 const ATTACK_COOLDOWN_MAX = 2.2;
@@ -53,11 +54,17 @@ export class Enemy {
   get currentSprite() { return this.anim.currentSprite; }
   get isDead()        { return this.hp <= 0; }
 
-  takeDamage(amount) {
+  // isBlocking is always false for CPU (no block logic yet)
+  get isBlocking() { return false; }
+
+  takeDamage(amount, attackerX = this.x - 1) {
     if (this.hurt) return;
     this.hp        = Math.max(0, this.hp - amount);
     this.hurt      = true;
     this.hurtTimer = HURT_DURATION;
+    // Knockback — push away from attacker
+    const dir = attackerX < this.x ? 1 : -1;
+    this.vx = dir * KNOCKBACK_FORCE;
   }
 
   resetForRound(x = 620) {
@@ -91,6 +98,15 @@ export class Enemy {
 
   _updateAI(dt, player) {
     if (this.anim.isAttacking) { this.vx = 0; return; }
+
+    // During hurt/knockback: let vx decay naturally, skip AI movement
+    if (this.hurt) {
+      const friction = 700 * dt;
+      if (Math.abs(this.vx) <= friction) this.vx = 0;
+      else this.vx -= Math.sign(this.vx) * friction;
+      this.x = Math.max(WORLD_MIN_X, Math.min(WORLD_MAX_X, this.x + this.vx * dt));
+      return;
+    }
 
     const dx = player.x - this.x;
     this.facingLeft = dx < 0;

@@ -37,6 +37,14 @@ export const CHAR_DEFS = {
         damage:        0,
         hitFrame:      -1,
       },
+      block: {
+        frames:        ['katie_block_01'],
+        frameDuration: 0.15,
+        loop:          true,
+        isAttack:      false,
+        damage:        0,
+        hitFrame:      -1,
+      },
       walk: {
         frames:        ['katie_walk_01', 'katie_walk_02', 'katie_walk_03'],
         frameDuration: 0.13,
@@ -130,8 +138,16 @@ export const CHAR_DEFS = {
         damage:        0,
         hitFrame:      -1,
       },
+      block: {
+        frames:        ['david_block_01'],
+        frameDuration: 0.15,
+        loop:          true,
+        isAttack:      false,
+        damage:        0,
+        hitFrame:      -1,
+      },
       walk: {
-        frames:        ['david_walk_01', 'david_walk_02', 'david_walk_03'],
+        frames:        ['david_walk_01', 'david_walk_02'],
         frameDuration: 0.13,
         loop:          true,
         isAttack:      false,
