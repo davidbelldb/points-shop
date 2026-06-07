@@ -48,6 +48,10 @@ export class Player {
     this.hurt          = false;
     this.hurtTimer     = 0;
 
+    // ── Combo counter ─────────────────────────────────────────────────────────
+    this.hitCombo      = 0;
+    this.hitComboTimer = 0;
+
     // ── Renderer ──────────────────────────────────────────────────────────────
     this.baseWidth  = PLAYER_BASE_WIDTH;
     this.baseHeight = PLAYER_BASE_HEIGHT;
@@ -76,6 +80,7 @@ export class Player {
     this.hp         = this.maxHp;
     this.hurt       = false; this.hurtTimer = 0;
     this.pendingDamage = 0;
+    this.hitCombo   = 0; this.hitComboTimer = 0;
     this.anim.play('idle');
   }
 
@@ -94,6 +99,12 @@ export class Player {
     if (this.hurtTimer > 0) {
       this.hurtTimer -= dt;
       if (this.hurtTimer <= 0) { this.hurt = false; this.hurtTimer = 0; }
+    }
+
+    // Combo timer — reset count if no hit lands within window
+    if (this.hitComboTimer > 0) {
+      this.hitComboTimer -= dt;
+      if (this.hitComboTimer <= 0) { this.hitCombo = 0; this.hitComboTimer = 0; }
     }
 
     const { hitActive } = this.anim.update(dt);

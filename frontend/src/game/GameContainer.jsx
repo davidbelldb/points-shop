@@ -3,14 +3,18 @@
  *
  * Top-level phase state machine.
  *
- *   splash  →  title  →  character_select  →  costume_select  →  level_select  →  game
+ *   splash → title → character_select → costume_select → level_select → vs_screen → game
  *
- * Asset loading runs in the background during the splash screen so
- * there is zero wait once the player reaches the game itself.
+ * Asset loading runs in the background during the splash screen.
+ * A single AudioManager instance is shared across all phases.
+ *   • Menu music plays during: title, character_select, costume_select, level_select
+ *   • VS stinger plays when vs_screen opens
+ *   • Battle music is managed by GameScreen
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { SpriteManager } from './engine/SpriteManager.js';
+import { SpriteManager }  from './engine/SpriteManager.js';
+import { AudioManager }   from './engine/AudioManager.js';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 import SplashScreen          from './screens/SplashScreen.jsx';
@@ -18,6 +22,7 @@ import TitleScreen           from './screens/TitleScreen.jsx';
 import CharacterSelectScreen from './screens/CharacterSelectScreen.jsx';
 import CostumeSelectScreen   from './screens/CostumeSelectScreen.jsx';
 import LevelSelectScreen     from './screens/LevelSelectScreen.jsx';
+import VSScreen              from './screens/VSScreen.jsx';
 import GameScreen            from './screens/GameScreen.jsx';
 
 // ─── Asset manifest ───────────────────────────────────────────────────────────
@@ -143,6 +148,8 @@ const SPRITE_MANIFEST = {
   bg_01:               background01Url,
 };
 
+const MENU_PHASES = new Set(['title', 'character_select', 'costume_select', 'level_select']);
+
 // ─── Phase machine ────────────────────────────────────────────────────────────
 
 export default function GameContainer() {
@@ -153,9 +160,13 @@ export default function GameContainer() {
   const [level,     setLevel]     = useState(null);
   const [matchKey,  setMatchKey]  = useState(0);
   const [scale,     setScale]     = useState(1);
-  const wrapperRef = useRef(null);
 
-  // Responsive scaling — keep internal resolution fixed, scale the container
+  const wrapperRef = useRef(null);
+  // Single AudioManager instance shared across all phases
+  const audioRef   = useRef(null);
+  if (!audioRef.current) audioRef.current = new AudioManager();
+
+  // Responsive scaling
   useEffect(() => {
     const updateScale = () => {
       if (!wrapperRef.current) return;
@@ -167,42 +178,59 @@ export default function GameContainer() {
     return () => window.removeEventListener('resize', updateScale);
   }, []);
 
+  // Sprite preload
   useEffect(() => {
     const mgr = new SpriteManager();
     mgr.preload(SPRITE_MANIFEST).then(() => setSprites(mgr));
   }, []);
 
-  const goTitle         = ()       => setPhase('title');
-  const goCharSelect    = ()       => setPhase('character_select');
-  const goCostumeSelect = (char)   => { setCharacter(char);    setPhase('costume_select'); };
-  const goLevelSelect   = (cos)    => { setCostume(cos);       setPhase('level_select'); };
-  const goGame          = (lvl)    => { setLevel(lvl);         setPhase('game'); };
+  // Menu music: play on menu phases, stop on vs_screen / game
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (MENU_PHASES.has(phase)) {
+      audio.startMenuMusic();
+    } else {
+      audio.stopMenuMusic();
+    }
+  }, [phase]);
 
-  // Quit from in-game → back to title screen
+  // ── Navigation helpers ─────────────────────────────────────────────────────
+  const goTitle         = ()    => setPhase('title');
+  const goCharSelect    = ()    => setPhase('character_select');
+  const goCostumeSelect = (c)   => { setCharacter(c); setPhase('costume_select'); };
+  const goLevelSelect   = (cos) => { setCostume(cos); setPhase('level_select'); };
+
+  // After level select → VS screen (with stinger)
+  const goVsScreen = (lvl) => {
+    setLevel(lvl);
+    audioRef.current.playVsStinger();
+    setPhase('vs_screen');
+  };
+
+  // After VS screen → game
+  const goGame = () => setPhase('game');
+
+  // Quit from in-game → back to title
   const handleQuit = () => {
-    setCharacter(null);
-    setCostume(null);
-    setLevel(null);
+    setCharacter(null); setCostume(null); setLevel(null);
     setPhase('title');
   };
 
-  // Rematch → back to character select for a fresh run
+  // Rematch → fresh run from character select
   const handleRematch = () => {
-    setCharacter(null);
-    setCostume(null);
-    setLevel(null);
+    setCharacter(null); setCostume(null); setLevel(null);
     setMatchKey(k => k + 1);
     setPhase('character_select');
   };
 
+  const cpuCharId = character === 'katie' ? 'david' : 'katie';
+
   return (
-    // Outer wrapper fills whatever space the page gives us
     <div
       ref={wrapperRef}
       className="w-full h-full bg-black flex items-center justify-center"
       style={{ minHeight: 0 }}
     >
-      {/* Inner game — fixed resolution, scaled to fit */}
       <div
         className="relative bg-black overflow-hidden"
         style={{
@@ -226,7 +254,15 @@ export default function GameContainer() {
           <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} />
         )}
         {phase === 'level_select' && (
-          <LevelSelectScreen onSelect={goGame} onBack={() => setPhase('costume_select')} />
+          <LevelSelectScreen onSelect={goVsScreen} onBack={() => setPhase('costume_select')} />
+        )}
+        {phase === 'vs_screen' && (
+          <VSScreen
+            sprites={sprites}
+            playerCharId={character}
+            cpuCharId={cpuCharId}
+            onComplete={goGame}
+          />
         )}
         {phase === 'game' && (
           <GameScreen
@@ -235,6 +271,7 @@ export default function GameContainer() {
             character={character}
             costume={costume}
             level={level}
+            audio={audioRef.current}
             onQuit={handleQuit}
             onRematch={handleRematch}
           />

@@ -43,6 +43,10 @@ export class Enemy {
     this.hurtTimer     = 0;
     this.facingLeft    = true;
 
+    // ── Combo counter ─────────────────────────────────────────────────────────
+    this.hitCombo      = 0;
+    this.hitComboTimer = 0;
+
     this.baseWidth  = PLAYER_BASE_WIDTH;
     this.baseHeight = PLAYER_BASE_HEIGHT;
     this.color      = this._charDef.color;
@@ -73,6 +77,7 @@ export class Enemy {
     this.hp        = this.maxHp;
     this.hurt      = false; this.hurtTimer = 0;
     this.pendingDamage = 0;
+    this.hitCombo  = 0; this.hitComboTimer = 0;
     this._attackCooldown = ATTACK_COOLDOWN_MIN;
     this.anim.play('idle');
   }
@@ -90,6 +95,12 @@ export class Enemy {
     if (this.hurtTimer > 0) {
       this.hurtTimer -= dt;
       if (this.hurtTimer <= 0) { this.hurt = false; this.hurtTimer = 0; }
+    }
+
+    // Combo timer
+    if (this.hitComboTimer > 0) {
+      this.hitComboTimer -= dt;
+      if (this.hitComboTimer <= 0) { this.hitCombo = 0; this.hitComboTimer = 0; }
     }
 
     // Anim tick — sets pendingDamage on hit frames

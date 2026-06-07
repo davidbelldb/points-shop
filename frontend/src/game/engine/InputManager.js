@@ -76,6 +76,24 @@ export class InputManager {
   /** Snapshot of all currently-held actions (useful for debugging). */
   heldActions() { return [...this._held]; }
 
+  // ── Touch injection ─────────────────────────────────────────────────────────
+  /**
+   * Simulate a key-down for `action` (called from TouchControls on pointerdown).
+   * Only adds to _pressed on the leading edge, same as _onKeyDown.
+   */
+  injectPress(action) {
+    if (!this._held.has(action)) this._pressed.add(action);
+    this._held.add(action);
+  }
+
+  /**
+   * Simulate a key-up for `action` (called from TouchControls on pointerup/cancel).
+   */
+  injectRelease(action) {
+    this._held.delete(action);
+    this._released.add(action);
+  }
+
   // ── Private handlers ────────────────────────────────────────────────────────
   _onKeyDown(e) {
     const action = ACTION_MAP[e.code];

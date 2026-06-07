@@ -54,6 +54,10 @@ export class CombatSystem {
           // Hit lands
           target.takeDamage(attacker.pendingDamage, attacker.x);
 
+          // Increment attacker's combo counter (reset 1.6 s window on each hit)
+          attacker.hitCombo      = (attacker.hitCombo ?? 0) + 1;
+          attacker.hitComboTimer = 1.6;
+
           // Impact audio — instrument-specific for piano/guitar, generic otherwise
           if (animName === 'piano_attack') {
             this.onAudio?.('piano_hit');
