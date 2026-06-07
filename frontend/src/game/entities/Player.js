@@ -20,8 +20,9 @@ import { CHAR_DEFS }           from '../engine/Characters.js';
 const KNOCKBACK_FORCE = 300; // px/s applied on hit
 
 export class Player {
-  constructor({ x = 200, z = 30, characterId = 'katie' } = {}) {
-    this._charDef   = CHAR_DEFS[characterId] ?? CHAR_DEFS.katie;
+  constructor({ x = 200, z = 30, characterId = 'katie', facingLeft = false } = {}) {
+    this._charDef        = CHAR_DEFS[characterId] ?? CHAR_DEFS.katie;
+    this._startFacingLeft = facingLeft;   // preserved across round resets
 
     // ── World position ──────────────────────────────────────────────────────
     this.x     = x;
@@ -35,7 +36,7 @@ export class Player {
 
     // ── State ───────────────────────────────────────────────────────────────
     this.grounded    = true;
-    this.facingLeft  = false;
+    this.facingLeft  = facingLeft;
     this.isBlocking  = false;
 
     // ── Animation ────────────────────────────────────────────────────────────
@@ -76,6 +77,7 @@ export class Player {
     this.vx = this.vz = this.vy = 0;
     this.jumpY      = 0;
     this.grounded   = true;
+    this.facingLeft = this._startFacingLeft;   // P2 always resets facing left
     this.isBlocking = false;
     this.hp         = this.maxHp;
     this.hurt       = false; this.hurtTimer = 0;

@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import titleBgUrl from '../../assets/backgrounds/title_screen.png';
 
-export default function TitleScreen({ onStart, audio }) {
+export default function TitleScreen({ onStart, onStart2P, canStart2P, audio }) {
   const [blink, setBlink] = useState(true);
   const canvasRef = useRef(null);
   const stateRef  = useRef(null);
@@ -139,8 +139,8 @@ export default function TitleScreen({ onStart, audio }) {
         }}
       />
 
-      {/* PRESS ENTER — centred in the bottom third (~y 375/450) */}
-      <div className="absolute inset-x-0 flex justify-center pointer-events-none select-none" style={{ top: '82%' }}>
+      {/* PRESS ENTER — centred in the bottom third */}
+      <div className="absolute inset-x-0 flex flex-col items-center gap-3 pointer-events-none select-none" style={{ top: '78%' }}>
         <p
           style={{
             fontFamily:    'var(--font-pixel)',
@@ -154,6 +154,30 @@ export default function TitleScreen({ onStart, audio }) {
         >
           PRESS ENTER TO START
         </p>
+
+        {/* 2P option — only shown when two gamepads are connected */}
+        {canStart2P && (
+          <button
+            onClick={(e) => { e.stopPropagation(); audio?.playMenuConfirm(); onStart2P?.(); }}
+            style={{
+              pointerEvents:   'auto',
+              fontFamily:      'var(--font-pixel)',
+              fontSize:        '0.5rem',
+              letterSpacing:   '0.2em',
+              color:           '#fbbf24',
+              background:      'rgba(0,0,0,0.55)',
+              border:          '2px solid rgba(251,191,36,0.55)',
+              borderRadius:    6,
+              padding:         '6px 16px',
+              cursor:          'pointer',
+              textShadow:      '0 0 12px #fbbf24',
+              boxShadow:       '0 0 12px rgba(251,191,36,0.25)',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            2 PLAYER MODE
+          </button>
+        )}
       </div>
 
       <p

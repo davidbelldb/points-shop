@@ -158,6 +158,8 @@ export const api = {
   duckyRace: (lineup_id, picked_ord, stake) =>
     request('/games/ducky/race', { method: 'POST', body: JSON.stringify({ lineup_id, picked_ord, stake }) }),
   duckyForm: () => request('/games/ducky/form'),
+  cambsRageWin: (difficulty, matchId) =>
+    request('/games/cambs-rage/win', { method: 'POST', body: JSON.stringify({ difficulty, matchId }) }),
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),

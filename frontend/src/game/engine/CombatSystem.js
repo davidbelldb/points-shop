@@ -22,6 +22,7 @@ export class CombatSystem {
   constructor() {
     this.onAudio = null;   // (type: string) => void
     this.onShake = null;   // (intensity: number, duration: number) => void
+    this.onKO    = null;   // () => void — fired once when a killing blow lands
   }
 
   /**
@@ -52,7 +53,9 @@ export class CombatSystem {
           this.onAudio?.('block');
         } else {
           // Hit lands
+          const wasAlive = !target.isDead;
           target.takeDamage(attacker.pendingDamage, attacker.x);
+          if (wasAlive && target.isDead) this.onKO?.();
 
           // Increment attacker's combo counter (reset 1.6 s window on each hit)
           attacker.hitCombo      = (attacker.hitCombo ?? 0) + 1;

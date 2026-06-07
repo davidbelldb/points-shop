@@ -191,6 +191,10 @@ export default function GameContainer() {
   const [scale,        setScale]        = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iosHint,      setIosHint]      = useState(false);
+  const [twoPlayer,    setTwoPlayer]    = useState(false);
+  const [gamepadCount, setGamepadCount] = useState(
+    () => [...(navigator.getGamepads?.() ?? [])].filter(Boolean).length,
+  );
 
   const wrapperRef = useRef(null);
   // Single AudioManager instance shared across all phases
@@ -287,6 +291,18 @@ export default function GameContainer() {
     } catch {}
   };
 
+  // Gamepad connect/disconnect — update count so TitleScreen shows 2P option
+  useEffect(() => {
+    const update = () =>
+      setGamepadCount([...(navigator.getGamepads?.() ?? [])].filter(Boolean).length);
+    window.addEventListener('gamepadconnected',    update);
+    window.addEventListener('gamepaddisconnected', update);
+    return () => {
+      window.removeEventListener('gamepadconnected',    update);
+      window.removeEventListener('gamepaddisconnected', update);
+    };
+  }, []);
+
   // Sprite preload
   useEffect(() => {
     const mgr = new SpriteManager();
@@ -318,6 +334,14 @@ export default function GameContainer() {
   const goCostumeSelect    = (c)    => { setCharacter(c); setPhase('costume_select'); };
   const goLevelSelect      = (cos)  => { setCostume(cos); setPhase('level_select'); };
 
+  // 2P: skip difficulty/char/costume — go straight to level select as Katie
+  const goLevelSelect2P = () => {
+    setTwoPlayer(true);
+    setCharacter('katie');
+    setCostume('default');
+    setPhase('level_select');
+  };
+
   // After level select → VS screen (with stinger)
   const goVsScreen = (lvl) => {
     setLevel(lvl);
@@ -331,14 +355,17 @@ export default function GameContainer() {
   // Quit from in-game → back to title
   const handleQuit = () => {
     setCharacter(null); setCostume(null); setLevel(null);
+    setTwoPlayer(false);
     setPhase('title');
   };
 
-  // Rematch → back to difficulty select so everything can be changed
+  // Rematch → difficulty select (1P) or level select (2P)
   const handleRematch = () => {
-    setCharacter(null); setCostume(null); setLevel(null);
+    setCharacter(twoPlayer ? 'katie' : null);
+    setCostume(twoPlayer ? 'default' : null);
+    setLevel(null);
     setMatchKey(k => k + 1);
-    setPhase('difficulty_select');
+    setPhase(twoPlayer ? 'level_select' : 'difficulty_select');
   };
 
   const cpuCharId = character === 'katie' ? 'david' : 'katie';
@@ -421,7 +448,12 @@ export default function GameContainer() {
           <SplashScreen ready={!!sprites} onContinue={goTitle} />
         )}
         {phase === 'title' && (
-          <TitleScreen onStart={goDifficultySelect} audio={audioRef.current} />
+          <TitleScreen
+            onStart={goDifficultySelect}
+            onStart2P={goLevelSelect2P}
+            canStart2P={gamepadCount >= 2}
+            audio={audioRef.current}
+          />
         )}
         {phase === 'difficulty_select' && (
           <DifficultySelectScreen
@@ -437,7 +469,11 @@ export default function GameContainer() {
           <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} audio={audioRef.current} />
         )}
         {phase === 'level_select' && (
-          <LevelSelectScreen onSelect={goVsScreen} onBack={() => setPhase('costume_select')} audio={audioRef.current} />
+          <LevelSelectScreen
+            onSelect={goVsScreen}
+            onBack={() => twoPlayer ? setPhase('title') : setPhase('costume_select')}
+            audio={audioRef.current}
+          />
         )}
         {phase === 'vs_screen' && (
           <VSScreen
@@ -456,6 +492,7 @@ export default function GameContainer() {
             level={level}
             difficulty={difficulty}
             audio={audioRef.current}
+            twoPlayer={twoPlayer}
             onQuit={handleQuit}
             onRematch={handleRematch}
           />
