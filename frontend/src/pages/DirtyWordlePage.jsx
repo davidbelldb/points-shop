@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/AuthContext.jsx';
 
 // ─── Word list ────────────────────────────────────────────────────────────────
 
@@ -37,7 +38,14 @@ const KEYBOARD_ROWS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC — used as storage key
+}
+
+function formatUKDate() {
+  const d = new Date();
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}`;
 }
 
 function getDailyWord() {
@@ -150,8 +158,8 @@ function Key({ label, state, onPress }) {
 
 // ─── Button styles ────────────────────────────────────────────────────────────
 
-const TEAL_BTN  = 'inline-flex items-center justify-center rounded-xl bg-[#61dbbb] px-5 py-2 text-sm font-semibold text-[#0d3d2e] transition hover:opacity-90 active:scale-95';
-const GHOST_BTN = 'inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 active:scale-95 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200';
+const TEAL_BTN  = 'flex-1 inline-flex items-center justify-center rounded-xl bg-[#61dbbb] px-4 py-3 text-sm font-semibold text-[#0d3d2e] transition hover:opacity-90 active:scale-95';
+const GHOST_BTN = 'flex-1 inline-flex items-center justify-center rounded-xl border border-neutral-400 bg-neutral-100 px-4 py-3 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-200 active:scale-95 dark:border-neutral-500 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600';
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -271,7 +279,7 @@ export default function DirtyWordlePage() {
         <div className="w-14" />
       </div>
 
-      <p className="text-xs text-neutral-400">{today} · New word at midnight</p>
+      <p className="text-xs text-neutral-400">{formatUKDate()} — New dirty word at midnight</p>
 
       {/* Grid */}
       <div className="flex flex-col gap-1.5">
@@ -386,12 +394,12 @@ export default function DirtyWordlePage() {
               )}
             </p>
 
-            <div className="flex flex-col gap-2">
-              <button onClick={copyResult} className={TEAL_BTN}>
-                {copied ? 'Copied!' : 'Copy result'}
-              </button>
+            <div className="flex flex-row gap-2">
               <button onClick={() => setModalDismissed(true)} className={GHOST_BTN}>
                 Close
+              </button>
+              <button onClick={copyResult} className={TEAL_BTN}>
+                {copied ? 'Copied!' : 'Copy result'}
               </button>
             </div>
           </div>
