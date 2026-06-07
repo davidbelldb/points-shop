@@ -54,23 +54,6 @@ export default function GamesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {slides && slides.map((s) => <CmsCard key={s.id} slide={s} />)}
-
-        {/* Dirty Wordle — always shown */}
-        <Link to="/games/dirty-wordle" className="block">
-          <div className="relative aspect-[16/7] md:aspect-square lg:aspect-[4/3] overflow-hidden rounded-2xl shadow-sm flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}>
-            <div className="text-center text-white p-4">
-              <p className="text-5xl mb-3">💦</p>
-              <p className="text-xl font-bold tracking-wide">Dirty Wordle</p>
-              <p className="text-sm text-white/60 mt-1">Daily filthy five-letter word</p>
-              <div className="flex justify-center gap-1 mt-3">
-                {['🟩','🟨','⬛','🟩','⬛'].map((e, i) => (
-                  <span key={i} style={{ fontSize: 20 }}>{e}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Link>
       </div>
 
       {slides === null && !error && (
