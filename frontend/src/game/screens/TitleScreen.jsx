@@ -32,8 +32,8 @@ export default function TitleScreen({ onStart }) {
         style={{ imageRendering: 'pixelated' }}
       />
 
-      {/* PRESS ENTER overlay — pinned to bottom-centre */}
-      <div className="absolute inset-0 flex items-end justify-center pb-10 pointer-events-none select-none">
+      {/* PRESS ENTER overlay — centred */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
         <p
           style={{
             fontFamily:   'var(--font-pixel)',
