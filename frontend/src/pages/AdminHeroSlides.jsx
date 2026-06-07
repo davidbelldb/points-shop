@@ -96,7 +96,7 @@ function SlideRow({ slide, onChanged, canMoveUp, canMoveDown, onMoveUp, onMoveDo
             title="Move up"
             className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-20 disabled:cursor-default"
           >
-            \u25b2
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 1 L9 8 L1 8 Z"/></svg>
           </button>
           <button
             onClick={onMoveDown}
@@ -104,7 +104,7 @@ function SlideRow({ slide, onChanged, canMoveUp, canMoveDown, onMoveUp, onMoveDo
             title="Move down"
             className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-20 disabled:cursor-default"
           >
-            \u25bc
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 9 L9 2 L1 2 Z"/></svg>
           </button>
         </div>
 
