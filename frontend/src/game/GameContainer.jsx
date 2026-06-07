@@ -315,26 +315,34 @@ export default function GameContainer() {
       className="w-full h-full bg-black flex items-center justify-center"
       style={{ minHeight: 0, position: 'relative' }}
     >
-      {/* Fullscreen toggle — floats above the scaled game canvas */}
+      {/* Fullscreen toggle
+          position:fixed keeps it outside any transform stacking context,
+          which is what causes taps to silently fail on iOS Safari when
+          a sibling element uses CSS transform: scale(). */}
       <button
         onClick={toggleFullscreen}
         title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         style={{
-          position:   'absolute',
-          top:        10,
-          right:      10,
-          zIndex:     200,
-          background: 'rgba(0,0,0,0.45)',
-          border:     '1px solid rgba(255,255,255,0.22)',
-          borderRadius: 5,
-          padding:    '5px 6px',
-          cursor:     'pointer',
-          color:      'rgba(255,255,255,0.75)',
-          lineHeight: 0,
-          transition: 'background 0.15s',
+          position:    'fixed',
+          top:         10,
+          right:       10,
+          zIndex:      9999,
+          /* Minimum 44×44 tap target (Apple HIG) */
+          minWidth:    44,
+          minHeight:   44,
+          display:     'flex',
+          alignItems:  'center',
+          justifyContent: 'center',
+          background:  'rgba(0,0,0,0.50)',
+          border:      '1px solid rgba(255,255,255,0.25)',
+          borderRadius: 6,
+          cursor:      'pointer',
+          color:       'rgba(255,255,255,0.80)',
+          lineHeight:  0,
+          /* Removes 300ms tap delay and double-tap zoom on iOS */
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
         }}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.70)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.45)'}
       >
         {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
       </button>
@@ -343,7 +351,7 @@ export default function GameContainer() {
       {iosHint && (
         <div
           style={{
-            position:   'absolute',
+            position:   'fixed',
             bottom:     20,
             left:       '50%',
             transform:  'translateX(-50%)',
