@@ -7,17 +7,18 @@
  * Battle music (A minor, 162 BPM, 4-bar loop):
  *   Bar 1 — Cambridge bell-chime motif (ascending arpeggios)
  *   Bar 2 — Battle charge theme
- *   Bar 3 — Flowing 16th-note run (punting-on-the-Cam feel)
+ *   Bar 3 — Flowing 16th-note run
  *   Bar 4 — Climax and resolution
  *
- * Menu music (A minor, 112 BPM, 4-bar loop):
- *   Slower, majestic, atmospheric — Pokémon title-screen feel
- *   Sine-wave lead + triangle bass + soft hi-hat
+ * Menu music (A minor, 150 BPM, 4-bar loop):
+ *   Streets of Rage style — driving sawtooth lead, square bass,
+ *   hard kick/snare on beats 1&3 and 2&4, tight 16th hi-hats.
  */
 
 // ─── Shared frequencies (Hz) — A natural minor ────────────────────────────────
 
-const E2=82.4, G2=98.0, A2=110, C3=130.8, D3=146.8, E3=164.8;
+const E2=82.4, G2=98.0, A2=110, B2=123.5, C3=130.8, D3=146.8, E3=164.8;
+const G3=196, A3=220;
 const E4=329.6, G4=392, A4=440, B4=493.9;
 const C5=523.3, D5=587.3, E5=659.3, G5=784, A5=880;
 const R = 0; // rest
@@ -58,33 +59,44 @@ const PERC = [
   [KICK,4],[SNARE,4],[KICK,4],[SNARE,4],
 ];
 
-// ─── Menu music note data (112 BPM) ───────────────────────────────────────────
+// ─── Menu music note data (150 BPM — Streets of Rage style) ──────────────────
 
-const MENU_BPM = 112;
-const MS16     = 60 / MENU_BPM / 4;  // one sixteenth-note (~0.134 s)
+const MENU_BPM = 150;
+const MS16     = 60 / MENU_BPM / 4;  // one sixteenth-note (0.1 s)
 
-// Stately A-minor melody with Cambridge character
+// Punchy A-minor riff — syncopated, SoR flavour
+// 4 bars × 16 sixteenths = 64 note entries
 const MENU_LEAD = [
-  // Bar 1 — Stately opening
-  [A4,4],[B4,2],[C5,2],  [E5,4],[D5,2],[C5,2],
-  // Bar 2 — Ascending development
-  [G4,4],[A4,4],         [B4,2],[C5,2],[D5,4],
-  // Bar 3 — Expressive rise
-  [E5,4],[R,2],[E5,2],   [G5,4],[E5,4],
-  // Bar 4 — Graceful descent and resolve
-  [D5,4],[C5,4],         [B4,4],[A4,4],
+  // Bar 1 — opening punch
+  [A4,1],[R,1],[A4,1],[A4,1], [C5,2],[R,2], [A4,1],[G4,1],[A4,1],[R,1], [E5,4],
+  // Bar 2 — response phrase
+  [E5,1],[R,1],[E5,1],[D5,1], [C5,2],[R,2], [B4,1],[A4,1],[G4,1],[R,1], [A4,4],
+  // Bar 3 — ascending run
+  [A4,1],[B4,1],[C5,1],[D5,1], [E5,2],[D5,1],[C5,1], [B4,1],[A4,1],[B4,1],[C5,1], [E5,4],
+  // Bar 4 — climax + punch out
+  [G5,2],[R,1],[E5,1], [D5,1],[E5,1],[C5,2], [D5,2],[R,2], [A4,4],
 ];
 
-// Slow, sustaining bass harmonics
+// Heavy octave-jumping bass (8th-note pattern, each note = 2 sixteenths)
 const MENU_BASS = [
-  [A2,8],[E2,8],   // Bar 1 — tonic → fifth
-  [C3,8],[G2,8],   // Bar 2 — relative major → sub-dominant
-  [A2,8],[A2,8],   // Bar 3 — tonic drone
-  [E2,8],[A2,8],   // Bar 4 — leading tone → home
+  // Bar 1
+  [A2,2],[A3,2],[A2,2],[G2,2],[G2,2],[G3,2],[G2,2],[A2,2],
+  // Bar 2
+  [A2,2],[A2,2],[E3,2],[A2,2],[E2,2],[E2,2],[E3,2],[E2,2],
+  // Bar 3
+  [A2,2],[C3,2],[E3,2],[A3,2],[A2,2],[G2,2],[A2,2],[A2,2],
+  // Bar 4
+  [D3,2],[D3,2],[E3,2],[E3,2],[A2,2],[A2,2],[A2,4],
 ];
 
-// Soft quarter-note hi-hat (16 entries × 4 sixteenths = 64 total)
-const MENU_HIHAT = Array.from({ length: 16 }, () => [HH_MARK, 4]);
+// Full 4-bar percussion pattern (kick on 1&3, snare on 2&4, hi-hat on all 16ths)
+const _BAR_PERC = [
+  [KICK,1],[HH_MARK,1],[HH_MARK,1],[HH_MARK,1],
+  [SNARE,1],[HH_MARK,1],[HH_MARK,1],[HH_MARK,1],
+  [KICK,1],[HH_MARK,1],[HH_MARK,1],[HH_MARK,1],
+  [SNARE,1],[HH_MARK,1],[HH_MARK,1],[HH_MARK,1],
+];
+const MENU_PERC = [..._BAR_PERC, ..._BAR_PERC, ..._BAR_PERC, ..._BAR_PERC];
 
 // ─── AudioManager class ───────────────────────────────────────────────────────
 
@@ -106,7 +118,7 @@ export class AudioManager {
     this._menuTimerId    = null;
     this._menuLeadIdx  = 0; this._menuLeadTime  = 0;
     this._menuBassIdx  = 0; this._menuBassTime  = 0;
-    this._menuHhIdx    = 0; this._menuHhTime    = 0;
+    this._menuPercIdx  = 0; this._menuPercTime  = 0;
   }
 
   // ── AudioContext ──────────────────────────────────────────────────────────────
@@ -226,13 +238,10 @@ export class AudioManager {
 
   /** Dramatic VS fanfare — played when the VS screen opens. */
   playVsStinger() {
-    // Rising A-minor fanfare: tonic → fifth → octave
-    this._tone({ type: 'square', freq: 440,  gainPeak: 0.22, duration: 0.18, start: 0 });
+    this._tone({ type: 'square', freq: 440,   gainPeak: 0.22, duration: 0.18, start: 0 });
     this._tone({ type: 'square', freq: 659.3, gainPeak: 0.25, duration: 0.22, start: 0.16 });
     this._tone({ type: 'square', freq: 880,   gainPeak: 0.28, duration: 0.50, start: 0.35 });
-    // Bass thump accent on final note
     this._tone({ type: 'sine',   freq: 110,   gainPeak: 0.22, duration: 0.30, start: 0.35 });
-    // Snare noise accent
     this._noise({ gainPeak: 0.18, duration: 0.12, start: 0.35, filterFreq: 1400 });
   }
 
@@ -252,7 +261,7 @@ export class AudioManager {
   // ── Battle music ──────────────────────────────────────────────────────────────
 
   startBattleMusic() {
-    this.stopMenuMusic();           // music is mutually exclusive
+    this.stopMenuMusic();
     if (this._musicPlaying) return;
     const ctx = this._getCtx();
 
@@ -321,20 +330,20 @@ export class AudioManager {
   // ── Menu music ────────────────────────────────────────────────────────────────
 
   startMenuMusic() {
-    this.stopBattleMusic();         // music is mutually exclusive
+    this.stopBattleMusic();
     if (this._menuPlaying) return;
     const ctx = this._getCtx();
 
     this._menuMasterGain = ctx.createGain();
     this._menuMasterGain.gain.setValueAtTime(0, ctx.currentTime);
-    this._menuMasterGain.gain.linearRampToValueAtTime(0.30, ctx.currentTime + 1.2);
+    this._menuMasterGain.gain.linearRampToValueAtTime(0.34, ctx.currentTime + 0.8);
     this._menuMasterGain.connect(ctx.destination);
 
     this._menuPlaying = true;
     const start = ctx.currentTime + 0.05;
     this._menuLeadTime = start; this._menuLeadIdx = 0;
     this._menuBassTime = start; this._menuBassIdx = 0;
-    this._menuHhTime   = start; this._menuHhIdx   = 0;
+    this._menuPercTime = start; this._menuPercIdx = 0;
 
     this._menuTick();
   }
@@ -359,28 +368,33 @@ export class AudioManager {
     const ctx  = this._getCtx();
     const LOOK = 0.2;
 
+    // Lead — sawtooth, staccato (SoR grit)
     while (this._menuLeadTime < ctx.currentTime + LOOK) {
       const [freq, dur16] = MENU_LEAD[this._menuLeadIdx];
       const dur = dur16 * MS16;
-      if (freq > 0) this._musicOsc(freq, this._menuLeadTime, dur * 0.88, 'sine', 0.055, this._menuMasterGain);
+      if (freq > 0) this._musicOsc(freq, this._menuLeadTime, dur * 0.58, 'sawtooth', 0.052, this._menuMasterGain);
       this._menuLeadTime += dur;
       this._menuLeadIdx = (this._menuLeadIdx + 1) % MENU_LEAD.length;
     }
 
+    // Bass — square, punchy
     while (this._menuBassTime < ctx.currentTime + LOOK) {
       const [freq, dur16] = MENU_BASS[this._menuBassIdx];
       const dur = dur16 * MS16;
-      if (freq > 0) this._musicOsc(freq, this._menuBassTime, dur * 0.92, 'triangle', 0.09, this._menuMasterGain);
+      if (freq > 0) this._musicOsc(freq, this._menuBassTime, dur * 0.72, 'square', 0.10, this._menuMasterGain);
       this._menuBassTime += dur;
       this._menuBassIdx = (this._menuBassIdx + 1) % MENU_BASS.length;
     }
 
-    while (this._menuHhTime < ctx.currentTime + LOOK) {
-      const [type, dur16] = MENU_HIHAT[this._menuHhIdx];
+    // Percussion — kick / snare / hi-hat
+    while (this._menuPercTime < ctx.currentTime + LOOK) {
+      const [type, dur16] = MENU_PERC[this._menuPercIdx];
       const dur = dur16 * MS16;
-      if (type === HH_MARK) this._menuHihat(this._menuHhTime);
-      this._menuHhTime += dur;
-      this._menuHhIdx = (this._menuHhIdx + 1) % MENU_HIHAT.length;
+      if (type === KICK)     this._menuKick(this._menuPercTime);
+      if (type === SNARE)    this._menuSnare(this._menuPercTime);
+      if (type === HH_MARK)  this._menuHihat(this._menuPercTime);
+      this._menuPercTime += dur;
+      this._menuPercIdx = (this._menuPercIdx + 1) % MENU_PERC.length;
     }
 
     this._menuTimerId = setTimeout(() => this._menuTick(), 20);
@@ -390,12 +404,6 @@ export class AudioManager {
 
   /**
    * Schedule a music oscillator note into a given master gain bus.
-   * @param {number} freq
-   * @param {number} startTime  — AudioContext absolute time
-   * @param {number} duration   — seconds
-   * @param {string} type       — OscillatorType
-   * @param {number} gainPeak
-   * @param {GainNode} masterGain — which bus to route into
    */
   _musicOsc(freq, startTime, duration, type, gainPeak, masterGain) {
     try {
@@ -416,7 +424,9 @@ export class AudioManager {
     } catch (_e) {}
   }
 
-  /** Synthesised kick drum — routes into battle music bus. */
+  // ─── Battle percussion ────────────────────────────────────────────────────────
+
+  /** Kick drum — battle music bus. */
   _musicKick(t) {
     try {
       if (!this._musicMasterGain) return;
@@ -434,12 +444,13 @@ export class AudioManager {
     } catch (_e) {}
   }
 
-  /** Synthesised snare — routes into battle music bus. */
+  /** Heavy snare — battle music bus. Gain 0.18 + pitched crack body. */
   _musicSnare(t) {
     try {
       if (!this._musicMasterGain) return;
       const ctx    = this._getCtx();
-      const bufLen = Math.ceil(ctx.sampleRate * 0.12);
+      // Noise layer
+      const bufLen = Math.ceil(ctx.sampleRate * 0.16);
       const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
       const data   = buf.getChannelData(0);
       for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
@@ -447,25 +458,94 @@ export class AudioManager {
       src.buffer = buf;
       const bpf = ctx.createBiquadFilter();
       bpf.type = 'bandpass';
-      bpf.frequency.value = 1200;
-      bpf.Q.value = 0.9;
+      bpf.frequency.value = 2000;
+      bpf.Q.value = 0.7;
       const g = ctx.createGain();
       src.connect(bpf);
       bpf.connect(g);
       g.connect(this._musicMasterGain);
-      g.gain.setValueAtTime(0.07, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
       src.start(t);
-      src.stop(t + 0.13);
+      src.stop(t + 0.18);
+      // Pitched crack body
+      const osc = ctx.createOscillator();
+      const og  = ctx.createGain();
+      osc.connect(og);
+      og.connect(this._musicMasterGain);
+      osc.frequency.setValueAtTime(240, t);
+      osc.frequency.exponentialRampToValueAtTime(80, t + 0.06);
+      og.gain.setValueAtTime(0.10, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      osc.start(t);
+      osc.stop(t + 0.09);
     } catch (_e) {}
   }
 
-  /** Soft hi-hat — routes into menu music bus. */
+  // ─── Menu percussion ──────────────────────────────────────────────────────────
+
+  /** Heavy kick drum — menu music bus. */
+  _menuKick(t) {
+    try {
+      if (!this._menuMasterGain) return;
+      const ctx = this._getCtx();
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      osc.connect(g);
+      g.connect(this._menuMasterGain);
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(38, t + 0.10);
+      g.gain.setValueAtTime(0.28, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      osc.start(t);
+      osc.stop(t + 0.14);
+    } catch (_e) {}
+  }
+
+  /** Heavy snare — menu music bus. Noise burst + pitched crack. */
+  _menuSnare(t) {
+    try {
+      if (!this._menuMasterGain) return;
+      const ctx    = this._getCtx();
+      // Noise burst
+      const bufLen = Math.ceil(ctx.sampleRate * 0.14);
+      const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const data   = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const bpf = ctx.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.value = 2400;
+      bpf.Q.value = 0.6;
+      const g = ctx.createGain();
+      src.connect(bpf);
+      bpf.connect(g);
+      g.connect(this._menuMasterGain);
+      g.gain.setValueAtTime(0.22, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      src.start(t);
+      src.stop(t + 0.15);
+      // Crack tone
+      const osc = ctx.createOscillator();
+      const og  = ctx.createGain();
+      osc.connect(og);
+      og.connect(this._menuMasterGain);
+      osc.frequency.setValueAtTime(220, t);
+      osc.frequency.exponentialRampToValueAtTime(75, t + 0.05);
+      og.gain.setValueAtTime(0.12, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      osc.start(t);
+      osc.stop(t + 0.08);
+    } catch (_e) {}
+  }
+
+  /** Tight hi-hat — menu music bus. */
   _menuHihat(t) {
     try {
       if (!this._menuMasterGain) return;
       const ctx    = this._getCtx();
-      const bufLen = Math.ceil(ctx.sampleRate * 0.06);
+      const bufLen = Math.ceil(ctx.sampleRate * 0.04);
       const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
       const data   = buf.getChannelData(0);
       for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
@@ -473,15 +553,15 @@ export class AudioManager {
       src.buffer = buf;
       const hpf = ctx.createBiquadFilter();
       hpf.type = 'highpass';
-      hpf.frequency.value = 7000;
+      hpf.frequency.value = 8000;
       const g = ctx.createGain();
       src.connect(hpf);
       hpf.connect(g);
       g.connect(this._menuMasterGain);
-      g.gain.setValueAtTime(0.025, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      g.gain.setValueAtTime(0.032, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
       src.start(t);
-      src.stop(t + 0.07);
+      src.stop(t + 0.05);
     } catch (_e) {}
   }
 }

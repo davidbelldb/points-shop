@@ -293,13 +293,15 @@ export default function GameScreen({ sprites, character, level, audio, onQuit, o
       update(dt) {
         if (pausedRef.current || matchDone) return;
 
+        // Always update entities so KO animations play after isFighting → false
+        player.update(dt, input);
+        enemy.update(dt, player);
+
         if (rounds.isFighting) {
           if (!musicStarted) {
             audio?.startBattleMusic();
             musicStarted = true;
           }
-          player.update(dt, input);
-          enemy.update(dt, player);
           combat.checkHit(player, [enemy]);
           combat.checkHit(enemy,  [player]);
         }
