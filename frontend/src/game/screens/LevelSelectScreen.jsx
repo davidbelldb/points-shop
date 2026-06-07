@@ -53,24 +53,36 @@ export const LEVELS = [
   },
 ];
 
-export default function LevelSelectScreen({ onSelect, onBack }) {
+export default function LevelSelectScreen({ onSelect, onBack, audio }) {
   const [cursor, setCursor] = useState(0);
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'Escape')     { onBack(); return; }
-      if (e.code === 'ArrowLeft')  setCursor(c => Math.max(0, c - 1));
-      if (e.code === 'ArrowRight') setCursor(c => Math.min(LEVELS.length - 1, c + 1));
-      if (e.code === 'ArrowUp')    setCursor(c => c - COLS >= 0 ? c - COLS : c);
-      if (e.code === 'ArrowDown')  setCursor(c => c + COLS < LEVELS.length ? c + COLS : c);
+      if (e.code === 'Escape') {
+        audio?.playMenuBack();
+        onBack();
+        return;
+      }
+      if (e.code === 'ArrowLeft'  && cursor > 0) {
+        audio?.playMenuMove(); setCursor(c => c - 1);
+      }
+      if (e.code === 'ArrowRight' && cursor < LEVELS.length - 1) {
+        audio?.playMenuMove(); setCursor(c => c + 1);
+      }
+      if (e.code === 'ArrowUp'   && cursor - COLS >= 0) {
+        audio?.playMenuMove(); setCursor(c => c - COLS);
+      }
+      if (e.code === 'ArrowDown' && cursor + COLS < LEVELS.length) {
+        audio?.playMenuMove(); setCursor(c => c + COLS);
+      }
       if (e.code === 'Enter') {
         const lvl = LEVELS[cursor];
-        if (lvl.available) onSelect(lvl);
+        if (lvl.available) { audio?.playMenuConfirm(); onSelect(lvl); }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, onSelect, onBack]);
+  }, [cursor, onSelect, onBack, audio]);
 
   return (
     <div
@@ -101,11 +113,11 @@ export default function LevelSelectScreen({ onSelect, onBack }) {
           return (
             <div
               key={lvl.id + i}
-              onClick={() => setCursor(i)}
-              onDoubleClick={() => { if (lvl.available) onSelect(lvl); }}
+              onClick={() => { if (cursor !== i) { audio?.playMenuMove(); setCursor(i); } }}
+              onDoubleClick={() => { if (lvl.available) { audio?.playMenuConfirm(); onSelect(lvl); } }}
               className="relative overflow-hidden cursor-pointer select-none"
               style={{
-                border:     `2px solid ${selected ? accent : '#ffffff1a'}`,
+                border:     `${selected ? '4px' : '1px'} solid ${selected ? accent : '#ffffff1a'}`,
                 boxShadow:  selected ? `0 0 18px ${accent}55` : 'none',
                 background: '#0d0d0d',
                 transition: 'border-color 0.12s, box-shadow 0.12s',

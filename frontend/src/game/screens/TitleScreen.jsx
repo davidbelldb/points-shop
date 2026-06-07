@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import titleBgUrl from '../../assets/backgrounds/title_screen.png';
 
-export default function TitleScreen({ onStart }) {
+export default function TitleScreen({ onStart, audio }) {
   const [blink, setBlink] = useState(true);
   const canvasRef = useRef(null);
   const stateRef  = useRef(null);
@@ -22,10 +22,15 @@ export default function TitleScreen({ onStart }) {
 
   // Keyboard + click/tap to start
   useEffect(() => {
-    const onKey = (e) => { if (e.code === 'Enter') onStart(); };
+    const onKey = (e) => {
+      if (e.code === 'Enter') {
+        audio?.playMenuConfirm();
+        onStart();
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onStart]);
+  }, [onStart, audio]);
 
   // Rain + lightning canvas animation
   useEffect(() => {
@@ -109,7 +114,7 @@ export default function TitleScreen({ onStart }) {
   return (
     <div
       className="relative w-full h-full overflow-hidden bg-black"
-      onClick={onStart}
+      onClick={() => { audio?.playMenuConfirm(); onStart(); }}
       style={{ cursor: 'pointer' }}
     >
       {/* Background */}
@@ -134,8 +139,8 @@ export default function TitleScreen({ onStart }) {
         }}
       />
 
-      {/* PRESS ENTER */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+      {/* PRESS ENTER — centred in the bottom third (~y 375/450) */}
+      <div className="absolute inset-x-0 flex justify-center pointer-events-none select-none" style={{ top: '82%' }}>
         <p
           style={{
             fontFamily:    'var(--font-pixel)',

@@ -119,6 +119,9 @@ export class AudioManager {
     this._menuLeadIdx  = 0; this._menuLeadTime  = 0;
     this._menuBassIdx  = 0; this._menuBassTime  = 0;
     this._menuPercIdx  = 0; this._menuPercTime  = 0;
+
+    // Auto-resume tracking
+    this._autoResumeHandler = null;
   }
 
   // ── AudioContext ──────────────────────────────────────────────────────────────
@@ -236,6 +239,24 @@ export class AudioManager {
     this._noise({ gainPeak: 0.08, duration: 0.06 });
   }
 
+  // ── Menu UI SFX ───────────────────────────────────────────────────────────────
+
+  /** Subtle tick when moving the cursor between options. */
+  playMenuMove() {
+    this._tone({ type: 'square', freq: 660, gainPeak: 0.09, duration: 0.035 });
+  }
+
+  /** Positive confirm sound — Enter / select. */
+  playMenuConfirm() {
+    this._tone({ type: 'square', freq: 440, gainPeak: 0.13, duration: 0.07 });
+    this._tone({ type: 'square', freq: 660, gainPeak: 0.12, duration: 0.10, start: 0.06 });
+  }
+
+  /** Negative / cancel sound — Escape / back. */
+  playMenuBack() {
+    this._tone({ type: 'square', freq: 440, freqEnd: 220, gainPeak: 0.11, duration: 0.13 });
+  }
+
   /** Dramatic VS fanfare — played when the VS screen opens. */
   playVsStinger() {
     this._tone({ type: 'square', freq: 440,   gainPeak: 0.22, duration: 0.18, start: 0 });
@@ -340,18 +361,49 @@ export class AudioManager {
     this._menuMasterGain.connect(ctx.destination);
 
     this._menuPlaying = true;
-    const start = ctx.currentTime + 0.05;
-    this._menuLeadTime = start; this._menuLeadIdx = 0;
-    this._menuBassTime = start; this._menuBassIdx = 0;
-    this._menuPercTime = start; this._menuPercIdx = 0;
+    // Note times are set relative to currentTime when context first runs,
+    // inside _menuTick — initialise to 0 as a sentinel.
+    this._menuLeadTime = 0; this._menuLeadIdx = 0;
+    this._menuBassTime = 0; this._menuBassIdx = 0;
+    this._menuPercTime = 0; this._menuPercIdx = 0;
+
+    // Register auto-resume so music starts on first mouse/touch/key interaction
+    this._registerAutoResume();
 
     this._menuTick();
+  }
+
+  /**
+   * Register one-shot listeners on document so the AudioContext is resumed
+   * as soon as the user makes any interaction (mouse move included).
+   * Without this, the music only starts on an explicit click/keydown.
+   */
+  _registerAutoResume() {
+    if (this._autoResumeHandler) return; // already registered
+    const ctx = this._getCtx();
+    if (ctx.state === 'running') return; // already running — nothing to do
+
+    const resume = () => {
+      ctx.resume().catch(() => {});
+      this._clearAutoResume();
+    };
+    this._autoResumeHandler = resume;
+    const EVENTS = ['mousemove', 'mousedown', 'touchstart', 'keydown', 'pointerdown'];
+    EVENTS.forEach(e => document.addEventListener(e, resume, { passive: true }));
+  }
+
+  _clearAutoResume() {
+    if (!this._autoResumeHandler) return;
+    const EVENTS = ['mousemove', 'mousedown', 'touchstart', 'keydown', 'pointerdown'];
+    EVENTS.forEach(e => document.removeEventListener(e, this._autoResumeHandler));
+    this._autoResumeHandler = null;
   }
 
   stopMenuMusic() {
     if (!this._menuPlaying) return;
     this._menuPlaying = false;
     clearTimeout(this._menuTimerId);
+    this._clearAutoResume();
 
     if (this._menuMasterGain) {
       const ctx = this._getCtx();
@@ -365,11 +417,28 @@ export class AudioManager {
 
   _menuTick() {
     if (!this._menuPlaying) return;
-    const ctx  = this._getCtx();
+    const ctx = this._getCtx();
+
+    // AudioContext suspended (waiting for user gesture) — poll at low rate,
+    // don't schedule notes; _menuLeadTime stays at 0 sentinel until running.
+    if (ctx.state !== 'running') {
+      this._menuTimerId = setTimeout(() => this._menuTick(), 50);
+      return;
+    }
+
     const LOOK = 0.2;
+    const now  = ctx.currentTime;
+
+    // First tick after context becomes running: anchor note times to now.
+    if (this._menuLeadTime === 0) {
+      const start = now + 0.04;
+      this._menuLeadTime = start;
+      this._menuBassTime = start;
+      this._menuPercTime = start;
+    }
 
     // Lead — sawtooth, staccato (SoR grit)
-    while (this._menuLeadTime < ctx.currentTime + LOOK) {
+    while (this._menuLeadTime < now + LOOK) {
       const [freq, dur16] = MENU_LEAD[this._menuLeadIdx];
       const dur = dur16 * MS16;
       if (freq > 0) this._musicOsc(freq, this._menuLeadTime, dur * 0.58, 'sawtooth', 0.052, this._menuMasterGain);
@@ -378,7 +447,7 @@ export class AudioManager {
     }
 
     // Bass — square, punchy
-    while (this._menuBassTime < ctx.currentTime + LOOK) {
+    while (this._menuBassTime < now + LOOK) {
       const [freq, dur16] = MENU_BASS[this._menuBassIdx];
       const dur = dur16 * MS16;
       if (freq > 0) this._musicOsc(freq, this._menuBassTime, dur * 0.72, 'square', 0.10, this._menuMasterGain);
@@ -387,12 +456,12 @@ export class AudioManager {
     }
 
     // Percussion — kick / snare / hi-hat
-    while (this._menuPercTime < ctx.currentTime + LOOK) {
+    while (this._menuPercTime < now + LOOK) {
       const [type, dur16] = MENU_PERC[this._menuPercIdx];
       const dur = dur16 * MS16;
-      if (type === KICK)     this._menuKick(this._menuPercTime);
-      if (type === SNARE)    this._menuSnare(this._menuPercTime);
-      if (type === HH_MARK)  this._menuHihat(this._menuPercTime);
+      if (type === KICK)    this._menuKick(this._menuPercTime);
+      if (type === SNARE)   this._menuSnare(this._menuPercTime);
+      if (type === HH_MARK) this._menuHihat(this._menuPercTime);
       this._menuPercTime += dur;
       this._menuPercIdx = (this._menuPercIdx + 1) % MENU_PERC.length;
     }

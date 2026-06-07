@@ -243,16 +243,16 @@ export default function GameContainer() {
           <SplashScreen ready={!!sprites} onContinue={goTitle} />
         )}
         {phase === 'title' && (
-          <TitleScreen onStart={goCharSelect} />
+          <TitleScreen onStart={goCharSelect} audio={audioRef.current} />
         )}
         {phase === 'character_select' && (
-          <CharacterSelectScreen onSelect={goCostumeSelect} onBack={goTitle} />
+          <CharacterSelectScreen onSelect={goCostumeSelect} onBack={goTitle} audio={audioRef.current} />
         )}
         {phase === 'costume_select' && (
-          <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} />
+          <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} audio={audioRef.current} />
         )}
         {phase === 'level_select' && (
-          <LevelSelectScreen onSelect={goVsScreen} onBack={() => setPhase('costume_select')} />
+          <LevelSelectScreen onSelect={goVsScreen} onBack={() => setPhase('costume_select')} audio={audioRef.current} />
         )}
         {phase === 'vs_screen' && (
           <VSScreen

@@ -36,26 +36,32 @@ const COSTUMES = {
 
 const ACCENT = { katie: '#c060ff', david: '#40c8ff' };
 
-export default function CostumeSelectScreen({ character, onSelect, onBack }) {
+export default function CostumeSelectScreen({ character, onSelect, onBack, audio }) {
   const [cursor, setCursor] = useState(0);
   const costumes = COSTUMES[character] ?? COSTUMES.katie;
   const accent   = ACCENT[character] ?? '#fbbf24';
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'Escape')                           { onBack(); return; }
-      if (e.code === 'ArrowLeft'  || e.code === 'KeyA')
-        setCursor(c => Math.max(0, c - 1));
-      if (e.code === 'ArrowRight' || e.code === 'KeyD')
-        setCursor(c => Math.min(costumes.length - 1, c + 1));
+      if (e.code === 'Escape') {
+        audio?.playMenuBack();
+        onBack();
+        return;
+      }
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        if (cursor > 0) { audio?.playMenuMove(); setCursor(c => Math.max(0, c - 1)); }
+      }
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        if (cursor < costumes.length - 1) { audio?.playMenuMove(); setCursor(c => Math.min(costumes.length - 1, c + 1)); }
+      }
       if (e.code === 'Enter') {
         const c = costumes[cursor];
-        if (c.available) onSelect(c);
+        if (c.available) { audio?.playMenuConfirm(); onSelect(c); }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, costumes, onSelect, onBack]);
+  }, [cursor, costumes, onSelect, onBack, audio]);
 
   return (
     <div
@@ -77,13 +83,13 @@ export default function CostumeSelectScreen({ character, onSelect, onBack }) {
           return (
             <div
               key={costume.id}
-              onClick={() => setCursor(i)}
-              onDoubleClick={() => { if (costume.available) onSelect(costume); }}
+              onClick={() => { if (cursor !== i) { audio?.playMenuMove(); setCursor(i); } }}
+              onDoubleClick={() => { if (costume.available) { audio?.playMenuConfirm(); onSelect(costume); } }}
               className="relative overflow-hidden cursor-pointer select-none flex flex-col"
               style={{
                 width:      200,
                 height:     230,
-                border:     `2px solid ${selected ? accent : '#ffffff1a'}`,
+                border:     `${selected ? '4px' : '1px'} solid ${selected ? accent : '#ffffff1a'}`,
                 boxShadow:  selected ? `0 0 20px ${accent}66` : 'none',
                 background: selected ? `${accent}0d` : '#0d0d0d',
                 transition: 'border-color 0.12s, box-shadow 0.12s, background 0.12s',

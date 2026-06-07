@@ -18,23 +18,32 @@ const CHARACTERS = [
   { id: 'david', name: 'DAVID', color: '#40c8ff' },
 ];
 
-export default function CharacterSelectScreen({ onSelect, onBack }) {
+export default function CharacterSelectScreen({ onSelect, onBack, audio }) {
   const [cursor, setCursor] = useState(0);
   const [confirm, setConfirm] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'Escape')                           { onBack(); return; }
-      if (e.code === 'ArrowLeft'  || e.code === 'KeyA') setCursor(0);
-      if (e.code === 'ArrowRight' || e.code === 'KeyD') setCursor(1);
+      if (e.code === 'Escape') {
+        audio?.playMenuBack();
+        onBack();
+        return;
+      }
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        if (cursor !== 0) { audio?.playMenuMove(); setCursor(0); }
+      }
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        if (cursor !== 1) { audio?.playMenuMove(); setCursor(1); }
+      }
       if (e.code === 'Enter') {
+        audio?.playMenuConfirm();
         setConfirm(true);
         setTimeout(() => onSelect(CHARACTERS[cursor].id), 400);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [cursor, onSelect, onBack]);
+  }, [cursor, onSelect, onBack, audio]);
 
   return (
     <div
@@ -56,13 +65,13 @@ export default function CharacterSelectScreen({ onSelect, onBack }) {
           return (
             <div
               key={char.id}
-              onClick={() => setCursor(i)}
-              onDoubleClick={() => { setCursor(i); setConfirm(true); setTimeout(() => onSelect(char.id), 400); }}
+              onClick={() => { if (cursor !== i) { audio?.playMenuMove(); setCursor(i); } }}
+              onDoubleClick={() => { audio?.playMenuConfirm(); setCursor(i); setConfirm(true); setTimeout(() => onSelect(char.id), 400); }}
               className="relative overflow-hidden cursor-pointer select-none"
               style={{
                 width:      200,
                 height:     240,
-                border:     `2px solid ${selected ? char.color : '#ffffff22'}`,
+                border:     `${selected ? '4px' : '1px'} solid ${selected ? char.color : '#ffffff22'}`,
                 boxShadow:  selected ? `0 0 24px ${char.color}88, inset 0 0 12px ${char.color}22` : 'none',
                 background: selected ? `${char.color}0d` : '#0d0d0d',
                 opacity:    confirm && !selected ? 0.3 : 1,
