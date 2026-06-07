@@ -144,16 +144,38 @@ function Overlay({ text, style: overlayStyle }) {
 
 function MatchOver({ winner, pts, onRematch, onQuit }) {
   const [sel, setSel] = useState(0);
+  const selRef = useRef(0);
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') setSel(0);
-      if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') setSel(1);
-      if (e.code === 'Enter') { if (sel === 0) onRematch(); else onQuit(); }
+      if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') { selRef.current = 0; setSel(0); }
+      if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') { selRef.current = 1; setSel(1); }
+      if (e.code === 'Enter') { if (selRef.current === 0) onRematch(); else onQuit(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [sel, onRematch, onQuit]);
+  }, [onRematch, onQuit]);
+
+  // Gamepad navigation
+  useEffect(() => {
+    let raf;
+    const prev = {};
+    const tick = () => {
+      const gp = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
+      if (gp) {
+        const left    = gp.buttons[14]?.pressed || gp.buttons[12]?.pressed || (gp.axes[0] ?? 0) < -0.28;
+        const right   = gp.buttons[15]?.pressed || gp.buttons[13]?.pressed || (gp.axes[0] ?? 0) >  0.28;
+        const confirm = gp.buttons[0]?.pressed;
+        if (left    && !prev.left)    { selRef.current = 0; setSel(0); }
+        if (right   && !prev.right)   { selRef.current = 1; setSel(1); }
+        if (confirm && !prev.confirm) { if (selRef.current === 0) onRematch(); else onQuit(); }
+        prev.left = left; prev.right = right; prev.confirm = confirm;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onRematch, onQuit]);
 
   const btnStyle = (active) => ({
     fontSize: '0.55rem', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.1s', padding: '8px 24px',
@@ -181,7 +203,7 @@ function MatchOver({ winner, pts, onRematch, onQuit }) {
         <button onClick={onQuit}    style={btnStyle(sel === 1)}>QUIT</button>
       </div>
       <p style={{ fontSize: '0.4rem', letterSpacing: '0.15em', color: '#ffffff33' }}>
-        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM
+        ←/→ · D-PAD SELECT &nbsp;·&nbsp; ENTER · A CONFIRM
       </p>
     </div>
   );
@@ -189,16 +211,40 @@ function MatchOver({ winner, pts, onRematch, onQuit }) {
 
 function PauseOverlay({ onResume, onQuit }) {
   const [sel, setSel] = useState(0);
+  const selRef = useRef(0);
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') setSel(0);
-      if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') setSel(1);
-      if (e.code === 'Enter') { if (sel === 0) onResume(); else onQuit(); }
+      if (e.code === 'ArrowLeft'  || e.code === 'ArrowUp'   || e.code === 'KeyA') { selRef.current = 0; setSel(0); }
+      if (e.code === 'ArrowRight' || e.code === 'ArrowDown'  || e.code === 'KeyD') { selRef.current = 1; setSel(1); }
+      if (e.code === 'Enter') { if (selRef.current === 0) onResume(); else onQuit(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [sel, onResume, onQuit]);
+  }, [onResume, onQuit]);
+
+  // Gamepad navigation
+  useEffect(() => {
+    let raf;
+    const prev = {};
+    const tick = () => {
+      const gp = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
+      if (gp) {
+        const left    = gp.buttons[14]?.pressed || gp.buttons[12]?.pressed || (gp.axes[0] ?? 0) < -0.28;
+        const right   = gp.buttons[15]?.pressed || gp.buttons[13]?.pressed || (gp.axes[0] ?? 0) >  0.28;
+        const confirm = gp.buttons[0]?.pressed;
+        const start   = gp.buttons[9]?.pressed;
+        if (left    && !prev.left)    { selRef.current = 0; setSel(0); }
+        if (right   && !prev.right)   { selRef.current = 1; setSel(1); }
+        if (confirm && !prev.confirm) { if (selRef.current === 0) onResume(); else onQuit(); }
+        if (start   && !prev.start)   { onResume(); }
+        prev.left = left; prev.right = right; prev.confirm = confirm; prev.start = start;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onResume, onQuit]);
 
   const btnStyle = (active) => ({
     fontSize: '0.55rem', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.1s', padding: '8px 24px',
@@ -216,7 +262,7 @@ function PauseOverlay({ onResume, onQuit }) {
         <button onClick={onQuit}   style={btnStyle(sel === 1)}>QUIT</button>
       </div>
       <p style={{ fontSize: '0.4rem', letterSpacing: '0.15em', color: '#ffffff33' }}>
-        ←/→ SELECT &nbsp;·&nbsp; ENTER CONFIRM &nbsp;·&nbsp; ESC RESUME
+        ←/→ · D-PAD SELECT &nbsp;·&nbsp; ENTER · A CONFIRM &nbsp;·&nbsp; ESC · START RESUME
       </p>
     </div>
   );
