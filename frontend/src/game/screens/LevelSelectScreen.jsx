@@ -34,14 +34,14 @@ export const LEVELS = [
     thumb:     null,
   },
   {
-    id:        'bishops',
-    name:      'COMING SOON',
+    id:        'bar_oh_they_dead',
+    name:      'BAR-OH THEY DEAD',
     available: false,
     thumb:     null,
   },
   {
-    id:        'bar_oh_no',
-    name:      "BAR-OH NO, THEY'RE DEAD",
+    id:        'coming_soon_1',
+    name:      'COMING SOON',
     available: false,
     thumb:     null,
   },
