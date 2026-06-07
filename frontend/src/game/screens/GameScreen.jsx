@@ -108,12 +108,16 @@ function ComboDisplay({ count, align = 'left' }) {
   );
 }
 
-function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo }) {
+const IS_TOUCH =
+  typeof window !== 'undefined' &&
+  ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo, onPause, paused }) {
   return (
     <>
       <div
-        className="absolute top-0 left-0 right-0 flex items-start justify-between px-3 pt-2 pointer-events-none select-none"
-        style={{ zIndex: 10 }}
+        className="absolute top-0 left-0 right-0 flex items-start justify-between px-3 pt-2 select-none"
+        style={{ zIndex: 10, pointerEvents: 'none' }}
       >
         {/* Katie — left */}
         <div className="flex flex-col gap-1">
@@ -130,6 +134,42 @@ function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo 
           <span style={{ fontSize: '1.2rem', color: '#fff', textShadow: '0 0 10px #fff8' }}>
             {round}
           </span>
+          {/* Touch-only pause button — sits under the round number */}
+          {IS_TOUCH && (
+            <button
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onPause?.(); }}
+              style={{
+                pointerEvents:           'auto',
+                touchAction:             'none',
+                WebkitTouchCallout:      'none',
+                WebkitTapHighlightColor: 'transparent',
+                marginTop:               4,
+                width:                   34,
+                height:                  34,
+                borderRadius:            '50%',
+                border:                  '2px solid rgba(255,255,255,0.28)',
+                background:              paused ? 'rgba(255,255,255,0.14)' : 'rgba(6,6,14,0.60)',
+                color:                   'rgba(255,255,255,0.70)',
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                cursor:                  'pointer',
+                boxShadow:               '0 2px 8px rgba(0,0,0,0.5)',
+              }}
+            >
+              {/* Pause ▐▐ / Play ▶ icon via SVG */}
+              {paused ? (
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <path d="M2 2 L9 6 L2 10 Z"/>
+                </svg>
+              ) : (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                  <rect x="1" y="1" width="3" height="8" rx="1"/>
+                  <rect x="6" y="1" width="3" height="8" rx="1"/>
+                </svg>
+              )}
+            </button>
+          )}
         </div>
 
         {/* David — right */}
@@ -385,14 +425,26 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
   return (
     <div
       className="relative overflow-hidden"
-      style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+      style={{
+        width:              CANVAS_WIDTH,
+        height:             CANVAS_HEIGHT,
+        userSelect:         'none',
+        WebkitUserSelect:   'none',
+        WebkitTouchCallout: 'none',
+      }}
     >
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}
         height={CANVAS_HEIGHT}
         className="block"
-        style={{ imageRendering: 'pixelated' }}
+        style={{
+          imageRendering:     'pixelated',
+          userSelect:         'none',
+          WebkitUserSelect:   'none',
+          WebkitTouchCallout: 'none',
+          touchAction:        'none',
+        }}
       />
 
       <HUD
@@ -403,6 +455,8 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
         round={hudState.round}
         playerCombo={hudState.playerCombo}
         enemyCombo={hudState.enemyCombo}
+        onPause={() => { pausedRef.current = !pausedRef.current; setPaused(p => !p); }}
+        paused={paused}
       />
 
       {hudState.overlay && !hudState.matchOver && !paused && (
