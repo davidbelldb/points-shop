@@ -258,14 +258,20 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
     combat.onAudio = (type) => audio.play(type);
     combat.onShake = (intensity, duration) => renderer.triggerShake(intensity, duration);
 
-    let frameCount = 0;
-    let matchDone  = false;
+    let frameCount   = 0;
+    let matchDone    = false;
+    let musicStarted = false;
 
     const loop = new GameLoop({
       update(dt) {
         if (pausedRef.current || matchDone) return;
 
         if (rounds.isFighting) {
+          // Start music on the first fighting frame
+          if (!musicStarted) {
+            audio.startBattleMusic();
+            musicStarted = true;
+          }
           player.update(dt, input);
           enemy.update(dt, player);
           combat.checkHit(player, [enemy]);
@@ -273,7 +279,10 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
         }
 
         rounds.update(dt, player, enemy);
-        if (rounds.isOver && !matchDone) matchDone = true;
+        if (rounds.isOver && !matchDone) {
+          matchDone = true;
+          audio.stopBattleMusic();
+        }
 
         input.consumeFrame();
       },
@@ -304,7 +313,7 @@ export default function GameScreen({ sprites, character, level, onQuit, onRematc
     });
 
     loop.start();
-    return () => { loop.stop(); input.detach(); };
+    return () => { loop.stop(); input.detach(); audio.stopBattleMusic(); };
   }, [sprites]);   // sprites is stable — this only runs once per mount
 
   const resume = () => { pausedRef.current = false; setPaused(false); };

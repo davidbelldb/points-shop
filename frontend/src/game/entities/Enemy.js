@@ -78,6 +78,14 @@ export class Enemy {
   }
 
   update(dt, player) {
+    // KO state — play ko anim, freeze all other logic
+    if (this.isDead) {
+      this.hurt = false;
+      if (this.anim.animName !== 'ko') this.anim.play('ko');
+      this.anim.update(dt);
+      return;
+    }
+
     // Hurt i-frames
     if (this.hurtTimer > 0) {
       this.hurtTimer -= dt;

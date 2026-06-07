@@ -55,7 +55,11 @@ import davidJumpUrl      from '../assets/sprites/david_jump.png';
 import davidWalk01Url    from '../assets/sprites/david_walk_01.png';
 import davidWalk02Url    from '../assets/sprites/david_walk_02.png';
 import davidBlock01Url   from '../assets/sprites/david_block_01.png';
+import davidKo01Url      from '../assets/sprites/david_ko_01.png';
+import davidKo02Url      from '../assets/sprites/david_ko_02.png';
 import katieBlock01Url   from '../assets/sprites/katie_block_01.png';
+import katieKo01Url      from '../assets/sprites/katie_ko_01.png';
+import katieKo02Url      from '../assets/sprites/katie_ko_02.png';
 import davidPunch01Url   from '../assets/sprites/david_punch_01.png';
 import davidPunch02Url   from '../assets/sprites/david_punch_02.png';
 import davidPunch03Url   from '../assets/sprites/david_punch_03.png';
@@ -112,7 +116,11 @@ const SPRITE_MANIFEST = {
   david_walk_01:       davidWalk01Url,
   david_walk_02:       davidWalk02Url,
   david_block_01:      davidBlock01Url,
+  david_ko_01:         davidKo01Url,
+  david_ko_02:         davidKo02Url,
   katie_block_01:      katieBlock01Url,
+  katie_ko_01:         katieKo01Url,
+  katie_ko_02:         katieKo02Url,
   david_punch_01:      davidPunch01Url,
   david_punch_02:      davidPunch02Url,
   david_punch_03:      davidPunch03Url,

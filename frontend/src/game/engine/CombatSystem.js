@@ -54,8 +54,12 @@ export class CombatSystem {
           // Hit lands
           target.takeDamage(attacker.pendingDamage, attacker.x);
 
-          // Impact audio
-          if (isHeavy) {
+          // Impact audio — instrument-specific for piano/guitar, generic otherwise
+          if (animName === 'piano_attack') {
+            this.onAudio?.('piano_hit');
+          } else if (animName === 'guitar') {
+            this.onAudio?.('guitar_hit');
+          } else if (isHeavy) {
             this.onAudio?.('special');
           } else if (animName === 'punch') {
             this.onAudio?.('punch');
