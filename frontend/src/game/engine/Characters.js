@@ -58,7 +58,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.08,
         loop:          false,
         isAttack:      true,
-        damage:        8,
+        damage:        12,
         hitFrame:      1,
       },
       kick: {
@@ -66,7 +66,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.10,
         loop:          false,
         isAttack:      true,
-        damage:        14,
+        damage:        22,
         hitFrame:      1,
       },
       power_kick: {
@@ -77,7 +77,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.10,
         loop:          false,
         isAttack:      true,
-        damage:        38,
+        damage:        44,
         hitFrame:      3,
       },
       combo: {
@@ -88,7 +88,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.09,
         loop:          false,
         isAttack:      true,
-        damage:        30,
+        damage:        38,
         hitFrame:      3,
       },
       piano_attack: {
@@ -100,7 +100,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.08,
         loop:          false,
         isAttack:      true,
-        damage:        52,
+        damage:        62,
         hitFrame:      7,
       },
     },
@@ -151,7 +151,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.08,
         loop:          false,
         isAttack:      true,
-        damage:        8,
+        damage:        12,
         hitFrame:      1,
       },
       kick: {
@@ -159,7 +159,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.10,
         loop:          false,
         isAttack:      true,
-        damage:        14,
+        damage:        22,
         hitFrame:      1,
       },
       power_kick: {
@@ -170,7 +170,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.10,
         loop:          false,
         isAttack:      true,
-        damage:        38,
+        damage:        44,
         hitFrame:      3,
       },
       special: {
@@ -181,7 +181,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.09,
         loop:          false,
         isAttack:      true,
-        damage:        35,
+        damage:        42,
         hitFrame:      4,
       },
       guitar: {
@@ -189,7 +189,7 @@ export const CHAR_DEFS = {
         frameDuration: 0.09,
         loop:          false,
         isAttack:      true,
-        damage:        45,
+        damage:        52,
         hitFrame:      2,
       },
     },
