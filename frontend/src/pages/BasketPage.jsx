@@ -23,10 +23,12 @@ export default function BasketPage() {
 
   if (!basket) return <p className="text-sm text-neutral-500">Loading...</p>;
 
+  const pocketLabel = `${account?.name ?? 'Your'}'s safe pocket`;
+
   if (basket.items.length === 0) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold">Katie's safe pocket</h1>
+        <h1 className="text-xl font-semibold">{pocketLabel}</h1>
         <p className="text-sm text-neutral-500">Oh look. It's empty. Better put something in it.</p>
         <Link to="/" className="inline-block rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-amber-900">
           Close basket
@@ -80,7 +82,7 @@ export default function BasketPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Katie's safe pocket</h1>
+      <h1 className="text-xl font-semibold">{pocketLabel}</h1>
 
       {/* \u2500\u2500 Responsive two-column layout \u2500\u2500
           Mobile  : flex-col \u2014 items first, then summary (current order preserved).

@@ -115,7 +115,7 @@ export default function BasketDrawer({ open, onClose }) {
         <div className="flex shrink-0 items-center justify-between border-b border-white/20 px-4 py-3">
           <h2 className="flex items-center gap-2 text-base font-semibold text-white">
             <img src="/sphincter-pink.svg" alt="" className="h-5 w-5" />
-            {isEmpty ? "Katie's safe pocket" : `Katie's safe pocket (${basket.items.length})`}
+            {(() => { const n = `${account?.name ?? 'Your'}'s safe pocket`; return isEmpty ? n : `${n} (${basket.items.length})`; })()}
           </h2>
           <button
             onClick={onClose}
