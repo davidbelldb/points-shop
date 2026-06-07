@@ -34,6 +34,19 @@ export function useGamepadMenu({
     let raf;
     const prev = {};
 
+    // Seed prev with whatever is already held so buttons carried over from
+    // the previous screen don't fire as fresh presses on the first tick.
+    const gp0 = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
+    if (gp0) {
+      prev.left    = gp0.buttons[14]?.pressed || (gp0.axes[0] ?? 0) < -DEADZONE;
+      prev.right   = gp0.buttons[15]?.pressed || (gp0.axes[0] ?? 0) >  DEADZONE;
+      prev.up      = gp0.buttons[12]?.pressed || (gp0.axes[1] ?? 0) < -DEADZONE;
+      prev.down    = gp0.buttons[13]?.pressed || (gp0.axes[1] ?? 0) >  DEADZONE;
+      prev.confirm = gp0.buttons[0]?.pressed;
+      prev.back    = gp0.buttons[1]?.pressed;
+      prev.start   = gp0.buttons[9]?.pressed;
+    }
+
     const tick = () => {
       const gp = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
       if (gp) {
