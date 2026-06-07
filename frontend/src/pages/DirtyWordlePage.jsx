@@ -172,9 +172,8 @@ function LeaderboardModal({ onClose, today }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-800 shadow-xl overflow-hidden">
         {/* Header — no divider, pink title */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="px-5 pt-5 pb-3">
           <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Leaderboard</h2>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition text-lg leading-none">✕</button>
         </div>
 
         <div className="px-5 pb-3 space-y-6 max-h-[80vh] overflow-y-auto">
