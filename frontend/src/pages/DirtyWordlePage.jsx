@@ -13,14 +13,17 @@ import { useAuth } from '../lib/AuthContext.jsx';
 // ─── Word list ────────────────────────────────────────────────────────────────
 
 const WORDS = [
-  'HORNY','DIRTY','SPANK','LUSTY','KINKY','NAKED','BOOBS','BOOTY','ERECT','LOVER',
-  'COCKY','BALLS','BONER','PERVY','FILTH','RANDY','JUICY','NUDES','PANTY','THONG',
-  'GROAN','MOANS','LICKS','TEASE','FLIRT','STRIP','NASTY','NYMPH','TABOO','WILLY',
-  'WOODY','SHAFT','GRIND','STRAP','TOUCH','TWERK','VULVA','DICKS','PRICK','PUSSY',
-  'BUTTS','TAINT','BOOBY','SWEAT','SEMEN','SPUNK','SAUCY','FLESH','FANNY','MOIST',
-  'GROPE','STIFF','THROB','PORNO','CRUDE','SEXTS','TRYST','DADDY','THIGH','VIXEN',
-  'FREAK','BAWDY','SASSY','STUDS','TEMPT','WENCH','SMUTS','OGLED','LEERS','TRAMP',
-  'LETCH','TORSO','SLUTT','CHAFE','HEAVE','THROB','LUSHY','ROGUE','PLUMP','GRUBS',
+  // ── Your suggestions ──────────────────────────────────────────────────────
+  'FILTH','SLUTS','SLAGS','WHORE','WANKY','BOOBS','TITTY','BUTTS','WILLY','BITCH',
+  'STIFF','COCKS','PUSSY','CUNTS','TWATS','NECKS','PLUGS','KATIE','DAVID',
+  // ── Dirty classics ────────────────────────────────────────────────────────
+  'HORNY','DIRTY','SPANK','LUSTY','KINKY','NAKED','BOOTY','ERECT','LOVER','COCKY',
+  'BALLS','BONER','PERVY','RANDY','JUICY','NUDES','PANTY','THONG','GROAN','MOANS',
+  'LICKS','TEASE','FLIRT','STRIP','NASTY','NYMPH','TABOO','SHAFT','GRIND','STRAP',
+  'TOUCH','TWERK','VULVA','DICKS','PRICK','TAINT','SPUNK','SAUCY','FLESH','FANNY',
+  'MOIST','GROPE','THROB','PORNO','CRUDE','SEXTS','TRYST','DADDY','THIGH','VIXEN',
+  'BAWDY','STUDS','WENCH','TRAMP','SMUTS','LETCH','KNOBS','WANKS','SHAGS','BONKS',
+  'HUMPS','ROMPS','LOINS','GROIN','BUSTY','BUXOM','TARTS','HUSSY','KINKS','ARSES',
 ];
 
 const WORD_LENGTH  = 5;
