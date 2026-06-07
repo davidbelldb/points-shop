@@ -60,6 +60,7 @@ export default function App() {
 
   const isHome = location.pathname === '/';
   const isGame = location.pathname.startsWith('/games/');
+  const isFullGame = location.pathname === '/games/streets-of-cambs-rage';
   const bannerOn = settings.banner_enabled === 'true' && (settings.banner_text || '').trim();
 
   return (
@@ -68,7 +69,7 @@ export default function App() {
       <SideNav />
 
       {/* All page content shifts right by sidebar width on md+ */}
-      <div className="md:pl-56">
+      <div className={`md:pl-56${isFullGame ? ' flex flex-col h-screen' : ''}`}>
       {user?.impersonating && (
         <div className="bg-amber-100 border-b border-amber-200">
           <div className="mx-auto flex w-full items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900 lg:px-6">
@@ -186,7 +187,7 @@ export default function App() {
         </div>
       )}
       {showFloater && <SurveyBanner />}
-      <main className={`px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'w-full pb-24 lg:px-8'}`}>
+      <main className={isFullGame ? 'flex-1 min-h-0 w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'w-full pb-24 lg:px-8'}`}>
         <Outlet />
       </main>
       </div>{/* end md:pl-56 wrapper */}

@@ -186,36 +186,50 @@ export default function GameContainer() {
   };
 
   return (
+    // Outer wrapper fills whatever space the page gives us
     <div
-      className="relative bg-black overflow-hidden"
-      style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+      ref={wrapperRef}
+      className="w-full h-full bg-black flex items-center justify-center"
+      style={{ minHeight: 0 }}
     >
-      {phase === 'splash' && (
-        <SplashScreen ready={!!sprites} onContinue={goTitle} />
-      )}
-      {phase === 'title' && (
-        <TitleScreen onStart={goCharSelect} />
-      )}
-      {phase === 'character_select' && (
-        <CharacterSelectScreen onSelect={goCostumeSelect} onBack={goTitle} />
-      )}
-      {phase === 'costume_select' && (
-        <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} />
-      )}
-      {phase === 'level_select' && (
-        <LevelSelectScreen onSelect={goGame} onBack={() => setPhase('costume_select')} />
-      )}
-      {phase === 'game' && (
-        <GameScreen
-          key={matchKey}
-          sprites={sprites}
-          character={character}
-          costume={costume}
-          level={level}
-          onQuit={handleQuit}
-          onRematch={handleRematch}
-        />
-      )}
+      {/* Inner game — fixed resolution, scaled to fit */}
+      <div
+        className="relative bg-black overflow-hidden"
+        style={{
+          width:           CANVAS_WIDTH,
+          height:          CANVAS_HEIGHT,
+          transform:       `scale(${scale})`,
+          transformOrigin: 'center center',
+          flexShrink:      0,
+        }}
+      >
+        {phase === 'splash' && (
+          <SplashScreen ready={!!sprites} onContinue={goTitle} />
+        )}
+        {phase === 'title' && (
+          <TitleScreen onStart={goCharSelect} />
+        )}
+        {phase === 'character_select' && (
+          <CharacterSelectScreen onSelect={goCostumeSelect} onBack={goTitle} />
+        )}
+        {phase === 'costume_select' && (
+          <CostumeSelectScreen character={character} onSelect={goLevelSelect} onBack={goCharSelect} />
+        )}
+        {phase === 'level_select' && (
+          <LevelSelectScreen onSelect={goGame} onBack={() => setPhase('costume_select')} />
+        )}
+        {phase === 'game' && (
+          <GameScreen
+            key={matchKey}
+            sprites={sprites}
+            character={character}
+            costume={costume}
+            level={level}
+            onQuit={handleQuit}
+            onRematch={handleRematch}
+          />
+        )}
+      </div>
     </div>
   );
 }
