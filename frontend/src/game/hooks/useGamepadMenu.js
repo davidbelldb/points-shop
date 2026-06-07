@@ -33,19 +33,11 @@ export function useGamepadMenu({
   useEffect(() => {
     let raf;
     const prev = {};
-
-    // Seed prev with whatever is already held so buttons carried over from
-    // the previous screen don't fire as fresh presses on the first tick.
-    const gp0 = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
-    if (gp0) {
-      prev.left    = gp0.buttons[14]?.pressed || (gp0.axes[0] ?? 0) < -DEADZONE;
-      prev.right   = gp0.buttons[15]?.pressed || (gp0.axes[0] ?? 0) >  DEADZONE;
-      prev.up      = gp0.buttons[12]?.pressed || (gp0.axes[1] ?? 0) < -DEADZONE;
-      prev.down    = gp0.buttons[13]?.pressed || (gp0.axes[1] ?? 0) >  DEADZONE;
-      prev.confirm = gp0.buttons[0]?.pressed;
-      prev.back    = gp0.buttons[1]?.pressed;
-      prev.start   = gp0.buttons[9]?.pressed;
-    }
+    // On the first RAF tick we only snapshot state — no callbacks fire.
+    // This prevents buttons held on the previous screen from triggering
+    // immediately when this screen mounts (Gamepad API state is only
+    // reliable inside a RAF callback, not in useEffect).
+    let seeded = false;
 
     const tick = () => {
       const gp = [...(navigator.getGamepads?.() ?? [])].filter(Boolean)[0];
@@ -58,19 +50,22 @@ export function useGamepadMenu({
         const back    = gp.buttons[1]?.pressed;
         const start   = gp.buttons[9]?.pressed;
 
-        if (left    && !prev.left)    cb.current.onLeft?.();
-        if (right   && !prev.right)   cb.current.onRight?.();
-        if (up      && !prev.up)      cb.current.onUp?.();
-        if (down    && !prev.down)    cb.current.onDown?.();
-        if (confirm && !prev.confirm) cb.current.onConfirm?.();
-        if (back    && !prev.back)    cb.current.onBack?.();
-        if (start   && !prev.start) {
-          if (cb.current.onStart) cb.current.onStart();
-          else cb.current.onConfirm?.();
+        if (seeded) {
+          if (left    && !prev.left)    cb.current.onLeft?.();
+          if (right   && !prev.right)   cb.current.onRight?.();
+          if (up      && !prev.up)      cb.current.onUp?.();
+          if (down    && !prev.down)    cb.current.onDown?.();
+          if (confirm && !prev.confirm) cb.current.onConfirm?.();
+          if (back    && !prev.back)    cb.current.onBack?.();
+          if (start   && !prev.start) {
+            if (cb.current.onStart) cb.current.onStart();
+            else cb.current.onConfirm?.();
+          }
         }
 
         prev.left = left; prev.right = right; prev.up = up; prev.down = down;
         prev.confirm = confirm; prev.back = back; prev.start = start;
+        seeded = true;
       }
       raf = requestAnimationFrame(tick);
     };
