@@ -149,24 +149,55 @@ const SPRITE_MANIFEST = {
 
 const MENU_PHASES = new Set(['title', 'difficulty_select', 'character_select', 'costume_select', 'level_select']);
 
+// ─── Fullscreen helpers ───────────────────────────────────────────────────────
+
+function FullscreenIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 3 21 3 21 9"/>
+      <polyline points="9 21 3 21 3 15"/>
+      <line x1="21" y1="3" x2="14" y2="10"/>
+      <line x1="3" y1="21" x2="10" y2="14"/>
+    </svg>
+  );
+}
+
+function ExitFullscreenIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 14 10 14 10 20"/>
+      <polyline points="20 10 14 10 14 4"/>
+      <line x1="10" y1="14" x2="3" y2="21"/>
+      <line x1="21" y1="3" x2="14" y2="10"/>
+    </svg>
+  );
+}
+
+// Detect iOS — fullscreen API is blocked; only orientation lock + PWA workaround available
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 // ─── Phase machine ────────────────────────────────────────────────────────────
 
 export default function GameContainer() {
-  const [phase,      setPhase]      = useState('splash');
-  const [sprites,    setSprites]    = useState(null);
-  const [difficulty, setDifficulty] = useState('easy');
-  const [character,  setCharacter]  = useState(null);
-  const [costume,    setCostume]    = useState(null);
-  const [level,      setLevel]      = useState(null);
-  const [matchKey,   setMatchKey]   = useState(0);
-  const [scale,      setScale]      = useState(1);
+  const [phase,        setPhase]        = useState('splash');
+  const [sprites,      setSprites]      = useState(null);
+  const [difficulty,   setDifficulty]   = useState('easy');
+  const [character,    setCharacter]    = useState(null);
+  const [costume,      setCostume]      = useState(null);
+  const [level,        setLevel]        = useState(null);
+  const [matchKey,     setMatchKey]     = useState(0);
+  const [scale,        setScale]        = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [iosHint,      setIosHint]      = useState(false);
 
   const wrapperRef = useRef(null);
   // Single AudioManager instance shared across all phases
   const audioRef   = useRef(null);
   if (!audioRef.current) audioRef.current = new AudioManager();
 
-  // Responsive scaling
+  // Responsive scaling — recalculates on resize AND fullscreen change
   useEffect(() => {
     const updateScale = () => {
       if (!wrapperRef.current) return;
@@ -177,6 +208,58 @@ export default function GameContainer() {
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
   }, []);
+
+  // Track fullscreen state changes
+  useEffect(() => {
+    const onChange = () => {
+      const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      setIsFullscreen(active);
+      // Re-run scale calc after browser repaints at new dimensions
+      setTimeout(() => {
+        if (!wrapperRef.current) return;
+        const { width, height } = wrapperRef.current.getBoundingClientRect();
+        setScale(Math.min(width / CANVAS_WIDTH, height / CANVAS_HEIGHT));
+      }, 100);
+    };
+    document.addEventListener('fullscreenchange',       onChange);
+    document.addEventListener('webkitfullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange',       onChange);
+      document.removeEventListener('webkitfullscreenchange', onChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+
+    if (fsEl) {
+      // Exit fullscreen
+      if      (document.exitFullscreen)       await document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      try { await screen.orientation.unlock(); } catch {}
+      return;
+    }
+
+    // iOS — no programmatic fullscreen; offer orientation lock + hint
+    if (isIOS()) {
+      try { await screen.orientation.lock('landscape'); } catch {}
+      // Only show the PWA hint if not already running as a PWA
+      const isPwa = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+      if (!isPwa) {
+        setIosHint(true);
+        setTimeout(() => setIosHint(false), 5000);
+      }
+      return;
+    }
+
+    // Android / desktop — standard Fullscreen API
+    const el = document.documentElement;
+    try {
+      if      (el.requestFullscreen)       await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      try { await screen.orientation.lock('landscape'); } catch {}
+    } catch {}
+  };
 
   // Sprite preload
   useEffect(() => {
@@ -230,8 +313,59 @@ export default function GameContainer() {
     <div
       ref={wrapperRef}
       className="w-full h-full bg-black flex items-center justify-center"
-      style={{ minHeight: 0 }}
+      style={{ minHeight: 0, position: 'relative' }}
     >
+      {/* Fullscreen toggle — floats above the scaled game canvas */}
+      <button
+        onClick={toggleFullscreen}
+        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        style={{
+          position:   'absolute',
+          top:        10,
+          right:      10,
+          zIndex:     200,
+          background: 'rgba(0,0,0,0.45)',
+          border:     '1px solid rgba(255,255,255,0.22)',
+          borderRadius: 5,
+          padding:    '5px 6px',
+          cursor:     'pointer',
+          color:      'rgba(255,255,255,0.75)',
+          lineHeight: 0,
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.70)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.45)'}
+      >
+        {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+      </button>
+
+      {/* iOS "Add to Home Screen" hint */}
+      {iosHint && (
+        <div
+          style={{
+            position:   'absolute',
+            bottom:     20,
+            left:       '50%',
+            transform:  'translateX(-50%)',
+            zIndex:     200,
+            background: 'rgba(0,0,0,0.82)',
+            border:     '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 8,
+            padding:    '10px 18px',
+            color:      'rgba(255,255,255,0.85)',
+            fontSize:   11,
+            fontFamily: 'system-ui, sans-serif',
+            textAlign:  'center',
+            whiteSpace: 'nowrap',
+            lineHeight: 1.5,
+            pointerEvents: 'none',
+          }}
+        >
+          For fullscreen on iOS:<br />
+          Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>
+        </div>
+      )}
+
       <div
         className="relative bg-black overflow-hidden"
         style={{
