@@ -65,11 +65,13 @@ export default function App() {
 
   // Hide the header on the game page when in landscape — gives edge-to-edge
   // canvas. Rotating back to portrait restores the header for navigation.
+  // Only hide the header for phone-sized landscape (height ≤ 500px).
+  // Tablets and desktops in landscape are always taller than this.
   const [isLandscape, setIsLandscape] = useState(
-    () => window.matchMedia('(orientation: landscape)').matches
+    () => window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches
   );
   useEffect(() => {
-    const mq = window.matchMedia('(orientation: landscape)');
+    const mq = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
     const handler = (e) => setIsLandscape(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
