@@ -67,12 +67,6 @@ export class GamepadManager {
 
     const input = this.inputRef?.current;
 
-    // Debug — fires once on first successful poll with connected gamepad
-    if (!this._debugged) {
-      this._debugged = true;
-      console.log('[GamepadManager] first poll — index:', this.gamepadIndex, '| has input:', !!input, '| gp:', gp.id);
-    }
-
     // ── Face / shoulder / d-pad buttons ───────────────────────────────────
     for (const [idxStr, action] of Object.entries(BUTTON_ACTIONS)) {
       const idx     = Number(idxStr);

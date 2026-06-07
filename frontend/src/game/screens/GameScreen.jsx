@@ -222,46 +222,6 @@ function PauseOverlay({ onResume, onQuit }) {
   );
 }
 
-// ─── Temporary gamepad debug overlay ─────────────────────────────────────────
-
-function GamepadDebug({ inputRef }) {
-  const [info, setInfo] = useState({ gamepads: [], held: [] });
-  useEffect(() => {
-    let raf;
-    const tick = () => {
-      const gps  = [...(navigator.getGamepads?.() ?? [])].filter(Boolean);
-      const held = inputRef?.current?.heldActions() ?? [];
-      setInfo({
-        gamepads: gps.map(g => ({
-          index: g.index,
-          id:    g.id.slice(0, 36),
-          btns:  g.buttons.map((b, i) => b.pressed ? i : null).filter(x => x !== null),
-          axes:  [g.axes[0]?.toFixed(2), g.axes[1]?.toFixed(2)],
-        })),
-        held,
-      });
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inputRef]);
-
-  return (
-    <div style={{ position: 'absolute', top: 4, left: 4, zIndex: 999, fontFamily: 'monospace', fontSize: 10, color: '#0f0', background: 'rgba(0,0,0,0.7)', padding: '4px 6px', pointerEvents: 'none', lineHeight: 1.6, maxWidth: 320 }}>
-      {info.gamepads.length === 0
-        ? 'No gamepads — press a button on controller'
-        : info.gamepads.map(g => (
-            <div key={g.index}>
-              [{g.index}] {g.id}<br/>
-              gpad btns: {g.btns.join(',') || '—'} · axes: {g.axes.join(', ')}<br/>
-              input held: {info.held.join(', ') || '—'}
-            </div>
-          ))
-      }
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function GameScreen({ sprites, character, level, difficulty = 'easy', audio, twoPlayer = false, onQuit, onRematch }) {
@@ -484,9 +444,6 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
 
       {/* Touch controls — hidden in 2P mode (both players use physical controllers) */}
       {!twoPlayer && <TouchControls inputRef={inputRef} />}
-
-      {/* Temporary gamepad debug overlay — remove once controller is confirmed working */}
-      <GamepadDebug inputRef={inputRef} />
 
       {/* Keyboard hint — hidden on touch devices */}
       {!IS_TOUCH && (
