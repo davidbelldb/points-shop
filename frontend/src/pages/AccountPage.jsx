@@ -174,7 +174,7 @@ export default function AccountPage() {
             <ThemeToggle />
           </section>
 
-          {account.email === 'davidbell.db@googlemail.com' && (
+          {user?.username === 'david' && (
             <Link
               to="/admin"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
