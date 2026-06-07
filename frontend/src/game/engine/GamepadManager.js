@@ -61,7 +61,7 @@ export class GamepadManager {
    * fires inject calls for any changes since the last tick.
    */
   poll() {
-    const gamepads = navigator.getGamepads?.() ?? [];
+    const gamepads = [...(navigator.getGamepads?.() ?? [])].filter(Boolean);
     const gp       = gamepads[this.gamepadIndex];
     if (!gp || !gp.connected) return;
 
