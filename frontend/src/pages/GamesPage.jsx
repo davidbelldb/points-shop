@@ -41,14 +41,11 @@ function StreetsCambsRageCard() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-4">
-          <p className="font-bold leading-tight text-white"
-             style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '0.65rem', letterSpacing: '0.04em' }}>
-            Streets of Cambs-Rage
-          </p>
-          <p className="mt-1.5 text-xs text-white/70">Beat 'em up · 1 Player</p>
+          <p className="text-lg font-bold leading-tight text-white">Streets of Cambs-Rage</p>
+          <p className="mt-0.5 text-sm text-white/70">Beat 'em up · 1 Player</p>
         </div>
-        <div className="absolute top-3 right-3 rounded px-2 py-0.5 text-white font-bold tracking-widest"
-             style={{ background: '#ef4444', fontFamily: 'system-ui, sans-serif', fontSize: '0.6rem' }}>
+        <div className="absolute top-3 right-3 rounded px-2 py-0.5 text-white text-xs font-bold tracking-widest"
+             style={{ background: '#ed70bd' }}>
           NEW
         </div>
       </div>
