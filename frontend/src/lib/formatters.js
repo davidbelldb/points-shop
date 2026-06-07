@@ -14,6 +14,7 @@ export function formatLedgerReason(reason) {
   if (reason.startsWith('shut-the-box:'))             return "Shut Katie's Box";
   if (reason.startsWith('ducky:stake-'))              return 'Ducky Derby bet';
   if (reason.startsWith('ducky:win-'))                return 'Ducky Derby win';
+  if (reason.startsWith('dirty-wordle:'))              return 'Dirty Wordle win';
   if (reason.startsWith('cambs-rage:easy:'))          return 'Streets of Cambs-Rage — Easy win';
   if (reason.startsWith('cambs-rage:medium:'))        return 'Streets of Cambs-Rage — Medium win';
   if (reason.startsWith('cambs-rage:hard:'))          return 'Streets of Cambs-Rage — Good Luck win';
