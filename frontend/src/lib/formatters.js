@@ -12,6 +12,10 @@ export function formatLedgerReason(reason) {
   if (reason.startsWith('shut-the-box:'))             return "Shut Katie's Box";
   if (reason.startsWith('ducky:stake-'))              return 'Ducky Derby bet';
   if (reason.startsWith('ducky:win-'))                return 'Ducky Derby win';
+  if (reason.startsWith('cambs-rage:easy:'))          return 'Streets of Cambs-Rage — Easy win';
+  if (reason.startsWith('cambs-rage:medium:'))        return 'Streets of Cambs-Rage — Medium win';
+  if (reason.startsWith('cambs-rage:hard:'))          return 'Streets of Cambs-Rage — Good Luck win';
+  if (reason.startsWith('cambs-rage:'))               return 'Streets of Cambs-Rage win';
   if (reason.startsWith('order:'))                   return 'Order purchase';
   if (reason.startsWith('admin:'))                   return 'Admin adjustment';
   return reason;

@@ -28,7 +28,7 @@ export default async function cambsRageRoutes(fastify) {
     }
 
     const pts    = PTS[difficulty] ?? PTS.easy;
-    const reason = `cambs-rage:${matchId}`;
+    const reason = `cambs-rage:${difficulty}:${matchId}`;
 
     // Idempotency check — if this matchId was already credited, return silently
     const { rows } = await query(
