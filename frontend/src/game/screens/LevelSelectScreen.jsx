@@ -40,8 +40,8 @@ export const LEVELS = [
     thumb:     null,
   },
   {
-    id:        'coming_soon_1',
-    name:      'COMING SOON',
+    id:        'bar_oh_no',
+    name:      "BAR-OH NO, THEY'RE DEAD",
     available: false,
     thumb:     null,
   },
