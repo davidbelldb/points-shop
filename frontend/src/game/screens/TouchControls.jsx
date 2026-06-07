@@ -326,7 +326,7 @@ function SpecialButton({ inputRef }) {
       label="◈  SPECIAL"
       color="rgba(251,191,36,1)"
       inputRef={inputRef}
-      style={{ width: D * 2 + G, height: 40, fontSize: '0.38rem', letterSpacing: '0.12em', borderRadius: 10 }}
+      style={{ width: D * 2 + G, height: D, fontSize: '0.38rem', letterSpacing: '0.12em', borderRadius: D / 2 }}
     />
   );
 }
