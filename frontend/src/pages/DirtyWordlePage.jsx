@@ -164,6 +164,7 @@ const GHOST_BTN = 'flex-1 inline-flex items-center justify-center rounded-xl bor
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DirtyWordlePage() {
+  const { user }   = useAuth();
   const today      = getTodayDate();
   const target     = getDailyWord();
   const storageKey = `dirty-wordle-${today}`;
@@ -347,7 +348,7 @@ export default function DirtyWordlePage() {
             ) : (
               <>
                 <h2 className="text-xl font-bold tracking-tight text-neutral-800 dark:text-white">
-                  Better luck tomorrow
+                  Sad times, {user?.name ?? 'you'}
                 </h2>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
                   The word was{' '}
