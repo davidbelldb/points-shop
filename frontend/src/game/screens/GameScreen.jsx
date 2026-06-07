@@ -324,7 +324,10 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
         gpad1.poll();
         gpad2?.poll();
 
-        if (pausedRef.current || matchDone) return;
+        if (pausedRef.current) return;
+        // After match ends, keep updating entities until slow-mo finishes
+        // so the finishing-blow animation plays at reduced speed.
+        if (matchDone && slowMoRef.current <= 0) return;
 
         // Slow-motion: scale dt when a KO just landed
         let adt = dt;  // adjusted delta time
