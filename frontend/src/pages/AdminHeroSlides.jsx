@@ -25,6 +25,25 @@ export default function AdminHeroSlides({ bare = false }) {
   }
   useEffect(() => { load(); }, []);
 
+  // Move a slide up or down within its placement group, then save new sort_orders.
+  async function move(slide, direction) {
+    const group = slides.filter(s => s.placement === slide.placement);
+    const idx = group.findIndex(s => s.id === slide.id);
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= group.length) return;
+
+    // Swap in the group array
+    const reordered = [...group];
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+
+    // Persist new sort_orders only for the two swapped slides
+    await Promise.all([
+      api.admin.updateHeroSlide(reordered[idx].id,    { sort_order: idx }),
+      api.admin.updateHeroSlide(reordered[swapIdx].id, { sort_order: swapIdx }),
+    ]);
+    await load();
+  }
+
   const body = (
     <>
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -33,7 +52,21 @@ export default function AdminHeroSlides({ bare = false }) {
       ) : (
         <>
           <ul className="space-y-2">
-            {slides.map((s) => <SlideRow key={s.id} slide={s} onChanged={load} />)}
+            {slides.map((s) => {
+              const group = slides.filter(g => g.placement === s.placement);
+              const idx   = group.findIndex(g => g.id === s.id);
+              return (
+                <SlideRow
+                  key={s.id}
+                  slide={s}
+                  onChanged={load}
+                  canMoveUp={idx > 0}
+                  canMoveDown={idx < group.length - 1}
+                  onMoveUp={() => move(s, -1)}
+                  onMoveDown={() => move(s, 1)}
+                />
+              );
+            })}
           </ul>
           <NewSlideForm onCreated={load} />
         </>
@@ -50,26 +83,49 @@ export default function AdminHeroSlides({ bare = false }) {
   );
 }
 
-function SlideRow({ slide, onChanged }) {
+function SlideRow({ slide, onChanged, canMoveUp, canMoveDown, onMoveUp, onMoveDown }) {
   const [open, setOpen] = useState(false);
   return (
     <li className="rounded-xl border border-neutral-200 bg-white">
-      <button onClick={() => setOpen((o) => !o)} className="flex w-full gap-3 p-3 text-left">
-        <div className="aspect-[16/7] w-32 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
-          <img src={slide.image_url} alt="" className="h-full w-full object-cover" />
+      <div className="flex w-full gap-3 p-3">
+        {/* Reorder buttons */}
+        <div className="flex shrink-0 flex-col justify-center gap-0.5">
+          <button
+            onClick={onMoveUp}
+            disabled={!canMoveUp}
+            title="Move up"
+            className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-20 disabled:cursor-default"
+          >
+            \u25b2
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={!canMoveDown}
+            title="Move down"
+            className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-20 disabled:cursor-default"
+          >
+            \u25bc
+          </button>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            {slide.title || <span className="text-neutral-400">(no title)</span>}
-            <span className="ml-2 text-xs font-normal text-neutral-400">[{slide.placement}]</span>
-            {!slide.is_active && <span className="ml-2 text-xs font-normal text-neutral-400">(hidden)</span>}
-          </p>
-          {slide.code && <p className="font-mono text-xs text-amber-700">{slide.code}</p>}
-          {slide.subtitle && <p className="truncate text-xs text-neutral-500">{slide.subtitle}</p>}
-          {slide.link_url && <p className="truncate font-mono text-xs text-neutral-500">{slide.link_url}</p>}
-        </div>
-        <span className="self-center text-neutral-400">{open ? '\u2212' : '+'}</span>
-      </button>
+
+        {/* Thumbnail + info \u2014 clicking toggles editor */}
+        <button onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 gap-3 text-left">
+          <div className="aspect-[16/7] w-32 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
+            <img src={slide.image_url} alt="" className="h-full w-full object-cover" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">
+              {slide.title || <span className="text-neutral-400">(no title)</span>}
+              <span className="ml-2 text-xs font-normal text-neutral-400">[{slide.placement}]</span>
+              {!slide.is_active && <span className="ml-2 text-xs font-normal text-neutral-400">(hidden)</span>}
+            </p>
+            {slide.code && <p className="font-mono text-xs text-amber-700">{slide.code}</p>}
+            {slide.subtitle && <p className="truncate text-xs text-neutral-500">{slide.subtitle}</p>}
+            {slide.link_url && <p className="truncate font-mono text-xs text-neutral-500">{slide.link_url}</p>}
+          </div>
+          <span className="self-center text-neutral-400">{open ? '\u2212' : '+'}</span>
+        </button>
+      </div>
       {open && <SlideEditor slide={slide} onChanged={onChanged} />}
     </li>
   );
