@@ -65,11 +65,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
-      {/* Persistent sidebar — tablet & desktop only */}
-      <SideNav />
+      {/* Persistent sidebar — hidden on the full-screen game route so it
+          doesn't appear when rotating to landscape on iPhone */}
+      {!isFullGame && <SideNav />}
 
-      {/* All page content shifts right by sidebar width on md+ */}
-      <div className={`md:pl-56${isFullGame ? ' flex flex-col h-screen' : ''}`}>
+      {/* All page content shifts right by sidebar width on md+
+          (not on the game route — no sidebar there) */}
+      <div className={isFullGame ? 'flex flex-col h-screen' : 'md:pl-56'}>
       {user?.impersonating && (
         <div className="bg-amber-100 border-b border-amber-200">
           <div className="mx-auto flex w-full items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900 lg:px-6">
@@ -187,7 +189,7 @@ export default function App() {
         </div>
       )}
       {showFloater && <SurveyBanner />}
-      <main className={isFullGame ? 'flex-1 min-h-0 w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'w-full pb-24 lg:px-8'}`}>
+      <main className={isFullGame ? 'flex-1 min-h-0 flex flex-col w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'w-full pb-24 lg:px-8'}`}>
         <Outlet />
       </main>
       </div>{/* end md:pl-56 wrapper */}

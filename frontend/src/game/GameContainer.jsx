@@ -197,16 +197,42 @@ export default function GameContainer() {
   const audioRef   = useRef(null);
   if (!audioRef.current) audioRef.current = new AudioManager();
 
-  // Responsive scaling — recalculates on resize AND fullscreen change
+  // Responsive scaling — uses ResizeObserver for accuracy on iOS where
+  // getBoundingClientRect can return 0 before layout settles.
   useEffect(() => {
-    const updateScale = () => {
+    const calc = (w, h) => {
+      if (w > 0 && h > 0) setScale(Math.min(w / CANVAS_WIDTH, h / CANVAS_HEIGHT));
+    };
+
+    // ResizeObserver fires whenever the wrapper's actual paint size changes
+    // (orientation flip, keyboard open, fullscreen enter/exit, etc.)
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        calc(e.contentRect.width, e.contentRect.height);
+      }
+    });
+    if (wrapperRef.current) ro.observe(wrapperRef.current);
+
+    // Fallback: window resize (catches cases where the observer hasn't fired yet)
+    const onResize = () => {
       if (!wrapperRef.current) return;
       const { width, height } = wrapperRef.current.getBoundingClientRect();
-      setScale(Math.min(width / CANVAS_WIDTH, height / CANVAS_HEIGHT));
+      // If element reports 0 (layout not settled), use visualViewport
+      const vw = width  || window.visualViewport?.width  || window.innerWidth;
+      const vh = height || window.visualViewport?.height || window.innerHeight;
+      calc(vw, vh);
     };
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+
+    // Initial calculation — defer one frame to let iOS finish layout
+    requestAnimationFrame(onResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
+    };
   }, []);
 
   // Track fullscreen state changes
@@ -312,40 +338,39 @@ export default function GameContainer() {
   return (
     <div
       ref={wrapperRef}
-      className="w-full h-full bg-black flex items-center justify-center"
-      style={{ minHeight: 0, position: 'relative' }}
+      className="w-full flex-1 min-h-0 bg-black flex items-center justify-center"
+      style={{ position: 'relative' }}
     >
-      {/* Fullscreen toggle
-          position:fixed keeps it outside any transform stacking context,
-          which is what causes taps to silently fail on iOS Safari when
-          a sibling element uses CSS transform: scale(). */}
-      <button
-        onClick={toggleFullscreen}
-        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        style={{
-          position:    'fixed',
-          top:         10,
-          right:       10,
-          zIndex:      9999,
-          /* Minimum 44×44 tap target (Apple HIG) */
-          minWidth:    44,
-          minHeight:   44,
-          display:     'flex',
-          alignItems:  'center',
-          justifyContent: 'center',
-          background:  'rgba(0,0,0,0.50)',
-          border:      '1px solid rgba(255,255,255,0.25)',
-          borderRadius: 6,
-          cursor:      'pointer',
-          color:       'rgba(255,255,255,0.80)',
-          lineHeight:  0,
-          /* Removes 300ms tap delay and double-tap zoom on iOS */
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
-      </button>
+      {/* Fullscreen toggle — hidden on iOS PWA (already fullscreen, button
+          can't do anything useful there). position:absolute keeps it inside
+          the game wrapper so it never overlaps the app header. */}
+      {!(isIOS() && (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches)) && (
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          style={{
+            position:    'absolute',
+            top:         8,
+            right:       8,
+            zIndex:      500,
+            minWidth:    44,
+            minHeight:   44,
+            display:     'flex',
+            alignItems:  'center',
+            justifyContent: 'center',
+            background:  'rgba(0,0,0,0.50)',
+            border:      '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 6,
+            cursor:      'pointer',
+            color:       'rgba(255,255,255,0.80)',
+            lineHeight:  0,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+        </button>
+      )}
 
       {/* iOS "Add to Home Screen" hint */}
       {iosHint && (
