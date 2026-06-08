@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
@@ -22,6 +22,24 @@ const GIF_PAGE_LIMIT = 20;
 function isGifUrl(body) {
   return typeof body === 'string' && /^https?:\/\/media\d*\.giphy\.com\/.+\.gif(\?.*)?$/.test(body);
 }
+
+// Detect audio voice notes.
+function isAudioUrl(body) {
+  return typeof body === 'string' && /^https?:\/\/.+\.(mp3|ogg|webm|m4a|wav|aac|opus)(\?.*)?$/i.test(body);
+}
+
+// Detect uploaded photos (non-Giphy image URLs).
+function isUploadedPhoto(body) {
+  return typeof body === 'string'
+    && /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|heic|avif)(\?.*)?$/i.test(body)
+    && !isGifUrl(body);
+}
+
+// Map stored reaction key → display emoji.
+const REACTION_MAP = { heart: '💜' };
+function reactionEmoji(r) { return r ? (REACTION_MAP[r] ?? r) : null; }
+
+const EMOJI_REACTIONS = ['😂', '💜', '🍆', '😬', '😱'];
 
 // ---------------------------------------------------------------------------
 // GIF Picker modal
@@ -277,31 +295,39 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onToggleHeart, onOpenStory, onSwipeReply }) {
-  const tapTimer = useRef(null);
-  const swipeRef = useRef(null);
-  const [draft, setDraft] = useState(m.body);
-  const [dragX, setDragX] = useState(0);
-  const [armed, setArmed] = useState(false);
+function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onSetReaction, onOpenStory, onSwipeReply }) {
+  const tapTimer  = useRef(null);
+  const holdTimer = useRef(null);
+  const swipeRef  = useRef(null);
+  const [draft, setDraft]           = useState(m.body);
+  const [dragX, setDragX]           = useState(0);
+  const [armed, setArmed]           = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => { if (isEditing) setDraft(m.body); }, [isEditing, m.body]);
-  useEffect(() => () => { if (tapTimer.current) clearTimeout(tapTimer.current); }, []);
+  useEffect(() => () => {
+    if (tapTimer.current)  clearTimeout(tapTimer.current);
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+  }, []);
+
+  function cancelHold() {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+  }
 
   function handleClick(e) {
     if (isEditing) return;
     if (e.target.closest('[data-bubble-action]')) return;
-    if (swipeRef.current?.suppressClick) {
-      swipeRef.current.suppressClick = false;
-      return;
-    }
+    if (swipeRef.current?.suppressClick) { swipeRef.current.suppressClick = false; return; }
+    if (showPicker) { setShowPicker(false); return; }
     if (tapTimer.current) {
       clearTimeout(tapTimer.current);
       tapTimer.current = null;
-      onToggleHeart();
+      // double-tap: no-op now (reactions via long-press)
     } else {
       tapTimer.current = setTimeout(() => {
         tapTimer.current = null;
-        if (mine && !isGifUrl(m.body)) onStartEdit();
+        const isMedia = isGifUrl(m.body) || isUploadedPhoto(m.body);
+        if (mine && !isMedia) onStartEdit();
       }, DOUBLE_TAP_MS);
     }
   }
@@ -309,14 +335,16 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
   function onPointerDown(e) {
     if (isEditing) return;
     if (e.target.closest('[data-bubble-action]')) return;
-    swipeRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      tracking: true,
-      decided: false,
-      suppressClick: false,
-      pointerId: e.pointerId,
-    };
+    swipeRef.current = { startX: e.clientX, startY: e.clientY, tracking: true, decided: false, suppressClick: false, pointerId: e.pointerId };
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      if (swipeRef.current && !swipeRef.current.decided) {
+        swipeRef.current.suppressClick = true;
+        if (tapTimer.current) { clearTimeout(tapTimer.current); tapTimer.current = null; }
+        setShowPicker(true);
+        try { navigator.vibrate?.(30); } catch { /* noop */ }
+      }
+    }, 500);
   }
   function onPointerMove(e) {
     const s = swipeRef.current;
@@ -325,11 +353,8 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     const dy = e.clientY - s.startY;
     if (!s.decided) {
       if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      if (Math.abs(dy) > Math.abs(dx)) {
-        s.tracking = false;
-        setDragX(0);
-        return;
-      }
+      cancelHold();
+      if (Math.abs(dy) > Math.abs(dx)) { s.tracking = false; setDragX(0); return; }
       s.decided = true;
       try { e.currentTarget.setPointerCapture?.(s.pointerId); } catch { /* noop */ }
     }
@@ -338,24 +363,19 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     setArmed(clamped >= SWIPE_TRIGGER);
   }
   function onPointerUp() {
+    cancelHold();
     const s = swipeRef.current;
     if (!s) return;
-    if (s.decided) {
-      s.suppressClick = true;
-      if (armed) onSwipeReply?.(m);
-    }
-    setDragX(0);
-    setArmed(false);
-    s.tracking = false;
-    s.decided = false;
+    if (s.decided) { s.suppressClick = true; if (armed) onSwipeReply?.(m); }
+    setDragX(0); setArmed(false); s.tracking = false; s.decided = false;
   }
 
-  const tone = mine
-    ? 'rounded-br-sm bg-amber-100 text-amber-900'
-    : 'rounded-bl-sm bg-pink-100 text-pink-900';
-
-  // GIF messages — render inline image, no edit mode.
-  const bodyIsGif = isGifUrl(m.body);
+  const tone = mine ? 'rounded-br-sm bg-amber-100 text-amber-900' : 'rounded-bl-sm bg-pink-100 text-pink-900';
+  const bodyIsGif   = isGifUrl(m.body);
+  const bodyIsPhoto = isUploadedPhoto(m.body);
+  const bodyIsAudio = isAudioUrl(m.body);
+  const bodyIsMedia = bodyIsGif || bodyIsPhoto || bodyIsAudio;
+  const rxEmoji     = reactionEmoji(m.reaction);
 
   return (
     <div
@@ -364,56 +384,68 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      style={{
-        transform: dragX ? `translateX(${dragX}px)` : undefined,
-        transition: dragX ? 'none' : 'transform 0.22s ease-out',
-        touchAction: 'pan-y',
-      }}
-      className={`group relative max-w-[78%] cursor-pointer select-none ${bodyIsGif ? 'overflow-hidden rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? 'none' : 'transform 0.22s ease-out', touchAction: 'pan-y' }}
+      className={`group relative max-w-[78%] cursor-pointer select-none ${bodyIsMedia ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
     >
+      {/* Emoji picker — floats above bubble on long-press */}
+      {showPicker && (
+        <div
+          data-bubble-action
+          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full bg-white shadow-xl border border-neutral-100 px-2 py-1.5"
+          style={{ whiteSpace: 'nowrap' }}
+        >
+          {EMOJI_REACTIONS.map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              data-bubble-action
+              onClick={(e) => { e.stopPropagation(); onSetReaction(m.reaction === emoji ? null : emoji); setShowPicker(false); }}
+              className="text-xl leading-none px-1.5 py-0.5 rounded-full transition-transform hover:scale-125 active:scale-110"
+              style={{ background: m.reaction === emoji ? '#f3f4f6' : 'transparent', transform: m.reaction === emoji ? 'scale(1.2)' : undefined }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Swipe reply arrow */}
       <span
         aria-hidden="true"
-        style={{
-          opacity: Math.min(1, dragX / SWIPE_TRIGGER),
-          transform: `translate(-${SWIPE_TRIGGER * 0.75}px, -50%) scale(${armed ? 1.15 : 1})`,
-        }}
+        style={{ opacity: Math.min(1, dragX / SWIPE_TRIGGER), transform: `translate(-${SWIPE_TRIGGER * 0.75}px, -50%) scale(${armed ? 1.15 : 1})` }}
         className={`pointer-events-none absolute top-1/2 ${mine ? 'right-full mr-2' : 'left-0 ml-[-3px]'} flex h-7 w-7 items-center justify-center rounded-full ${armed ? 'bg-amber-500 text-white' : 'bg-white text-amber-700 shadow ring-1 ring-amber-200'}`}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9 17 4 12 9 7" />
-          <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+          <polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" />
         </svg>
       </span>
 
       {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
 
-      {bodyIsGif ? (
-        /* GIF bubble — frameless image with time overlay */
-        <div className="relative">
-          <img
-            src={m.body}
-            alt="GIF"
-            className="block max-w-[220px] rounded-2xl"
-            loading="lazy"
-          />
-          <p className="absolute bottom-1 right-2 text-[10px] text-white/80 drop-shadow">
-            {timeLabel(m.created_at)}
-          </p>
+      {bodyIsMedia ? (
+        /* Photo / GIF / Audio bubble */
+        <div className={`relative ${bodyIsAudio ? `rounded-2xl px-0 py-0 ${tone}` : 'overflow-hidden rounded-2xl'}`}>
+          {bodyIsAudio ? (
+            <AudioPlayer src={m.body} mine={mine} />
+          ) : (
+            <img src={m.body} alt={bodyIsGif ? 'GIF' : 'Photo'} className="block max-w-[220px]" loading="lazy" />
+          )}
+          {!bodyIsAudio && (
+            <p className="absolute bottom-1 right-2 text-[10px] text-white/80 drop-shadow">{timeLabel(m.created_at)}</p>
+          )}
           {mine && (
             <button
               data-bubble-action
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-black/30 text-white group-hover:flex"
+              className={`absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full text-white group-hover:flex ${bodyIsAudio ? 'bg-amber-900/30' : 'bg-black/30'}`}
               aria-label="Delete"
-            >
-              {'×'}
-            </button>
+            >×</button>
           )}
-          {m.reaction === 'heart' && (
+          {rxEmoji && (
             <span className={`pointer-events-none absolute -bottom-2 z-10 ${mine ? 'left-1' : 'right-1'} text-base leading-none`} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}>
-              {'💜'}
+              {rxEmoji}
             </span>
           )}
         </div>
@@ -422,27 +454,13 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            autoFocus
-            rows={2}
+            autoFocus rows={2}
             className="block w-full resize-none rounded-md border border-amber-200 bg-white/70 px-2 py-1 text-sm text-neutral-900 focus:outline-none"
             onClick={(e) => e.stopPropagation()}
           />
           <div className="flex justify-end gap-2 text-xs font-semibold">
-            <button
-              data-bubble-action
-              onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
-              className="rounded-md px-2 py-1 text-neutral-600 hover:bg-white/40"
-            >
-              Cancel
-            </button>
-            <button
-              data-bubble-action
-              disabled={!draft.trim() || draft === m.body}
-              onClick={(e) => { e.stopPropagation(); onSaveEdit(draft); }}
-              className="rounded-md bg-amber-600 px-2 py-1 text-amber-900 disabled:opacity-40"
-            >
-              Save
-            </button>
+            <button data-bubble-action onClick={(e) => { e.stopPropagation(); onCancelEdit(); }} className="rounded-md px-2 py-1 text-neutral-600 hover:bg-white/40">Cancel</button>
+            <button data-bubble-action disabled={!draft.trim() || draft === m.body} onClick={(e) => { e.stopPropagation(); onSaveEdit(draft); }} className="rounded-md bg-amber-600 px-2 py-1 text-amber-900 disabled:opacity-40">Save</button>
           </div>
         </div>
       ) : (
@@ -458,17 +476,11 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-white/40 text-amber-900 group-hover:flex"
               aria-label="Delete"
-            >
-              {'×'}
-            </button>
+            >×</button>
           )}
-          {m.reaction === 'heart' && (
-            <span
-              className={`pointer-events-none absolute -bottom-2 z-10 ${mine ? 'left-1' : 'right-1'} text-base leading-none`}
-              style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
-              aria-label="Purple heart reaction"
-            >
-              {'💜'}
+          {rxEmoji && (
+            <span className={`pointer-events-none absolute -bottom-2 z-10 ${mine ? 'left-1' : 'right-1'} text-base leading-none`} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}>
+              {rxEmoji}
             </span>
           )}
         </>
@@ -498,6 +510,145 @@ function GifButton({ onClick }) {
   );
 }
 
+function PhotoButton({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Send a photo"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
+    >
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="13" r="4" />
+      </svg>
+    </button>
+  );
+}
+
+function MicButton({ recording, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={recording ? 'Stop recording' : 'Record voice note'}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition active:scale-95 ${
+        recording
+          ? 'border-red-300 bg-red-50 text-red-500 animate-pulse'
+          : 'border-neutral-200 bg-white text-neutral-500 hover:border-amber-300 hover:text-amber-700'
+      }`}
+    >
+      {recording ? (
+        /* Stop square */
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+        </svg>
+      ) : (
+        /* Microphone */
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+          <line x1="8" y1="22" x2="16" y2="22" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// Inline audio player for voice note bubbles — mirrors AudioNotesSection style, scaled for chat.
+const WAVEFORM_BARS = Array.from({ length: 28 }, (_, i) =>
+  3 + Math.round((Math.abs(Math.sin(i * 1.7)) * 0.7 + Math.abs(Math.sin(i * 0.5)) * 0.3) * 12),
+);
+
+function fmtAudio(s) {
+  const v = Number.isFinite(s) && s > 0 ? s : 0;
+  return `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}`;
+}
+
+function AudioPlayer({ src, mine }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [cur, setCur]         = useState(0);
+  const [dur, setDur]         = useState(0);
+
+  function toggle() {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) {
+      document.querySelectorAll('audio').forEach(el => { if (el !== a) el.pause(); });
+      a.play().catch(() => {});
+    } else { a.pause(); }
+  }
+
+  function seek(e) {
+    const a = audioRef.current;
+    if (!a || !dur) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    a.currentTime = frac * dur;
+    setCur(a.currentTime);
+  }
+
+  const progress   = dur > 0 ? cur / dur : 0;
+  // mine = amber bubble → amber button, pink fill; theirs = pink bubble → pink button, teal fill
+  const btnBg      = mine ? '#f59e0b' : '#ed70bd';
+  const barFill    = mine ? '#ed70bd' : '#61dbbb';
+  const barEmpty   = mine ? '#fde68a' : '#fbcfe8';
+  const timeColor  = mine ? '#92400e' : '#9d174d';
+
+  return (
+    <div className="flex items-center gap-2.5 px-3 py-2.5 min-w-[210px]">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => { setPlaying(false); setCur(0); }}
+        onTimeUpdate={e => setCur(e.currentTarget.currentTime)}
+        onLoadedMetadata={e => setDur(e.currentTarget.duration || 0)}
+      />
+      <button
+        data-bubble-action
+        onClick={e => { e.stopPropagation(); toggle(); }}
+        style={{ background: btnBg }}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition active:scale-95"
+        aria-label={playing ? 'Pause' : 'Play'}
+      >
+        {playing ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/>
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        )}
+      </button>
+      <div className="min-w-0 flex-1">
+        {/* Clickable waveform */}
+        <div
+          data-bubble-action
+          className="flex h-7 cursor-pointer items-center gap-[2px]"
+          onClick={e => { e.stopPropagation(); seek(e); }}
+        >
+          {WAVEFORM_BARS.map((h, i) => (
+            <span
+              key={i}
+              className="flex-1 rounded-full"
+              style={{ height: h, background: i / WAVEFORM_BARS.length <= progress ? barFill : barEmpty }}
+            />
+          ))}
+        </div>
+        <p className="mt-0.5 text-[10px] font-medium" style={{ color: timeColor }}>
+          {fmtAudio(playing || cur > 0 ? cur : dur)}{dur > 0 ? ` / ${fmtAudio(dur)}` : ''}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -508,13 +659,17 @@ export default function MessagesPage() {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId]   = useState(null);
   const [viewerStory, setViewerStory] = useState(null);
-  const [replyTo, setReplyTo] = useState(null);
-  const [gifOpen, setGifOpen] = useState(false);
-  const inputRef = useRef(null);
-  const bottomRef = useRef(null);
-  const lastCountRef = useRef(0);
+  const [replyTo, setReplyTo]       = useState(null);
+  const [gifOpen, setGifOpen]       = useState(false);
+  const [recording, setRecording]   = useState(false);
+  const recorderRef = useRef(null);
+  const recChunksRef = useRef([]);
+  const inputRef      = useRef(null);
+  const photoInputRef = useRef(null);
+  const bottomRef     = useRef(null);
+  const lastCountRef  = useRef(0);
 
   async function openStoryById(storyId) {
     if (!storyId) return;
@@ -571,6 +726,56 @@ export default function MessagesPage() {
     }
   }
 
+  async function toggleRecording() {
+    if (recording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        setRecording(false);
+        const blob = new Blob(recChunksRef.current, { type: mimeType });
+        const ext  = mimeType.includes('webm') ? 'webm' : 'm4a';
+        const file = new File([blob], `voice-note.${ext}`, { type: mimeType });
+        setBusy(true); setError(null);
+        try {
+          const { url } = await api.upload(file);
+          await api.sendMessage(url, null, replyTo?.id ?? null);
+          setReplyTo(null);
+          await refresh(false);
+          await refreshBasket();
+        } catch (err) { setError(err.message); }
+        finally { setBusy(false); }
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setRecording(true);
+    } catch (err) {
+      setError('Microphone access denied.');
+    }
+  }
+
+  async function sendPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setBusy(true); setError(null);
+    try {
+      const { url } = await api.upload(file);
+      await api.sendMessage(url, null, replyTo?.id ?? null);
+      setReplyTo(null);
+      await refresh(false);
+      await refreshBasket();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+
   async function sendGif(gifUrl) {
     setGifOpen(false);
     setBusy(true);
@@ -610,19 +815,13 @@ export default function MessagesPage() {
     } catch (e) { setError(e.message); }
   }
 
-  async function toggleHeart(id) {
-    const current = data.messages.find((x) => x.id === id);
-    if (!current) return;
-    const next = current.reaction === 'heart' ? null : 'heart';
+  async function setReaction(id, emoji) {
     setData((prev) => ({
       ...prev,
-      messages: prev.messages.map((m) => (m.id === id ? { ...m, reaction: next } : m)),
+      messages: prev.messages.map((m) => (m.id === id ? { ...m, reaction: emoji } : m)),
     }));
-    try { await api.setMessageReaction(id, next); }
-    catch (e) {
-      setError(e.message);
-      await refresh(false);
-    }
+    try { await api.setMessageReaction(id, emoji); }
+    catch (e) { setError(e.message); await refresh(false); }
   }
 
   let lastDay = null;
@@ -678,7 +877,7 @@ export default function MessagesPage() {
                       onCancelEdit={() => setEditingId(null)}
                       onSaveEdit={(body) => saveEdit(m.id, body)}
                       onDelete={() => remove(m.id)}
-                      onToggleHeart={() => toggleHeart(m.id)}
+                      onSetReaction={(emoji) => setReaction(m.id, emoji)}
                       onSwipeReply={handleSwipeReply}
                     />
                   </div>
@@ -720,6 +919,9 @@ export default function MessagesPage() {
           )}
           <form onSubmit={send} className="flex items-stretch gap-2 py-3">
             <GifButton onClick={() => setGifOpen(true)} />
+            <PhotoButton onClick={() => photoInputRef.current?.click()} />
+            <MicButton recording={recording} onClick={toggleRecording} />
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={sendPhoto} />
             <input
               ref={inputRef}
               type="text"
