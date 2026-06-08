@@ -601,10 +601,10 @@ function AudioPlayer({ src, mine }) {
   }
 
   const progress   = dur > 0 ? cur / dur : 0;
-  // Both sides: pink play button. Bar fill differs so you can tell whose is whose.
-  const btnBg      = '#ed70bd';
+  // Both sides: teal play button. Bar fill differs so you can tell whose is whose.
+  const btnBg      = '#61dbbb';
   const barFill    = mine ? '#ed70bd' : '#61dbbb';
-  const barEmpty   = mine ? '#fce7f3' : '#fbcfe8';
+  const barEmpty   = mine ? '#fce7f3' : '#d1faf0';
   const timeColor  = '#ffffff';
 
   return (
@@ -965,17 +965,17 @@ export default function MessagesPage() {
               {recording ? (
                 /* ── State 1: actively recording ── */
                 <div className="flex items-center gap-3">
-                  <span className={`h-3 w-3 rounded-full shrink-0 transition-colors ${recPaused ? 'bg-neutral-300' : 'bg-pink-500 animate-pulse'}`} />
-                  <span className="w-10 text-sm font-semibold tabular-nums text-pink-600">
+                  <span className={`h-3 w-3 rounded-full shrink-0 transition-colors ${recPaused ? 'bg-neutral-300' : 'bg-[#61dbbb] animate-pulse'}`} />
+                  <span className="w-10 text-sm font-semibold tabular-nums text-black dark:text-white">
                     {`${Math.floor(recSecs / 60)}:${String(recSecs % 60).padStart(2, '0')}`}
                   </span>
                   <span className="flex-1 text-xs text-neutral-400">{recPaused ? 'Paused' : 'Recording…'}</span>
-                  {/* Pause / Resume */}
+                  {/* Pause / Resume — solid teal, no border */}
                   <button
                     type="button"
                     onClick={togglePause}
                     aria-label={recPaused ? 'Resume' : 'Pause'}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-pink-200 bg-pink-50 text-pink-500 transition active:scale-95"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#61dbbb] text-[#0d3d2e] transition active:scale-95"
                   >
                     {recPaused ? (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -983,12 +983,12 @@ export default function MessagesPage() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>
                     )}
                   </button>
-                  {/* Stop → move to review */}
+                  {/* Stop → move to review — solid teal, no border */}
                   <button
                     type="button"
                     onClick={stopRecording}
                     aria-label="Stop recording"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-pink-300 bg-pink-50 text-pink-500 transition active:scale-95"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#61dbbb] text-[#0d3d2e] transition active:scale-95"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
                   </button>
@@ -1009,7 +1009,7 @@ export default function MessagesPage() {
                       type="button"
                       onClick={sendVoiceNote}
                       disabled={busy}
-                      className="flex-1 rounded-xl bg-pink-500 py-2 text-sm font-semibold text-white transition active:scale-95 disabled:opacity-40"
+                      className="flex-1 rounded-xl bg-[#61dbbb] py-2 text-sm font-semibold text-[#0d3d2e] transition active:scale-95 disabled:opacity-40"
                     >
                       Send
                     </button>
