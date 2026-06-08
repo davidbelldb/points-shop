@@ -116,6 +116,19 @@ export async function setReaction(messageId, accountId, reaction) {
   return updated;
 }
 
+// Detect the type of a chat message body so we can write a meaningful
+// push notification. Mirrors the frontend isAudioUrl / isUploadedPhoto logic.
+function classifyMessage(body) {
+  if (typeof body !== 'string') return 'message';
+  const isMedia = body.startsWith('/media/') || /^https?:\/\//.test(body);
+  if (!isMedia) return 'message';
+  const lower = body.split('?')[0].toLowerCase();
+  if (/\.(mp3|ogg|webm|m4a|wav|aac|opus)$/.test(lower)) return 'voice note';
+  if (/\.gif$/.test(lower)) return 'GIF';
+  if (/\.(jpg|jpeg|png|webp|heic|heif|avif)$/.test(lower)) return 'photo';
+  return 'message';
+}
+
 export async function sendMessage(senderId, recipientId, body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) {
   const trimmed = body.trim();
   if (!trimmed) {
@@ -142,14 +155,22 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
 
   const senderRes = await query(`SELECT name FROM accounts WHERE id = $1`, [senderId]);
   const senderName = senderRes.rows[0]?.name ?? 'Someone';
-  const preview = trimmed.length > 100 ? trimmed.slice(0, 97) + '...' : trimmed;
+
+  const type = classifyMessage(trimmed);
+  const title = `${senderName} sent you a sneaky ${type}`;
+  // For media messages the body is a URL — show a friendly placeholder instead.
+  const preview = type === 'message'
+    ? (trimmed.length > 100 ? trimmed.slice(0, 97) + '...' : trimmed)
+    : type === 'voice note' ? '🎙️ Voice note'
+    : type === 'GIF'        ? '🎞️ GIF'
+    :                         '📷 Photo';
 
   await query(
     `INSERT INTO notifications (account_id, type, title, body, link_url)
      VALUES ($1, 'message', $2, $3, '/messages')`,
-    [recipientId, `New message from ${senderName}`, preview],
+    [recipientId, title, preview],
   );
-  sendPush(recipientId, { title: `New message from ${senderName}`, body: preview, url: '/messages' });
+  sendPush(recipientId, { title, body: preview, url: '/messages' });
 
   return rows[0];
 }
