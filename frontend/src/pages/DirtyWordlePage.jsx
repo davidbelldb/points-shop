@@ -267,7 +267,19 @@ function LeaderboardModal({ onClose, today }) {
                         className="grid grid-cols-4 px-3 py-2.5 text-sm items-center"
                         style={{ background: rowBg, borderTop: `1px solid ${rowBorder}` }}
                       >
-                        <span className="font-semibold" style={{ color: textPri }}>{player.name}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="block h-7 w-7 shrink-0 overflow-hidden rounded-full"
+                            style={{ border: `2px solid ${cardBorder}` }}>
+                            {player.photo_url
+                              ? <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
+                              : <span className="flex h-full w-full items-center justify-center text-[10px] font-bold"
+                                  style={{ background: cardBorder, color: textPri }}>
+                                  {player.name?.[0]}
+                                </span>
+                            }
+                          </span>
+                          <span className="truncate font-semibold" style={{ color: textPri }}>{player.name}</span>
+                        </div>
                         <span className="text-center font-bold" style={{ color: '#61dbbb' }}>{player.wins}</span>
                         <span className="text-center" style={{ color: textSec }}>{player.avg_guesses}</span>
                         <span className="text-center" style={{ color: textSec }}>{player.total_pts}</span>
