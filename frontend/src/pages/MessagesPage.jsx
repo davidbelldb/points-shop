@@ -1061,7 +1061,6 @@ export default function MessagesPage() {
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
-                  <span className="text-xs text-neutral-400 ml-1">GIF · Photo · Voice</span>
                 </div>
               )}
             </div>
