@@ -1015,7 +1015,7 @@ export default function MessagesPage() {
                     type="button"
                     onClick={togglePause}
                     aria-label={recPaused ? 'Resume' : 'Pause'}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#61dbbb] text-[#0d3d2e] transition active:scale-95"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#61dbbb] text-[#0d3d2e] transition active:scale-95"
                   >
                     {recPaused ? (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -1028,7 +1028,7 @@ export default function MessagesPage() {
                     type="button"
                     onClick={stopRecording}
                     aria-label="Stop recording"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#61dbbb] text-[#0d3d2e] transition active:scale-95"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#61dbbb] text-[#0d3d2e] transition active:scale-95"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
                   </button>
