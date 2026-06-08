@@ -29,7 +29,7 @@ function PlayerChip({ tone, label, active, status, score, players }) {
         <p className="truncate text-sm font-semibold">{label}</p>
         <p className="text-[11px] uppercase tracking-wide opacity-70">{status || ' '}</p>
       </div>
-      <span className="rounded-full bg-white/70 px-2 py-0.5 text-sm font-bold">{score}</span>
+      <span className={`rounded-full px-2 py-0.5 text-sm font-bold ${tone === 'me' ? 'bg-teal-400 text-teal-950' : 'bg-pink-400 text-pink-950'}`}>{score}</span>
     </div>
   );
 }
