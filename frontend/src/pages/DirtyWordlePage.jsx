@@ -157,7 +157,7 @@ function Key({ label, state, onPress, isDark }) {
   if (wide) { bg = '#1d4039'; color = '#ffffff'; }
   else if (state === 'correct') { bg = KEY_BG.correct; color = KEY_TEXT.correct; }
   else if (state === 'present') { bg = KEY_BG.present; color = KEY_TEXT.present; }
-  else if (state === 'absent') { bg = isDark ? KEY_BG.absent.dark : KEY_BG.absent.light; color = isDark ? '#fff' : '#525252'; }
+  else if (state === 'absent') { bg = isDark ? KEY_BG.absent.dark : KEY_BG.absent.light; color = '#fff'; }
   else { bg = isDark ? KEY_BG.unused.dark : KEY_BG.unused.light; color = isDark ? '#fff' : '#171717'; }
   return (
     <button
