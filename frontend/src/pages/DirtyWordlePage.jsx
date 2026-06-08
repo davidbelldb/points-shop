@@ -414,7 +414,7 @@ export default function DirtyWordlePage() {
   const { theme }  = useTheme();
   const today      = getTodayDate();
   const target     = getDailyWord();
-  const storageKey = `dirty-wordle-${today}`;
+  const storageKey = `dirty-wordle-${user?.id ?? 'guest'}-${today}`;
 
   const loadSaved = () => {
     try { return JSON.parse(localStorage.getItem(storageKey)) ?? {}; } catch { return {}; }
@@ -439,8 +439,9 @@ export default function DirtyWordlePage() {
       try {
         // 1. Try in-progress guesses first
         const { guesses: serverGuesses } = await api.dirtyWordleProgress(today);
+        // Always apply server state — even empty — to prevent bleed from another user's localStorage.
+        setGuesses(serverGuesses ?? []);
         if (serverGuesses && serverGuesses.length > 0) {
-          setGuesses(serverGuesses);
           // Recompute derived state from loaded guesses
           const lastGuess = serverGuesses[serverGuesses.length - 1];
           const isWon  = lastGuess === target;
@@ -448,6 +449,13 @@ export default function DirtyWordlePage() {
           if (isWon)  setWon(true);
           if (isOver) setGameOver(true);
           if (isOver && !saved.modalAcked) setModalDismissed(false);
+        } else {
+          // No guesses on server → fresh game for this user; clear any stale local state.
+          setGameOver(false);
+          setWon(false);
+          setPtsEarned(null);
+          setModalDismissed(false);
+          setResultSaved(false);
         }
       } catch {
         // Server unreachable — fall back to whatever localStorage had
