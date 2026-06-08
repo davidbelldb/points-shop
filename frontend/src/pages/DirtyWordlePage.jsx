@@ -292,14 +292,21 @@ function LeaderboardModal({ onClose, today }) {
                     const playerColor = player.name === user?.name ? '#61dbbb' : '#ed70bd';
                     // Fixed card height: enough for name + 6-row grid + score line
                     const cardHeight = 280;
+                    // Grid zone: 6 rows × 24px + 5 gaps × 4px = 164px
+                    const gridZoneH = MAX_GUESSES * 24 + (MAX_GUESSES - 1) * 4;
                     return played ? (
                       <div
                         key={player.name}
-                        className="rounded-xl p-3 flex flex-col items-center justify-start gap-2"
+                        className="rounded-xl p-3 flex flex-col items-center justify-between"
                         style={{ background: cardBg, border: `1px solid ${cardBorder}`, height: cardHeight }}
                       >
+                        {/* Top: name */}
                         <p className="text-sm font-bold uppercase tracking-wide" style={{ color: playerColor }}>{player.name}</p>
-                        <ColourGrid grid={played.guess_grid} cellSize={24} />
+                        {/* Middle: fixed-height grid zone so grids always start at same Y */}
+                        <div style={{ height: gridZoneH, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ColourGrid grid={played.guess_grid} cellSize={24} />
+                        </div>
+                        {/* Bottom: score + pts pill */}
                         <div className="text-center space-y-0.5">
                           <p className="text-xs" style={{ color: textSec }}>
                             {played.won ? `${played.guesses_taken}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`}
