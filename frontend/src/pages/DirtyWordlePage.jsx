@@ -182,18 +182,46 @@ const GHOST_BTN = 'flex-1 inline-flex items-center justify-center rounded-xl bor
 // ─── Leaderboard modal ────────────────────────────────────────────────────────
 
 function LeaderboardModal({ onClose, today }) {
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data,     setData]     = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [viewDate, setViewDate] = useState(today);
   const { theme } = useTheme();
   const { user }  = useAuth();
   const dark = theme === 'dark';
 
+  const minDate = useMemo(() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - 6);
+    return d.toISOString().slice(0, 10);
+  }, [today]);
+
+  const isToday = viewDate === today;
+
+  function formatViewDate(dateStr) {
+    const [yyyy, mm, dd] = dateStr.split('-');
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  function formatDayMonth(dateStr) {
+    const [, mm, dd] = dateStr.split('-');
+    return `${dd}/${mm}`;
+  }
+
+  function navigateDate(delta) {
+    const d = new Date(viewDate);
+    d.setDate(d.getDate() + delta);
+    const next = d.toISOString().slice(0, 10);
+    if (next >= minDate && next <= today) setViewDate(next);
+  }
+
   useEffect(() => {
-    api.dirtyWordleLeaderboard(today)
+    setLoading(true);
+    setData(null);
+    api.dirtyWordleLeaderboard(viewDate)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [today]);
+  }, [viewDate]);
 
   const modalBg   = dark ? '#1e1e1c' : '#ffffff';
   const cardBg    = dark ? '#30302e' : '#f5f5f4';
@@ -210,7 +238,7 @@ function LeaderboardModal({ onClose, today }) {
       <div className="w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: modalBg }}>
         {/* Header */}
         <div className="px-5 pt-5 pb-3">
-          <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Leaderboard</h2>
+          <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Dirty Wordle Leaderboard</h2>
         </div>
 
         <div className="px-5 pb-3 space-y-6 max-h-[80vh] overflow-y-auto">
@@ -221,9 +249,23 @@ function LeaderboardModal({ onClose, today }) {
             <>
               {/* ── Today's grids ── */}
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: textSec }}>
-                  Today — {formatUKDate()}
-                </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: textSec }}>
+                    {isToday ? `Today — ${formatViewDate(today)}` : formatViewDate(viewDate)}
+                  </p>
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => navigateDate(-1)} disabled={viewDate <= minDate}
+                      style={{ background: 'none', border: 'none', cursor: viewDate <= minDate ? 'default' : 'pointer',
+                        color: textPri, fontSize: 20, padding: '0 6px', opacity: viewDate <= minDate ? 0.25 : 1 }}>
+                      ‹
+                    </button>
+                    <button onClick={() => navigateDate(1)} disabled={viewDate >= today}
+                      style={{ background: 'none', border: 'none', cursor: viewDate >= today ? 'default' : 'pointer',
+                        color: textPri, fontSize: 20, padding: '0 6px', opacity: viewDate >= today ? 0.25 : 1 }}>
+                      ›
+                    </button>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   {data.allTime.map(player => {
@@ -271,7 +313,10 @@ function LeaderboardModal({ onClose, today }) {
                           {player.name}
                         </p>
                         <p className="text-xs text-center font-semibold uppercase tracking-wide leading-relaxed" style={{ color: textSec }}>
-                          yet to play<br />today
+                          {isToday
+                            ? <>yet to play<br />today</>
+                            : <>didn't play<br />on {formatDayMonth(viewDate)}</>
+                          }
                         </p>
                       </div>
                     );
