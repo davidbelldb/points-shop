@@ -266,17 +266,19 @@ function LeaderboardModal({ onClose, today }) {
                     {getDayLabel(viewDate)}
                   </p>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => navigateDate(-1)} disabled={viewDate <= minDate}
-                      style={{ background: 'none', border: 'none', cursor: viewDate <= minDate ? 'default' : 'pointer',
-                        color: textPri, fontSize: 20, padding: '0 4px', opacity: viewDate <= minDate ? 0.25 : 1 }}>
-                      ‹
-                    </button>
                     <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: textSec }}>
                       {formatViewDate(viewDate)}
                     </p>
+                    <button onClick={() => navigateDate(-1)} disabled={viewDate <= minDate}
+                      style={{ background: 'none', border: 'none', cursor: viewDate <= minDate ? 'default' : 'pointer',
+                        color: textPri, fontSize: 20, lineHeight: 1, padding: '0 4px',
+                        opacity: viewDate <= minDate ? 0.25 : 1, position: 'relative', top: '-1px' }}>
+                      ‹
+                    </button>
                     <button onClick={() => navigateDate(1)} disabled={viewDate >= today}
                       style={{ background: 'none', border: 'none', cursor: viewDate >= today ? 'default' : 'pointer',
-                        color: textPri, fontSize: 20, padding: '0 4px', opacity: viewDate >= today ? 0.25 : 1 }}>
+                        color: textPri, fontSize: 20, lineHeight: 1, padding: '0 4px',
+                        opacity: viewDate >= today ? 0.25 : 1, position: 'relative', top: '-1px' }}>
                       ›
                     </button>
                   </div>
