@@ -605,7 +605,7 @@ function AudioPlayer({ src, mine }) {
   const btnBg      = '#ed70bd';
   const barFill    = mine ? '#ed70bd' : '#61dbbb';
   const barEmpty   = mine ? '#fce7f3' : '#fbcfe8';
-  const timeColor  = mine ? '#9d174d' : '#9d174d';
+  const timeColor  = '#ffffff';
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 min-w-[210px]">
@@ -674,12 +674,16 @@ export default function MessagesPage() {
   const [replyTo, setReplyTo]       = useState(null);
   const [gifOpen, setGifOpen]       = useState(false);
   const [recording, setRecording]   = useState(false);
+  const [recPaused, setRecPaused]   = useState(false);
   const [recSecs, setRecSecs]       = useState(0);
+  const [recBlob, setRecBlob]       = useState(null);
+  const [recBlobUrl, setRecBlobUrl] = useState(null);
   const [showMedia, setShowMedia]   = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const recorderRef  = useRef(null);
   const recChunksRef = useRef([]);
   const recTimerRef  = useRef(null);
+  const recMimeRef   = useRef('');
   const inputRef      = useRef(null);
   const photoInputRef = useRef(null);
   const bottomRef     = useRef(null);
@@ -741,46 +745,81 @@ export default function MessagesPage() {
     }
   }
 
-  async function toggleRecording() {
-    if (recording) {
+  // Stop the ongoing recording; onstop will transition to review state.
+  function stopRecording() {
+    clearInterval(recTimerRef.current);
+    recorderRef.current?.stop();
+  }
+
+  // Pause / resume the ongoing recording, ticking the timer accordingly.
+  function togglePause() {
+    const rec = recorderRef.current;
+    if (!rec) return;
+    if (rec.state === 'recording') {
+      rec.pause();
       clearInterval(recTimerRef.current);
-      recorderRef.current?.stop();
-      return;
+      setRecPaused(true);
+    } else if (rec.state === 'paused') {
+      rec.resume();
+      recTimerRef.current = setInterval(() => setRecSecs(s => s + 1), 1000);
+      setRecPaused(false);
     }
+  }
+
+  async function toggleRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      recMimeRef.current = mimeType;
       const recorder = new MediaRecorder(stream, { mimeType });
       recChunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
         clearInterval(recTimerRef.current);
         setRecording(false);
-        setRecSecs(0);
-        setShowMedia(false);
+        setRecPaused(false);
+        // Build blob + object URL for local playback review; don't send yet.
         const blob = new Blob(recChunksRef.current, { type: mimeType });
-        const ext  = mimeType.includes('webm') ? 'webm' : 'm4a';
-        const file = new File([blob], `voice-note.${ext}`, { type: mimeType });
-        setBusy(true); setError(null);
-        try {
-          const { url } = await api.upload(file);
-          await api.sendMessage(url, null, replyTo?.id ?? null);
-          setReplyTo(null);
-          await refresh(false);
-          await refreshBasket();
-        } catch (err) { setError(err.message); }
-        finally { setBusy(false); }
+        setRecBlob(blob);
+        setRecBlobUrl(URL.createObjectURL(blob));
+        // showMedia stays true → review state
       };
       recorder.start();
       recorderRef.current = recorder;
       setRecSecs(0);
       setRecording(true);
-      setShowMedia(true); // keep tray open to show recording UI
+      setRecPaused(false);
+      setShowMedia(true);
       recTimerRef.current = setInterval(() => setRecSecs(s => s + 1), 1000);
     } catch (err) {
       setError('Microphone access denied.');
     }
+  }
+
+  async function sendVoiceNote() {
+    if (!recBlob) return;
+    const blob = recBlob;
+    const blobUrl = recBlobUrl;
+    setRecBlob(null); setRecBlobUrl(null); setRecSecs(0); setShowMedia(false);
+    URL.revokeObjectURL(blobUrl);
+    const mimeType = recMimeRef.current;
+    const ext  = mimeType.includes('webm') ? 'webm' : 'm4a';
+    const file = new File([blob], `voice-note.${ext}`, { type: mimeType });
+    setBusy(true); setError(null);
+    try {
+      const { url } = await api.upload(file);
+      await api.sendMessage(url, null, replyTo?.id ?? null);
+      setReplyTo(null);
+      await refresh(false);
+      await refreshBasket();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+
+  function discardVoiceNote() {
+    if (recBlobUrl) URL.revokeObjectURL(recBlobUrl);
+    setRecBlob(null); setRecBlobUrl(null); setRecSecs(0); setShowMedia(false);
   }
 
   async function sendPhoto(e) {
@@ -922,34 +961,68 @@ export default function MessagesPage() {
         <div className="px-4 lg:px-8">
           {/* Media tray — slides in above the input row */}
           {showMedia && (
-            <div className="flex items-center gap-3 pt-3 pb-1">
+            <div className="pt-3 pb-1">
               {recording ? (
-                /* Recording in progress — show pulsing indicator + timer + stop button */
-                <>
-                  <span className="h-3 w-3 rounded-full bg-pink-500 animate-pulse shrink-0" />
-                  <span className="text-sm font-semibold tabular-nums text-pink-600">
+                /* ── State 1: actively recording ── */
+                <div className="flex items-center gap-3">
+                  <span className={`h-3 w-3 rounded-full shrink-0 transition-colors ${recPaused ? 'bg-neutral-300' : 'bg-pink-500 animate-pulse'}`} />
+                  <span className="w-10 text-sm font-semibold tabular-nums text-pink-600">
                     {`${Math.floor(recSecs / 60)}:${String(recSecs % 60).padStart(2, '0')}`}
                   </span>
-                  <span className="text-xs text-neutral-400 flex-1">Recording…</span>
+                  <span className="flex-1 text-xs text-neutral-400">{recPaused ? 'Paused' : 'Recording…'}</span>
+                  {/* Pause / Resume */}
                   <button
                     type="button"
-                    onClick={toggleRecording}
+                    onClick={togglePause}
+                    aria-label={recPaused ? 'Resume' : 'Pause'}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-pink-200 bg-pink-50 text-pink-500 transition active:scale-95"
+                  >
+                    {recPaused ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>
+                    )}
+                  </button>
+                  {/* Stop → move to review */}
+                  <button
+                    type="button"
+                    onClick={stopRecording}
                     aria-label="Stop recording"
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-pink-300 bg-pink-50 text-pink-500 transition active:scale-95"
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="4" y="4" width="16" height="16" rx="2" />
-                    </svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
                   </button>
-                </>
+                </div>
+              ) : recBlob ? (
+                /* ── State 2: review before sending ── */
+                <div className="space-y-2">
+                  <AudioPlayer src={recBlobUrl} mine={true} />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={discardVoiceNote}
+                      className="flex-1 rounded-xl border border-neutral-200 bg-white py-2 text-sm text-neutral-500 transition active:scale-95"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={sendVoiceNote}
+                      disabled={busy}
+                      className="flex-1 rounded-xl bg-pink-500 py-2 text-sm font-semibold text-white transition active:scale-95 disabled:opacity-40"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
               ) : (
-                /* Normal tray */
-                <>
+                /* ── State 3: normal media picker ── */
+                <div className="flex items-center gap-3">
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
                   <span className="text-xs text-neutral-400 ml-1">GIF · Photo · Voice</span>
-                </>
+                </div>
               )}
             </div>
           )}
