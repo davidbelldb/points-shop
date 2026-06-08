@@ -164,6 +164,10 @@ export const api = {
     request('/games/dirty-wordle/result', { method: 'POST', body: JSON.stringify(payload) }),
   dirtyWordleLeaderboard: (date) =>
     request(`/games/dirty-wordle/leaderboard?date=${date}`),
+  dirtyWordleProgress: (date) =>
+    request(`/games/dirty-wordle/progress?date=${date}`),
+  dirtyWordleSaveProgress: (payload) =>
+    request('/games/dirty-wordle/progress', { method: 'POST', body: JSON.stringify(payload) }),
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),

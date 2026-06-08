@@ -124,6 +124,36 @@ export default async function dirtyWordleRoutes(fastify) {
     };
   });
 
+  // ── Save in-progress guesses (mid-game persistence) ──────────────────────
+  fastify.get('/api/games/dirty-wordle/progress', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    const date = req.query.date ?? new Date().toISOString().slice(0, 10);
+    const { rows } = await query(
+      `SELECT guesses FROM dirty_wordle_progress WHERE account_id = $1 AND date = $2`,
+      [accountId, date],
+    );
+    return { guesses: rows[0]?.guesses ?? [] };
+  });
+
+  fastify.post('/api/games/dirty-wordle/progress', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const { date, guesses } = req.body ?? {};
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return reply.code(400).send({ error: 'date required (YYYY-MM-DD)' });
+    }
+    if (!Array.isArray(guesses)) {
+      return reply.code(400).send({ error: 'guesses array required' });
+    }
+    await query(
+      `INSERT INTO dirty_wordle_progress (account_id, date, guesses, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (account_id, date)
+       DO UPDATE SET guesses = EXCLUDED.guesses, updated_at = NOW()`,
+      [accountId, date, JSON.stringify(guesses)],
+    );
+    return { ok: true };
+  });
+
   // ── Legacy /win kept for backwards compat (redirects to /result) ──────────
   fastify.post('/api/games/dirty-wordle/win', async (req, reply) => {
     return reply.code(410).send({ error: 'Use POST /api/games/dirty-wordle/result' });

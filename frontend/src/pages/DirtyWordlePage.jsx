@@ -291,6 +291,22 @@ export default function DirtyWordlePage() {
   const [modalDismissed,   setModalDismissed]   = useState(saved.modalAcked   ?? false);
   const [resultSaved,      setResultSaved]      = useState(saved.resultSaved  ?? false);
   const [showLeaderboard,  setShowLeaderboard]  = useState(false);
+  const [progressLoaded,   setProgressLoaded]   = useState(saved.guesses != null);
+
+  // On mount: fetch server-side progress (syncs across devices).
+  // Only runs if the game isn't already finished locally.
+  useEffect(() => {
+    if (saved.gameOver) { setProgressLoaded(true); return; }
+    api.dirtyWordleProgress(today)
+      .then(({ guesses: serverGuesses }) => {
+        if (serverGuesses && serverGuesses.length > 0) {
+          setGuesses(serverGuesses);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setProgressLoaded(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today]);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({
@@ -323,6 +339,8 @@ export default function DirtyWordlePage() {
 
     setGuesses(newGuesses);
     setCurrentGuess('');
+    // Persist progress to server so any device can resume
+    api.dirtyWordleSaveProgress({ date: today, guesses: newGuesses }).catch(() => {});
     if (isWon)  setWon(true);
     if (isOver) {
       setGameOver(true);
@@ -385,14 +403,14 @@ export default function DirtyWordlePage() {
     <div className="flex flex-col items-center gap-4 py-4 px-2">
       {/* Header */}
       <div className="w-full max-w-sm flex items-center justify-between">
-        <Link to="/games" className="w-24 text-sm text-neutral-500">← Games</Link>
+        <Link to="/games" className="w-20 text-sm text-neutral-500">← Games</Link>
         <h1 className="font-bold text-lg tracking-wide">Dirty Wordle</h1>
         <button
           onClick={() => setShowLeaderboard(true)}
-          className="w-24 text-right text-sm font-medium px-2 py-1 rounded-lg transition"
+          className="w-20 text-right text-sm font-medium px-2 py-1 rounded-lg transition"
           style={{ color: '#61dbbb' }}
         >
-          Leaderboard
+          Scores
         </button>
       </div>
 
