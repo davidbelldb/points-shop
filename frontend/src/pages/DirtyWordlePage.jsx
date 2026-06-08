@@ -103,13 +103,16 @@ function ColourGrid({ grid, cellSize = 32 }) {
 
 // ─── Tile ─────────────────────────────────────────────────────────────────────
 
-const TILE_TEXT = { correct: '#0d3d2e', present: '#fff', absent: '#fff' };
+const TILE_TEXT = { correct: '#0d3d2e', present: '#fff' };
 
 function Tile({ letter, state, delay = 0, revealed, isDark }) {
   const isColoured = ['correct','present','absent'].includes(state);
 
+  const absentBg   = isDark ? '#525252' : '#e8e8e6';
+  const absentText = isDark ? '#ffffff' : '#525252';
+
   const bg = isColoured
-    ? { correct: '#61dbbb', present: '#ed70bd', absent: '#525252' }[state]
+    ? (state === 'absent' ? absentBg : { correct: '#61dbbb', present: '#ed70bd' }[state])
     : isDark ? '#1f1f1e' : '#e8e8e6';
 
   const border = isColoured
@@ -127,7 +130,7 @@ function Tile({ letter, state, delay = 0, revealed, isDark }) {
         border: `2px solid ${border}`,
         borderRadius: 6,
         background: bg,
-        color: isColoured ? TILE_TEXT[state] : (isDark ? '#ffffff' : '#171717'),
+        color: state === 'absent' ? absentText : isColoured ? TILE_TEXT[state] : (isDark ? '#ffffff' : '#171717'),
         transition: revealed ? `background 0.15s ${delay}ms, border-color 0.15s ${delay}ms` : 'border-color 0.1s',
         transform: letter && !revealed ? 'scale(1.08)' : 'scale(1)',
         transitionProperty: revealed ? 'background, border-color' : 'transform, border-color',
@@ -143,7 +146,7 @@ function Tile({ letter, state, delay = 0, revealed, isDark }) {
 const KEY_BG = {
   correct: '#61dbbb',
   present: '#ed70bd',
-  absent:  { dark: '#5c5c59', light: '#d4d4d0' },   // lighter = "ruled out / faded"
+  absent:  { dark: '#525252', light: '#e8e8e6' },   // matches tile absent colour per mode
   unused:  { dark: '#2e2e2c', light: '#939390' },   // darker  = "default keyboard"
 };
 const KEY_TEXT = { correct: '#0d3d2e', present: '#fff', absent: '#fff', unused: { dark: '#ffffff', light: '#171717' } };
@@ -154,7 +157,7 @@ function Key({ label, state, onPress, isDark }) {
   if (wide) { bg = '#1d4039'; color = '#ffffff'; }
   else if (state === 'correct') { bg = KEY_BG.correct; color = KEY_TEXT.correct; }
   else if (state === 'present') { bg = KEY_BG.present; color = KEY_TEXT.present; }
-  else if (state === 'absent') { bg = isDark ? KEY_BG.absent.dark : KEY_BG.absent.light; color = '#fff'; }
+  else if (state === 'absent') { bg = isDark ? KEY_BG.absent.dark : KEY_BG.absent.light; color = isDark ? '#fff' : '#525252'; }
   else { bg = isDark ? KEY_BG.unused.dark : KEY_BG.unused.light; color = isDark ? '#fff' : '#171717'; }
   return (
     <button
