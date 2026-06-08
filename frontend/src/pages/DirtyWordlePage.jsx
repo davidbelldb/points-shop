@@ -93,6 +93,7 @@ function ColourGrid({ grid, cellSize = 32 }) {
                 background:
                   state === 'correct' ? '#61dbbb'
                   : state === 'present' ? '#ed70bd'
+                  : state === 'empty' ? (isDark ? '#2a2a28' : '#ebebea')
                   : isDark ? '#525252' : '#939391',
               }}
             />
@@ -272,11 +273,16 @@ function LeaderboardModal({ onClose, today }) {
                 <div className="grid grid-cols-2 gap-3">
                   {data.allTime.map(player => {
                     const played = data.today.find(t => t.name === player.name);
+                    const emptyRow = Array(WORD_LENGTH).fill('empty');
+                    const emptyGrid = Array(MAX_GUESSES).fill(emptyRow);
+                    const playerColor = player.name === user?.name ? '#61dbbb' : '#ed70bd';
+                    // Fixed card height: enough for name + 6-row grid + score line
+                    const cardHeight = 252;
                     return played ? (
                       <div
                         key={player.name}
-                        className="rounded-xl p-3 flex flex-col items-center gap-2"
-                        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+                        className="rounded-xl p-3 flex flex-col items-center justify-center gap-2"
+                        style={{ background: cardBg, border: `1px solid ${cardBorder}`, height: cardHeight }}
                       >
                         <p className="text-sm font-semibold" style={{ color: textPri }}>{player.name}</p>
                         <ColourGrid grid={played.guess_grid} cellSize={24} />
@@ -298,11 +304,11 @@ function LeaderboardModal({ onClose, today }) {
                     ) : (
                       <div
                         key={player.name}
-                        className="rounded-xl p-3 flex flex-col items-center justify-center gap-2 min-h-[140px]"
-                        style={{ background: cardBg, border: `1px dashed ${cardBorder}` }}
+                        className="rounded-xl p-3 flex flex-col items-center justify-center gap-2"
+                        style={{ background: cardBg, border: `1px dashed ${cardBorder}`, height: cardHeight }}
                       >
                         <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-full"
-                          style={{ border: `3px solid ${player.name === user?.name ? '#61dbbb' : '#ed70bd'}` }}>
+                          style={{ border: `3px solid ${playerColor}` }}>
                           {player.photo_url
                             ? <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
                             : <span className="flex h-full w-full items-center justify-center text-sm font-bold"
@@ -311,7 +317,7 @@ function LeaderboardModal({ onClose, today }) {
                               </span>
                           }
                         </span>
-                        <p className="text-sm font-bold uppercase tracking-wide" style={{ color: player.name === user?.name ? '#61dbbb' : '#ed70bd' }}>
+                        <p className="text-sm font-bold uppercase tracking-wide" style={{ color: playerColor }}>
                           {player.name}
                         </p>
                         <p className="text-xs text-center font-semibold uppercase tracking-wide leading-relaxed" style={{ color: textSec }}>
