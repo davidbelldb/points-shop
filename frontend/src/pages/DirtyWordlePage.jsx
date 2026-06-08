@@ -103,22 +103,31 @@ function ColourGrid({ grid, cellSize = 32 }) {
 
 // ─── Tile ─────────────────────────────────────────────────────────────────────
 
-const TILE_BG     = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: '#1f1f1e', empty: '#1f1f1e' };
-const TILE_BORDER = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: '#30302e',  empty: '#30302e' };
-const TILE_TEXT   = { correct: '#0d3d2e', present: '#fff',    absent: '#fff' };
+const TILE_TEXT = { correct: '#0d3d2e', present: '#fff', absent: '#fff' };
 
-function Tile({ letter, state, delay = 0, revealed }) {
+function Tile({ letter, state, delay = 0, revealed, isDark }) {
   const isColoured = ['correct','present','absent'].includes(state);
+
+  const bg = isColoured
+    ? { correct: '#61dbbb', present: '#ed70bd', absent: '#525252' }[state]
+    : isDark ? '#1f1f1e' : '#e8e8e6';
+
+  const border = isColoured
+    ? { correct: '#61dbbb', present: '#ed70bd', absent: '#525252' }[state]
+    : state === 'active'
+      ? (isDark ? '#6b6b68' : '#a3a3a0')
+      : (isDark ? '#30302e' : '#d4d4d0');
+
   return (
     <div
       style={{
         width: 56, height: 56,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 22, fontWeight: 700,
-        border: `2px solid ${TILE_BORDER[state]}`,
+        border: `2px solid ${border}`,
         borderRadius: 6,
-        background: TILE_BG[state],
-        color: isColoured ? TILE_TEXT[state] : 'inherit',
+        background: bg,
+        color: isColoured ? TILE_TEXT[state] : (isDark ? '#ffffff' : '#171717'),
         transition: revealed ? `background 0.15s ${delay}ms, border-color 0.15s ${delay}ms` : 'border-color 0.1s',
         transform: letter && !revealed ? 'scale(1.08)' : 'scale(1)',
         transitionProperty: revealed ? 'background, border-color' : 'transform, border-color',
@@ -131,22 +140,24 @@ function Tile({ letter, state, delay = 0, revealed }) {
 
 // ─── Keyboard key ─────────────────────────────────────────────────────────────
 
-const KEY_BG   = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', unused: undefined };
+const KEY_BG   = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252' };
 const KEY_TEXT = { correct: '#0d3d2e', present: '#fff',    absent: '#fff' };
 
-function Key({ label, state, onPress }) {
+function Key({ label, state, onPress, isDark }) {
   const wide = label === 'ENTER' || label === '⌫';
-  const bg   = KEY_BG[state];
+  const coloured = KEY_BG[state];
+  const bg    = coloured ?? (isDark ? '#4a4a47' : '#d4d4d0');
+  const color = coloured ? KEY_TEXT[state] : (isDark ? '#ffffff' : '#171717');
   return (
     <button
       onPointerDown={(e) => { e.preventDefault(); onPress(label); }}
       style={{
-        height: 52, minWidth: wide ? 56 : 36, padding: wide ? '0 6px' : 0,
+        height: 52, flex: wide ? 1.5 : 1,
+        padding: 0,
         borderRadius: 6, fontWeight: 700, fontSize: wide ? 11 : 15,
-        border: 'none', background: bg, color: bg ? KEY_TEXT[state] : undefined,
+        border: 'none', background: bg, color,
         cursor: 'pointer', userSelect: 'none', touchAction: 'none', transition: 'background 0.15s',
       }}
-      className={!bg ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-600 dark:text-neutral-100' : ''}
     >
       {label}
     </button>
@@ -270,8 +281,8 @@ function LeaderboardModal({ onClose, today }) {
           )}
         </div>
 
-        <div className="px-5 pb-5">
-          <button onClick={onClose} className="w-full rounded-xl py-3 text-sm font-semibold transition hover:opacity-90 active:scale-95"
+        <div className="px-5 pb-5 flex justify-center">
+          <button onClick={onClose} className="w-1/2 rounded-xl py-3 text-sm font-semibold transition hover:opacity-90 active:scale-95"
             style={{ background: '#61dbbb', color: '#0d3d2e' }}>
             Close
           </button>
@@ -285,6 +296,7 @@ function LeaderboardModal({ onClose, today }) {
 
 export default function DirtyWordlePage() {
   const { user }   = useAuth();
+  const { theme }  = useTheme();
   const today      = getTodayDate();
   const target     = getDailyWord();
   const storageKey = `dirty-wordle-${today}`;
@@ -424,10 +436,12 @@ export default function DirtyWordlePage() {
   const showModal  = gameOver && !modalDismissed;
   const resultGrid = guesses.map(g => evaluateGuess(g, target));
 
+  const isDark = theme === 'dark';
+
   return (
-    <div className="flex flex-col items-center gap-4 py-4 px-2">
+    <div className="flex flex-col items-center gap-4 py-4">
       {/* Header */}
-      <div className="w-full max-w-sm flex items-center justify-between">
+      <div className="w-full max-w-sm flex items-center justify-between px-2">
         <Link to="/games" className="w-20 text-sm text-neutral-500">← Games</Link>
         <h1 className="font-bold text-lg tracking-wide">Dirty Wordle</h1>
         <button
@@ -456,19 +470,19 @@ export default function DirtyWordlePage() {
               {Array.from({ length: WORD_LENGTH }, (_, colIdx) => {
                 const letter = word[colIdx] ?? '';
                 const state  = result ? result[colIdx] : letter ? 'active' : 'empty';
-                return <Tile key={colIdx} letter={letter} state={state} delay={colIdx * 80} revealed={submitted} />;
+                return <Tile key={colIdx} letter={letter} state={state} delay={colIdx * 80} revealed={submitted} isDark={isDark} />;
               })}
             </div>
           );
         })}
       </div>
 
-      {/* On-screen keyboard */}
-      <div className="flex flex-col gap-1.5 mt-1">
+      {/* On-screen keyboard — edge to edge */}
+      <div className="w-full flex flex-col gap-1.5 mt-1 px-1">
         {KEYBOARD_ROWS.map((row, i) => (
-          <div key={i} style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
+          <div key={i} style={{ display: 'flex', gap: 4 }}>
             {row.map(key => (
-              <Key key={key} label={key} state={letterStates[key] ?? 'unused'} onPress={onKey} />
+              <Key key={key} label={key} state={letterStates[key] ?? 'unused'} onPress={onKey} isDark={isDark} />
             ))}
           </div>
         ))}
