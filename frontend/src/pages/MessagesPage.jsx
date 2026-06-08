@@ -23,16 +23,19 @@ function isGifUrl(body) {
   return typeof body === 'string' && /^https?:\/\/media\d*\.giphy\.com\/.+\.gif(\?.*)?$/.test(body);
 }
 
-// Detect audio voice notes.
+// Detect audio voice notes — handles both /media/ relative paths and full URLs.
 function isAudioUrl(body) {
-  return typeof body === 'string' && /^https?:\/\/.+\.(mp3|ogg|webm|m4a|wav|aac|opus)(\?.*)?$/i.test(body);
+  if (typeof body !== 'string') return false;
+  if (!body.startsWith('/media/') && !/^https?:\/\//.test(body)) return false;
+  return /\.(mp3|ogg|webm|m4a|wav|aac|opus)(\?.*)?$/i.test(body);
 }
 
-// Detect uploaded photos (non-Giphy image URLs).
+// Detect uploaded photos — handles /media/ relative paths and full URLs.
 function isUploadedPhoto(body) {
-  return typeof body === 'string'
-    && /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|heic|avif)(\?.*)?$/i.test(body)
-    && !isGifUrl(body);
+  if (typeof body !== 'string') return false;
+  if (!body.startsWith('/media/') && !/^https?:\/\//.test(body)) return false;
+  if (isGifUrl(body)) return false;
+  return /\.(jpg|jpeg|png|gif|webp|heic|heif|avif)(\?.*)?$/i.test(body);
 }
 
 // Map stored reaction key → display emoji.
@@ -295,7 +298,7 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onSetReaction, onOpenStory, onSwipeReply }) {
+function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
   const swipeRef  = useRef(null);
@@ -430,7 +433,14 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
           {bodyIsAudio ? (
             <AudioPlayer src={m.body} mine={mine} />
           ) : (
-            <img src={m.body} alt={bodyIsGif ? 'GIF' : 'Photo'} className="block max-w-[220px]" loading="lazy" />
+            <img
+              src={m.body}
+              alt={bodyIsGif ? 'GIF' : 'Photo'}
+              className="block max-w-[220px] cursor-pointer"
+              loading="lazy"
+              data-bubble-action
+              onClick={(e) => { e.stopPropagation(); onOpenPhoto?.(m.body); }}
+            />
           )}
           {!bodyIsAudio && (
             <p className="absolute bottom-1 right-2 text-[10px] text-white/80 drop-shadow">{timeLabel(m.created_at)}</p>
@@ -665,6 +675,7 @@ export default function MessagesPage() {
   const [gifOpen, setGifOpen]       = useState(false);
   const [recording, setRecording]   = useState(false);
   const [showMedia, setShowMedia]   = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
   const recorderRef = useRef(null);
   const recChunksRef = useRef([]);
   const inputRef      = useRef(null);
@@ -880,6 +891,7 @@ export default function MessagesPage() {
                       onSaveEdit={(body) => saveEdit(m.id, body)}
                       onDelete={() => remove(m.id)}
                       onSetReaction={(emoji) => setReaction(m.id, emoji)}
+                      onOpenPhoto={(src) => setLightboxSrc(src)}
                       onSwipeReply={handleSwipeReply}
                     />
                   </div>
@@ -992,6 +1004,30 @@ export default function MessagesPage() {
           initialIndex={0}
           onClose={() => setViewerStory(null)}
         />
+      )}
+
+      {/* Photo lightbox */}
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
+          onClick={() => setLightboxSrc(null)}
+        >
+          <img
+            src={lightboxSrc}
+            alt="Photo"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightboxSrc(null)}
+            aria-label="Close"
+            className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+            </svg>
+          </button>
+        </div>
       )}
     </>
   );
