@@ -286,7 +286,6 @@ function LeaderboardModal({ onClose, today }) {
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-center mt-1" style={{ color: textSec }}>Avg = average guesses on wins</p>
                 </div>
               )}
             </>
