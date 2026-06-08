@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
+import { useTheme } from '../lib/ThemeContext.jsx';
 import StoryViewer from '../components/stories/StoryViewer.jsx';
 import SliderSticker from '../components/stories/SliderSticker.jsx';
 
@@ -665,6 +666,7 @@ function AudioPlayer({ src, mine }) {
 export default function MessagesPage() {
   const { user } = useAuth();
   const { refresh: refreshBasket } = useBasket();
+  const { theme } = useTheme();
   const [data, setData] = useState({ other: null, messages: [] });
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -966,7 +968,7 @@ export default function MessagesPage() {
                 /* ── State 1: actively recording ── */
                 <div className="flex items-center gap-3">
                   <span className={`h-3 w-3 rounded-full shrink-0 transition-colors ${recPaused ? 'bg-neutral-300' : 'bg-[#61dbbb] animate-pulse'}`} />
-                  <span className="w-10 text-sm font-semibold tabular-nums text-black dark:text-white">
+                  <span className="w-10 text-sm font-semibold tabular-nums" style={{ color: theme === 'dark' ? '#ffffff' : '#000000' }}>
                     {`${Math.floor(recSecs / 60)}:${String(recSecs % 60).padStart(2, '0')}`}
                   </span>
                   <span className="flex-1 text-xs text-neutral-400">{recPaused ? 'Paused' : 'Recording…'}</span>
