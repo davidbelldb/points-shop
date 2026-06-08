@@ -199,7 +199,7 @@ function LeaderboardModal({ onClose, today }) {
                     {data.today.map(player => (
                       <div
                         key={player.name}
-                        className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 p-3 flex flex-col items-center gap-2"
+                        className="rounded-xl border border-neutral-200 dark:border-neutral-600 bg-neutral-100 dark:bg-neutral-700 p-3 flex flex-col items-center gap-2"
                       >
                         <p className="text-sm font-semibold text-neutral-800 dark:text-white">{player.name}</p>
                         <ColourGrid grid={player.guess_grid} cellSize={24} />
@@ -231,9 +231,9 @@ function LeaderboardModal({ onClose, today }) {
               {data.allTime.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">All time</p>
-                  <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+                  <div className="rounded-xl border border-neutral-200 dark:border-neutral-600 overflow-hidden">
                     {/* Header row */}
-                    <div className="grid grid-cols-4 bg-neutral-100 dark:bg-neutral-900 px-3 py-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+                    <div className="grid grid-cols-4 bg-neutral-100 dark:bg-neutral-700 px-3 py-2 text-xs font-semibold text-neutral-500 dark:text-neutral-300 uppercase tracking-wide">
                       <span>Player</span>
                       <span className="text-center">Wins</span>
                       <span className="text-center">Avg</span>
@@ -242,7 +242,7 @@ function LeaderboardModal({ onClose, today }) {
                     {data.allTime.map((player, i) => (
                       <div
                         key={player.name}
-                        className={`grid grid-cols-4 px-3 py-2.5 text-sm items-center ${i % 2 === 0 ? 'bg-white dark:bg-neutral-800' : 'bg-neutral-50 dark:bg-neutral-850'}`}
+                        className={`grid grid-cols-4 px-3 py-2.5 text-sm items-center border-t border-neutral-100 dark:border-neutral-700 bg-white dark:bg-neutral-800`}
                       >
                         <span className="font-semibold text-neutral-800 dark:text-white">{player.name}</span>
                         <span className="text-center font-bold" style={{ color: '#61dbbb' }}>{player.wins}</span>
