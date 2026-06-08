@@ -210,6 +210,15 @@ function LeaderboardModal({ onClose, today }) {
     return `${dd}/${mm}`;
   }
 
+  function getDayLabel(dateStr) {
+    if (dateStr === today) return 'TODAY';
+    const yest = new Date(today);
+    yest.setDate(yest.getDate() - 1);
+    if (dateStr === yest.toISOString().slice(0, 10)) return 'YESTERDAY';
+    const days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+    return days[new Date(dateStr + 'T12:00:00').getDay()];
+  }
+
   function navigateDate(delta) {
     const d = new Date(viewDate);
     d.setDate(d.getDate() + delta);
@@ -254,17 +263,20 @@ function LeaderboardModal({ onClose, today }) {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: textSec }}>
-                    {isToday ? `Today — ${formatViewDate(today)}` : formatViewDate(viewDate)}
+                    {getDayLabel(viewDate)}
                   </p>
-                  <div className="flex items-center gap-0.5">
+                  <div className="flex items-center gap-1">
                     <button onClick={() => navigateDate(-1)} disabled={viewDate <= minDate}
                       style={{ background: 'none', border: 'none', cursor: viewDate <= minDate ? 'default' : 'pointer',
-                        color: textPri, fontSize: 20, padding: '0 6px', opacity: viewDate <= minDate ? 0.25 : 1 }}>
+                        color: textPri, fontSize: 20, padding: '0 4px', opacity: viewDate <= minDate ? 0.25 : 1 }}>
                       ‹
                     </button>
+                    <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: textSec }}>
+                      {formatViewDate(viewDate)}
+                    </p>
                     <button onClick={() => navigateDate(1)} disabled={viewDate >= today}
                       style={{ background: 'none', border: 'none', cursor: viewDate >= today ? 'default' : 'pointer',
-                        color: textPri, fontSize: 20, padding: '0 6px', opacity: viewDate >= today ? 0.25 : 1 }}>
+                        color: textPri, fontSize: 20, padding: '0 4px', opacity: viewDate >= today ? 0.25 : 1 }}>
                       ›
                     </button>
                   </div>
