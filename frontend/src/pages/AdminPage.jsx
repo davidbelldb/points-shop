@@ -170,6 +170,7 @@ function BrandingSection({ settings, onChanged }) {
   const [bannerFg, setBannerFg] = useState('#ffffff');
   const [countdownDate, setCountdownDate] = useState('');
   const [countdownTime, setCountdownTime] = useState('');
+  const [clearKey, setClearKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -185,7 +186,7 @@ function BrandingSection({ settings, onChanged }) {
     setBannerFg(settings.banner_text_colour ?? '#ffffff');
     setCountdownDate(settings.banner_countdown_date ?? '');
     setCountdownTime(settings.banner_countdown_time ?? '');
-  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle, settings.banner_text, settings.banner_bg_colour, settings.banner_text_colour, settings.banner_countdown_date, settings.banner_countdown_time]);
+  }, [settings.shop_name, settings.hero_title, settings.hero_subtitle, settings.banner_text, settings.banner_link_url, settings.banner_bg_colour, settings.banner_text_colour, settings.banner_countdown_date, settings.banner_countdown_time]);
 
   async function toggleBanner() {
     setBusy(true); setError(null);
@@ -296,12 +297,14 @@ function BrandingSection({ settings, onChanged }) {
       <Field label="Sneaky countdown date & time">
         <div className="flex flex-wrap items-center gap-2">
           <input
+            key={`date-${clearKey}`}
             type="date"
             className={inputCls + ' min-w-[150px] flex-1'}
             value={countdownDate}
             onChange={(e) => setCountdownDate(e.target.value)}
           />
           <input
+            key={`time-${clearKey}`}
             type="time"
             className={inputCls + ' w-[110px]'}
             value={countdownTime}
@@ -312,7 +315,7 @@ function BrandingSection({ settings, onChanged }) {
           {(countdownDate || countdownTime) && (
             <button
               type="button"
-              onClick={() => { setCountdownDate(''); setCountdownTime(''); }}
+              onClick={() => { setCountdownDate(''); setCountdownTime(''); setClearKey((k) => k + 1); }}
               className="shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-600"
             >
               Clear
