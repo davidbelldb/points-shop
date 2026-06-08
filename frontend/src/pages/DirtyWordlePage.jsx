@@ -143,15 +143,16 @@ function Tile({ letter, state, delay = 0, revealed, isDark }) {
 const KEY_BG = {
   correct: '#61dbbb',
   present: '#ed70bd',
-  absent:  { dark: '#2e2e2c', light: '#939390' },   // clearly darker = "ruled out"
-  unused:  { dark: '#5c5c59', light: '#d4d4d0' },   // medium = "not yet tried"
+  absent:  { dark: '#5c5c59', light: '#d4d4d0' },   // lighter = "ruled out / faded"
+  unused:  { dark: '#2e2e2c', light: '#939390' },   // darker  = "default keyboard"
 };
 const KEY_TEXT = { correct: '#0d3d2e', present: '#fff', absent: '#fff', unused: { dark: '#ffffff', light: '#171717' } };
 
 function Key({ label, state, onPress, isDark }) {
   const wide = label === 'ENTER' || label === '⌫';
   let bg, color;
-  if (state === 'correct') { bg = KEY_BG.correct; color = KEY_TEXT.correct; }
+  if (wide) { bg = '#1d4039'; color = '#ffffff'; }
+  else if (state === 'correct') { bg = KEY_BG.correct; color = KEY_TEXT.correct; }
   else if (state === 'present') { bg = KEY_BG.present; color = KEY_TEXT.present; }
   else if (state === 'absent') { bg = isDark ? KEY_BG.absent.dark : KEY_BG.absent.light; color = '#fff'; }
   else { bg = isDark ? KEY_BG.unused.dark : KEY_BG.unused.light; color = isDark ? '#fff' : '#171717'; }
@@ -256,8 +257,8 @@ function LeaderboardModal({ onClose, today }) {
                         <p className="text-sm font-bold uppercase tracking-wide" style={{ color: player.name === user?.name ? '#61dbbb' : '#ed70bd' }}>
                           {player.name}
                         </p>
-                        <p className="text-xs text-center font-semibold uppercase tracking-wide" style={{ color: textSec }}>
-                          yet to play today
+                        <p className="text-xs text-center font-semibold uppercase tracking-wide leading-relaxed" style={{ color: textSec }}>
+                          yet to play<br />today
                         </p>
                       </div>
                     );
