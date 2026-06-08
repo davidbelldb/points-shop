@@ -47,7 +47,8 @@ function formatUKDate() {
   const d = new Date();
   const dd = String(d.getUTCDate()).padStart(2, '0');
   const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}`;
+  const yyyy = d.getUTCFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 function getDailyWord() {
@@ -101,8 +102,8 @@ function ColourGrid({ grid, cellSize = 32 }) {
 
 // ─── Tile ─────────────────────────────────────────────────────────────────────
 
-const TILE_BG     = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: 'transparent', empty: 'transparent' };
-const TILE_BORDER = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: '#737373',     empty: '#d4d4d4' };
+const TILE_BG     = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: '#1f1f1e', empty: '#1f1f1e' };
+const TILE_BORDER = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252', active: '#30302e',  empty: '#30302e' };
 const TILE_TEXT   = { correct: '#0d3d2e', present: '#fff',    absent: '#fff' };
 
 function Tile({ letter, state, delay = 0, revealed }) {
@@ -391,11 +392,11 @@ export default function DirtyWordlePage() {
           className="text-sm font-medium px-2 py-1 rounded-lg transition"
           style={{ color: '#61dbbb' }}
         >
-          Board
+          Leaderboard
         </button>
       </div>
 
-      <p className="text-xs text-neutral-400">{formatUKDate()} — New dirty word at midnight</p>
+      <p className="text-xs text-neutral-400">{formatUKDate()} — Another day, another dirdle.</p>
 
       {/* Grid */}
       <div className="flex flex-col gap-1.5">
