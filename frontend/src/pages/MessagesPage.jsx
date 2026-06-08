@@ -664,6 +664,7 @@ export default function MessagesPage() {
   const [replyTo, setReplyTo]       = useState(null);
   const [gifOpen, setGifOpen]       = useState(false);
   const [recording, setRecording]   = useState(false);
+  const [showMedia, setShowMedia]   = useState(false);
   const recorderRef = useRef(null);
   const recChunksRef = useRef([]);
   const inputRef      = useRef(null);
@@ -898,6 +899,17 @@ export default function MessagesPage() {
       {/* Composer bar */}
       <div className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
         <div className="px-4 lg:px-8">
+          {/* Media tray — slides in above the input row */}
+          {showMedia && (
+            <div className="flex items-center gap-3 pt-3 pb-1">
+              <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
+              <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
+              <MicButton recording={recording} onClick={() => { toggleRecording(); setShowMedia(false); }} />
+              <span className="text-xs text-neutral-400 ml-1">GIF · Photo · Voice</span>
+            </div>
+          )}
+          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={sendPhoto} />
+
           {replyTo && (
             <div className="mt-2 flex items-center gap-2 rounded-xl border-l-2 border-amber-500 bg-amber-50 px-3 py-1.5 text-xs">
               <div className="min-w-0 flex-1">
@@ -906,23 +918,34 @@ export default function MessagesPage() {
                 </p>
                 <p className="line-clamp-1 text-neutral-700">{replyTo.body}</p>
               </div>
-              <button
-                onClick={() => setReplyTo(null)}
-                aria-label="Cancel reply"
-                className="shrink-0 rounded-full p-1 text-neutral-500 hover:bg-amber-100"
-              >
+              <button onClick={() => setReplyTo(null)} aria-label="Cancel reply" className="shrink-0 rounded-full p-1 text-neutral-500 hover:bg-amber-100">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
                 </svg>
               </button>
             </div>
           )}
-          <form onSubmit={send} className="flex items-center gap-1.5 py-3">
-            <GifButton onClick={() => setGifOpen(true)} />
-            <PhotoButton onClick={() => photoInputRef.current?.click()} />
-            <MicButton recording={recording} onClick={toggleRecording} />
-            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={sendPhoto} />
+
+          {/* Main input row: [+] [textarea] [send] */}
+          <form onSubmit={send} className="flex items-end gap-2 py-3">
+            {/* + / × toggle */}
+            <button
+              type="button"
+              onClick={() => setShowMedia(o => !o)}
+              aria-label={showMedia ? 'Close media options' : 'Add media'}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
+            >
+              {showMedia ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              )}
+            </button>
+
             <textarea
               ref={inputRef}
               rows={1}
@@ -940,6 +963,7 @@ export default function MessagesPage() {
               className="block flex-1 rounded-2xl border border-neutral-200 bg-white px-4 py-2.5 text-sm leading-5 focus:border-amber-500 focus:outline-none resize-none overflow-hidden"
               style={{ minHeight: 40, maxHeight: 120 }}
             />
+
             <button
               type="submit"
               disabled={busy || !draft.trim()}
