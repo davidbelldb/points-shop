@@ -165,6 +165,7 @@ function BrandingSection({ settings, onChanged }) {
   const [heroTitle, setHeroTitle] = useState('');
   const [heroSubtitle, setHeroSubtitle] = useState('');
   const [bannerText, setBannerText] = useState('');
+  const [bannerLink, setBannerLink] = useState('');
   const [bannerBg, setBannerBg] = useState('#0b8476');
   const [bannerFg, setBannerFg] = useState('#ffffff');
   const [countdownDate, setCountdownDate] = useState('');
@@ -179,6 +180,7 @@ function BrandingSection({ settings, onChanged }) {
     setHeroTitle(settings.hero_title ?? '');
     setHeroSubtitle(settings.hero_subtitle ?? '');
     setBannerText(settings.banner_text ?? '');
+    setBannerLink(settings.banner_link_url ?? '');
     setBannerBg(settings.banner_bg_colour ?? '#0b8476');
     setBannerFg(settings.banner_text_colour ?? '#ffffff');
     setCountdownDate(settings.banner_countdown_date ?? '');
@@ -222,6 +224,7 @@ function BrandingSection({ settings, onChanged }) {
         hero_title: heroTitle,
         hero_subtitle: heroSubtitle,
         banner_text: bannerText,
+        banner_link_url: bannerLink.trim() || null,
         banner_bg_colour: bannerBg,
         banner_text_colour: bannerFg,
         banner_countdown_date: countdownDate,
@@ -274,6 +277,7 @@ function BrandingSection({ settings, onChanged }) {
         </button>
       </div>
       <Field label="Banner message"><input className={inputCls} value={bannerText} onChange={(e) => setBannerText(e.target.value)} placeholder="e.g. Free delivery this weekend!" /></Field>
+      <Field label="Banner link (optional)"><input className={inputCls} value={bannerLink} onChange={(e) => setBannerLink(e.target.value)} placeholder="/games/dirty-wordle" /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Banner colour">
           <div className="flex items-center gap-2">

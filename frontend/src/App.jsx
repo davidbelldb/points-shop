@@ -196,14 +196,24 @@ export default function App() {
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       {/* Basket drawer — all devices */}
       <BasketDrawer open={basketOpen} onClose={() => setBasketOpen(false)} />
-      {isHome && bannerOn && (
-        <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
+      {isHome && bannerOn && (() => {
+        const bannerLink = (settings.banner_link_url || '').trim();
+        const inner = (
           <div className="flex w-full items-center justify-center gap-2.5 px-3 py-1.5 text-xs font-semibold tracking-wide lg:px-6">
             <span className="truncate">{settings.banner_text}</span>
             <CountdownClock date={settings.banner_countdown_date} time={settings.banner_countdown_time} />
           </div>
-        </div>
-      )}
+        );
+        return bannerLink ? (
+          <a href={bannerLink} style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff', display: 'block', textDecoration: 'none' }}>
+            {inner}
+          </a>
+        ) : (
+          <div style={{ background: settings.banner_bg_colour || '#0b8476', color: settings.banner_text_colour || '#ffffff' }}>
+            {inner}
+          </div>
+        );
+      })()}
       {showFloater && <SurveyBanner />}
       <main className={isFullGame ? 'flex-1 min-h-0 flex flex-col w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-24 md:pb-8' : 'w-full pb-24 lg:px-8'}`}>
         <Outlet />
