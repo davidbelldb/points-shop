@@ -601,11 +601,11 @@ function AudioPlayer({ src, mine }) {
   }
 
   const progress   = dur > 0 ? cur / dur : 0;
-  // mine = amber bubble → amber button, pink fill; theirs = pink bubble → pink button, teal fill
-  const btnBg      = mine ? '#f59e0b' : '#ed70bd';
+  // Both sides: pink play button. Bar fill differs so you can tell whose is whose.
+  const btnBg      = '#ed70bd';
   const barFill    = mine ? '#ed70bd' : '#61dbbb';
-  const barEmpty   = mine ? '#fde68a' : '#fbcfe8';
-  const timeColor  = mine ? '#92400e' : '#9d174d';
+  const barEmpty   = mine ? '#fce7f3' : '#fbcfe8';
+  const timeColor  = mine ? '#9d174d' : '#9d174d';
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 min-w-[210px]">
@@ -674,10 +674,12 @@ export default function MessagesPage() {
   const [replyTo, setReplyTo]       = useState(null);
   const [gifOpen, setGifOpen]       = useState(false);
   const [recording, setRecording]   = useState(false);
+  const [recSecs, setRecSecs]       = useState(0);
   const [showMedia, setShowMedia]   = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
-  const recorderRef = useRef(null);
+  const recorderRef  = useRef(null);
   const recChunksRef = useRef([]);
+  const recTimerRef  = useRef(null);
   const inputRef      = useRef(null);
   const photoInputRef = useRef(null);
   const bottomRef     = useRef(null);
@@ -741,6 +743,7 @@ export default function MessagesPage() {
 
   async function toggleRecording() {
     if (recording) {
+      clearInterval(recTimerRef.current);
       recorderRef.current?.stop();
       return;
     }
@@ -752,7 +755,10 @@ export default function MessagesPage() {
       recorder.ondataavailable = (e) => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+        clearInterval(recTimerRef.current);
         setRecording(false);
+        setRecSecs(0);
+        setShowMedia(false);
         const blob = new Blob(recChunksRef.current, { type: mimeType });
         const ext  = mimeType.includes('webm') ? 'webm' : 'm4a';
         const file = new File([blob], `voice-note.${ext}`, { type: mimeType });
@@ -768,7 +774,10 @@ export default function MessagesPage() {
       };
       recorder.start();
       recorderRef.current = recorder;
+      setRecSecs(0);
       setRecording(true);
+      setShowMedia(true); // keep tray open to show recording UI
+      recTimerRef.current = setInterval(() => setRecSecs(s => s + 1), 1000);
     } catch (err) {
       setError('Microphone access denied.');
     }
@@ -914,10 +923,34 @@ export default function MessagesPage() {
           {/* Media tray — slides in above the input row */}
           {showMedia && (
             <div className="flex items-center gap-3 pt-3 pb-1">
-              <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
-              <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
-              <MicButton recording={recording} onClick={() => { toggleRecording(); setShowMedia(false); }} />
-              <span className="text-xs text-neutral-400 ml-1">GIF · Photo · Voice</span>
+              {recording ? (
+                /* Recording in progress — show pulsing indicator + timer + stop button */
+                <>
+                  <span className="h-3 w-3 rounded-full bg-pink-500 animate-pulse shrink-0" />
+                  <span className="text-sm font-semibold tabular-nums text-pink-600">
+                    {`${Math.floor(recSecs / 60)}:${String(recSecs % 60).padStart(2, '0')}`}
+                  </span>
+                  <span className="text-xs text-neutral-400 flex-1">Recording…</span>
+                  <button
+                    type="button"
+                    onClick={toggleRecording}
+                    aria-label="Stop recording"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-pink-300 bg-pink-50 text-pink-500 transition active:scale-95"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                  </button>
+                </>
+              ) : (
+                /* Normal tray */
+                <>
+                  <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
+                  <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
+                  <MicButton recording={false} onClick={toggleRecording} />
+                  <span className="text-xs text-neutral-400 ml-1">GIF · Photo · Voice</span>
+                </>
+              )}
             </div>
           )}
           <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={sendPhoto} />
