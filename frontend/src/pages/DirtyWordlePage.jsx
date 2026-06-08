@@ -296,7 +296,7 @@ function LeaderboardModal({ onClose, today }) {
                         className="rounded-xl p-3 flex flex-col items-center justify-center gap-2"
                         style={{ background: cardBg, border: `1px solid ${cardBorder}`, height: cardHeight }}
                       >
-                        <p className="text-sm font-semibold" style={{ color: textPri }}>{player.name}</p>
+                        <p className="text-sm font-bold uppercase tracking-wide" style={{ color: playerColor }}>{player.name}</p>
                         <ColourGrid grid={played.guess_grid} cellSize={24} />
                         <div className="text-center space-y-0.5">
                           <p className="text-xs" style={{ color: textSec }}>
