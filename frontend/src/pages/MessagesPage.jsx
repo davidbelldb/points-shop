@@ -754,12 +754,17 @@ export default function MessagesPage() {
   useEffect(() => {
     if (data.messages.length > lastCountRef.current) {
       const isInitial = lastCountRef.current === 0;
-      requestAnimationFrame(() => {
+      // On initial load, delay 150ms so images/layout settle before measuring scrollHeight.
+      // On new messages, fire immediately.
+      const delay = isInitial ? 150 : 0;
+      const t = setTimeout(() => {
         window.scrollTo({
           top: document.documentElement.scrollHeight,
           behavior: isInitial ? 'instant' : 'smooth',
         });
-      });
+      }, delay);
+      lastCountRef.current = data.messages.length;
+      return () => clearTimeout(t);
     }
     lastCountRef.current = data.messages.length;
   }, [data.messages.length]);
@@ -991,8 +996,8 @@ export default function MessagesPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
       </div>
-      {/* Sentinel outside space-y flow — pb-20 clears the fixed composer bar */}
-      <div ref={bottomRef} className="pb-20" aria-hidden />
+      {/* Sentinel — outside space-y flow so no extra margin is added */}
+      <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
       <div className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
