@@ -385,11 +385,11 @@ export default function DirtyWordlePage() {
     <div className="flex flex-col items-center gap-4 py-4 px-2">
       {/* Header */}
       <div className="w-full max-w-sm flex items-center justify-between">
-        <Link to="/games" className="text-sm text-neutral-500">← Games</Link>
+        <Link to="/games" className="w-24 text-sm text-neutral-500">← Games</Link>
         <h1 className="font-bold text-lg tracking-wide">Dirty Wordle</h1>
         <button
           onClick={() => setShowLeaderboard(true)}
-          className="text-sm font-medium px-2 py-1 rounded-lg transition"
+          className="w-24 text-right text-sm font-medium px-2 py-1 rounded-lg transition"
           style={{ color: '#61dbbb' }}
         >
           Leaderboard
