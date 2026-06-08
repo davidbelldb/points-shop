@@ -752,21 +752,18 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    if (data.messages.length > lastCountRef.current) {
-      const isInitial = lastCountRef.current === 0;
-      // On initial load, delay 150ms so images/layout settle before measuring scrollHeight.
-      // On new messages, fire immediately.
-      const delay = isInitial ? 150 : 0;
-      const t = setTimeout(() => {
-        window.scrollTo({
-          top: document.documentElement.scrollHeight,
-          behavior: isInitial ? 'instant' : 'smooth',
-        });
-      }, delay);
-      lastCountRef.current = data.messages.length;
-      return () => clearTimeout(t);
-    }
+    if (!data.messages.length) return;
+    const isNew = data.messages.length > lastCountRef.current;
     lastCountRef.current = data.messages.length;
+    if (!isNew) return;
+    // Scroll to absolute bottom. Setting both covers iOS Safari (body) and other
+    // browsers (documentElement). Large number is clamped to actual scrollHeight.
+    const scrollToBottom = () => {
+      document.documentElement.scrollTop = 999999;
+      document.body.scrollTop = 999999;
+    };
+    // Double rAF ensures layout is fully committed before we measure.
+    requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
   }, [data.messages.length]);
 
   async function send(e) {
