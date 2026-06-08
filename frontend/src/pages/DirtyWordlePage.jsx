@@ -277,7 +277,7 @@ function LeaderboardModal({ onClose, today }) {
                     const emptyGrid = Array(MAX_GUESSES).fill(emptyRow);
                     const playerColor = player.name === user?.name ? '#61dbbb' : '#ed70bd';
                     // Fixed card height: enough for name + 6-row grid + score line
-                    const cardHeight = 252;
+                    const cardHeight = 280;
                     return played ? (
                       <div
                         key={player.name}
