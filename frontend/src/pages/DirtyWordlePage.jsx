@@ -220,38 +220,46 @@ function LeaderboardModal({ onClose, today }) {
                   Today — {formatUKDate()}
                 </p>
 
-                {data.today.length === 0 ? (
-                  <p className="text-sm text-center py-2" style={{ color: textSec }}>
-                    Neither of you has played today yet.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    {data.today.map(player => (
+                <div className="grid grid-cols-2 gap-3">
+                  {data.allTime.map(player => {
+                    const played = data.today.find(t => t.name === player.name);
+                    return played ? (
                       <div
                         key={player.name}
                         className="rounded-xl p-3 flex flex-col items-center gap-2"
                         style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
                       >
                         <p className="text-sm font-semibold" style={{ color: textPri }}>{player.name}</p>
-                        <ColourGrid grid={player.guess_grid} cellSize={24} />
+                        <ColourGrid grid={played.guess_grid} cellSize={24} />
                         <div className="text-center space-y-0.5">
                           <p className="text-xs" style={{ color: textSec }}>
-                            {player.won ? `${player.guesses_taken}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`}
+                            {played.won ? `${played.guesses_taken}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`}
                           </p>
-                          {player.pts > 0 && (
+                          {played.pts > 0 && (
                             <span className="inline-block rounded-lg px-2 py-0.5 text-xs font-semibold"
                               style={{ background: '#61dbbb', color: '#0d3d2e' }}>
-                              +{player.pts} pts
+                              +{played.pts} pts
                             </span>
                           )}
-                          {!player.won && (
+                          {!played.won && (
                             <p className="text-xs" style={{ color: '#ed70bd' }}>No points</p>
                           )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ) : (
+                      <div
+                        key={player.name}
+                        className="rounded-xl p-3 flex flex-col items-center justify-center gap-2 min-h-[140px]"
+                        style={{ background: cardBg, border: `1px dashed ${cardBorder}` }}
+                      >
+                        <p className="text-sm font-semibold" style={{ color: textPri }}>{player.name}</p>
+                        <p className="text-xs text-center font-semibold uppercase tracking-wide" style={{ color: textSec }}>
+                          is yet to play today
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* ── All-time stats ── */}
