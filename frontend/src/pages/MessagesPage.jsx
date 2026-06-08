@@ -395,7 +395,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       {showPicker && (
         <div
           data-bubble-action
-          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full bg-white shadow-xl border border-neutral-100 px-2 py-1.5"
+          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full bg-neutral-900 shadow-xl px-2 py-1.5"
           style={{ whiteSpace: 'nowrap' }}
         >
           {EMOJI_REACTIONS.map(emoji => (
@@ -914,7 +914,7 @@ export default function MessagesPage() {
         )}
 
         {data.messages.length > 0 && (
-          <ul className="space-y-2">
+          <ul className="space-y-4">
             {data.messages.map((m) => {
               const mine = m.sender_id === user?.id;
               const day = dayLabel(m.created_at);
