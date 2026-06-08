@@ -103,8 +103,42 @@ export default async function dirtyWordleRoutes(fastify) {
         ORDER BY wins DESC, avg_guesses ASC NULLS LAST`,
     );
 
+    // ── Series wins ───────────────────────────────────────────────────────
+    // Compute how many series each player has won (only completed series count).
+    const { rows: completedSeries } = await query(
+      `SELECT id, starts_on, ends_on FROM dirty_wordle_series WHERE ends_on < CURRENT_DATE ORDER BY starts_on`,
+    );
+
+    const seriesWins = {}; // account_id → win count
+
+    for (const series of completedSeries) {
+      // Sum dirty-wordle points per player within this series window
+      const { rows: ptsByPlayer } = await query(
+        `SELECT a.id AS account_id, COALESCE(SUM(pl.delta), 0) AS pts
+           FROM accounts a
+           LEFT JOIN points_ledger pl
+             ON pl.account_id = a.id
+            AND pl.reason LIKE 'dirty-wordle:%'
+            AND TO_DATE(REPLACE(pl.reason, 'dirty-wordle:', ''), 'YYYY-MM-DD') BETWEEN $1 AND $2
+          GROUP BY a.id`,
+        [series.starts_on, series.ends_on],
+      );
+
+      // Sort descending; winner must have strictly more points than second place
+      const sorted = [...ptsByPlayer].sort((a, b) => Number(b.pts) - Number(a.pts));
+      if (
+        sorted.length >= 1 &&
+        (sorted.length === 1 || Number(sorted[0].pts) > Number(sorted[1].pts)) &&
+        Number(sorted[0].pts) > 0
+      ) {
+        const wid = sorted[0].account_id;
+        seriesWins[wid] = (seriesWins[wid] ?? 0) + 1;
+      }
+    }
+
     return {
       date,
+      completed_series_count: completedSeries.length,
       today: todayRows.map(r => ({
         name:         r.name,
         photo_url:    r.photo_url,
@@ -120,6 +154,7 @@ export default async function dirtyWordleRoutes(fastify) {
         wins:          Number(r.wins),
         avg_guesses:   r.avg_guesses != null ? Number(r.avg_guesses) : '-',
         total_pts:     Number(r.total_pts),
+        series_wins:   seriesWins[r.account_id] ?? 0,
       })),
     };
   });

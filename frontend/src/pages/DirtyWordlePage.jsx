@@ -181,6 +181,7 @@ function LeaderboardModal({ onClose, today }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
+  const { user }  = useAuth();
   const dark = theme === 'dark';
 
   useEffect(() => {
@@ -252,9 +253,11 @@ function LeaderboardModal({ onClose, today }) {
                         className="rounded-xl p-3 flex flex-col items-center justify-center gap-2 min-h-[140px]"
                         style={{ background: cardBg, border: `1px dashed ${cardBorder}` }}
                       >
-                        <p className="text-sm font-semibold" style={{ color: textPri }}>{player.name}</p>
+                        <p className="text-sm font-bold uppercase tracking-wide" style={{ color: player.name === user?.name ? '#61dbbb' : '#ed70bd' }}>
+                          {player.name}
+                        </p>
                         <p className="text-xs text-center font-semibold uppercase tracking-wide" style={{ color: textSec }}>
-                          is yet to play today
+                          yet to play today
                         </p>
                       </div>
                     );
@@ -269,36 +272,42 @@ function LeaderboardModal({ onClose, today }) {
                   <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${cardBorder}` }}>
                     {/* Header */}
                     <div className="grid px-3 py-2 text-xs font-semibold uppercase tracking-wide"
-                      style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr', background: tableHead, color: textSec }}>
+                      style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', background: tableHead, color: textSec }}>
                       <span>Player</span>
                       <span className="text-center">Wins</span>
                       <span className="text-center">Avg</span>
                       <span className="text-center">Pts</span>
+                      <span className="text-center">Series</span>
                     </div>
-                    {data.allTime.map(player => (
-                      <div
-                        key={player.name}
-                        className="grid px-3 py-2.5 text-sm items-center"
-                        style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr', background: rowBg, borderTop: `1px solid ${rowBorder}` }}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="block h-7 w-7 shrink-0 overflow-hidden rounded-full"
-                            style={{ border: `2px solid ${cardBorder}` }}>
-                            {player.photo_url
-                              ? <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
-                              : <span className="flex h-full w-full items-center justify-center text-[10px] font-bold"
-                                  style={{ background: cardBorder, color: textPri }}>
-                                  {player.name?.[0]}
-                                </span>
-                            }
-                          </span>
-                          <span className="truncate font-semibold" style={{ color: textPri }}>{player.name}</span>
+                    {data.allTime.map(player => {
+                      const noSeriesYet = data.completed_series_count === 0;
+                      const seriesDisplay = noSeriesYet ? '-' : (player.series_wins ?? 0);
+                      return (
+                        <div
+                          key={player.name}
+                          className="grid px-3 py-2.5 text-sm items-center"
+                          style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', background: rowBg, borderTop: `1px solid ${rowBorder}` }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="block h-7 w-7 shrink-0 overflow-hidden rounded-full"
+                              style={{ border: `2px solid ${cardBorder}` }}>
+                              {player.photo_url
+                                ? <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
+                                : <span className="flex h-full w-full items-center justify-center text-[10px] font-bold"
+                                    style={{ background: cardBorder, color: textPri }}>
+                                    {player.name?.[0]}
+                                  </span>
+                              }
+                            </span>
+                            <span className="truncate font-semibold" style={{ color: textPri }}>{player.name}</span>
+                          </div>
+                          <span className="text-center font-bold" style={{ color: '#61dbbb' }}>{player.wins}</span>
+                          <span className="text-center" style={{ color: textSec }}>{player.avg_guesses}</span>
+                          <span className="text-center" style={{ color: textSec }}>{player.total_pts}</span>
+                          <span className="text-center font-bold" style={{ color: noSeriesYet ? textSec : '#ed70bd' }}>{seriesDisplay}</span>
                         </div>
-                        <span className="text-center font-bold" style={{ color: '#61dbbb' }}>{player.wins}</span>
-                        <span className="text-center" style={{ color: textSec }}>{player.avg_guesses}</span>
-                        <span className="text-center" style={{ color: textSec }}>{player.total_pts}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
