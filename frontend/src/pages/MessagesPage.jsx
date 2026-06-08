@@ -679,7 +679,11 @@ function AudioPlayer({ src, mine, fallbackDur = 0 }) {
           ))}
         </div>
         <p className="mt-0.5 text-[10px] font-medium" style={{ color: timeCss }}>
-          {fmtAudio(cur > 0 ? cur : displayDur)}{displayDur > 0 ? ` / ${fmtAudio(displayDur)}` : ''}
+          {displayDur > 0
+            ? cur > 0
+              ? `${fmtAudio(cur)} / ${fmtAudio(displayDur)}`
+              : fmtAudio(displayDur)
+            : ''}
         </p>
       </div>
     </div>
@@ -749,7 +753,14 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (data.messages.length > lastCountRef.current && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      const isInitial = lastCountRef.current === 0;
+      // Use rAF so the DOM has fully painted before scrolling
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({
+          behavior: isInitial ? 'instant' : 'smooth',
+          block: 'end',
+        });
+      });
     }
     lastCountRef.current = data.messages.length;
   }, [data.messages.length]);
@@ -917,7 +928,7 @@ export default function MessagesPage() {
 
   return (
     <>
-      <div className="space-y-3 pb-24">
+      <div className="space-y-4 pb-20">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {data.other && <Avatar url={data.other.photo_url} name={data.other.name} size="lg" />}
@@ -977,7 +988,7 @@ export default function MessagesPage() {
           </ul>
         )}
 
-        <div ref={bottomRef} aria-hidden style={{ scrollMarginBottom: '7rem' }} />
+        <div ref={bottomRef} aria-hidden />
 
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
