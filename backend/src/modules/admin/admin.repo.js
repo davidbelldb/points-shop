@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { pool, query } from '../../db.js';
 import { getDefaultAccountId } from '../accounts/accounts.repo.js';
 import { sendPush } from '../notifications/push.js';
@@ -147,6 +148,16 @@ export async function updateAccount(patch) {
   fields.push(`updated_at = NOW()`);
   values.push(accountId);
   await query(`UPDATE accounts SET ${fields.join(', ')} WHERE id = $${i}`, values);
+}
+
+// Change the password of the non-admin (other) account.
+export async function changeOtherUserPassword(newPassword) {
+  const { rows } = await query(
+    `SELECT id FROM accounts WHERE role != 'admin' ORDER BY created_at LIMIT 1`,
+  );
+  if (!rows[0]) throw Object.assign(new Error('No non-admin account found'), { statusCode: 404 });
+  const hash = await bcrypt.hash(newPassword, 10);
+  await query(`UPDATE accounts SET password_hash = $1, updated_at = NOW() WHERE id = $2`, [hash, rows[0].id]);
 }
 
 export async function adjustPoints(delta, reason, accountId = null) {

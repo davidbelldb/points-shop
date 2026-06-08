@@ -109,6 +109,10 @@ export default function AdminPage() {
         <AccountSection account={account} onChanged={refresh} />
       </AdminCollapsible>
 
+      <AdminCollapsible title="Katie's password" storageKey="admin::katie-password">
+        <KatiePasswordSection />
+      </AdminCollapsible>
+
       <AdminCollapsible title="Products" storageKey="admin::products">
         {error && <p className="text-sm text-red-600">{error}</p>}
         {loading ? (
@@ -332,6 +336,62 @@ function BrandingSection({ settings, onChanged }) {
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button onClick={saveText} disabled={busy} className="w-full rounded-md bg-amber-600 py-2 text-sm font-semibold text-amber-900 disabled:opacity-40">
         Save branding
+      </button>
+    </div>
+  );
+}
+
+function KatiePasswordSection() {
+  const [pw, setPw]       = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy]   = useState(false);
+  const [error, setError] = useState(null);
+  const [done, setDone]   = useState(false);
+
+  async function save() {
+    if (pw.length < 6)        { setError('Password must be at least 6 characters.'); return; }
+    if (pw !== confirm)       { setError('Passwords don\'t match.'); return; }
+    setBusy(true); setError(null); setDone(false);
+    try {
+      await api.admin.changeOtherUserPassword(pw);
+      setPw(''); setConfirm(''); setDone(true);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-neutral-500">Set a new password for Katie's account.</p>
+      <label className="block text-xs font-medium text-neutral-600">
+        New password
+        <input
+          type="password"
+          className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+          value={pw}
+          onChange={(e) => { setPw(e.target.value); setDone(false); }}
+          placeholder="Min. 6 characters"
+          autoComplete="new-password"
+        />
+      </label>
+      <label className="block text-xs font-medium text-neutral-600">
+        Confirm password
+        <input
+          type="password"
+          className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+          value={confirm}
+          onChange={(e) => { setConfirm(e.target.value); setDone(false); }}
+          placeholder="Repeat password"
+          autoComplete="new-password"
+        />
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {done  && <p className="text-sm text-emerald-600">Password updated ✓</p>}
+      <button
+        onClick={save}
+        disabled={busy || !pw || !confirm}
+        className="w-full rounded-md bg-amber-600 py-2 text-sm font-semibold text-amber-900 disabled:opacity-40"
+      >
+        {busy ? 'Saving…' : 'Update password'}
       </button>
     </div>
   );

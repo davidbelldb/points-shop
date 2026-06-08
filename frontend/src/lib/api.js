@@ -290,5 +290,7 @@ export const api = {
     pushScheduled:   ()        => request('/admin/push-scheduled'),
     pushCancelScheduled: (id)  => request(`/admin/push-scheduled/${id}`, { method: 'DELETE' }),
     pushDismiss:     ()        => request('/admin/push-dismiss',       { method: 'POST' }),
+    changeOtherUserPassword: (password) =>
+      request('/admin/other-account/password', { method: 'PATCH', body: JSON.stringify({ password }) }),
   },
 };

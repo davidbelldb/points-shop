@@ -14,6 +14,7 @@ import {
   deleteProductMedia,
   updateAccount,
   adjustPoints,
+  changeOtherUserPassword,
 } from './admin.repo.js';
 import { listAllOrders, updateOrderStatus } from '../orders/orders.repo.js';
 import { transcodeVideoIfNeeded } from '../media/transcode.js';
@@ -141,6 +142,19 @@ export default async function adminRoutes(fastify) {
   fastify.patch('/api/admin/account', async (req) => {
     await updateAccount(req.body ?? {});
     return { updated: true };
+  });
+
+  fastify.patch('/api/admin/other-account/password', async (req, reply) => {
+    const { password } = req.body ?? {};
+    if (typeof password !== 'string' || password.length < 6) {
+      return reply.code(400).send({ error: 'Password must be at least 6 characters' });
+    }
+    try {
+      await changeOtherUserPassword(password);
+      return { updated: true };
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
   });
 
   fastify.post('/api/admin/account/credit', async (req, reply) => {
