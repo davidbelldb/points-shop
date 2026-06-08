@@ -498,7 +498,7 @@ function GifButton({ onClick }) {
       type="button"
       onClick={onClick}
       aria-label="Send a GIF"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
     >
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="6" width="20" height="12" rx="2.5" />
@@ -516,7 +516,7 @@ function PhotoButton({ onClick }) {
       type="button"
       onClick={onClick}
       aria-label="Send a photo"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
     >
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -532,7 +532,7 @@ function MicButton({ recording, onClick }) {
       type="button"
       onClick={onClick}
       aria-label={recording ? 'Stop recording' : 'Record voice note'}
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition active:scale-95 ${
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition active:scale-95 ${
         recording
           ? 'border-red-300 bg-red-50 text-red-500 animate-pulse'
           : 'border-neutral-200 bg-white text-neutral-500 hover:border-amber-300 hover:text-amber-700'
@@ -917,7 +917,7 @@ export default function MessagesPage() {
               </button>
             </div>
           )}
-          <form onSubmit={send} className="flex items-stretch gap-2 py-3">
+          <form onSubmit={send} className="flex items-center gap-1.5 py-3">
             <GifButton onClick={() => setGifOpen(true)} />
             <PhotoButton onClick={() => photoInputRef.current?.click()} />
             <MicButton recording={recording} onClick={toggleRecording} />
@@ -929,14 +929,18 @@ export default function MessagesPage() {
               onChange={(e) => setDraft(e.target.value)}
               placeholder={replyTo ? `Reply to ${replyTo.senderName}…` : 'Say something...'}
               autoComplete="off"
-              className="block h-11 flex-1 rounded-2xl border border-neutral-200 bg-white px-4 text-sm focus:border-amber-500 focus:outline-none"
+              className="block h-10 flex-1 rounded-2xl border border-neutral-200 bg-white px-4 text-sm focus:border-amber-500 focus:outline-none"
             />
             <button
               type="submit"
               disabled={busy || !draft.trim()}
-              className="shrink-0 h-11 rounded-2xl bg-amber-600 px-5 text-sm font-semibold text-amber-900 disabled:opacity-40"
+              aria-label="Send"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white disabled:opacity-40 active:scale-95 transition"
             >
-              Send
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
             </button>
           </form>
         </div>
