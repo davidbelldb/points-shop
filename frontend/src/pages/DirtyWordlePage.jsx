@@ -254,8 +254,8 @@ function LeaderboardModal({ onClose, today }) {
                   <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: textSec }}>All time</p>
                   <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${cardBorder}` }}>
                     {/* Header */}
-                    <div className="grid grid-cols-4 px-3 py-2 text-xs font-semibold uppercase tracking-wide"
-                      style={{ background: tableHead, color: textSec }}>
+                    <div className="grid px-3 py-2 text-xs font-semibold uppercase tracking-wide"
+                      style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr', background: tableHead, color: textSec }}>
                       <span>Player</span>
                       <span className="text-center">Wins</span>
                       <span className="text-center">Avg</span>
@@ -264,8 +264,8 @@ function LeaderboardModal({ onClose, today }) {
                     {data.allTime.map(player => (
                       <div
                         key={player.name}
-                        className="grid grid-cols-4 px-3 py-2.5 text-sm items-center"
-                        style={{ background: rowBg, borderTop: `1px solid ${rowBorder}` }}
+                        className="grid px-3 py-2.5 text-sm items-center"
+                        style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr', background: rowBg, borderTop: `1px solid ${rowBorder}` }}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="block h-7 w-7 shrink-0 overflow-hidden rounded-full"
