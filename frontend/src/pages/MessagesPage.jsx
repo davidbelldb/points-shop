@@ -752,13 +752,12 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    if (data.messages.length > lastCountRef.current && bottomRef.current) {
+    if (data.messages.length > lastCountRef.current) {
       const isInitial = lastCountRef.current === 0;
-      // Use rAF so the DOM has fully painted before scrolling
       requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
           behavior: isInitial ? 'instant' : 'smooth',
-          block: 'end',
         });
       });
     }
@@ -928,7 +927,7 @@ export default function MessagesPage() {
 
   return (
     <>
-      <div className="space-y-4 pb-20">
+      <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {data.other && <Avatar url={data.other.photo_url} name={data.other.name} size="lg" />}
@@ -988,12 +987,12 @@ export default function MessagesPage() {
           </ul>
         )}
 
-        <div ref={bottomRef} aria-hidden />
-
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
       </div>
+      {/* Sentinel outside space-y flow — pb-20 clears the fixed composer bar */}
+      <div ref={bottomRef} className="pb-20" aria-hidden />
 
       {/* Composer bar */}
       <div className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
