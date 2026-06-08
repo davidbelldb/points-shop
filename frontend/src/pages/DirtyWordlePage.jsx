@@ -295,7 +295,7 @@ function LeaderboardModal({ onClose, today }) {
                     return played ? (
                       <div
                         key={player.name}
-                        className="rounded-xl p-3 flex flex-col items-center justify-center gap-2"
+                        className="rounded-xl p-3 flex flex-col items-center justify-start gap-2"
                         style={{ background: cardBg, border: `1px solid ${cardBorder}`, height: cardHeight }}
                       >
                         <p className="text-sm font-bold uppercase tracking-wide" style={{ color: playerColor }}>{player.name}</p>
