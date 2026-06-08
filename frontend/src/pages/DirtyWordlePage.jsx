@@ -257,6 +257,16 @@ function LeaderboardModal({ onClose, today }) {
                         className="rounded-xl p-3 flex flex-col items-center justify-center gap-2 min-h-[140px]"
                         style={{ background: cardBg, border: `1px dashed ${cardBorder}` }}
                       >
+                        <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-full"
+                          style={{ border: `3px solid ${player.name === user?.name ? '#61dbbb' : '#ed70bd'}` }}>
+                          {player.photo_url
+                            ? <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
+                            : <span className="flex h-full w-full items-center justify-center text-sm font-bold"
+                                style={{ background: cardBorder, color: textPri }}>
+                                {player.name?.[0]}
+                              </span>
+                          }
+                        </span>
                         <p className="text-sm font-bold uppercase tracking-wide" style={{ color: player.name === user?.name ? '#61dbbb' : '#ed70bd' }}>
                           {player.name}
                         </p>
