@@ -2,7 +2,9 @@ import {
   listNotifications, unreadCount, markAllRead, deleteNotification, deleteAllNotifications,
   savePushSubscription, deletePushSubscription,
 } from './notifications.repo.js';
-import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
+import { sendPush } from './push.js';
+import { query } from '../../db.js';
 import { config } from '../../config.js';
 
 export default async function notificationsRoutes(fastify) {
@@ -44,5 +46,20 @@ export default async function notificationsRoutes(fastify) {
     const endpoint = req.body?.endpoint;
     if (endpoint) await deletePushSubscription(endpoint);
     return { ok: true };
+  });
+
+  // ── Admin: broadcast a push to every subscribed device ───────────────────
+  fastify.post('/api/admin/push-broadcast', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Forbidden' });
+    const { title, body, url } = req.body ?? {};
+    if (!title || !body) return reply.code(400).send({ error: 'title and body required' });
+
+    const { rows } = await query(
+      `SELECT DISTINCT account_id FROM push_subscriptions`,
+    );
+    if (rows.length === 0) return { sent: 0 };
+
+    await Promise.all(rows.map(r => sendPush(r.account_id, { title, body, url: url || '/' })));
+    return { sent: rows.length };
   });
 }
