@@ -716,6 +716,7 @@ export default function MessagesPage() {
     try {
       await api.sendMessage(draft, null, replyTo?.id ?? null);
       setDraft('');
+      if (inputRef.current) inputRef.current.style.height = '40px';
       setReplyTo(null);
       await refresh(false);
       await refreshBasket();
@@ -922,14 +923,22 @@ export default function MessagesPage() {
             <PhotoButton onClick={() => photoInputRef.current?.click()} />
             <MicButton recording={recording} onClick={toggleRecording} />
             <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={sendPhoto} />
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+              }}
               placeholder={replyTo ? `Reply to ${replyTo.senderName}…` : 'Say something...'}
               autoComplete="off"
-              className="block h-10 flex-1 rounded-2xl border border-neutral-200 bg-white px-4 text-sm focus:border-amber-500 focus:outline-none"
+              className="block flex-1 rounded-2xl border border-neutral-200 bg-white px-4 py-2.5 text-sm leading-5 focus:border-amber-500 focus:outline-none resize-none overflow-hidden"
+              style={{ minHeight: 40, maxHeight: 120 }}
             />
             <button
               type="submit"
