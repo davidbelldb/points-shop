@@ -249,8 +249,9 @@ function LeaderboardModal({ onClose, today }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: modalBg }}>
         {/* Header */}
-        <div className="px-5 pt-5 pb-3">
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between">
           <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Dirty Wordle Leaderboard</h2>
+          <button onClick={onClose} aria-label="Close" style={{ color: textSec, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, fontSize: 22, padding: '0 0 0 8px' }}>✕</button>
         </div>
 
         <div className="px-5 pb-3 space-y-6 max-h-[80vh] overflow-y-auto">
@@ -403,12 +404,6 @@ function LeaderboardModal({ onClose, today }) {
           )}
         </div>
 
-        <div className="px-5 pb-5 flex justify-center">
-          <button onClick={onClose} className="w-1/2 rounded-xl py-3 text-sm font-semibold transition hover:opacity-90 active:scale-95"
-            style={{ background: '#61dbbb', color: '#0d3d2e' }}>
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );
