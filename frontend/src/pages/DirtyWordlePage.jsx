@@ -78,6 +78,8 @@ function evaluateGuess(guess, target) {
 // ─── Mini colour grid (shared between result modal and leaderboard) ───────────
 
 function ColourGrid({ grid, cellSize = 32 }) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   return (
     <div className="flex flex-col items-center gap-1">
       {grid.map((row, ri) => (
@@ -91,7 +93,7 @@ function ColourGrid({ grid, cellSize = 32 }) {
                 background:
                   state === 'correct' ? '#61dbbb'
                   : state === 'present' ? '#ed70bd'
-                  : '#525252',
+                  : isDark ? '#525252' : '#939391',
               }}
             />
           ))}
@@ -539,8 +541,7 @@ export default function DirtyWordlePage() {
         <h1 className="font-bold text-lg tracking-wide">Dirty Wordle</h1>
         <button
           onClick={() => setShowLeaderboard(true)}
-          className="w-20 text-right text-sm font-medium px-2 py-1 rounded-lg transition"
-          style={{ color: '#61dbbb' }}
+          className="w-20 text-right text-sm font-medium px-2 py-1 rounded-lg transition text-neutral-500"
         >
           Scores
         </button>
