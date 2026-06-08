@@ -285,6 +285,7 @@ export const api = {
     updateDuckyNightCommentary: (ord, patch) => request(`/admin/games/ducky/night-commentary/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     updateDuckyNightIntro: (ord, patch) => request(`/admin/games/ducky/night-intro/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     upload: uploadFile,
+    users:           ()        => request('/admin/users'),
     pushBroadcast:   (payload) => request('/admin/push-broadcast',    { method: 'POST',   body: JSON.stringify(payload) }),
     pushScheduled:   ()        => request('/admin/push-scheduled'),
     pushCancelScheduled: (id)  => request(`/admin/push-scheduled/${id}`, { method: 'DELETE' }),

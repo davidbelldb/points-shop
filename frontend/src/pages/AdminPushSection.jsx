@@ -12,15 +12,17 @@ function localDatetimeDefault() {
 }
 
 export default function AdminPushSection() {
-  const [title,       setTitle]       = useState('');
-  const [body,        setBody]        = useState('');
-  const [url,         setUrl]         = useState('');
-  const [schedule,    setSchedule]    = useState(false);
+  const [title,        setTitle]        = useState('');
+  const [body,         setBody]         = useState('');
+  const [url,          setUrl]          = useState('');
+  const [recipientId,  setRecipientId]  = useState('all');
+  const [users,        setUsers]        = useState([]);
+  const [schedule,     setSchedule]     = useState(false);
   const [scheduledFor, setScheduledFor] = useState(localDatetimeDefault());
-  const [busy,        setBusy]        = useState(false);
-  const [result,      setResult]      = useState(null);
-  const [pending,     setPending]     = useState([]);
-  const [dismissBusy, setDismissBusy] = useState(false);
+  const [busy,         setBusy]         = useState(false);
+  const [result,       setResult]       = useState(null);
+  const [pending,      setPending]      = useState([]);
+  const [dismissBusy,  setDismissBusy]  = useState(false);
 
   async function loadPending() {
     try {
@@ -29,7 +31,10 @@ export default function AdminPushSection() {
     } catch {}
   }
 
-  useEffect(() => { loadPending(); }, []);
+  useEffect(() => {
+    loadPending();
+    api.admin.users().then(res => setUsers(res ?? [])).catch(() => {});
+  }, []);
 
   async function send(e) {
     e.preventDefault();
@@ -41,6 +46,7 @@ export default function AdminPushSection() {
         title: title.trim(),
         body: body.trim(),
         url: url.trim() || '/',
+        ...(recipientId !== 'all' ? { accountId: recipientId } : {}),
         ...(schedule ? { scheduledFor: new Date(scheduledFor).toISOString() } : {}),
       };
       const res = await api.admin.pushBroadcast(payload);
@@ -97,6 +103,15 @@ export default function AdminPushSection() {
             Link <span className="font-normal text-neutral-400">(optional — defaults to /)</span>
           </label>
           <input className={inputCls} value={url} onChange={e => setUrl(e.target.value)} placeholder="/games" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">Send to</label>
+          <select className={inputCls} value={recipientId} onChange={e => setRecipientId(e.target.value)}>
+            <option value="all">Everyone</option>
+            {users.map(u => (
+              <option key={u.id} value={u.id}>{u.name || u.username}</option>
+            ))}
+          </select>
         </div>
 
         {/* Schedule toggle */}

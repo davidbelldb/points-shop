@@ -51,7 +51,7 @@ export default async function notificationsRoutes(fastify) {
   // ── Admin: broadcast push (immediate or scheduled) ────────────────────────
   fastify.post('/api/admin/push-broadcast', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Forbidden' });
-    const { title, body, url, scheduledFor } = req.body ?? {};
+    const { title, body, url, scheduledFor, accountId } = req.body ?? {};
     if (!title || !body) return reply.code(400).send({ error: 'title and body required' });
 
     // Scheduled — store for later
@@ -61,15 +61,17 @@ export default async function notificationsRoutes(fastify) {
         return reply.code(400).send({ error: 'scheduledFor must be a future datetime' });
       }
       const { rows } = await query(
-        `INSERT INTO scheduled_push_notifications (title, body, url, scheduled_for)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [title, body, url || '/', ts],
+        `INSERT INTO scheduled_push_notifications (title, body, url, scheduled_for, account_id)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [title, body, url || '/', ts, accountId || null],
       );
       return { scheduled: true, id: rows[0].id, scheduledFor: ts.toISOString() };
     }
 
-    // Immediate
-    const { rows } = await query(`SELECT DISTINCT account_id FROM push_subscriptions`);
+    // Immediate — single recipient or all
+    const { rows } = accountId
+      ? await query(`SELECT DISTINCT account_id FROM push_subscriptions WHERE account_id = $1`, [accountId])
+      : await query(`SELECT DISTINCT account_id FROM push_subscriptions`);
     if (rows.length === 0) return { sent: 0 };
     await Promise.all(rows.map(r => sendPush(r.account_id, { title, body, url: url || '/' })));
     return { sent: rows.length };

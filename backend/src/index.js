@@ -127,10 +127,12 @@ async function fireScheduledPushes() {
       `UPDATE scheduled_push_notifications
           SET sent_at = NOW()
         WHERE sent_at IS NULL AND scheduled_for <= NOW()
-        RETURNING id, title, body, url`,
+        RETURNING id, title, body, url, account_id`,
     );
     for (const n of due) {
-      const { rows: subs } = await dbQuery(`SELECT DISTINCT account_id FROM push_subscriptions`);
+      const { rows: subs } = n.account_id
+        ? await dbQuery(`SELECT DISTINCT account_id FROM push_subscriptions WHERE account_id = $1`, [n.account_id])
+        : await dbQuery(`SELECT DISTINCT account_id FROM push_subscriptions`);
       await Promise.all(subs.map(r => sendPush(r.account_id, { title: n.title, body: n.body, url: n.url })));
       fastify.log.info({ id: n.id }, 'Scheduled push fired');
     }
