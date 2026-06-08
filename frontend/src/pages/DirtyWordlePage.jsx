@@ -291,20 +291,31 @@ export default function DirtyWordlePage() {
   const [modalDismissed,   setModalDismissed]   = useState(saved.modalAcked   ?? false);
   const [resultSaved,      setResultSaved]      = useState(saved.resultSaved  ?? false);
   const [showLeaderboard,  setShowLeaderboard]  = useState(false);
-  const [progressLoaded,   setProgressLoaded]   = useState(saved.guesses != null);
+  const [progressLoaded, setProgressLoaded] = useState(false);
 
-  // On mount: fetch server-side progress (syncs across devices).
-  // Only runs if the game isn't already finished locally.
+  // On mount: always sync from server so any device picks up current state.
   useEffect(() => {
-    if (saved.gameOver) { setProgressLoaded(true); return; }
-    api.dirtyWordleProgress(today)
-      .then(({ guesses: serverGuesses }) => {
+    async function syncFromServer() {
+      try {
+        // 1. Try in-progress guesses first
+        const { guesses: serverGuesses } = await api.dirtyWordleProgress(today);
         if (serverGuesses && serverGuesses.length > 0) {
           setGuesses(serverGuesses);
+          // Recompute derived state from loaded guesses
+          const lastGuess = serverGuesses[serverGuesses.length - 1];
+          const isWon  = lastGuess === target;
+          const isOver = isWon || serverGuesses.length >= MAX_GUESSES;
+          if (isWon)  setWon(true);
+          if (isOver) setGameOver(true);
+          if (isOver && !saved.modalAcked) setModalDismissed(false);
         }
-      })
-      .catch(() => {})
-      .finally(() => setProgressLoaded(true));
+      } catch {
+        // Server unreachable — fall back to whatever localStorage had
+      } finally {
+        setProgressLoaded(true);
+      }
+    }
+    syncFromServer();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today]);
 
@@ -416,8 +427,8 @@ export default function DirtyWordlePage() {
 
       <p className="text-xs text-neutral-400">{formatUKDate()} — Another day, another dirdle.</p>
 
-      {/* Grid */}
-      <div className="flex flex-col gap-1.5">
+      {/* Grid — held back until server sync completes to avoid empty flash */}
+      <div className="flex flex-col gap-1.5" style={{ opacity: progressLoaded ? 1 : 0, transition: 'opacity 0.15s' }}>
         {Array.from({ length: MAX_GUESSES }, (_, rowIdx) => {
           const submitted = rowIdx < guesses.length;
           const isCurrent = rowIdx === guesses.length && !gameOver;
