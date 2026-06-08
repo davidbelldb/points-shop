@@ -108,15 +108,15 @@ const TILE_TEXT = { correct: '#0d3d2e', present: '#fff' };
 function Tile({ letter, state, delay = 0, revealed, isDark }) {
   const isColoured = ['correct','present','absent'].includes(state);
 
-  const absentBg   = isDark ? '#525252' : '#e8e8e6';
-  const absentText = isDark ? '#ffffff' : '#525252';
+  const absentBg   = isDark ? '#525252' : '#939391';
+  const absentText = '#ffffff';
 
   const bg = isColoured
     ? (state === 'absent' ? absentBg : { correct: '#61dbbb', present: '#ed70bd' }[state])
     : isDark ? '#1f1f1e' : '#e8e8e6';
 
   const border = isColoured
-    ? { correct: '#61dbbb', present: '#ed70bd', absent: '#525252' }[state]
+    ? (state === 'absent' ? absentBg : { correct: '#61dbbb', present: '#ed70bd' }[state])
     : state === 'active'
       ? (isDark ? '#6b6b68' : '#a3a3a0')
       : (isDark ? '#30302e' : '#d4d4d0');
@@ -146,8 +146,8 @@ function Tile({ letter, state, delay = 0, revealed, isDark }) {
 const KEY_BG = {
   correct: '#61dbbb',
   present: '#ed70bd',
-  absent:  { dark: '#525252', light: '#e8e8e6' },   // matches tile absent colour per mode
-  unused:  { dark: '#2e2e2c', light: '#939390' },   // darker  = "default keyboard"
+  absent:  { dark: '#525252', light: '#939391' },   // matches tile absent colour per mode
+  unused:  { dark: '#2e2e2c', light: '#e8e8e6' },   // darker  = "default keyboard"
 };
 const KEY_TEXT = { correct: '#0d3d2e', present: '#fff', absent: '#fff', unused: { dark: '#ffffff', light: '#171717' } };
 
