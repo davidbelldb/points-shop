@@ -22,7 +22,7 @@ export default async function dirtyWordleRoutes(fastify) {
   // ── Save result (win or loss) + credit points on win ──────────────────────
   fastify.post('/api/games/dirty-wordle/result', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
-    const { date, won, guesses_taken, guess_grid } = req.body ?? {};
+    const { date, won, guesses_taken, guess_grid, guesses } = req.body ?? {};
 
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return reply.code(400).send({ error: 'date required (YYYY-MM-DD)' });
@@ -39,10 +39,10 @@ export default async function dirtyWordleRoutes(fastify) {
 
     // Upsert result row — idempotent, first write wins
     await query(
-      `INSERT INTO dirty_wordle_results (account_id, date, won, guesses_taken, guess_grid)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (account_id, date) DO NOTHING`,
-      [accountId, date, won, guesses_taken, JSON.stringify(guess_grid)],
+      `INSERT INTO dirty_wordle_results (account_id, date, won, guesses_taken, guess_grid, guesses)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (account_id, date) DO UPDATE SET guesses = EXCLUDED.guesses`,
+      [accountId, date, won, guesses_taken, JSON.stringify(guess_grid), JSON.stringify(guesses ?? [])],
     );
 
     // Credit points on win (also idempotent via ledger reason)
@@ -128,11 +128,22 @@ export default async function dirtyWordleRoutes(fastify) {
   fastify.get('/api/games/dirty-wordle/progress', async (req) => {
     const accountId = getEffectiveAccountId(req);
     const date = req.query.date ?? new Date().toISOString().slice(0, 10);
-    const { rows } = await query(
+
+    // Check in-progress first
+    const { rows: progressRows } = await query(
       `SELECT guesses FROM dirty_wordle_progress WHERE account_id = $1 AND date = $2`,
       [accountId, date],
     );
-    return { guesses: rows[0]?.guesses ?? [] };
+    if (progressRows[0]?.guesses?.length > 0) {
+      return { guesses: progressRows[0].guesses };
+    }
+
+    // Fall back to completed result (permanent record) if progress is gone
+    const { rows: resultRows } = await query(
+      `SELECT guesses FROM dirty_wordle_results WHERE account_id = $1 AND date = $2`,
+      [accountId, date],
+    );
+    return { guesses: resultRows[0]?.guesses ?? [] };
   });
 
   fastify.post('/api/games/dirty-wordle/progress', async (req, reply) => {

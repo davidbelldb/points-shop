@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { useTheme } from '../lib/ThemeContext.jsx';
 
 // ─── Word list ────────────────────────────────────────────────────────────────
 
@@ -162,6 +163,8 @@ const GHOST_BTN = 'flex-1 inline-flex items-center justify-center rounded-xl bor
 function LeaderboardModal({ onClose, today }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const { theme } = useTheme();
+  const dark = theme === 'dark';
 
   useEffect(() => {
     api.dirtyWordleLeaderboard(today)
@@ -170,28 +173,38 @@ function LeaderboardModal({ onClose, today }) {
       .finally(() => setLoading(false));
   }, [today]);
 
+  const modalBg   = dark ? '#1e1e1c' : '#ffffff';
+  const cardBg    = dark ? '#30302e' : '#f5f5f4';
+  const cardBorder= dark ? '#3a3a38' : '#e5e5e5';
+  const tableBg   = dark ? '#30302e' : '#f5f5f4';
+  const tableHead = dark ? '#252523' : '#e5e5e5';
+  const rowBg     = dark ? '#2a2a28' : '#ffffff';
+  const rowBorder = dark ? '#3a3a38' : '#e5e5e5';
+  const textPri   = dark ? '#ffffff' : '#171717';
+  const textSec   = dark ? '#a3a3a3' : '#737373';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-800 shadow-xl overflow-hidden">
-        {/* Header — no divider, pink title */}
+      <div className="w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: modalBg }}>
+        {/* Header */}
         <div className="px-5 pt-5 pb-3">
           <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Leaderboard</h2>
         </div>
 
         <div className="px-5 pb-3 space-y-6 max-h-[80vh] overflow-y-auto">
-          {loading && <p className="text-sm text-center text-neutral-400">Loading...</p>}
-          {!loading && !data && <p className="text-sm text-center text-neutral-400">Couldn't load leaderboard.</p>}
+          {loading && <p className="text-sm text-center" style={{ color: textSec }}>Loading...</p>}
+          {!loading && !data && <p className="text-sm text-center" style={{ color: textSec }}>Couldn't load scores.</p>}
 
           {data && (
             <>
               {/* ── Today's grids ── */}
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: textSec }}>
                   Today — {formatUKDate()}
                 </p>
 
                 {data.today.length === 0 ? (
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-2">
+                  <p className="text-sm text-center py-2" style={{ color: textSec }}>
                     Neither of you has played today yet.
                   </p>
                 ) : (
@@ -199,21 +212,18 @@ function LeaderboardModal({ onClose, today }) {
                     {data.today.map(player => (
                       <div
                         key={player.name}
-                        className="rounded-xl border border-neutral-200 dark:border-neutral-600 bg-neutral-100 dark:bg-neutral-700 p-3 flex flex-col items-center gap-2"
+                        className="rounded-xl p-3 flex flex-col items-center gap-2"
+                        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
                       >
-                        <p className="text-sm font-semibold text-neutral-800 dark:text-white">{player.name}</p>
+                        <p className="text-sm font-semibold" style={{ color: textPri }}>{player.name}</p>
                         <ColourGrid grid={player.guess_grid} cellSize={24} />
                         <div className="text-center space-y-0.5">
-                          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                            {player.won
-                              ? `${player.guesses_taken}/${MAX_GUESSES}`
-                              : `X/${MAX_GUESSES}`}
+                          <p className="text-xs" style={{ color: textSec }}>
+                            {player.won ? `${player.guesses_taken}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`}
                           </p>
                           {player.pts > 0 && (
-                            <span
-                              className="inline-block rounded-lg px-2 py-0.5 text-xs font-semibold"
-                              style={{ background: '#61dbbb', color: '#0d3d2e' }}
-                            >
+                            <span className="inline-block rounded-lg px-2 py-0.5 text-xs font-semibold"
+                              style={{ background: '#61dbbb', color: '#0d3d2e' }}>
                               +{player.pts} pts
                             </span>
                           )}
@@ -230,28 +240,30 @@ function LeaderboardModal({ onClose, today }) {
               {/* ── All-time stats ── */}
               {data.allTime.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">All time</p>
-                  <div className="rounded-xl border border-neutral-200 dark:border-neutral-600 overflow-hidden">
-                    {/* Header row */}
-                    <div className="grid grid-cols-4 bg-neutral-100 dark:bg-neutral-700 px-3 py-2 text-xs font-semibold text-neutral-500 dark:text-neutral-300 uppercase tracking-wide">
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: textSec }}>All time</p>
+                  <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${cardBorder}` }}>
+                    {/* Header */}
+                    <div className="grid grid-cols-4 px-3 py-2 text-xs font-semibold uppercase tracking-wide"
+                      style={{ background: tableHead, color: textSec }}>
                       <span>Player</span>
                       <span className="text-center">Wins</span>
                       <span className="text-center">Avg</span>
                       <span className="text-center">Pts</span>
                     </div>
-                    {data.allTime.map((player, i) => (
+                    {data.allTime.map(player => (
                       <div
                         key={player.name}
-                        className={`grid grid-cols-4 px-3 py-2.5 text-sm items-center border-t border-neutral-100 dark:border-neutral-700 bg-white dark:bg-neutral-800`}
+                        className="grid grid-cols-4 px-3 py-2.5 text-sm items-center"
+                        style={{ background: rowBg, borderTop: `1px solid ${rowBorder}` }}
                       >
-                        <span className="font-semibold text-neutral-800 dark:text-white">{player.name}</span>
+                        <span className="font-semibold" style={{ color: textPri }}>{player.name}</span>
                         <span className="text-center font-bold" style={{ color: '#61dbbb' }}>{player.wins}</span>
-                        <span className="text-center text-neutral-600 dark:text-neutral-300">{player.avg_guesses}</span>
-                        <span className="text-center text-neutral-600 dark:text-neutral-300">{player.total_pts}</span>
+                        <span className="text-center" style={{ color: textSec }}>{player.avg_guesses}</span>
+                        <span className="text-center" style={{ color: textSec }}>{player.total_pts}</span>
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-neutral-400 text-center mt-1">Avg = average guesses on wins</p>
+                  <p className="text-xs text-center mt-1" style={{ color: textSec }}>Avg = average guesses on wins</p>
                 </div>
               )}
             </>
@@ -259,7 +271,8 @@ function LeaderboardModal({ onClose, today }) {
         </div>
 
         <div className="px-5 pb-5">
-          <button onClick={onClose} className="w-full rounded-xl bg-[#61dbbb] py-3 text-sm font-semibold text-[#0d3d2e] transition hover:opacity-90 active:scale-95">
+          <button onClick={onClose} className="w-full rounded-xl py-3 text-sm font-semibold transition hover:opacity-90 active:scale-95"
+            style={{ background: '#61dbbb', color: '#0d3d2e' }}>
             Close
           </button>
         </div>
@@ -364,6 +377,7 @@ export default function DirtyWordlePage() {
         won: isWon,
         guesses_taken: newGuesses.length,
         guess_grid: grid,
+        guesses: newGuesses,
       })
         .then(r => { setPtsEarned(isWon ? r.pts : 0); setResultSaved(true); })
         .catch(() => { setPtsEarned(fallbackPts); setResultSaved(false); });
