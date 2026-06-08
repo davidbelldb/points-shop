@@ -140,20 +140,26 @@ function Tile({ letter, state, delay = 0, revealed, isDark }) {
 
 // ─── Keyboard key ─────────────────────────────────────────────────────────────
 
-const KEY_BG   = { correct: '#61dbbb', present: '#ed70bd', absent: '#525252' };
-const KEY_TEXT = { correct: '#0d3d2e', present: '#fff',    absent: '#fff' };
+const KEY_BG = {
+  correct: '#61dbbb',
+  present: '#ed70bd',
+  absent:  { dark: '#2e2e2c', light: '#939390' },   // clearly darker = "ruled out"
+  unused:  { dark: '#5c5c59', light: '#d4d4d0' },   // medium = "not yet tried"
+};
+const KEY_TEXT = { correct: '#0d3d2e', present: '#fff', absent: '#fff', unused: { dark: '#ffffff', light: '#171717' } };
 
 function Key({ label, state, onPress, isDark }) {
   const wide = label === 'ENTER' || label === '⌫';
-  const coloured = KEY_BG[state];
-  const bg    = coloured ?? (isDark ? '#4a4a47' : '#d4d4d0');
-  const color = coloured ? KEY_TEXT[state] : (isDark ? '#ffffff' : '#171717');
+  let bg, color;
+  if (state === 'correct') { bg = KEY_BG.correct; color = KEY_TEXT.correct; }
+  else if (state === 'present') { bg = KEY_BG.present; color = KEY_TEXT.present; }
+  else if (state === 'absent') { bg = isDark ? KEY_BG.absent.dark : KEY_BG.absent.light; color = '#fff'; }
+  else { bg = isDark ? KEY_BG.unused.dark : KEY_BG.unused.light; color = isDark ? '#fff' : '#171717'; }
   return (
     <button
       onPointerDown={(e) => { e.preventDefault(); onPress(label); }}
       style={{
-        height: 52, flex: wide ? 1.5 : 1,
-        padding: 0,
+        height: 52, flex: wide ? 1.5 : 1, padding: 0,
         borderRadius: 6, fontWeight: 700, fontSize: wide ? 11 : 15,
         border: 'none', background: bg, color,
         cursor: 'pointer', userSelect: 'none', touchAction: 'none', transition: 'background 0.15s',

@@ -84,23 +84,23 @@ export default async function dirtyWordleRoutes(fastify) {
       [`dirty-wordle:${date}`, date],
     );
 
-    // All-time stats per account
+    // All-time stats — all accounts shown even if they haven't played yet
     const { rows: statsRows } = await query(
-      `SELECT r.account_id,
+      `SELECT a.id AS account_id,
               a.name,
               a.photo_url,
-              COUNT(*)                              AS games_played,
-              COUNT(*) FILTER (WHERE r.won)         AS wins,
-              ROUND(AVG(r.guesses_taken)::numeric, 1) AS avg_guesses,
-              COALESCE(SUM(pl.delta), 0)            AS total_pts
-         FROM dirty_wordle_results r
-         JOIN accounts a ON a.id = r.account_id
+              COUNT(r.id)                                        AS games_played,
+              COUNT(r.id) FILTER (WHERE r.won)                   AS wins,
+              ROUND(AVG(r.guesses_taken) FILTER (WHERE r.won)::numeric, 1) AS avg_guesses,
+              COALESCE(SUM(pl.delta), 0)                         AS total_pts
+         FROM accounts a
+         LEFT JOIN dirty_wordle_results r ON r.account_id = a.id
          LEFT JOIN points_ledger pl
-           ON pl.account_id = r.account_id
+           ON pl.account_id = a.id
           AND pl.reason = 'dirty-wordle:' || r.date::text
           AND r.won = true
-        GROUP BY r.account_id, a.name, a.photo_url
-        ORDER BY wins DESC, avg_guesses ASC`,
+        GROUP BY a.id, a.name, a.photo_url
+        ORDER BY wins DESC, avg_guesses ASC NULLS LAST`,
     );
 
     return {
@@ -118,7 +118,7 @@ export default async function dirtyWordleRoutes(fastify) {
         photo_url:     r.photo_url,
         games_played:  Number(r.games_played),
         wins:          Number(r.wins),
-        avg_guesses:   Number(r.avg_guesses),
+        avg_guesses:   r.avg_guesses != null ? Number(r.avg_guesses) : '-',
         total_pts:     Number(r.total_pts),
       })),
     };
