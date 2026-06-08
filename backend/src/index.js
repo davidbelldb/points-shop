@@ -37,6 +37,8 @@ import storiesRoutes from './modules/stories/stories.routes.js';
 import lastfmRoutes from './modules/stories/lastfm.routes.js';
 import mediaRoutes from './modules/media/media.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
+import { sendPush } from './modules/notifications/push.js';
+import { query as dbQuery } from './db.js';
 
 const MEDIA_DIR = config.mediaDir;
 await mkdir(MEDIA_DIR, { recursive: true });
@@ -117,6 +119,26 @@ await fastify.register(lastfmRoutes);
 await fastify.register(mediaRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
+
+// ── Scheduled push notification poller (every 60s) ───────────────────────────
+async function fireScheduledPushes() {
+  try {
+    const { rows: due } = await dbQuery(
+      `UPDATE scheduled_push_notifications
+          SET sent_at = NOW()
+        WHERE sent_at IS NULL AND scheduled_for <= NOW()
+        RETURNING id, title, body, url`,
+    );
+    for (const n of due) {
+      const { rows: subs } = await dbQuery(`SELECT DISTINCT account_id FROM push_subscriptions`);
+      await Promise.all(subs.map(r => sendPush(r.account_id, { title: n.title, body: n.body, url: n.url })));
+      fastify.log.info({ id: n.id }, 'Scheduled push fired');
+    }
+  } catch (e) {
+    fastify.log.error({ err: e }, 'Scheduled push poller error');
+  }
+}
+setInterval(fireScheduledPushes, 60_000);
 
 // One-shot background backfill for legacy video stories without poster
 // thumbnails. Doesn't block startup; logs progress through fastify.log.

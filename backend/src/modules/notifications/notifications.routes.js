@@ -48,18 +48,64 @@ export default async function notificationsRoutes(fastify) {
     return { ok: true };
   });
 
-  // ── Admin: broadcast a push to every subscribed device ───────────────────
+  // ── Admin: broadcast push (immediate or scheduled) ────────────────────────
   fastify.post('/api/admin/push-broadcast', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Forbidden' });
-    const { title, body, url } = req.body ?? {};
+    const { title, body, url, scheduledFor } = req.body ?? {};
     if (!title || !body) return reply.code(400).send({ error: 'title and body required' });
 
-    const { rows } = await query(
-      `SELECT DISTINCT account_id FROM push_subscriptions`,
-    );
-    if (rows.length === 0) return { sent: 0 };
+    // Scheduled — store for later
+    if (scheduledFor) {
+      const ts = new Date(scheduledFor);
+      if (isNaN(ts.getTime()) || ts <= new Date()) {
+        return reply.code(400).send({ error: 'scheduledFor must be a future datetime' });
+      }
+      const { rows } = await query(
+        `INSERT INTO scheduled_push_notifications (title, body, url, scheduled_for)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [title, body, url || '/', ts],
+      );
+      return { scheduled: true, id: rows[0].id, scheduledFor: ts.toISOString() };
+    }
 
+    // Immediate
+    const { rows } = await query(`SELECT DISTINCT account_id FROM push_subscriptions`);
+    if (rows.length === 0) return { sent: 0 };
     await Promise.all(rows.map(r => sendPush(r.account_id, { title, body, url: url || '/' })));
+    return { sent: rows.length };
+  });
+
+  // ── Admin: list pending scheduled pushes ─────────────────────────────────
+  fastify.get('/api/admin/push-scheduled', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Forbidden' });
+    const { rows } = await query(
+      `SELECT id, title, body, url, scheduled_for
+         FROM scheduled_push_notifications
+        WHERE sent_at IS NULL
+        ORDER BY scheduled_for ASC`,
+    );
+    return { items: rows };
+  });
+
+  // ── Admin: cancel a scheduled push ───────────────────────────────────────
+  fastify.delete('/api/admin/push-scheduled/:id', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Forbidden' });
+    await query(
+      `DELETE FROM scheduled_push_notifications WHERE id = $1 AND sent_at IS NULL`,
+      [req.params.id],
+    );
+    return { ok: true };
+  });
+
+  // ── Admin: dismiss — sends a 'clear' push so devices close the notification
+  // Works on Android/Chrome. iOS does not support getNotifications() in SW.
+  fastify.post('/api/admin/push-dismiss', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Forbidden' });
+    const { rows } = await query(`SELECT DISTINCT account_id FROM push_subscriptions`);
+    if (rows.length === 0) return { sent: 0 };
+    await Promise.all(rows.map(r =>
+      sendPush(r.account_id, { action: 'clear', tag: 'sneaky-broadcast' }),
+    ));
     return { sent: rows.length };
   });
 }

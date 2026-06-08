@@ -28,6 +28,8 @@ export async function sendPush(accountId, payload) {
       title: payload.title || 'Sneaky Points',
       body: payload.body || '',
       url: payload.url || '/',
+      action: payload.action || null,
+      tag: payload.tag || 'sneaky-broadcast',
     });
     await Promise.all(rows.map(async (s) => {
       try {
