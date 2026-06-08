@@ -577,53 +577,80 @@ function fmtAudio(s) {
   return `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}`;
 }
 
-function AudioPlayer({ src, mine }) {
+// fallbackDur is used for MediaRecorder blobs which often report NaN/Infinity
+// duration until the seek-to-end trick resolves the real value.
+function AudioPlayer({ src, mine, fallbackDur = 0 }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [cur, setCur]         = useState(0);
   const [dur, setDur]         = useState(0);
+  const [err, setErr]         = useState(false);
 
   function toggle() {
     const a = audioRef.current;
     if (!a) return;
     if (a.paused) {
       document.querySelectorAll('audio').forEach(el => { if (el !== a) el.pause(); });
-      a.play().catch(() => {});
+      setErr(false);
+      a.play().catch(() => setErr(true));
     } else { a.pause(); }
   }
 
-  function seek(e) {
-    const a = audioRef.current;
-    if (!a || !dur) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    a.currentTime = frac * dur;
-    setCur(a.currentTime);
+  // MediaRecorder blobs frequently have duration=NaN or Infinity.
+  // Seeking to a huge time forces the browser to decode to the real end,
+  // after which onSeeked receives the corrected finite duration.
+  function handleLoadedMetadata(e) {
+    const a = e.currentTarget;
+    if (Number.isFinite(a.duration) && a.duration > 0) {
+      setDur(a.duration);
+    } else {
+      // Trigger duration resolution
+      a.currentTime = 1e9;
+    }
   }
 
-  const progress   = dur > 0 ? cur / dur : 0;
+  function handleSeeked(e) {
+    const a = e.currentTarget;
+    if (Number.isFinite(a.duration) && a.duration > 0 && dur === 0) {
+      setDur(a.duration);
+      a.currentTime = 0; // reset to start after probing
+    }
+  }
+
+  const displayDur = dur > 0 ? dur : fallbackDur;
+  const progress   = displayDur > 0 ? cur / displayDur : 0;
   // Both sides: teal play button. Bar fill differs so you can tell whose is whose.
-  const btnBg      = '#61dbbb';
-  const barFill    = mine ? '#ed70bd' : '#61dbbb';
-  const barEmpty   = mine ? '#fce7f3' : '#d1faf0';
-  const timeColor  = '#ffffff';
+  const btnBg   = '#61dbbb';
+  const barFill = mine ? '#ed70bd' : '#61dbbb';
+  const barEmpty= mine ? '#fce7f3' : '#d1faf0';
+  const timeCss = '#ffffff';
+
+  function seek(e) {
+    const a = audioRef.current;
+    if (!a || !displayDur) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    a.currentTime = frac * displayDur;
+    setCur(a.currentTime);
+  }
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 min-w-[210px]">
       <audio
         ref={audioRef}
         src={src}
-        preload="metadata"
+        preload="auto"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => { setPlaying(false); setCur(0); }}
         onTimeUpdate={e => setCur(e.currentTarget.currentTime)}
-        onLoadedMetadata={e => setDur(e.currentTarget.duration || 0)}
+        onLoadedMetadata={handleLoadedMetadata}
+        onSeeked={handleSeeked}
       />
       <button
         data-bubble-action
         onClick={e => { e.stopPropagation(); toggle(); }}
-        style={{ background: btnBg }}
+        style={{ background: err ? '#ef4444' : btnBg }}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition active:scale-95"
         aria-label={playing ? 'Pause' : 'Play'}
       >
@@ -638,7 +665,6 @@ function AudioPlayer({ src, mine }) {
         )}
       </button>
       <div className="min-w-0 flex-1">
-        {/* Clickable waveform */}
         <div
           data-bubble-action
           className="flex h-7 cursor-pointer items-center gap-[2px]"
@@ -652,8 +678,8 @@ function AudioPlayer({ src, mine }) {
             />
           ))}
         </div>
-        <p className="mt-0.5 text-[10px] font-medium" style={{ color: timeColor }}>
-          {fmtAudio(playing || cur > 0 ? cur : dur)}{dur > 0 ? ` / ${fmtAudio(dur)}` : ''}
+        <p className="mt-0.5 text-[10px] font-medium" style={{ color: timeCss }}>
+          {fmtAudio(cur > 0 ? cur : displayDur)}{displayDur > 0 ? ` / ${fmtAudio(displayDur)}` : ''}
         </p>
       </div>
     </div>
@@ -998,7 +1024,7 @@ export default function MessagesPage() {
               ) : recBlob ? (
                 /* ── State 2: review before sending ── */
                 <div className="space-y-2">
-                  <AudioPlayer src={recBlobUrl} mine={true} />
+                  <AudioPlayer src={recBlobUrl} mine={true} fallbackDur={recSecs} />
                   <div className="flex gap-2">
                     <button
                       type="button"
