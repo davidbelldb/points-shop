@@ -27,14 +27,14 @@ function metaLine(ev) {
 function UpcomingCard({ ev }) {
   // Pink if it's a gifts event, teal otherwise — keeps the page palette tight.
   const pink = ev.gifts;
-  const tone = pink ? 'bg-pink-50 border-pink-200' : 'bg-amber-50 border-amber-200';
+  const tone = pink ? 'bg-pink-50' : 'bg-amber-50 border border-amber-200';
   return (
     <Link
       to="/calendar"
-      className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition hover:shadow-sm active:scale-[0.99] ${tone}`}
+      className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 transition hover:shadow-sm active:scale-[0.99] ${tone}`}
     >
       <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm ring-1 ring-pink-200"
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm${pink ? '' : ' ring-1 ring-amber-200'}`}
         style={{ backgroundColor: '#fce7f3', color: EVENT_ICON_COLOR }}
       >
         <EventIcon iconKey={ev.icon} size={20} />

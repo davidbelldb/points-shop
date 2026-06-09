@@ -390,15 +390,15 @@ function EventCard({ ev, onClick }) {
   // Cards alternate by flag — gifts → pink, show-and-tell → teal accent, plain → teal-50.
   const pink = ev.gifts;
   const tone = pink
-    ? 'bg-pink-50 border-pink-200'
-    : 'bg-amber-50 border-amber-200';
+    ? 'bg-pink-50'
+    : 'bg-amber-50 border border-amber-200';
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition hover:shadow-sm active:scale-[0.99] ${tone}`}
+      className={`flex w-full items-start gap-3 rounded-2xl p-3 text-left transition hover:shadow-sm active:scale-[0.99] ${tone}`}
     >
       <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1 ring-pink-200"
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm${pink ? '' : ' ring-1 ring-amber-200'}`}
         style={{ backgroundColor: '#fce7f3', color: EVENT_ICON_COLOR }}
       >
         <EventIcon iconKey={ev.icon} size={20} />
