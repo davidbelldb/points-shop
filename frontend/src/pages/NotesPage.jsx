@@ -705,14 +705,15 @@ export default function NotesPage() {
     >
       {/* Desktop two-pane */}
       <div className="hidden md:grid h-full" style={{ gridTemplateColumns: '280px 1fr' }}>
-        <div className="h-full overflow-hidden">{listPanel}</div>
+        {/* No overflow-hidden on list panel — allows the New Note popover to escape */}
+        <div className="h-full">{listPanel}</div>
         <div className="h-full overflow-hidden">{editorPanel}</div>
       </div>
 
       {/* Mobile single-pane */}
       <div className="flex h-full flex-col md:hidden">
         {mobilePane === 'list'
-          ? <div className="h-full overflow-hidden">{listPanel}</div>
+          ? <div className="h-full">{listPanel}</div>
           : <div className="h-full overflow-hidden">{editorPanel}</div>
         }
       </div>

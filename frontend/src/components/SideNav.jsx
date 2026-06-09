@@ -52,6 +52,17 @@ function CalendarIcon() {
     </svg>
   );
 }
+function NotesIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <line x1="10" y1="9" x2="8" y2="9" />
+    </svg>
+  );
+}
 function StoreIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -128,6 +139,7 @@ export default function SideNav() {
         <div className="space-y-0.5">
           <NavItem to="/"         label="Home"       icon={<HomeIcon />} />
           <NavItem to="/store"    label="Store"      icon={<StoreIcon />} />
+          <NavItem to="/notes"    label="Notes"      icon={<NotesIcon />} />
           <NavItem to="/stories"  label="Stories"    icon={<FeedIcon />} />
           <NavItem to="/games"    label="Games"      icon={<GameIcon />} />
           <NavItem to="/rewatch"  label="Watch list" icon={<TvIcon />} />

@@ -1,4 +1,7 @@
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { findOtherUser } from '../chat/chat.repo.js';
+import { sendPush } from '../notifications/push.js';
+import { query } from '../../db.js';
 import {
   listNotes,
   createNote,
@@ -8,6 +11,31 @@ import {
   restoreNote,
   hardDeleteNote,
 } from './notes.repo.js';
+
+/** Fetch the display name for an account (fire-and-forget safe). */
+async function getSenderName(accountId) {
+  try {
+    const { rows } = await query(`SELECT name FROM accounts WHERE id = $1`, [accountId]);
+    return rows[0]?.name ?? 'Someone';
+  } catch { return 'Someone'; }
+}
+
+/**
+ * Notify the other user about a note event.
+ * action: 'added' | 'updated'
+ */
+async function notifyPartner(actorId, action) {
+  try {
+    const [other, name] = await Promise.all([findOtherUser(actorId), getSenderName(actorId)]);
+    if (!other) return;
+    await sendPush(other.id, {
+      title: `${name} just ${action} a sneaky note`,
+      body: 'Best go take a look, ey?',
+      url: '/notes',
+      tag: 'sneaky-note',
+    });
+  } catch { /* never let notification errors bubble up */ }
+}
 
 export default async function notesRoutes(fastify) {
   // GET /api/notes?status=active|archived|deleted
@@ -26,6 +54,7 @@ export default async function notesRoutes(fastify) {
     if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
     const type = req.body?.type === 'shared' ? 'shared' : 'personal';
     const note = await createNote(accountId, type);
+    notifyPartner(accountId, 'added'); // fire-and-forget
     return reply.code(201).send(note);
   });
 
@@ -36,7 +65,9 @@ export default async function notesRoutes(fastify) {
     const { body } = req.body ?? {};
     if (typeof body !== 'string') return reply.code(400).send({ error: 'body (string) required' });
     try {
-      return await updateNote(req.params.id, accountId, body);
+      const note = await updateNote(req.params.id, accountId, body);
+      notifyPartner(accountId, 'updated'); // fire-and-forget
+      return note;
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }
