@@ -215,7 +215,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               title="Move to trash"
-              className="rounded p-1 opacity-0 group-hover:opacity-100 transition-all text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              className="rounded p-1 opacity-0 group-hover:opacity-100 transition-all text-neutral-400 dark:text-neutral-500 hover:bg-red-50 hover:text-[#fca5a5]"
             ><TrashIcon size={13} /></button>
           )}
           {mode === 'trash' && (
@@ -226,11 +226,8 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
                 onHardDelete();
               }}
               title="Delete permanently"
-              className={`rounded p-1 opacity-0 group-hover:opacity-100 transition-all ${
-                confirmHard
-                  ? 'text-red-600 bg-red-50 dark:bg-red-900/20 opacity-100'
-                  : 'text-neutral-400 dark:text-neutral-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-              }`}
+              className="rounded p-1 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-[#fca5a5] text-neutral-400 dark:text-neutral-500"
+              style={confirmHard ? { opacity: 1, background: '#3a1818', color: '#fca5a5' } : {}}
             >
               {confirmHard
                 ? <span className="text-[9px] font-bold px-0.5">Sure?</span>
@@ -259,7 +256,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
     return (
       <SwipeRow
         leftAction={{ label: 'Archive', bg: 'bg-[#2a5a4f]',   color: '#61dbbb', icon: <ArchiveIcon size={18} />, onClick: onArchive }}
-        rightAction={{ label: 'Delete',  bg: 'bg-red-500',     color: '#ffffff', icon: <TrashIcon size={18} />,   onClick: onDelete  }}
+        rightAction={{ label: 'Delete',  bg: 'bg-[#3a1818]',   color: '#fca5a5', icon: <TrashIcon size={18} />,   onClick: onDelete  }}
       >{inner}</SwipeRow>
     );
   }
@@ -267,7 +264,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
     return (
       <SwipeRow
         leftAction={{ label: 'Restore', bg: 'bg-[#2a5a4f]',   color: '#61dbbb', icon: <RestoreIcon size={18} />, onClick: onRestore }}
-        rightAction={{ label: 'Delete',  bg: 'bg-red-500',     color: '#ffffff', icon: <TrashIcon size={18} />,   onClick: onDelete  }}
+        rightAction={{ label: 'Delete',  bg: 'bg-[#3a1818]',   color: '#fca5a5', icon: <TrashIcon size={18} />,   onClick: onDelete  }}
       >{inner}</SwipeRow>
     );
   }
@@ -275,7 +272,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
     return (
       <SwipeRow
         leftAction={{ label: 'Restore', bg: 'bg-[#2a5a4f]',   color: '#61dbbb', icon: <RestoreIcon size={18} />, onClick: onRestore    }}
-        rightAction={{ label: 'Delete',  bg: 'bg-red-500',     color: '#ffffff', icon: <TrashIcon size={18} />,   onClick: onHardDelete }}
+        rightAction={{ label: 'Delete',  bg: 'bg-[#3a1818]',   color: '#fca5a5', icon: <TrashIcon size={18} />,   onClick: onHardDelete }}
       >{inner}</SwipeRow>
     );
   }
