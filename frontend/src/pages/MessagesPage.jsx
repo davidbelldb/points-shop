@@ -447,8 +447,8 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
           style={{
             opacity: Math.min(1, Math.abs(Math.min(0, dragX)) / SWIPE_TRIGGER),
             transform: `translate(${SWIPE_TRIGGER * 0.75}px, -50%) scale(${leftArmed ? 1.15 : 1})`,
-            background: leftArmed ? '#b91c1c' : '#fee2e2',
-            color: leftArmed ? '#ffffff' : '#b91c1c',
+            background: leftArmed ? '#3a1818' : '#2d1212',
+            color: '#fca5a5',
           }}
           className="pointer-events-none absolute top-1/2 left-full ml-2 flex h-7 w-7 items-center justify-center rounded-full shadow"
         >
@@ -1229,8 +1229,7 @@ export default function MessagesPage() {
             </p>
             <button
               onClick={() => removeForce(confirmDeleteId)}
-              className="w-full rounded-xl py-3 text-sm font-semibold text-white active:scale-95 transition"
-              style={{ background: '#b91c1c' }}
+              className="w-full rounded-xl py-3 text-sm font-semibold bg-red-50 text-red-700 active:scale-95 transition"
             >
               Delete
             </button>
