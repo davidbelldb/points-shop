@@ -43,7 +43,7 @@ function isUploadedPhoto(body) {
 const REACTION_MAP = { heart: '💜' };
 function reactionEmoji(r) { return r ? (REACTION_MAP[r] ?? r) : null; }
 
-const EMOJI_REACTIONS = ['😂', '💜', '🍆', '😬', '😱'];
+const EMOJI_REACTIONS = ['😂', '💜', '🍆', '😬', '😲'];
 
 // ---------------------------------------------------------------------------
 // GIF Picker modal
@@ -300,6 +300,7 @@ const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
 function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
+  const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
   const swipeRef  = useRef(null);
@@ -396,7 +397,8 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       {showPicker && (
         <div
           data-bubble-action
-          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full bg-neutral-900 shadow-xl px-2 py-1.5"
+          style={{ background: theme === 'dark' ? '#1f1f1f' : '#fafafa' }}
+          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full shadow-xl px-2 py-1.5"
           style={{ whiteSpace: 'nowrap' }}
         >
           {EMOJI_REACTIONS.map(emoji => (
