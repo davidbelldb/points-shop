@@ -211,6 +211,12 @@ export const api = {
     const qs = params.toString();
     return request(`/orders${qs ? `?${qs}` : ''}`);
   },
+  // Notes
+  listNotes: () => request('/notes'),
+  createNote: () => request('/notes', { method: 'POST' }),
+  updateNote: (id, body) => request(`/notes/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  deleteNote: (id) => request(`/notes/${id}`, { method: 'DELETE' }),
+
   admin: {
     listProducts:    () => request('/admin/products'),
     createProduct:   (data) => request('/admin/products', { method: 'POST', body: JSON.stringify(data) }),

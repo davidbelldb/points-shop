@@ -36,6 +36,7 @@ import calendarRoutes from './modules/calendar/calendar.routes.js';
 import storiesRoutes from './modules/stories/stories.routes.js';
 import lastfmRoutes from './modules/stories/lastfm.routes.js';
 import mediaRoutes from './modules/media/media.routes.js';
+import notesRoutes from './modules/notes/notes.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 import { sendPush } from './modules/notifications/push.js';
 import { query as dbQuery } from './db.js';
@@ -117,6 +118,7 @@ await fastify.register(calendarRoutes);
 await fastify.register(storiesRoutes);
 await fastify.register(lastfmRoutes);
 await fastify.register(mediaRoutes);
+await fastify.register(notesRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 
