@@ -116,17 +116,27 @@ function SwipeRow({ children, leftAction, rightAction }) {
 
   const close = () => { setOffset(0); setRevealed(false); };
 
+  // iOS Safari compositing-layer fix: overflow-hidden + transform = buttons bleed through.
+  // Instead, use clip-path on the buttons to hide them when not swiped.
+  // clip from left: TOTAL_W when hidden (offset=0), 0 when fully revealed (offset=-TOTAL_W).
+  const clipLeft = Math.max(0, TOTAL_W + offset);
+  const animating = startX.current === null;
+
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden"
+      className="relative"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Action buttons — mobile only */}
+      {/* Action buttons — clipped via clip-path to avoid iOS compositing bleed-through */}
       <div
-        className="md:hidden absolute right-0 top-0 bottom-0 flex overflow-hidden rounded-r-xl"
-        style={{ width: TOTAL_W }}
+        className="md:hidden absolute right-0 top-0 bottom-0 flex rounded-r-xl"
+        style={{
+          width: TOTAL_W,
+          clipPath: `inset(0 0 0 ${clipLeft}px)`,
+          transition: animating ? 'clip-path 0.22s ease' : 'none',
+        }}
       >
         {actions.map((a) => (
           <button
@@ -140,14 +150,11 @@ function SwipeRow({ children, leftAction, rightAction }) {
           </button>
         ))}
       </div>
-      {/* Row — slides left to reveal buttons. position+zIndex ensures the row
-          always paints over the absolute buttons on iOS compositing layers. */}
+      {/* Row content — slides left on swipe */}
       <div
         style={{
           transform: `translateX(${offset}px)`,
-          transition: startX.current === null ? 'transform 0.22s ease' : 'none',
-          position: 'relative',
-          zIndex: 1,
+          transition: animating ? 'transform 0.22s ease' : 'none',
         }}
       >
         {children}
@@ -168,7 +175,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
       className={`group relative flex cursor-pointer flex-col gap-0.5 rounded-xl px-3 py-2.5 transition-colors select-none ${
         active
           ? 'bg-amber-50 dark:bg-amber-900/20'
-          : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+          : 'hover:bg-neutral-100'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -337,8 +344,8 @@ function NoteEditor({ note, onBack, onSaved, readOnly }) {
     <div className="flex h-full flex-col bg-white dark:bg-[#1c1c1e]">
       {/* Mobile back bar (hidden on md+) */}
       {onBack && (
-        <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 px-3 py-2.5 md:hidden">
-          <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-amber-600 dark:text-amber-400">
+        <div className="flex items-center gap-2 border-b border-neutral-200 px-3 pt-5 pb-2.5 md:hidden">
+          <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-neutral-500 dark:text-neutral-400">
             <BackChevron size={16} /> Notes
           </button>
           {!readOnly && (
@@ -400,7 +407,7 @@ function NoteEditor({ note, onBack, onSaved, readOnly }) {
               onChange={(e) => { setBody(e.target.value); scheduleSave(title, e.target.value); }}
               placeholder="Start writing…"
               rows={6}
-              className="mt-3 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 focus:outline-none"
+              className="mt-3 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed text-neutral-800 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 focus:outline-none"
             />
           </>
         )}
@@ -430,14 +437,14 @@ function EmptyState({ message }) {
 
 function NewNotePopover({ onCreate, onClose }) {
   return (
-    <div className="absolute top-full right-0 mt-1.5 z-50 w-48 rounded-2xl bg-white dark:bg-neutral-800 shadow-2xl ring-1 ring-black/8 dark:ring-white/8 overflow-hidden py-1">
+    <div className="absolute top-full right-0 mt-1.5 z-50 w-48 rounded-2xl bg-white shadow-2xl ring-1 ring-black/8 dark:ring-white/8 overflow-hidden py-1">
       <button
         onClick={() => { onCreate('personal'); onClose(); }}
-        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700/60 transition-colors"
+        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
       >
         <PersonIcon size={14} /> Personal note
       </button>
-      <div className="mx-3 h-px bg-neutral-100 dark:bg-neutral-700" />
+      <div className="mx-3 h-px bg-neutral-100" />
       <button
         onClick={() => { onCreate('shared'); onClose(); }}
         className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-[#1f8a6b] dark:text-[#61dbbb] hover:bg-[#61dbbb]/5 dark:hover:bg-[#61dbbb]/10 transition-colors"
@@ -548,9 +555,9 @@ export default function NotesPage() {
   // ── List panel ──────────────────────────────────────────────────────────────
 
   const listPanel = (
-    <div className="flex h-full flex-col bg-neutral-50 dark:bg-[#1c1c1e] border-r border-neutral-200 dark:border-neutral-800">
+    <div className="flex h-full flex-col bg-neutral-50 dark:bg-[#1c1c1e] border-r border-neutral-200">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-3 pt-5 pb-3 border-b border-neutral-200 dark:border-neutral-800">
+      <div className="flex items-center justify-between gap-2 px-3 pt-5 pb-3 border-b border-neutral-200">
         {view !== 'active' ? (
           <button
             onClick={() => setView('active')}
@@ -621,7 +628,7 @@ export default function NotesPage() {
                 </p>
                 {sharedNotes.map((note) => <NoteRow {...rowProps(note)} />)}
                 {personalNotes.length > 0 && (
-                  <div className="my-1.5 mx-3 h-px bg-neutral-200 dark:bg-neutral-800" />
+                  <div className="my-1.5 mx-3 h-px bg-neutral-200" />
                 )}
               </>
             )}
@@ -644,28 +651,28 @@ export default function NotesPage() {
 
       {/* Footer: Archive + Trash links */}
       {view === 'active' && (
-        <div className="flex gap-1 border-t border-neutral-200 dark:border-neutral-800 p-2">
+        <div className="flex gap-1 border-t border-neutral-200 p-2">
           <button
             onClick={() => setView('archive')}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 transition-colors"
           >
             <ArchiveIcon size={12} />
             Archive
             {footerCounts.archive > 0 && (
-              <span className="rounded-full bg-neutral-200 dark:bg-neutral-700 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-neutral-600 dark:text-neutral-300">
+              <span className="rounded-full bg-neutral-200 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-neutral-600 dark:text-neutral-300">
                 {footerCounts.archive}
               </span>
             )}
           </button>
-          <div className="my-1 w-px bg-neutral-200 dark:bg-neutral-800" />
+          <div className="my-1 w-px bg-neutral-200" />
           <button
             onClick={() => setView('trash')}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 transition-colors"
           >
             <TrashIcon size={12} />
             Deleted
             {footerCounts.trash > 0 && (
-              <span className="rounded-full bg-neutral-200 dark:bg-neutral-700 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-neutral-600 dark:text-neutral-300">
+              <span className="rounded-full bg-neutral-200 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-neutral-600 dark:text-neutral-300">
                 {footerCounts.trash}
               </span>
             )}
