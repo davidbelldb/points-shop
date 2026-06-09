@@ -413,7 +413,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
                 data-bubble-action
                 onClick={(e) => { e.stopPropagation(); onSetReaction(m.reaction === emoji ? null : emoji); setShowPicker(false); }}
                 className="text-xl leading-none px-1.5 py-0.5 rounded-full transition-transform hover:scale-125 active:scale-110"
-                style={{ background: m.reaction === emoji ? '#f3f4f6' : 'transparent', transform: m.reaction === emoji ? 'scale(1.2)' : undefined }}
+                style={{ background: m.reaction === emoji ? (theme === 'dark' ? '#1f1f1f' : '#f3f4f6') : 'transparent', transform: m.reaction === emoji ? 'scale(1.2)' : undefined }}
               >
                 {emoji}
               </button>
