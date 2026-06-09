@@ -215,6 +215,7 @@ export const api = {
   listNotes: (status = 'active') => request(`/notes?status=${status}`),
   createNote: (type = 'personal') => request('/notes', { method: 'POST', body: JSON.stringify({ type }) }),
   updateNote: (id, body) => request(`/notes/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  changeNoteType: (id, type) => request(`/notes/${id}/type`, { method: 'PATCH', body: JSON.stringify({ type }) }),
   archiveNote: (id) => request(`/notes/${id}/archive`, { method: 'PATCH' }),
   restoreNote: (id) => request(`/notes/${id}/restore`, { method: 'PATCH' }),
   deleteNote: (id) => request(`/notes/${id}`, { method: 'DELETE' }),

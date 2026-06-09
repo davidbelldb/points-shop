@@ -117,6 +117,25 @@ export async function restoreNote(id, accountId) {
   return rows[0];
 }
 
+/** Change a note's type — only the original owner can do this. */
+export async function changeNoteType(id, accountId, type) {
+  const { rows } = await query(
+    `UPDATE notes
+        SET type = $3, updated_at = NOW()
+      WHERE id = $1
+        AND account_id = $2
+        AND status = 'active'
+      RETURNING id, body, type, status, created_at, updated_at`,
+    [id, accountId, type],
+  );
+  if (!rows[0]) {
+    const err = new Error('Note not found or not editable');
+    err.statusCode = 404;
+    throw err;
+  }
+  return rows[0];
+}
+
 export async function hardDeleteNote(id, accountId) {
   const { rowCount } = await query(
     `DELETE FROM notes

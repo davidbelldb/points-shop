@@ -6,6 +6,7 @@ import {
   listNotes,
   createNote,
   updateNote,
+  changeNoteType,
   archiveNote,
   softDeleteNote,
   restoreNote,
@@ -67,6 +68,21 @@ export default async function notesRoutes(fastify) {
     try {
       const note = await updateNote(req.params.id, accountId, body);
       notifyPartner(accountId, 'updated'); // fire-and-forget
+      return note;
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  // PATCH /api/notes/:id/type  { type: 'personal'|'shared' }
+  fastify.patch('/api/notes/:id/type', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+    const type = req.body?.type;
+    if (type !== 'personal' && type !== 'shared') return reply.code(400).send({ error: 'type must be personal or shared' });
+    try {
+      const note = await changeNoteType(req.params.id, accountId, type);
+      if (type === 'shared') notifyPartner(accountId, 'shared'); // fire-and-forget
       return note;
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });

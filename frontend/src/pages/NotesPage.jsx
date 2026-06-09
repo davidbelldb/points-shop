@@ -284,7 +284,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
 
 // ─── Note Editor ──────────────────────────────────────────────────────────────
 
-function NoteEditor({ note, onBack, onSaved, readOnly }) {
+function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
   const titleRef   = useRef(null);
   const bodyRef    = useRef(null);
   const saveTimer  = useRef(null);
@@ -297,8 +297,9 @@ function NoteEditor({ note, onBack, onSaved, readOnly }) {
 
   const [title,   setTitle]   = useState(() => splitBody(note.body ?? '').title);
   const [body,    setBody]    = useState(() => splitBody(note.body ?? '').body);
-  const [saving,  setSaving]  = useState(false);
-  const [savedAt, setSavedAt] = useState(null);
+  const [saving,    setSaving]    = useState(false);
+  const [savedAt,   setSavedAt]   = useState(null);
+  const [converting, setConverting] = useState(false);
 
   useEffect(() => {
     const { title: t, body: b } = splitBody(note.body ?? '');
@@ -373,14 +374,32 @@ function NoteEditor({ note, onBack, onSaved, readOnly }) {
           })}
         </p>
 
-        {/* Shared badge */}
-        {note.type === 'shared' && (
-          <div className="mb-5 flex justify-center">
+        {/* Shared badge / Share button */}
+        <div className="mb-5 flex justify-center">
+          {note.type === 'shared' ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#61dbbb]/15 dark:bg-[#61dbbb]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-[#1f8a6b] dark:text-[#61dbbb]">
               <SharedPeopleIcon size={11} /> Shared note
             </span>
-          </div>
-        )}
+          ) : !readOnly && (
+            <button
+              onClick={async () => {
+                if (converting) return;
+                setConverting(true);
+                try {
+                  const updated = await api.changeNoteType(note.id, 'shared');
+                  onTypeChanged(updated);
+                } catch { /* silent */ } finally {
+                  setConverting(false);
+                }
+              }}
+              disabled={converting}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#61dbbb]/30 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#61dbbb]/60 transition hover:border-[#61dbbb] hover:text-[#61dbbb] active:scale-95 disabled:opacity-40"
+            >
+              <SharedPeopleIcon size={11} />
+              {converting ? 'Sharing…' : 'Share with Katie'}
+            </button>
+          )}
+        </div>
 
         {readOnly ? (
           /* Read-only view for archive / trash */
@@ -702,6 +721,7 @@ export default function NotesPage() {
       note={activeNote}
       onBack={() => setMobilePane('list')}
       onSaved={handleSaved}
+      onTypeChanged={handleSaved}
       readOnly={view !== 'active'}
     />
   ) : (
