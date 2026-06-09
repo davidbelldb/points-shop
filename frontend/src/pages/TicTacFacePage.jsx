@@ -287,7 +287,7 @@ export default function TicTacFacePage() {
   const showModal        = !!match?.finished && !modalDismissed;
   const matchInProgress  = match && !match.finished;
   const meStatus    = !game ? '' : game.finished ? '' : (isMyTurn ? 'Your turn' : 'Waiting');
-  const otherStatus = !game ? '' : game.finished ? '' : (isMyTurn ? 'Waiting' : 'Their turn');
+  const otherStatus = !game ? '' : game.finished ? '' : (isMyTurn ? 'Waiting' : 'Their go');
 
   return (
     <div className="space-y-4 py-2">
