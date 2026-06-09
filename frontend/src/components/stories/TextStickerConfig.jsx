@@ -107,7 +107,7 @@ export default function TextStickerConfig({ initial, onCancel, onSave, onDelete 
             <button
               type="button"
               onClick={onDelete}
-              className="mt-2 w-full rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
+              className="mt-2 w-full rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
             >
               Remove text
             </button>

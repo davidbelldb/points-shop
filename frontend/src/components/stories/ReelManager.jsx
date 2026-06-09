@@ -215,7 +215,7 @@ export default function ReelManager({ reelId, onClose, onChanged }) {
             type="button"
             onClick={deleteReel}
             disabled={busy}
-            className="mt-4 w-full rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-40"
+            className="mt-4 w-full rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-40"
           >
             Delete this reel
           </button>
