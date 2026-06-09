@@ -455,15 +455,6 @@ export default function NotesPage() {
   const [creating,     setCreating]     = useState(false);
   const [showPopover,  setShowPopover]  = useState(false);
   const [footerCounts, setFooterCounts] = useState({ archive: 0, trash: 0 });
-  const popoverRef = useRef(null);
-
-  // Close popover on outside click
-  useEffect(() => {
-    if (!showPopover) return;
-    const h = (e) => { if (!popoverRef.current?.contains(e.target)) setShowPopover(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [showPopover]);
 
   // Load notes whenever view changes
   useEffect(() => {
@@ -569,12 +560,16 @@ export default function NotesPage() {
         )}
 
         {view === 'active' && (
-          <div className="relative" ref={popoverRef}>
+          <div className="relative">
+            {/* Backdrop — closes popover when tapping outside, sits above scroll container */}
+            {showPopover && (
+              <div className="fixed inset-0 z-40" onClick={() => setShowPopover(false)} />
+            )}
             <button
               onClick={() => setShowPopover((v) => !v)}
               disabled={creating}
               aria-label="New note"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 transition hover:bg-amber-200 dark:hover:bg-amber-800/40 active:scale-95 disabled:opacity-40"
+              className="relative z-50 flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 transition hover:bg-amber-200 dark:hover:bg-amber-800/40 active:scale-95 disabled:opacity-40"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
