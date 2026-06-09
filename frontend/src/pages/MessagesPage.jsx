@@ -396,15 +396,15 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       {/* Emoji picker — floats above bubble on long-press */}
       {showPicker && (
         <>
-          {/* Transparent backdrop — tap anywhere outside to dismiss */}
+          {/* Transparent backdrop — covers everything including nav/composer */}
           <div
-            className="fixed inset-0 z-20"
+            className="fixed inset-0 z-50"
             onClick={(e) => { e.stopPropagation(); setShowPicker(false); }}
           />
           <div
             data-bubble-action
             style={{ background: theme === 'dark' ? '#1f1f1f' : '#fafafa', whiteSpace: 'nowrap' }}
-            className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full shadow-xl px-2 py-1.5"
+            className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-0.5 rounded-full shadow-xl px-2 py-1.5"
           >
             {EMOJI_REACTIONS.map(emoji => (
               <button
