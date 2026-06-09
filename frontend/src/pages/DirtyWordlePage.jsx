@@ -713,8 +713,12 @@ export default function DirtyWordlePage() {
 
   const isDark = theme === 'dark';
 
+  // Scroll to top on mount — iOS PWA can restore a mid-page scroll position
+  // when navigating back to the game, hiding the title/scores header.
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, []);
+
   return (
-    <div className="flex flex-col items-center gap-4 py-4">
+    <div className="flex flex-col items-center gap-4 py-2">
       {/* Header */}
       <div className="w-full max-w-sm flex items-center justify-between px-2">
         <Link to="/games" className="w-20 text-sm text-neutral-500">← Games</Link>
