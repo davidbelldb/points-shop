@@ -477,6 +477,18 @@ export default function NotesPage() {
       .catch((e) => setError(e.message));
   }, [view]);
 
+  // Poll for new/updated notes every 5 s (matches messages cadence).
+  // Silent — doesn't reset active selection or show loading states.
+  useEffect(() => {
+    const poll = setInterval(async () => {
+      try {
+        const fresh = await api.listNotes(API_STATUS[view]);
+        setNotes(fresh);
+      } catch { /* ignore poll errors */ }
+    }, 5000);
+    return () => clearInterval(poll);
+  }, [view]);
+
   // Refresh archive / trash counts for footer badges
   const refreshCounts = useCallback(() => {
     Promise.all([api.listNotes('archived'), api.listNotes('deleted')])
@@ -561,7 +573,7 @@ export default function NotesPage() {
         {view !== 'active' ? (
           <button
             onClick={() => setView('active')}
-            className="flex items-center gap-1 text-sm font-medium text-amber-600 dark:text-amber-400"
+            className="flex items-center gap-1 text-sm font-medium text-neutral-500 dark:text-neutral-400"
           >
             <BackChevron size={15} />
             <span className="font-bold text-neutral-900 dark:text-white">{viewLabel[view]}</span>
