@@ -52,6 +52,15 @@ function CalendarIcon() {
     </svg>
   );
 }
+function StoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
 function UserIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -118,6 +127,7 @@ export default function SideNav() {
       <nav className="flex flex-1 flex-col overflow-y-auto p-2 pt-3">
         <div className="space-y-0.5">
           <NavItem to="/"         label="Home"       icon={<HomeIcon />} />
+          <NavItem to="/store"    label="Store"      icon={<StoreIcon />} />
           <NavItem to="/stories"  label="Stories"    icon={<FeedIcon />} />
           <NavItem to="/games"    label="Games"      icon={<GameIcon />} />
           <NavItem to="/rewatch"  label="Watch list" icon={<TvIcon />} />
