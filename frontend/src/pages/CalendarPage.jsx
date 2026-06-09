@@ -404,18 +404,20 @@ function EventCard({ ev, onClick }) {
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-sm font-semibold text-neutral-900">{ev.title}</p>
         <p className="line-clamp-1 text-xs text-neutral-600">{formatEventDateLine(ev)}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
+        {ev.location && (
+          <p className="line-clamp-1 text-[11px] text-neutral-500">{ev.location}</p>
+        )}
+      </div>
+      {(ev.show_and_tell || ev.gifts) && (
+        <div className="shrink-0 flex flex-col items-end gap-1 text-[10px] font-semibold">
           {ev.show_and_tell && (
             <span className="rounded-full bg-pink-200 px-2 py-0.5 text-pink-800">Show & Tell</span>
           )}
           {ev.gifts && (
             <span className="rounded-full bg-pink-200 px-2 py-0.5 text-pink-800">Gifts</span>
           )}
-          {ev.location && (
-            <span className="line-clamp-1 text-neutral-500">• {ev.location}</span>
-          )}
         </div>
-      </div>
+      )}
     </button>
   );
 }
