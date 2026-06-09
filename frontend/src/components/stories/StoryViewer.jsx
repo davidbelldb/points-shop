@@ -648,14 +648,18 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
               onFocus={() => { setPausedByReply(true); setReactionsVisible(false); }}
               onBlur={() => { setPausedByReply(false); setReactionsVisible(true); }}
               placeholder={`Reply to ${story.author_name}…`}
-              className="h-10 flex-1 rounded-full border border-teal-500/40 bg-transparent px-4 text-sm font-medium text-teal-500 placeholder:text-teal-500/60 focus:border-teal-500 focus:outline-none"
+              className="h-10 flex-1 rounded-full border border-[#61dbbb] bg-neutral-800 px-4 text-sm font-medium text-white placeholder:text-neutral-400 focus:outline-none"
             />
             <button
               type="submit"
               disabled={!reply.trim() || sending}
-              className="h-10 rounded-full bg-transparent px-4 text-sm font-semibold text-teal-500 disabled:opacity-40"
+              aria-label="Send"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#61dbbb] text-[#0d3d2e] disabled:opacity-40 active:scale-95 transition"
             >
-              Send
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
             </button>
           </form>
         )}
