@@ -6,7 +6,10 @@ export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
     if (typeof window === 'undefined') return 'light';
     try {
-      return window.localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+      const stored = window.localStorage.getItem('theme');
+      if (stored === 'dark' || stored === 'light') return stored;
+      // No stored preference — follow OS preference
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     } catch {
       return 'light';
     }

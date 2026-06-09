@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* ── Dark-mode variant ───────────────────────────────────────────────────────
+   Override Tailwind v4's default (media-query) dark variant so that all
+   `dark:` utilities respond to the `html.dark` class set by ThemeContext,
+   not the OS-level prefers-color-scheme media query.
+   Without this, toggling dark mode in the app would only affect the CSS-
+   variable overrides below, while `dark:` utility classes would still follow
+   the OS preference — creating inconsistent theming on iOS/PWA. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Override red palette → pink #ed70bd */
   --color-red-50:  #fdf0f9;

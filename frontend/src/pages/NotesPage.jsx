@@ -132,18 +132,22 @@ function SwipeRow({ children, leftAction, rightAction }) {
           <button
             key={a.label}
             onClick={() => { close(); a.onClick(); }}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 ${a.bg} text-white text-[10px] font-semibold`}
+            style={{ color: a.color ?? '#ffffff' }}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 ${a.bg} text-[10px] font-semibold`}
           >
             {a.icon}
             {a.label}
           </button>
         ))}
       </div>
-      {/* Row — slides left to reveal buttons */}
+      {/* Row — slides left to reveal buttons. position+zIndex ensures the row
+          always paints over the absolute buttons on iOS compositing layers. */}
       <div
         style={{
           transform: `translateX(${offset}px)`,
           transition: startX.current === null ? 'transform 0.22s ease' : 'none',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         {children}
@@ -247,24 +251,24 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
   if (mode === 'active') {
     return (
       <SwipeRow
-        leftAction={{ label: 'Archive', bg: 'bg-blue-500',   icon: <ArchiveIcon size={18} />, onClick: onArchive }}
-        rightAction={{ label: 'Delete',  bg: 'bg-red-500',    icon: <TrashIcon size={18} />,   onClick: onDelete  }}
+        leftAction={{ label: 'Archive', bg: 'bg-[#2a5a4f]',   color: '#61dbbb', icon: <ArchiveIcon size={18} />, onClick: onArchive }}
+        rightAction={{ label: 'Delete',  bg: 'bg-red-500',     color: '#ffffff', icon: <TrashIcon size={18} />,   onClick: onDelete  }}
       >{inner}</SwipeRow>
     );
   }
   if (mode === 'archive') {
     return (
       <SwipeRow
-        leftAction={{ label: 'Restore', bg: 'bg-emerald-500', icon: <RestoreIcon size={18} />, onClick: onRestore }}
-        rightAction={{ label: 'Delete',  bg: 'bg-red-500',     icon: <TrashIcon size={18} />,   onClick: onDelete  }}
+        leftAction={{ label: 'Restore', bg: 'bg-[#2a5a4f]',   color: '#61dbbb', icon: <RestoreIcon size={18} />, onClick: onRestore }}
+        rightAction={{ label: 'Delete',  bg: 'bg-red-500',     color: '#ffffff', icon: <TrashIcon size={18} />,   onClick: onDelete  }}
       >{inner}</SwipeRow>
     );
   }
   if (mode === 'trash') {
     return (
       <SwipeRow
-        leftAction={{ label: 'Restore', bg: 'bg-emerald-500', icon: <RestoreIcon size={18} />, onClick: onRestore    }}
-        rightAction={{ label: 'Delete',  bg: 'bg-red-600',     icon: <TrashIcon size={18} />,   onClick: onHardDelete }}
+        leftAction={{ label: 'Restore', bg: 'bg-[#2a5a4f]',   color: '#61dbbb', icon: <RestoreIcon size={18} />, onClick: onRestore    }}
+        rightAction={{ label: 'Delete',  bg: 'bg-red-500',     color: '#ffffff', icon: <TrashIcon size={18} />,   onClick: onHardDelete }}
       >{inner}</SwipeRow>
     );
   }
@@ -546,7 +550,7 @@ export default function NotesPage() {
   const listPanel = (
     <div className="flex h-full flex-col bg-neutral-50 dark:bg-[#1c1c1e] border-r border-neutral-200 dark:border-neutral-800">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-3 py-3 border-b border-neutral-200 dark:border-neutral-800">
+      <div className="flex items-center justify-between gap-2 px-3 pt-5 pb-3 border-b border-neutral-200 dark:border-neutral-800">
         {view !== 'active' ? (
           <button
             onClick={() => setView('active')}
