@@ -221,6 +221,16 @@ export const api = {
   deleteNote: (id) => request(`/notes/${id}`, { method: 'DELETE' }),
   hardDeleteNote: (id) => request(`/notes/${id}/permanent`, { method: 'DELETE' }),
 
+  // Moments
+  listMoments: () => request('/moments'),
+  createMoment: (type = 'personal') => request('/moments', { method: 'POST', body: JSON.stringify({ type }) }),
+  getMoment: (id) => request(`/moments/${id}`),
+  updateMoment: (id, patch) => request(`/moments/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  promoteMoment: (id) => request(`/moments/${id}/promote`, { method: 'PATCH' }),
+  deleteMoment: (id) => request(`/moments/${id}`, { method: 'DELETE' }),
+  addMomentMedia: (id, url, type) => request(`/moments/${id}/media`, { method: 'POST', body: JSON.stringify({ url, type }) }),
+  removeMomentMedia: (momentId, mediaId) => request(`/moments/${momentId}/media/${mediaId}`, { method: 'DELETE' }),
+
   admin: {
     listProducts:    () => request('/admin/products'),
     createProduct:   (data) => request('/admin/products', { method: 'POST', body: JSON.stringify(data) }),

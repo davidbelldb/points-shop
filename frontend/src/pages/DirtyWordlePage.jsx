@@ -41,20 +41,25 @@ const KEYBOARD_ROWS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Returns today's date string (YYYY-MM-DD) in UK time (Europe/London).
+// Both the word and the guess records key off this, so everything resets
+// at midnight UK time regardless of UTC offset (GMT in winter, BST in summer).
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 }
 
 function formatUKDate() {
-  const d = new Date();
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const yyyy = d.getUTCFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  return new Date().toLocaleDateString('en-GB', {
+    timeZone: 'Europe/London',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  });
 }
 
 function getDailyWord() {
-  const epoch = Math.floor(Date.now() / 86_400_000);
+  // Derive epoch-day index from the UK date so the word changes at UK midnight.
+  const ukDate = getTodayDate(); // 'YYYY-MM-DD'
+  const [yyyy, mm, dd] = ukDate.split('-').map(Number);
+  const epoch = Math.floor(Date.UTC(yyyy, mm - 1, dd) / 86_400_000);
   return WORDS[epoch % WORDS.length];
 }
 
