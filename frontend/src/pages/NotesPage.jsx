@@ -8,6 +8,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Highlight from '@tiptap/extension-highlight';
+import Underline from '@tiptap/extension-underline';
+import Placeholder from '@tiptap/extension-placeholder';
 import { api } from '../lib/api.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,9 +33,33 @@ function daysLeft(iso) {
   return Math.max(0, 30 - Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 }
 
+/** Strip HTML tags + entities for list preview text. */
+function stripHtml(html) {
+  return (html ?? '').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Split stored body into title (first line) and rich HTML body (rest). */
+function splitBody(raw) {
+  const nl = (raw ?? '').indexOf('\n');
+  if (nl === -1) return { title: raw ?? '', bodyHtml: '' };
+  return { title: raw.slice(0, nl), bodyHtml: raw.slice(nl + 1) };
+}
+
+/**
+ * Convert old plain-text notes to HTML paragraphs for Tiptap.
+ * HTML notes (start with '<') are returned unchanged.
+ */
+function toHtml(raw) {
+  if (!raw) return '';
+  if (raw.trimStart().startsWith('<')) return raw;
+  return raw.split('\n').map(l =>
+    `<p>${l ? l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</p>`
+  ).join('');
+}
+
 function parseNote(note) {
-  const lines = (note.body ?? '').split('\n');
-  return { title: lines[0] || '', preview: lines.slice(1).find(l => l.trim()) ?? '' };
+  const { title, bodyHtml } = splitBody(note.body ?? '');
+  return { title, preview: stripHtml(bodyHtml) };
 }
 
 // view state → API status param
@@ -279,51 +310,173 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
   return inner;
 }
 
+// ─── Note Toolbar ─────────────────────────────────────────────────────────────
+
+function NoteToolbar({ editor }) {
+  const [showStyles, setShowStyles] = useState(false);
+  if (!editor) return null;
+
+  const Btn = ({ active, onMd, title: t, children }) => (
+    <button
+      onMouseDown={onMd}
+      title={t}
+      className={`notes-tb-btn flex h-8 min-w-[2rem] flex-shrink-0 items-center justify-center rounded-lg px-1.5 transition-colors${active ? ' notes-tb-active' : ''}`}
+    >
+      {children}
+    </button>
+  );
+  const Sep = () => <div className="notes-tb-sep mx-0.5 h-5 w-px flex-shrink-0" />;
+
+  const activeStyle = editor.isActive('heading', { level: 1 }) ? 'Title'
+    : editor.isActive('heading', { level: 2 }) ? 'Heading'
+    : editor.isActive('heading', { level: 3 }) ? 'Subheading'
+    : 'Body';
+
+  const STYLES = [
+    { label: 'Title',      labelCls: 'text-lg font-bold',     run: () => editor.chain().focus().setHeading({ level: 1 }).run() },
+    { label: 'Heading',    labelCls: 'text-base font-bold',   run: () => editor.chain().focus().setHeading({ level: 2 }).run() },
+    { label: 'Subheading', labelCls: 'text-sm font-semibold', run: () => editor.chain().focus().setHeading({ level: 3 }).run() },
+    { label: 'Body',       labelCls: 'text-sm',               run: () => editor.chain().focus().setParagraph().run() },
+  ];
+
+  const inTaskList = editor.isActive('taskList');
+
+  return (
+    <div className="notes-toolbar relative select-none">
+      {/* Text-style dropdown */}
+      {showStyles && (
+        <>
+          <div className="fixed inset-0 z-40" onMouseDown={() => setShowStyles(false)} />
+          <div className="notes-styles-panel absolute bottom-full left-0 right-0 z-50 shadow-xl">
+            {STYLES.map(({ label, labelCls, run }) => (
+              <button
+                key={label}
+                onMouseDown={(e) => { e.preventDefault(); run(); setShowStyles(false); }}
+                className={`notes-style-item flex w-full items-baseline justify-between px-5 py-2.5 text-left transition-colors${label === activeStyle ? ' notes-style-active' : ''}`}
+              >
+                <span className={labelCls}>{label}</span>
+                {label === activeStyle && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="flex items-center overflow-x-auto px-2 py-1.5 gap-0">
+        {/* Text style */}
+        <Btn active={showStyles} onMd={(e) => { e.preventDefault(); setShowStyles(v => !v); }} title="Text style">
+          <span className="text-xs font-bold tracking-tight">Aa</span>
+        </Btn>
+        <Sep />
+        {/* Bold */}
+        <Btn active={editor.isActive('bold')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }} title="Bold">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h8a4 4 0 0 1 0 8H6V4zM6 12h9a4 4 0 0 1 0 8H6V12z" /></svg>
+        </Btn>
+        {/* Italic */}
+        <Btn active={editor.isActive('italic')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }} title="Italic">
+          <svg width="11" height="13" viewBox="0 0 22 24" fill="currentColor"><path d="M10 4h6M6 20h6M14 4 8 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" /></svg>
+        </Btn>
+        {/* Underline */}
+        <Btn active={editor.isActive('underline')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }} title="Underline">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 4v6a6 6 0 0 0 12 0V4" /><line x1="4" y1="22" x2="20" y2="22" /></svg>
+        </Btn>
+        {/* Strikethrough */}
+        <Btn active={editor.isActive('strike')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }} title="Strikethrough">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><path d="M16 6c0 0-1-2-4-2s-4.5 1.5-4.5 3.5C7.5 10 9.5 11 12 12" /><path d="M8 18c0 0 1 2 4 2s4.5-1.5 4.5-3.5C16.5 14.5 15 13 12 12" /></svg>
+        </Btn>
+        {/* Highlight */}
+        <Btn active={editor.isActive('highlight')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleHighlight().run(); }} title="Highlight">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
+        </Btn>
+        <Sep />
+        {/* Checklist */}
+        <Btn active={editor.isActive('taskList')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleTaskList().run(); }} title="Checklist">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+        </Btn>
+        {/* Bullet list */}
+        <Btn active={editor.isActive('bulletList')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleBulletList().run(); }} title="Bullet list">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none" /><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none" />
+            <line x1="9" y1="6" x2="20" y2="6" /><line x1="9" y1="12" x2="20" y2="12" /><line x1="9" y1="18" x2="20" y2="18" />
+          </svg>
+        </Btn>
+        {/* Numbered list */}
+        <Btn active={editor.isActive('orderedList')} onMd={(e) => { e.preventDefault(); editor.chain().focus().toggleOrderedList().run(); }} title="Numbered list">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="10" y1="6" x2="20" y2="6" /><line x1="10" y1="12" x2="20" y2="12" /><line x1="10" y1="18" x2="20" y2="18" />
+            <text x="2" y="8" fontSize="7" fill="currentColor" stroke="none" fontWeight="700">1</text>
+            <text x="2" y="14" fontSize="7" fill="currentColor" stroke="none" fontWeight="700">2</text>
+            <text x="2" y="20" fontSize="7" fill="currentColor" stroke="none" fontWeight="700">3</text>
+          </svg>
+        </Btn>
+        <Sep />
+        {/* Outdent */}
+        <Btn active={false} onMd={(e) => {
+          e.preventDefault();
+          inTaskList
+            ? editor.chain().focus().liftListItem('taskItem').run()
+            : editor.chain().focus().liftListItem('listItem').run();
+        }} title="Decrease indent">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" />
+            <polyline points="11 7 8 10 11 13" />
+          </svg>
+        </Btn>
+        {/* Indent */}
+        <Btn active={false} onMd={(e) => {
+          e.preventDefault();
+          inTaskList
+            ? editor.chain().focus().sinkListItem('taskItem').run()
+            : editor.chain().focus().sinkListItem('listItem').run();
+        }} title="Increase indent">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" />
+            <polyline points="7 7 10 10 7 13" />
+          </svg>
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
 // ─── Note Editor ──────────────────────────────────────────────────────────────
 
 function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
   const titleRef   = useRef(null);
-  const bodyRef    = useRef(null);
   const saveTimer  = useRef(null);
-  const latestBody = useRef(note.body ?? '');
+  const latestHtml = useRef('');
 
-  const splitBody = (raw) => {
-    const idx = raw.indexOf('\n');
-    return idx === -1 ? { title: raw, body: '' } : { title: raw.slice(0, idx), body: raw.slice(idx + 1) };
-  };
+  const { title: initTitle, bodyHtml: initBodyHtml } = splitBody(note.body ?? '');
+  const initHtml = toHtml(initBodyHtml);
 
-  const [title,   setTitle]   = useState(() => splitBody(note.body ?? '').title);
-  const [body,    setBody]    = useState(() => splitBody(note.body ?? '').body);
-  const [saving,    setSaving]    = useState(false);
-  const [savedAt,   setSavedAt]   = useState(null);
+  const [title,      setTitle]      = useState(initTitle);
+  const [saving,     setSaving]     = useState(false);
+  const [savedAt,    setSavedAt]    = useState(null);
   const [converting, setConverting] = useState(false);
 
-  useEffect(() => {
-    const { title: t, body: b } = splitBody(note.body ?? '');
-    setTitle(t); setBody(b);
-    latestBody.current = note.body ?? '';
-    clearTimeout(saveTimer.current);
-    setSavedAt(null);
-  }, [note.id]);
+  // Callback ref so onUpdate always captures the latest title without stale closure
+  const onUpdateRef = useRef(null);
 
-  const resize = (ref) => {
-    if (!ref.current) return;
-    ref.current.style.height = 'auto';
-    ref.current.style.height = ref.current.scrollHeight + 'px';
-  };
-  const resizeTitle = useCallback(() => resize(titleRef), []);
-  const resizeBody  = useCallback(() => resize(bodyRef),  []);
+  latestHtml.current = initHtml;
+
+  const resizeTitle = useCallback(() => {
+    if (!titleRef.current) return;
+    titleRef.current.style.height = 'auto';
+    titleRef.current.style.height = titleRef.current.scrollHeight + 'px';
+  }, []);
   useEffect(() => { resizeTitle(); }, [title, resizeTitle]);
-  useEffect(() => { resizeBody();  }, [body,  resizeBody]);
 
-  const scheduleSave = useCallback((newTitle, newBody) => {
-    const combined = newTitle + (newBody ? '\n' + newBody : '');
-    latestBody.current = combined;
+  const scheduleSave = useCallback((newTitle, newHtml) => {
+    const combined = newTitle + (newHtml ? '\n' + newHtml : '');
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       setSaving(true);
       try {
-        const saved = await api.updateNote(note.id, latestBody.current);
+        const saved = await api.updateNote(note.id, combined);
         onSaved(saved);
         setSavedAt(new Date());
       } catch (e) {
@@ -334,13 +487,39 @@ function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
     }, 800);
   }, [note.id, onSaved]);
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Highlight,
+      Underline,
+      Placeholder.configure({ placeholder: 'Start writing…' }),
+    ],
+    content: initHtml,
+    editable: !readOnly,
+    // Delegate to a ref so we always capture the latest title without stale closure
+    onUpdate: ({ editor: ed }) => onUpdateRef.current?.(ed),
+  });
+
+  // Keep onUpdateRef pointing at the latest title + scheduleSave
+  onUpdateRef.current = (ed) => {
+    const html = ed.getHTML();
+    latestHtml.current = html;
+    scheduleSave(title, html);
+  };
+
+  // Focus title on new blank note
   useEffect(() => {
     if (!note.body) titleRef.current?.focus();
   }, [note.id, note.body]);
 
+  // Cleanup save timer on unmount
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
+
   return (
     <div className="flex h-full flex-col bg-white dark:bg-[#1c1c1e]">
-      {/* Mobile back bar (hidden on md+) */}
+      {/* Mobile back bar */}
       {onBack && (
         <div className="flex items-center gap-2 border-b border-neutral-200 px-3 pt-5 pb-2.5 md:hidden">
           <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-neutral-500 dark:text-neutral-400">
@@ -398,36 +577,49 @@ function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
           )}
         </div>
 
+        {/* Title */}
         {readOnly ? (
-          /* Read-only view for archive / trash */
-          <div>
+          <>
             <h1 className="mb-3 text-2xl font-bold leading-snug text-neutral-900 dark:text-white">
-              {title || <span className="italic text-neutral-300 dark:text-neutral-600">Untitled</span>}
+              {initTitle || <span className="italic text-neutral-300 dark:text-neutral-600">Untitled</span>}
             </h1>
-            <p className="whitespace-pre-wrap text-base leading-relaxed text-neutral-700 dark:text-neutral-300">{body}</p>
-          </div>
+            {/* Read-only rich content */}
+            <div
+              className="notes-content-ro"
+              dangerouslySetInnerHTML={{ __html: initHtml }}
+            />
+          </>
         ) : (
           <>
             <textarea
               ref={titleRef}
               value={title}
-              onChange={(e) => { const v = e.target.value.replace(/\n/g, ''); setTitle(v); scheduleSave(v, body); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); bodyRef.current?.focus(); } }}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\n/g, '');
+                setTitle(v);
+                // latestHtml.current always holds the latest editor HTML
+                scheduleSave(v, editor ? editor.getHTML() : latestHtml.current);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  editor?.commands.focus();
+                }
+              }}
               placeholder="Title"
               rows={1}
               className="w-full resize-none overflow-hidden bg-transparent text-2xl font-bold leading-snug text-neutral-900 dark:text-white placeholder:text-neutral-300 dark:placeholder:text-neutral-700 focus:outline-none"
             />
-            <textarea
-              ref={bodyRef}
-              value={body}
-              onChange={(e) => { setBody(e.target.value); scheduleSave(title, e.target.value); }}
-              placeholder="Start writing…"
-              rows={6}
-              className="mt-3 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed text-neutral-800 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 focus:outline-none"
-            />
+            {/* Tiptap rich editor */}
+            <div className="notes-content">
+              <EditorContent editor={editor} />
+            </div>
           </>
         )}
       </div>
+
+      {/* Apple Notes-style format toolbar — only when editing */}
+      {!readOnly && <NoteToolbar editor={editor} />}
     </div>
   );
 }
