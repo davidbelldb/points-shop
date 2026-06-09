@@ -526,12 +526,12 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
                     onClick={() => setIcon(key)}
                     aria-label={label}
                     title={label}
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                      selected ? 'bg-pink-100 ring-2 ring-pink-400' : 'bg-neutral-100'
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                      selected ? 'bg-pink-100' : 'bg-neutral-100'
                     }`}
                     style={{ color: EVENT_ICON_COLOR }}
                   >
-                    <Icon size={20} />
+                    <Icon size={16} />
                   </button>
                 );
               })}
