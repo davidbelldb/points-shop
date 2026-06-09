@@ -6,7 +6,7 @@ import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
 // Whitelist of allowed reaction keys. Keep tiny — we render a fixed emoji
 // per key in the frontend, so adding new ones requires both ends to know.
-const ALLOWED_REACTIONS = new Set(['heart', '😂', '💜', '🍆', '😬', '😲']);
+const ALLOWED_REACTIONS = new Set(['heart', '😂', '💜', '🍆', '🫦', '😲']);
 
 export default async function chatRoutes(fastify) {
   fastify.get('/api/messages', async (req) => {

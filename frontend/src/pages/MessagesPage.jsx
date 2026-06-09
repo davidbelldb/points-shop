@@ -43,7 +43,7 @@ function isUploadedPhoto(body) {
 const REACTION_MAP = { heart: '💜' };
 function reactionEmoji(r) { return r ? (REACTION_MAP[r] ?? r) : null; }
 
-const EMOJI_REACTIONS = ['😂', '💜', '🍆', '😬', '😲'];
+const EMOJI_REACTIONS = ['😂', '💜', '🍆', '🫦', '😲'];
 
 // ---------------------------------------------------------------------------
 // GIF Picker modal
