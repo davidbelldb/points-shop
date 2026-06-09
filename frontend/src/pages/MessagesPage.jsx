@@ -727,7 +727,9 @@ export default function MessagesPage() {
   const inputRef      = useRef(null);
   const photoInputRef = useRef(null);
   const bottomRef     = useRef(null);
+  const composerRef   = useRef(null);
   const lastCountRef  = useRef(0);
+  const [composerHeight, setComposerHeight] = useState(80);
 
   async function openStoryById(storyId) {
     if (!storyId) return;
@@ -773,6 +775,23 @@ export default function MessagesPage() {
     // Double rAF ensures layout is fully committed before we measure.
     requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
   }, [data.messages.length]);
+
+  // Track composer bar height so the spacer always pushes content clear of it.
+  // ResizeObserver fires whenever the tray opens/closes or reply banner appears.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setComposerHeight(el.offsetHeight);
+      // Re-scroll so the last message stays above the (now taller/shorter) bar.
+      requestAnimationFrame(() => {
+        document.documentElement.scrollTop = 999999;
+        document.body.scrollTop = 999999;
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   async function send(e) {
     if (e?.preventDefault) e.preventDefault();
@@ -1001,11 +1020,12 @@ export default function MessagesPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
       </div>
-      {/* Sentinel — outside space-y flow so no extra margin is added */}
+      {/* Spacer — matches live composer bar height so last message is never hidden */}
+      <div style={{ height: composerHeight }} aria-hidden />
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
-      <div className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
+      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]">
         <div className="px-4 lg:px-8">
           {/* Media tray — slides in above the input row */}
           {showMedia && (
