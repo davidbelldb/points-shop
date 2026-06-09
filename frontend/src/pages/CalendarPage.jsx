@@ -331,7 +331,7 @@ function HighlightsSection({ focusDate, selectedDay }) {
   if (stories.length === 0) return null;
 
   return (
-    <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+    <section className="space-y-3 rounded-2xl bg-amber-50 p-3">
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800">Sneaky Highlights</h2>
         <Link to="/stories" className="text-xs font-semibold text-amber-700">All highlights</Link>
@@ -389,16 +389,14 @@ function HighlightsSection({ focusDate, selectedDay }) {
 function EventCard({ ev, onClick }) {
   // Cards alternate by flag — gifts → pink, show-and-tell → teal accent, plain → teal-50.
   const pink = ev.gifts;
-  const tone = pink
-    ? 'bg-pink-50'
-    : 'bg-amber-50 border border-amber-200';
+  const tone = pink ? 'bg-pink-50' : 'bg-amber-50';
   return (
     <button
       onClick={onClick}
       className={`flex w-full items-start gap-3 rounded-2xl p-3 text-left transition hover:shadow-sm active:scale-[0.99] ${tone}`}
     >
       <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm${pink ? '' : ' ring-1 ring-amber-200'}`}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm"
         style={{ backgroundColor: '#fce7f3', color: EVENT_ICON_COLOR }}
       >
         <EventIcon iconKey={ev.icon} size={20} />

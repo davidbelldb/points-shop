@@ -499,7 +499,7 @@ function LeaderboardModal({ onClose, today }) {
                     className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-50"
                     style={{ background: '#61dbbb', color: '#0d3d2e' }}
                   >
-                    {shared ? '✓ Sent to chat!' : sharing ? 'Sending…' : 'Share to chat 💬'}
+                    {shared ? '✓ Sent to chat!' : sharing ? 'Sending…' : 'Share in chat'}
                   </button>
                 )}
               </div>
