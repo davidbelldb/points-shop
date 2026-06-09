@@ -17,6 +17,7 @@ const WORDS = [
   // ── Your suggestions ──────────────────────────────────────────────────────
   'FILTH','SLUTS','SLAGS','WHORE','WANKY','BOOBS','TITTY','BUTTS','WILLY','BITCH',
   'STIFF','COCKS','PUSSY','CUNTS','TWATS','NECKS','PLUGS','KATIE','DAVID',
+  'STUFF','CREAM','KNEES','DOGGY','BRACE','SLAPS','CHOKE',
   // ── Dirty classics ────────────────────────────────────────────────────────
   'HORNY','DIRTY','SPANK','LUSTY','KINKY','NAKED','BOOTY','ERECT','LOVER','COCKY',
   'BALLS','BONER','PERVY','RANDY','JUICY','NUDES','PANTY','THONG','GROAN','MOANS',
