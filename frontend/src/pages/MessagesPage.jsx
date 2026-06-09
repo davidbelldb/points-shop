@@ -448,7 +448,8 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
             opacity: Math.min(1, Math.abs(Math.min(0, dragX)) / SWIPE_TRIGGER),
             transform: `translate(${SWIPE_TRIGGER * 0.75}px, -50%) scale(${leftArmed ? 1.15 : 1})`,
           }}
-          className={`pointer-events-none absolute top-1/2 left-full ml-2 flex h-7 w-7 items-center justify-center rounded-full ${leftArmed ? 'bg-red-500 text-white' : 'bg-white text-red-500 shadow ring-1 ring-red-200'}`}
+          className="pointer-events-none absolute top-1/2 left-full ml-2 flex h-7 w-7 items-center justify-center rounded-full shadow"
+          style={{ background: leftArmed ? '#b91c1c' : '#fee2e2', color: leftArmed ? '#ffffff' : '#b91c1c' }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
@@ -1218,24 +1219,24 @@ export default function MessagesPage() {
           onClick={() => setConfirmDeleteId(null)}
         >
           <div
-            className="w-full max-w-sm rounded-t-2xl bg-white dark:bg-neutral-900 p-4 pb-8 space-y-3"
+            className="w-full max-w-sm rounded-t-2xl pt-7 px-4 pb-10 space-y-3"
+            style={{ background: '#2a2a28' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-center text-sm font-medium text-neutral-800 dark:text-neutral-100">
-              Delete this message?
-            </p>
-            <p className="text-center text-xs text-neutral-500 dark:text-neutral-400">
-              This can't be undone.
+            <p className="text-center text-sm font-medium pb-1" style={{ color: '#ededea' }}>
+              Are you sure you want to delete this message?
             </p>
             <button
               onClick={() => removeForce(confirmDeleteId)}
-              className="w-full rounded-xl bg-red-500 py-3 text-sm font-semibold text-white active:scale-95 transition"
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white active:scale-95 transition"
+              style={{ background: '#b91c1c' }}
             >
               Delete
             </button>
             <button
               onClick={() => setConfirmDeleteId(null)}
-              className="w-full rounded-xl border border-neutral-200 dark:border-neutral-700 py-3 text-sm font-semibold text-neutral-700 dark:text-neutral-300 active:scale-95 transition"
+              className="w-full rounded-xl py-3 text-sm font-semibold active:scale-95 transition"
+              style={{ background: '#3d3d3b', color: '#9a9a95' }}
             >
               Cancel
             </button>
