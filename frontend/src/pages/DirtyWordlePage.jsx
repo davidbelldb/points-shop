@@ -184,10 +184,131 @@ const GHOST_BTN = 'flex-1 inline-flex items-center justify-center rounded-xl bor
 
 // ─── Leaderboard modal ────────────────────────────────────────────────────────
 
+// Draw the two-player side-by-side grid onto an offscreen canvas and return
+// it as a PNG Blob. Pure canvas — no html2canvas dependency needed.
+function buildGridBlob(players, todayRows, viewDate) {
+  return new Promise((resolve) => {
+    const CELL  = 28;          // px per grid cell
+    const COLS  = WORD_LENGTH; // 5
+    const ROWS  = MAX_GUESSES; // 6
+    const GAP   = 4;           // gap between cells
+    const PAD   = 20;          // outer padding
+    const INNER = 16;          // card inner padding
+    const TITLE_H  = 32;       // name label height
+    const SCORE_H  = 42;       // score + pts pill area
+    const GRID_W   = COLS * CELL + (COLS - 1) * GAP;
+    const GRID_H   = ROWS * CELL + (ROWS - 1) * GAP;
+    const CARD_W   = GRID_W + INNER * 2;
+    const CARD_H   = TITLE_H + GRID_H + SCORE_H + INNER * 2;
+    const NUM_CARDS = players.length;
+    const CARD_GAP  = 12;
+    const W = NUM_CARDS * CARD_W + (NUM_CARDS - 1) * CARD_GAP + PAD * 2;
+    const H = CARD_H + PAD * 2 + 28; // 28px for date label at top
+
+    const canvas = document.createElement('canvas');
+    const DPR = 2; // retina
+    canvas.width  = W * DPR;
+    canvas.height = H * DPR;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(DPR, DPR);
+
+    // Background
+    ctx.fillStyle = '#1e1e1c';
+    ctx.fillRect(0, 0, W, H);
+
+    // Date label
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillStyle = '#737373';
+    ctx.textAlign = 'center';
+    const [, mm, dd] = viewDate.split('-');
+    ctx.fillText(`Dirty Wordle · ${dd}/${mm}`, W / 2, PAD + 4);
+
+    const cellColor = (state) => {
+      if (state === 'correct') return '#61dbbb';
+      if (state === 'present') return '#ed70bd';
+      if (state === 'empty')   return '#2a2a28';
+      return '#525252'; // absent
+    };
+
+    const roundRect = (x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    };
+
+    players.forEach((player, idx) => {
+      const played = todayRows.find(t => t.name === player.name);
+      const playerColor = idx === 0 ? '#61dbbb' : '#ed70bd';
+      const cardX = PAD + idx * (CARD_W + CARD_GAP);
+      const cardY = PAD + 20;
+
+      // Card background
+      ctx.fillStyle = '#30302e';
+      roundRect(cardX, cardY, CARD_W, CARD_H, 12);
+      ctx.fill();
+
+      // Player name
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.fillStyle = playerColor;
+      ctx.textAlign = 'center';
+      ctx.fillText(player.name.toUpperCase(), cardX + CARD_W / 2, cardY + INNER + 16);
+
+      // Grid
+      const grid = played?.guess_grid ?? Array(ROWS).fill(Array(COLS).fill('empty'));
+      const gridX = cardX + INNER;
+      const gridY = cardY + INNER + TITLE_H;
+      grid.forEach((row, ri) => {
+        row.forEach((state, ci) => {
+          const cx = gridX + ci * (CELL + GAP);
+          const cy = gridY + ri * (CELL + GAP);
+          ctx.fillStyle = cellColor(state);
+          roundRect(cx, cy, CELL, CELL, 4);
+          ctx.fill();
+        });
+      });
+
+      // Score text
+      if (played) {
+        const scoreY = gridY + GRID_H + 10;
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fillStyle = '#a3a3a3';
+        ctx.textAlign = 'center';
+        const scoreLabel = played.won ? `${played.guesses_taken}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
+        ctx.fillText(scoreLabel, cardX + CARD_W / 2, scoreY + 12);
+
+        if (played.pts > 0) {
+          // Pts pill
+          const pillW = 64, pillH = 22, pillR = 8;
+          const pillX = cardX + CARD_W / 2 - pillW / 2;
+          const pillY = scoreY + 18;
+          ctx.fillStyle = '#61dbbb';
+          roundRect(pillX, pillY, pillW, pillH, pillR);
+          ctx.fill();
+          ctx.font = 'bold 11px system-ui, sans-serif';
+          ctx.fillStyle = '#0d3d2e';
+          ctx.fillText(`+${played.pts} pts`, cardX + CARD_W / 2, pillY + 15);
+        }
+      }
+    });
+
+    canvas.toBlob(resolve, 'image/png');
+  });
+}
+
 function LeaderboardModal({ onClose, today }) {
-  const [data,     setData]     = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [viewDate, setViewDate] = useState(today);
+  const [data,       setData]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [viewDate,   setViewDate]   = useState(today);
+  const [sharing,    setSharing]    = useState(false);
+  const [shared,     setShared]     = useState(false);
   const { theme } = useTheme();
   const { user }  = useAuth();
   const dark = theme === 'dark';
@@ -224,6 +345,23 @@ function LeaderboardModal({ onClose, today }) {
     d.setDate(d.getDate() + delta);
     const next = d.toISOString().slice(0, 10);
     if (next >= minDate && next <= today) setViewDate(next);
+  }
+
+  async function shareToChat() {
+    if (!data?.allTime?.length) return;
+    setSharing(true);
+    try {
+      const blob = await buildGridBlob(data.allTime, data.today, viewDate);
+      const file = new File([blob], 'wordle-result.png', { type: 'image/png' });
+      const { url } = await api.upload(file);
+      await api.sendMessage(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 2500);
+    } catch (e) {
+      console.error('Share failed', e);
+    } finally {
+      setSharing(false);
+    }
   }
 
   useEffect(() => {
@@ -352,6 +490,18 @@ function LeaderboardModal({ onClose, today }) {
                     );
                   })}
                 </div>
+
+                {/* Share to chat button — only show when both players have played */}
+                {data.today.length === 2 && (
+                  <button
+                    onClick={shareToChat}
+                    disabled={sharing || shared}
+                    className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-50"
+                    style={{ background: '#61dbbb', color: '#0d3d2e' }}
+                  >
+                    {shared ? '✓ Sent to chat!' : sharing ? 'Sending…' : 'Share to chat 💬'}
+                  </button>
+                )}
               </div>
 
               {/* ── All-time stats ── */}
