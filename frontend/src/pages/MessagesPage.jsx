@@ -447,9 +447,10 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
           style={{
             opacity: Math.min(1, Math.abs(Math.min(0, dragX)) / SWIPE_TRIGGER),
             transform: `translate(${SWIPE_TRIGGER * 0.75}px, -50%) scale(${leftArmed ? 1.15 : 1})`,
+            background: leftArmed ? '#b91c1c' : '#fee2e2',
+            color: leftArmed ? '#ffffff' : '#b91c1c',
           }}
           className="pointer-events-none absolute top-1/2 left-full ml-2 flex h-7 w-7 items-center justify-center rounded-full shadow"
-          style={{ background: leftArmed ? '#b91c1c' : '#fee2e2', color: leftArmed ? '#ffffff' : '#b91c1c' }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
