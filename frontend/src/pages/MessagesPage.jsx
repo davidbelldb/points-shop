@@ -299,7 +299,7 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
+function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
@@ -307,6 +307,7 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
   const [draft, setDraft]           = useState(m.body);
   const [dragX, setDragX]           = useState(0);
   const [armed, setArmed]           = useState(false);
+  const [leftArmed, setLeftArmed]   = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => { if (isEditing) setDraft(m.body); }, [isEditing, m.body]);
@@ -363,16 +364,22 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       s.decided = true;
       try { e.currentTarget.setPointerCapture?.(s.pointerId); } catch { /* noop */ }
     }
-    const clamped = Math.max(0, Math.min(SWIPE_MAX, dx));
+    // Right swipe (positive dx) = reply; left swipe (negative dx, mine only) = delete
+    const clamped = Math.max(mine ? -SWIPE_MAX : 0, Math.min(SWIPE_MAX, dx));
     setDragX(clamped);
     setArmed(clamped >= SWIPE_TRIGGER);
+    if (mine) setLeftArmed(clamped <= -SWIPE_TRIGGER);
   }
   function onPointerUp() {
     cancelHold();
     const s = swipeRef.current;
     if (!s) return;
-    if (s.decided) { s.suppressClick = true; if (armed) onSwipeReply?.(m); }
-    setDragX(0); setArmed(false); s.tracking = false; s.decided = false;
+    if (s.decided) {
+      s.suppressClick = true;
+      if (armed) onSwipeReply?.(m);
+      else if (leftArmed && mine) onForceDelete?.();
+    }
+    setDragX(0); setArmed(false); setLeftArmed(false); s.tracking = false; s.decided = false;
   }
 
   const tone = mine ? 'rounded-br-sm bg-amber-100 text-amber-900' : 'rounded-bl-sm bg-pink-100 text-pink-900';
@@ -432,6 +439,22 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
           <polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" />
         </svg>
       </span>
+
+      {/* Swipe-left delete indicator (mine messages only) */}
+      {mine && (
+        <span
+          aria-hidden="true"
+          style={{
+            opacity: Math.min(1, Math.abs(Math.min(0, dragX)) / SWIPE_TRIGGER),
+            transform: `translate(${SWIPE_TRIGGER * 0.75}px, -50%) scale(${leftArmed ? 1.15 : 1})`,
+          }}
+          className={`pointer-events-none absolute top-1/2 left-full ml-2 flex h-7 w-7 items-center justify-center rounded-full ${leftArmed ? 'bg-red-500 text-white' : 'bg-white text-red-500 shadow ring-1 ring-red-200'}`}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
+          </svg>
+        </span>
+      )}
 
       {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
@@ -935,6 +958,12 @@ export default function MessagesPage() {
     catch (e) { setError(e.message); }
   }
 
+  // Swipe-to-delete bypasses the confirm dialog — the gesture is confirmation enough.
+  async function removeForce(id) {
+    try { await api.deleteMessage(id); await refresh(false); }
+    catch (e) { setError(e.message); }
+  }
+
   async function saveEdit(id, body) {
     try {
       await api.editMessage(id, body);
@@ -1005,6 +1034,7 @@ export default function MessagesPage() {
                       onCancelEdit={() => setEditingId(null)}
                       onSaveEdit={(body) => saveEdit(m.id, body)}
                       onDelete={() => remove(m.id)}
+                      onForceDelete={() => removeForce(m.id)}
                       onSetReaction={(emoji) => setReaction(m.id, emoji)}
                       onOpenPhoto={(src) => setLightboxSrc(src)}
                       onSwipeReply={handleSwipeReply}
