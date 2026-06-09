@@ -41,24 +41,28 @@ const KEYBOARD_ROWS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Returns today's date string (YYYY-MM-DD) in UK time (Europe/London).
-// Both the word and the guess records key off this, so everything resets
-// at midnight UK time regardless of UTC offset (GMT in winter, BST in summer).
+// Returns today's date as YYYY-MM-DD in the Europe/London timezone.
+// Uses formatToParts for reliable cross-browser/Safari support.
 function getTodayDate() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
 }
 
 function formatUKDate() {
-  return new Date().toLocaleDateString('en-GB', {
+  const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London',
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  return `${p.day}/${p.month}/${p.year}`;
 }
 
 function getDailyWord() {
-  // Derive epoch-day index from the UK date so the word changes at UK midnight.
-  const ukDate = getTodayDate(); // 'YYYY-MM-DD'
-  const [yyyy, mm, dd] = ukDate.split('-').map(Number);
+  const [yyyy, mm, dd] = getTodayDate().split('-').map(Number);
   const epoch = Math.floor(Date.UTC(yyyy, mm - 1, dd) / 86_400_000);
   return WORDS[epoch % WORDS.length];
 }
