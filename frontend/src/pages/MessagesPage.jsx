@@ -743,6 +743,7 @@ export default function MessagesPage() {
   const [recBlobUrl, setRecBlobUrl] = useState(null);
   const [showMedia, setShowMedia]   = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const recorderRef  = useRef(null);
   const recChunksRef = useRef([]);
   const recTimerRef  = useRef(null);
@@ -958,8 +959,8 @@ export default function MessagesPage() {
     catch (e) { setError(e.message); }
   }
 
-  // Swipe-to-delete bypasses the confirm dialog — the gesture is confirmation enough.
   async function removeForce(id) {
+    setConfirmDeleteId(null);
     try { await api.deleteMessage(id); await refresh(false); }
     catch (e) { setError(e.message); }
   }
@@ -1034,7 +1035,7 @@ export default function MessagesPage() {
                       onCancelEdit={() => setEditingId(null)}
                       onSaveEdit={(body) => saveEdit(m.id, body)}
                       onDelete={() => remove(m.id)}
-                      onForceDelete={() => removeForce(m.id)}
+                      onForceDelete={() => setConfirmDeleteId(m.id)}
                       onSetReaction={(emoji) => setReaction(m.id, emoji)}
                       onOpenPhoto={(src) => setLightboxSrc(src)}
                       onSwipeReply={handleSwipeReply}
@@ -1208,6 +1209,38 @@ export default function MessagesPage() {
           initialIndex={0}
           onClose={() => setViewerStory(null)}
         />
+      )}
+
+      {/* Swipe-delete confirmation */}
+      {confirmDeleteId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-t-2xl bg-white dark:bg-neutral-900 p-4 pb-8 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-center text-sm font-medium text-neutral-800 dark:text-neutral-100">
+              Delete this message?
+            </p>
+            <p className="text-center text-xs text-neutral-500 dark:text-neutral-400">
+              This can't be undone.
+            </p>
+            <button
+              onClick={() => removeForce(confirmDeleteId)}
+              className="w-full rounded-xl bg-red-500 py-3 text-sm font-semibold text-white active:scale-95 transition"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setConfirmDeleteId(null)}
+              className="w-full rounded-xl border border-neutral-200 dark:border-neutral-700 py-3 text-sm font-semibold text-neutral-700 dark:text-neutral-300 active:scale-95 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Photo lightbox */}
