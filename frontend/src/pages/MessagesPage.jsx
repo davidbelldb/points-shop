@@ -395,25 +395,31 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     >
       {/* Emoji picker — floats above bubble on long-press */}
       {showPicker && (
-        <div
-          data-bubble-action
-          style={{ background: theme === 'dark' ? '#1f1f1f' : '#fafafa' }}
-          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full shadow-xl px-2 py-1.5"
-          style={{ whiteSpace: 'nowrap' }}
-        >
-          {EMOJI_REACTIONS.map(emoji => (
-            <button
-              key={emoji}
-              type="button"
-              data-bubble-action
-              onClick={(e) => { e.stopPropagation(); onSetReaction(m.reaction === emoji ? null : emoji); setShowPicker(false); }}
-              className="text-xl leading-none px-1.5 py-0.5 rounded-full transition-transform hover:scale-125 active:scale-110"
-              style={{ background: m.reaction === emoji ? '#f3f4f6' : 'transparent', transform: m.reaction === emoji ? 'scale(1.2)' : undefined }}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
+        <>
+          {/* Transparent backdrop — tap anywhere outside to dismiss */}
+          <div
+            className="fixed inset-0 z-20"
+            onClick={(e) => { e.stopPropagation(); setShowPicker(false); }}
+          />
+          <div
+            data-bubble-action
+            style={{ background: theme === 'dark' ? '#1f1f1f' : '#fafafa', whiteSpace: 'nowrap' }}
+            className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 rounded-full shadow-xl px-2 py-1.5"
+          >
+            {EMOJI_REACTIONS.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                data-bubble-action
+                onClick={(e) => { e.stopPropagation(); onSetReaction(m.reaction === emoji ? null : emoji); setShowPicker(false); }}
+                className="text-xl leading-none px-1.5 py-0.5 rounded-full transition-transform hover:scale-125 active:scale-110"
+                style={{ background: m.reaction === emoji ? '#f3f4f6' : 'transparent', transform: m.reaction === emoji ? 'scale(1.2)' : undefined }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Swipe reply arrow */}
