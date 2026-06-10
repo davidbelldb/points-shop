@@ -520,13 +520,13 @@ export default function SneakyCallsPage() {
 
         {/* Top banner — back link + partner identity */}
         <div
-          className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 bg-gradient-to-b from-black/70 to-transparent px-6 pb-10 pt-6"
+          className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 bg-gradient-to-b from-black/70 via-black/40 to-transparent px-6 pb-12 pt-6"
           style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}
         >
           <Link to="/" className="absolute left-4 top-[max(1.5rem,env(safe-area-inset-top))] text-sm text-white/80">
             Back
           </Link>
-          <span className="block h-14 w-14 overflow-hidden rounded-full ring-2 ring-pink-400">
+          <span className="mt-10 block h-14 w-14 overflow-hidden rounded-full ring-2 ring-pink-400">
             <Avatar person={other} className="h-full w-full" />
           </span>
           <p className="text-sm font-semibold text-white">{other?.name ?? '…'}</p>
@@ -555,7 +555,7 @@ export default function SneakyCallsPage() {
             >
               <FilterIcon className="h-5 w-5" />
             </button>
-            <button type="button" onClick={start} disabled={busy || !other} className={TEAL_BTN}>
+            <button type="button" onClick={start} disabled={busy || !other} className={`${TEAL_BTN} h-12`}>
               <VideoIcon className="mr-2 h-4 w-4" />
               {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
             </button>
