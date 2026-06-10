@@ -91,12 +91,12 @@ function ComboDisplay({ count, align = 'left' }) {
   );
 }
 
-function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo, onPause, paused }) {
+function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo, onPause, paused, p1Name = 'KATIE', p2Name = 'DAVID' }) {
   return (
     <>
       <div className="absolute top-0 left-0 right-0 flex items-start justify-between px-3 pt-2 select-none" style={{ zIndex: 10, pointerEvents: 'none' }}>
         <div className="flex flex-col gap-1">
-          <HealthBar name="KATIE" hp={playerHp} maxHp={maxHp} align="left" />
+          <HealthBar name={p1Name} hp={playerHp} maxHp={maxHp} align="left" />
           <WinPips wins={scores.player} align="left" />
         </div>
 
@@ -118,7 +118,7 @@ function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo,
         </div>
 
         <div className="flex flex-col gap-1 items-end">
-          <HealthBar name="DAVID" hp={enemyHp} maxHp={maxHp} align="right" />
+          <HealthBar name={p2Name} hp={enemyHp} maxHp={maxHp} align="right" />
           <WinPips wins={scores.enemy} align="right" />
         </div>
       </div>
@@ -143,7 +143,7 @@ function Overlay({ text, style: overlayStyle }) {
   );
 }
 
-function MatchOver({ winner, pts, onRematch, onQuit }) {
+function MatchOver({ winner, pts, onRematch, onQuit, p1Name = 'KATIE', p2Name = 'DAVID' }) {
   const [sel, setSel] = useState(0);
   const selRef = useRef(0);
 
@@ -175,7 +175,7 @@ function MatchOver({ winner, pts, onRematch, onQuit }) {
     textShadow: active ? '0 0 10px #fff8' : 'none',
   });
 
-  const winnerName = winner === 'player' ? 'KATIE WINS!' : 'DAVID WINS!';
+  const winnerName = winner === 'player' ? `${p1Name} WINS!` : `${p2Name} WINS!`;
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-auto select-none" style={{ background: 'rgba(0,0,0,0.75)', zIndex: 30, fontFamily: 'var(--font-pixel)' }}>
@@ -248,7 +248,7 @@ function PauseOverlay({ onResume, onQuit }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function GameScreen({ sprites, character, level, difficulty = 'easy', audio, twoPlayer = false, net = null, netRole = null, onQuit, onRematch }) {
+export default function GameScreen({ sprites, character, level, difficulty = 'easy', audio, twoPlayer = false, p2Character = null, net = null, netRole = null, onQuit, onRematch }) {
   const canvasRef  = useRef(null);
   const inputRef   = useRef(null);   // P1 — exposed to TouchControls + GamepadManager 0
   const inputRef2  = useRef(null);   // P2 — GamepadManager 1 (local 2P) or network (online host)
@@ -256,11 +256,21 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
   const slowMoRef  = useRef(0);      // seconds remaining in slow-motion
   const matchIdRef = useRef(null);   // per-match UUID for points idempotency
 
+  // ── Character slots ─────────────────────────────────────────────────────────
+  // P1 = `character` (host's pick online); P2 = `p2Character` or the mirror.
+  // Mirror matches get a " 2" suffix so the HUD stays readable.
+  const p1CharId = character ?? 'katie';
+  const p2CharId = p2Character ?? (p1CharId === 'katie' ? 'david' : 'katie');
+  const p1Name   = p1CharId.toUpperCase();
+  const p2Name   = p1CharId === p2CharId ? `${p2CharId.toUpperCase()} 2` : p2CharId.toUpperCase();
+
   // ── Online netplay (host-authoritative) ─────────────────────────────────────
   const isOnline = !!net;
   const isHost   = isOnline && netRole === 'host';
   const isGuest  = isOnline && netRole === 'guest';
   const [oppLeft, setOppLeft] = useState(false);
+  const guestMidRef    = useRef(null);   // host's matchId, carried in snapshots
+  const onlineClaimRef = useRef(false);  // win points claimed once per match
 
   // Latest container callbacks for use inside net.onMessage (avoids stale closures)
   const onRematchRef = useRef(onRematch);
@@ -325,6 +335,22 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
       .catch(() => setPtsEarned(WIN_PTS[difficulty] ?? 4)); // optimistic fallback
   }, [hudState.matchOver, hudState.winner]);
 
+  // Online PvP: the WINNER claims their points (idempotent server-side).
+  // Host wins as 'player' (P1 slot), guest wins as 'enemy' (P2 slot).
+  const iWonOnline = isOnline && hudState.matchOver &&
+    (isHost ? hudState.winner === 'player' : hudState.winner === 'enemy');
+
+  useEffect(() => {
+    if (!iWonOnline || onlineClaimRef.current) return;
+    const mid = isHost ? matchIdRef.current : guestMidRef.current;
+    if (!mid) return;
+    onlineClaimRef.current = true;
+    api.crOnlineWin(mid)
+      .then(({ pts }) => setPtsEarned(pts))
+      .catch(() => setPtsEarned(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iWonOnline]);
+
   // Game loop — runs once per mount (sprites ref is stable)
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -338,8 +364,8 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
       inputRef.current = input;
       const gpad1 = new GamepadManager(0, inputRef, { onPause: () => {} });
 
-      const player = new Player({ x: 200, z: 30, characterId: 'katie' });
-      const enemy  = new Player({ x: 620, z: 30, characterId: 'david', facingLeft: true });
+      const player = new Player({ x: 200, z: 30, characterId: p1CharId });
+      const enemy  = new Player({ x: 620, z: 30, characterId: p2CharId, facingLeft: true });
       const renderer = new Renderer(canvas, sprites);
 
       let snap = null;
@@ -347,7 +373,10 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
       let frameCount = 0;
 
       net.onMessage = (m) => {
-        if (m.t === 's') snap = m;
+        if (m.t === 's') {
+          snap = m;
+          if (m.mid) guestMidRef.current = m.mid;
+        }
         else if (m.t === 'rematch') onRematchRef.current?.();
         else if (m.t === 'quit') setOppLeft(true);
       };
@@ -408,20 +437,17 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
     inputRef.current = input;
 
     // Entities
-    const playerCharId = character ?? 'katie';
-    const cpuCharId    = playerCharId === 'katie' ? 'david' : 'katie';
-
-    const player = new Player({ x: 200, z: 30, characterId: playerCharId });
+    const player = new Player({ x: 200, z: 30, characterId: p1CharId });
 
     // In 2P mode: second Player instead of Enemy AI; starts on right, facing left
     let enemy;
     let input2 = null;
     if (twoPlayer) {
-      input2 = new InputManager();   // no keyboard attach — driven by gamepad only
+      input2 = new InputManager();   // no keyboard attach — driven by gamepad 1 or the network
       inputRef2.current = input2;
-      enemy = new Player({ x: 620, z: 30, characterId: cpuCharId, facingLeft: true });
+      enemy = new Player({ x: 620, z: 30, characterId: p2CharId, facingLeft: true });
     } else {
-      enemy = new Enemy({ x: 620, z: 30, characterId: cpuCharId, difficulty });
+      enemy = new Enemy({ x: 620, z: 30, characterId: p2CharId, difficulty });
     }
 
     // Gamepad managers — poll inside the game loop update each frame.
@@ -431,7 +457,7 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
 
     const renderer = new Renderer(canvas, sprites);
     const combat   = new CombatSystem();
-    const rounds   = new RoundManager();
+    const rounds   = new RoundManager({ p1Name, p2Name });
 
     // ── ONLINE HOST — guest inputs arrive over the DataChannel ───────────────
     // The guest ships its full held-action set every frame; we diff against
@@ -537,6 +563,7 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
           const packF = (f) => [f.x, f.z, f.jumpY, f.facingLeft ? 1 : 0, f.hurt ? 1 : 0, f.anim.animName, f.anim.frameIndex];
           net.send({
             t: 's',
+            mid: matchIdRef.current,
             p: packF(player),
             e: packF(enemy),
             hud: {
@@ -591,6 +618,8 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
         enemyCombo={hudState.enemyCombo}
         onPause={togglePause}
         paused={paused}
+        p1Name={p1Name}
+        p2Name={p2Name}
       />
 
       {hudState.overlay && !hudState.matchOver && !paused && (
@@ -604,9 +633,11 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
       {hudState.matchOver && !oppLeft && (
         <MatchOver
           winner={hudState.winner}
-          pts={hudState.winner === 'player' && !twoPlayer ? ptsEarned : null}
+          pts={(hudState.winner === 'player' && !twoPlayer) || iWonOnline ? ptsEarned : null}
           onRematch={doRematch}
           onQuit={doQuit}
+          p1Name={p1Name}
+          p2Name={p2Name}
         />
       )}
 

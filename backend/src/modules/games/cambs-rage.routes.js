@@ -18,6 +18,7 @@ import { sendPush }              from '../notifications/push.js';
 import { query }                 from '../../db.js';
 
 const PTS = { easy: 4, medium: 8, hard: 12 };
+const ONLINE_WIN_PTS = 10;
 
 // ── Online challenge ring (same pattern as SneakyTime calls) ─────────────────
 // challengedId → { fromId, fromName, at }
@@ -35,6 +36,29 @@ function getPendingChallenge(id) {
 }
 
 export default async function cambsRageRoutes(fastify) {
+  // POST /api/games/cambs-rage/online-win — winner of an online PvP match
+  // claims their points. Idempotent per (matchId, account) so a re-render
+  // can't double-credit; the loser never calls this.
+  fastify.post('/api/games/cambs-rage/online-win', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+
+    const { matchId } = req.body ?? {};
+    if (!matchId || typeof matchId !== 'string' || matchId.length > 64) {
+      return reply.code(400).send({ error: 'matchId required' });
+    }
+
+    const reason = `cambs-rage:online:${matchId}:${accountId}`;
+    const { rows } = await query(
+      `SELECT 1 FROM points_ledger WHERE reason = $1 LIMIT 1`,
+      [reason],
+    );
+    if (rows.length > 0) return { pts: ONLINE_WIN_PTS, alreadyClaimed: true };
+
+    await creditPoints(accountId, ONLINE_WIN_PTS, reason);
+    return { pts: ONLINE_WIN_PTS, alreadyClaimed: false };
+  });
+
   // POST /api/games/cambs-rage/challenge — invite the partner to an online match.
   fastify.post('/api/games/cambs-rage/challenge', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);

@@ -194,6 +194,7 @@ export default function GameContainer() {
   const [iosHint,      setIosHint]      = useState(false);
   const [twoPlayer,    setTwoPlayer]    = useState(false);
   const [netRole,      setNetRole]      = useState(null);  // null | 'host' | 'guest'
+  const [p2Char,       setP2Char]       = useState(null);  // P2 slot character (online)
   const [gamepadCount, setGamepadCount] = useState(
     () => [...(navigator.getGamepads?.() ?? [])].filter(Boolean).length,
   );
@@ -201,6 +202,8 @@ export default function GameContainer() {
   // Online netplay connection — owned here so it survives GameScreen remounts
   // (rematches). Set by OnlineLobbyScreen via onConnected.
   const netRef = useRef(null);
+  const roleRef = useRef(null);
+  const onlineCharsRef = useRef({ mine: null, theirs: null }); // char-pick exchange
   // Arrived via the "Tap to Fight!" push notification?
   const joinPendingRef = useRef(
     typeof window !== 'undefined' &&
@@ -343,24 +346,51 @@ export default function GameContainer() {
   const goAfterSplash      = ()     => setPhase(joinPendingRef.current ? 'online_lobby' : 'title');
   const goOnlineLobby      = ()     => setPhase('online_lobby');
 
-  // Online lobby handed us an open DataChannel — straight to the VS screen.
-  // Host plays Katie (P1 slot), guest plays David (P2 slot).
+  // Online lobby handed us an open DataChannel — both players pick a
+  // character (any combination, mirror matches allowed), exchange picks over
+  // the channel, then it's VS screen → fight. Host owns the P1 slot.
   const handleOnlineConnected = (net, role) => {
     netRef.current = net;
+    roleRef.current = role;
+    onlineCharsRef.current = { mine: null, theirs: null };
     net.onClose = () => {        // GameScreen overrides this while mounted
       netRef.current = null;
+      roleRef.current = null;
       setNetRole(null);
       setTwoPlayer(false);
+      setP2Char(null);
       setPhase('title');
+    };
+    net.onMessage = (m) => {     // pre-game: only char picks flow here
+      if (m.t === 'char') {
+        onlineCharsRef.current.theirs = m.c;
+        maybeStartOnlineMatch();
+      }
     };
     setNetRole(role);
     setTwoPlayer(true);
-    setCharacter('katie');
     setCostume('default');
     setLevel(null);              // default stage online
+    setPhase('online_char_select');
+  };
+
+  const handleOnlineCharPick = (c) => {
+    onlineCharsRef.current.mine = c;
+    netRef.current?.send({ t: 'char', c });
+    if (!maybeStartOnlineMatch()) setPhase('online_wait');
+  };
+
+  function maybeStartOnlineMatch() {
+    const { mine, theirs } = onlineCharsRef.current;
+    if (!mine || !theirs || !netRef.current) return false;
+    const p1 = roleRef.current === 'host' ? mine : theirs;  // host = P1 slot
+    const p2 = roleRef.current === 'host' ? theirs : mine;
+    setCharacter(p1);
+    setP2Char(p2);
     audioRef.current.playVsStinger();
     setPhase('vs_screen');
-  };
+    return true;
+  }
   const goDifficultySelect = ()     => setPhase('difficulty_select');
   const goCharSelect       = (diff) => { setDifficulty(diff); setPhase('character_select'); };
   const goCostumeSelect    = (c)    => { setCharacter(c); setPhase('costume_select'); };
@@ -390,10 +420,12 @@ export default function GameContainer() {
       netRef.current.onClose = null;   // we're quitting deliberately
       netRef.current.close();
       netRef.current = null;
+      roleRef.current = null;
       setNetRole(null);
     }
     setCharacter(null); setCostume(null); setLevel(null);
     setTwoPlayer(false);
+    setP2Char(null);
     setPhase('title');
   };
 
@@ -506,6 +538,20 @@ export default function GameContainer() {
             audio={audioRef.current}
           />
         )}
+        {phase === 'online_char_select' && (
+          <CharacterSelectScreen
+            onSelect={handleOnlineCharPick}
+            onBack={handleQuit}
+            audio={audioRef.current}
+          />
+        )}
+        {phase === 'online_wait' && (
+          <div className="flex h-full w-full items-center justify-center bg-black select-none">
+            <p className="animate-pulse" style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.6rem', letterSpacing: '0.2em', color: '#fff' }}>
+              WAITING FOR OPPONENT…
+            </p>
+          </div>
+        )}
         {phase === 'difficulty_select' && (
           <DifficultySelectScreen
             onSelect={goCharSelect}
@@ -530,7 +576,8 @@ export default function GameContainer() {
           <VSScreen
             sprites={sprites}
             playerCharId={character}
-            cpuCharId={cpuCharId}
+            cpuCharId={p2Char ?? cpuCharId}
+            rightTag={twoPlayer ? 'P2' : 'CPU'}
             onComplete={goGame}
           />
         )}
@@ -544,6 +591,7 @@ export default function GameContainer() {
             difficulty={difficulty}
             audio={audioRef.current}
             twoPlayer={twoPlayer}
+            p2Character={p2Char}
             net={netRef.current}
             netRole={netRole}
             onQuit={handleQuit}

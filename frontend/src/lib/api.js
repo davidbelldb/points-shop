@@ -248,6 +248,7 @@ export const api = {
   crChallengeStatus: () => request('/games/cambs-rage/challenge'),
   crChallengeAnswer: () => request('/games/cambs-rage/challenge/answer', { method: 'POST', body: JSON.stringify({}) }),
   crChallengeCancel: () => request('/games/cambs-rage/challenge/cancel', { method: 'POST', body: JSON.stringify({}) }),
+  crOnlineWin:       (matchId) => request('/games/cambs-rage/online-win', { method: 'POST', body: JSON.stringify({ matchId }) }),
 
   admin: {
     listProducts:    () => request('/admin/products'),

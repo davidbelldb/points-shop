@@ -191,7 +191,7 @@ export default function OnlineLobbyScreen({ autoJoin = false, onConnected, onBac
       </button>
 
       <p style={{ ...PIXEL, fontSize: '0.38rem', letterSpacing: '0.1em', color: '#ffffff33', position: 'absolute', bottom: 10 }}>
-        HOST PLAYS KATIE · CHALLENGER PLAYS DAVID
+        PICK ANY FIGHTER · WINNER TAKES 10 PTS
       </p>
     </div>
   );

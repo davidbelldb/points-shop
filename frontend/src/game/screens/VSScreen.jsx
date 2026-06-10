@@ -57,7 +57,7 @@ function CharPortrait({ sprites, charId, flip, width = 200, height = 260 }) {
 
 const NAMES = { katie: 'KATIE', david: 'DAVID' };
 
-export default function VSScreen({ sprites, playerCharId, cpuCharId, onComplete }) {
+export default function VSScreen({ sprites, playerCharId, cpuCharId, rightTag = 'CPU', onComplete }) {
   const [entered,    setEntered]    = useState(false);
   const [vsVisible,  setVsVisible]  = useState(false);
   const [nameFlash,  setNameFlash]  = useState(false);
@@ -191,7 +191,7 @@ export default function VSScreen({ sprites, playerCharId, cpuCharId, onComplete 
         transition: SLIDE,
       }}>
         {/* CPU tag */}
-        <span style={{ fontSize: '0.4rem', letterSpacing: '0.3em', color: '#f87171aa' }}>CPU</span>
+        <span style={{ fontSize: '0.4rem', letterSpacing: '0.3em', color: '#f87171aa' }}>{rightTag}</span>
 
         {/* Portrait — flipped so CPU faces the player */}
         <div style={{ border: '2px solid #ef444444', boxShadow: '0 0 30px #ef444422' }}>

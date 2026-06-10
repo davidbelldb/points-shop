@@ -14,7 +14,9 @@ const FIGHT_DURATION = 0.7;   // seconds "FIGHT!" is shown
 const ROUND_END_HOLD = 2.2;   // seconds before next round starts
 
 export class RoundManager {
-  constructor() {
+  constructor({ p1Name = 'KATIE', p2Name = 'DAVID' } = {}) {
+    this.p1Name  = p1Name;
+    this.p2Name  = p2Name;
     this.round   = 1;
     this.scores  = { player: 0, enemy: 0 };
     this.phase   = 'countdown';   // 'countdown'|'fighting'|'round_end'|'match_end'
@@ -38,7 +40,7 @@ export class RoundManager {
       return this.winner === 'player' ? 'K.O.!' : 'K.O.!';
     }
     if (this.phase === 'match_end') {
-      return this.winner === 'player' ? 'KATIE WINS!' : 'DAVID WINS!';
+      return this.winner === 'player' ? `${this.p1Name} WINS!` : `${this.p2Name} WINS!`;
     }
     return null;
   }
