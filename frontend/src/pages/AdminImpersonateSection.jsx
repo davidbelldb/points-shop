@@ -72,7 +72,9 @@ export default function AdminImpersonateSection({ bare = false }) {
     return mins >= 60 ? `muted ${Math.round(mins / 60)}h` : `muted ${mins}m`;
   }
 
-  const others = users.filter((u) => u.id !== user.actual_id);
+  // Show every account here (including yourself) so you can mute your own
+  // notifications too — just hide the "View as" button for your own row.
+  const allUsers = users;
 
   const body = user.impersonating ? (
     <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
@@ -89,25 +91,28 @@ export default function AdminImpersonateSection({ bare = false }) {
     </div>
   ) : (
     <ul className="space-y-2">
-      {others.map((u) => {
+      {allUsers.map((u) => {
         const label = muteLabel(u.notifications_muted_until);
+        const isSelf = u.id === user.actual_id;
         return (
           <li key={u.id} className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <Avatar url={u.photo_url} name={u.name} />
                 <div>
-                  <p className="text-sm font-medium">{u.name}</p>
+                  <p className="text-sm font-medium">{u.name}{isSelf ? ' (you)' : ''}</p>
                   <p className="text-xs text-neutral-500">{u.username} {'\u00b7'} {u.role}</p>
                 </div>
               </div>
-              <button
-                onClick={() => impersonate(u.id)}
-                disabled={busy}
-                className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40"
-              >
-                View as
-              </button>
+              {!isSelf && (
+                <button
+                  onClick={() => impersonate(u.id)}
+                  disabled={busy}
+                  className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40"
+                >
+                  View as
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 border-t border-neutral-100 pt-2">
               <span className="text-xs text-neutral-500">
