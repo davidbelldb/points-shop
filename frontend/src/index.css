@@ -430,18 +430,37 @@ html.dark .moments-page > div:last-child { background: #1c1c1e; color: #ededea; 
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* ── Handsontable (Sneaky Spreadsheets) — pink selection in both themes ────── */
-.ht-theme-main,
-.ht-theme-main-dark {
-  --ht-cell-selection-border-color: #f968b7;
-  --ht-cell-selection-background-color: rgba(249, 104, 183, 0.12);
-  --ht-cell-editor-border-color: #f968b7;
+/* ── Handsontable (Sneaky Spreadsheets) — pink selection in both themes ──────
+   The theme stylesheet is lazy-loaded AFTER this file, so these overrides need
+   higher specificity (html prefix) plus !important to beat the theme's own
+   variable definitions regardless of stylesheet order. */
+html .ht-theme-main,
+html .ht-theme-main-dark,
+html .ht-theme-main .handsontable,
+html .ht-theme-main-dark .handsontable {
+  --ht-cell-selection-border-color: #f968b7 !important;
+  --ht-cell-selection-background-color: rgba(249, 104, 183, 0.12) !important;
+  --ht-cell-editor-border-color: #f968b7 !important;
   /* Fill handle (the drag dot) + autofill preview */
-  --ht-cell-autofill-background-color: #f968b7;
-  --ht-cell-autofill-border-color: #f968b7;
-  --ht-cell-autofill-fill-border-color: #f968b7;
+  --ht-cell-autofill-background-color: #f968b7 !important;
+  --ht-cell-autofill-border-color: #f968b7 !important;
+  --ht-cell-autofill-fill-border-color: #f968b7 !important;
   /* Touch selection handles on mobile */
-  --ht-cell-mobile-handle-background-color: #f968b7;
-  --ht-cell-mobile-handle-border-color: #f968b7;
+  --ht-cell-mobile-handle-background-color: #f968b7 !important;
+  --ht-cell-mobile-handle-border-color: #f968b7 !important;
+}
+
+/* Belt and braces — the classic selection border elements, in case any part
+   of the grid still draws from the legacy classes rather than theme vars. */
+html .ht-theme-main .wtBorder.current,
+html .ht-theme-main .wtBorder.area,
+html .ht-theme-main-dark .wtBorder.current,
+html .ht-theme-main-dark .wtBorder.area {
+  background-color: #f968b7 !important;
+}
+html .ht-theme-main .wtBorder.corner,
+html .ht-theme-main-dark .wtBorder.corner {
+  background-color: #f968b7 !important;
+  border-color: #f968b7 !important;
 }
 
