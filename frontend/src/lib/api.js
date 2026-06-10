@@ -276,6 +276,8 @@ export const api = {
     listUsers: () => request('/admin/users'),
     startImpersonate: (target_user_id) => request('/admin/impersonate', { method: 'POST', body: JSON.stringify({ target_user_id }) }),
     stopImpersonate: () => request('/admin/impersonate', { method: 'DELETE' }),
+    muteUser: (id, minutes) => request(`/admin/users/${id}/mute`, { method: 'POST', body: JSON.stringify({ minutes }) }),
+    unmuteUser: (id) => request(`/admin/users/${id}/mute`, { method: 'DELETE' }),
     listAllOrders: () => request('/admin/orders'),
     updateOrderStatus: (id, status, reason) =>
       request(`/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),

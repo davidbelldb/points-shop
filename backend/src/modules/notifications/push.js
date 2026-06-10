@@ -19,6 +19,13 @@ export function pushEnabled() {
 export async function sendPush(accountId, payload) {
   if (!enabled || !accountId) return;
   try {
+    const muted = await query(
+      `SELECT 1 FROM accounts
+        WHERE id = $1 AND notifications_muted_until IS NOT NULL AND notifications_muted_until > NOW()`,
+      [accountId],
+    );
+    if (muted.rows.length > 0) return;
+
     const { rows } = await query(
       `SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE account_id = $1`,
       [accountId],

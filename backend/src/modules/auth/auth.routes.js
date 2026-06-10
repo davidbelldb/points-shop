@@ -54,9 +54,41 @@ export default async function authRoutes(fastify) {
   fastify.get('/api/admin/users', async (req, reply) => {
     if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'Admin only' });
     const { rows } = await query(
-      `SELECT id, username, role, name, photo_url FROM accounts ORDER BY role DESC, username ASC`,
+      `SELECT id, username, role, name, photo_url, notifications_muted_until
+         FROM accounts ORDER BY role DESC, username ASC`,
     );
     return rows;
+  });
+
+  // Temporarily silence push notifications for an account — e.g. so a
+  // partner's phone doesn't buzz with "your turn" pushes while their account
+  // is being driven via impersonation for testing.
+  fastify.post('/api/admin/users/:id/mute', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'Admin only' });
+    const minutes = Number(req.body?.minutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return reply.code(400).send({ error: 'minutes must be a positive number' });
+    }
+    const { rows } = await query(
+      `UPDATE accounts SET notifications_muted_until = NOW() + ($2 || ' minutes')::interval
+        WHERE id = $1
+        RETURNING id, notifications_muted_until`,
+      [req.params.id, minutes],
+    );
+    if (rows.length === 0) return reply.code(404).send({ error: 'User not found' });
+    return rows[0];
+  });
+
+  fastify.delete('/api/admin/users/:id/mute', async (req, reply) => {
+    if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'Admin only' });
+    const { rows } = await query(
+      `UPDATE accounts SET notifications_muted_until = NULL
+        WHERE id = $1
+        RETURNING id, notifications_muted_until`,
+      [req.params.id],
+    );
+    if (rows.length === 0) return reply.code(404).send({ error: 'User not found' });
+    return rows[0];
   });
 
   fastify.post('/api/admin/impersonate', async (req, reply) => {
