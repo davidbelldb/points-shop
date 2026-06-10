@@ -312,8 +312,10 @@ export default function SneakySpreadsheetsPage() {
         </button>
       </div>
 
-      {/* Formatting toolbar — applies to the current cell selection */}
-      <div className="flex items-center gap-1.5">
+      {/* Formatting toolbar — applies to the current cell selection.
+          onMouseDown preventDefault keeps the grid selection/focus intact
+          while the button is pressed. */}
+      <div className="flex items-center gap-1.5" onMouseDown={(e) => e.preventDefault()}>
         <button
           onClick={() => applyFormat('b')}
           title="Bold"
@@ -376,6 +378,7 @@ export default function SneakySpreadsheetsPage() {
             colHeaders={active.columns?.length ? active.columns : true}
             rowHeaders={true}
             contextMenu={true}
+            outsideClickDeselects={false}
             minSpareRows={1}
             manualColumnResize={true}
             manualRowResize={true}
