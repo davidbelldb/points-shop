@@ -25,6 +25,7 @@ import CostumeSelectScreen     from './screens/CostumeSelectScreen.jsx';
 import LevelSelectScreen       from './screens/LevelSelectScreen.jsx';
 import VSScreen                from './screens/VSScreen.jsx';
 import GameScreen              from './screens/GameScreen.jsx';
+import OnlineLobbyScreen       from './screens/OnlineLobbyScreen.jsx';
 
 // ─── Asset manifest ───────────────────────────────────────────────────────────
 import katieIdleUrl      from '../assets/sprites/katie_idle.png';
@@ -192,8 +193,18 @@ export default function GameContainer() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iosHint,      setIosHint]      = useState(false);
   const [twoPlayer,    setTwoPlayer]    = useState(false);
+  const [netRole,      setNetRole]      = useState(null);  // null | 'host' | 'guest'
   const [gamepadCount, setGamepadCount] = useState(
     () => [...(navigator.getGamepads?.() ?? [])].filter(Boolean).length,
+  );
+
+  // Online netplay connection — owned here so it survives GameScreen remounts
+  // (rematches). Set by OnlineLobbyScreen via onConnected.
+  const netRef = useRef(null);
+  // Arrived via the "Tap to Fight!" push notification?
+  const joinPendingRef = useRef(
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('join') === '1',
   );
 
   const wrapperRef = useRef(null);
@@ -329,6 +340,27 @@ export default function GameContainer() {
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const goTitle            = ()     => setPhase('title');
+  const goAfterSplash      = ()     => setPhase(joinPendingRef.current ? 'online_lobby' : 'title');
+  const goOnlineLobby      = ()     => setPhase('online_lobby');
+
+  // Online lobby handed us an open DataChannel — straight to the VS screen.
+  // Host plays Katie (P1 slot), guest plays David (P2 slot).
+  const handleOnlineConnected = (net, role) => {
+    netRef.current = net;
+    net.onClose = () => {        // GameScreen overrides this while mounted
+      netRef.current = null;
+      setNetRole(null);
+      setTwoPlayer(false);
+      setPhase('title');
+    };
+    setNetRole(role);
+    setTwoPlayer(true);
+    setCharacter('katie');
+    setCostume('default');
+    setLevel(null);              // default stage online
+    audioRef.current.playVsStinger();
+    setPhase('vs_screen');
+  };
   const goDifficultySelect = ()     => setPhase('difficulty_select');
   const goCharSelect       = (diff) => { setDifficulty(diff); setPhase('character_select'); };
   const goCostumeSelect    = (c)    => { setCharacter(c); setPhase('costume_select'); };
@@ -354,13 +386,23 @@ export default function GameContainer() {
 
   // Quit from in-game → back to title
   const handleQuit = () => {
+    if (netRef.current) {
+      netRef.current.onClose = null;   // we're quitting deliberately
+      netRef.current.close();
+      netRef.current = null;
+      setNetRole(null);
+    }
     setCharacter(null); setCostume(null); setLevel(null);
     setTwoPlayer(false);
     setPhase('title');
   };
 
-  // Rematch → difficulty select (1P) or level select (2P)
+  // Rematch → difficulty select (1P), level select (2P), instant restart (online)
   const handleRematch = () => {
+    if (netRef.current) {
+      setMatchKey(k => k + 1);         // remount GameScreen, channel stays open
+      return;
+    }
     setCharacter(twoPlayer ? 'katie' : null);
     setCostume(twoPlayer ? 'default' : null);
     setLevel(null);
@@ -445,13 +487,22 @@ export default function GameContainer() {
         }}
       >
         {phase === 'splash' && (
-          <SplashScreen ready={!!sprites} onContinue={goTitle} />
+          <SplashScreen ready={!!sprites} onContinue={goAfterSplash} />
         )}
         {phase === 'title' && (
           <TitleScreen
             onStart={goDifficultySelect}
             onStart2P={goLevelSelect2P}
+            onStartOnline={goOnlineLobby}
             canStart2P={gamepadCount >= 2}
+            audio={audioRef.current}
+          />
+        )}
+        {phase === 'online_lobby' && (
+          <OnlineLobbyScreen
+            autoJoin={joinPendingRef.current && (joinPendingRef.current = false, true)}
+            onConnected={handleOnlineConnected}
+            onBack={goTitle}
             audio={audioRef.current}
           />
         )}
@@ -493,6 +544,8 @@ export default function GameContainer() {
             difficulty={difficulty}
             audio={audioRef.current}
             twoPlayer={twoPlayer}
+            net={netRef.current}
+            netRole={netRole}
             onQuit={handleQuit}
             onRematch={handleRematch}
           />

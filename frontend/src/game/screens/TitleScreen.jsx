@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import titleBgUrl from '../../assets/backgrounds/title_screen.png';
 import { useGamepadMenu } from '../hooks/useGamepadMenu.js';
 
-export default function TitleScreen({ onStart, onStart2P, canStart2P, audio }) {
+export default function TitleScreen({ onStart, onStart2P, onStartOnline, canStart2P, audio }) {
   const [blink, setBlink] = useState(true);
   const canvasRef = useRef(null);
   const stateRef  = useRef(null);
@@ -157,6 +157,28 @@ export default function TitleScreen({ onStart, onStart2P, canStart2P, audio }) {
         >
           PRESS ENTER TO START
         </p>
+
+        {/* Online VS — challenge your rival over the internet */}
+        <button
+          onClick={(e) => { e.stopPropagation(); audio?.playMenuConfirm(); onStartOnline?.(); }}
+          style={{
+            pointerEvents:   'auto',
+            fontFamily:      'var(--font-pixel)',
+            fontSize:        '0.5rem',
+            letterSpacing:   '0.2em',
+            color:           '#61dbbb',
+            background:      'rgba(0,0,0,0.55)',
+            border:          '2px solid rgba(97,219,187,0.55)',
+            borderRadius:    6,
+            padding:         '6px 16px',
+            cursor:          'pointer',
+            textShadow:      '0 0 12px #61dbbb',
+            boxShadow:       '0 0 12px rgba(97,219,187,0.25)',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          ONLINE VS
+        </button>
 
         {/* 2P option — only shown when two gamepads are connected */}
         {canStart2P && (

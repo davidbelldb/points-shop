@@ -248,13 +248,25 @@ function PauseOverlay({ onResume, onQuit }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function GameScreen({ sprites, character, level, difficulty = 'easy', audio, twoPlayer = false, onQuit, onRematch }) {
+export default function GameScreen({ sprites, character, level, difficulty = 'easy', audio, twoPlayer = false, net = null, netRole = null, onQuit, onRematch }) {
   const canvasRef  = useRef(null);
   const inputRef   = useRef(null);   // P1 — exposed to TouchControls + GamepadManager 0
-  const inputRef2  = useRef(null);   // P2 — GamepadManager 1 only (2P mode)
+  const inputRef2  = useRef(null);   // P2 — GamepadManager 1 (local 2P) or network (online host)
   const pausedRef  = useRef(false);
   const slowMoRef  = useRef(0);      // seconds remaining in slow-motion
   const matchIdRef = useRef(null);   // per-match UUID for points idempotency
+
+  // ── Online netplay (host-authoritative) ─────────────────────────────────────
+  const isOnline = !!net;
+  const isHost   = isOnline && netRole === 'host';
+  const isGuest  = isOnline && netRole === 'guest';
+  const [oppLeft, setOppLeft] = useState(false);
+
+  // Latest container callbacks for use inside net.onMessage (avoids stale closures)
+  const onRematchRef = useRef(onRematch);
+  const onQuitRef    = useRef(onQuit);
+  onRematchRef.current = onRematch;
+  onQuitRef.current    = onQuit;
 
   if (!matchIdRef.current) {
     matchIdRef.current = (crypto.randomUUID?.() ?? Math.random().toString(36).slice(2, 18));
@@ -271,10 +283,24 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
     playerCombo: 0, enemyCombo: 0,
   });
 
-  // Toggle pause helper — shared by ESC key, touch button, and gamepad Start
+  // Toggle pause helper — shared by ESC key, touch button, and gamepad Start.
+  // Guests can't pause — the host owns the simulation (they see the host's
+  // PAUSED state via snapshots instead).
   const togglePause = () => {
+    if (isGuest) return;
     pausedRef.current = !pausedRef.current;
     setPaused(p => !p);
+  };
+
+  // Online rematch/quit coordination
+  const doRematch = () => {
+    if (isHost)       { net.send({ t: 'rematch' }); onRematch(); }
+    else if (isGuest) { net.send({ t: 'rematchreq' }); }  // host confirms with 'rematch'
+    else onRematch();
+  };
+  const doQuit = () => {
+    if (isOnline) net.send({ t: 'quit' });
+    onQuit();
   };
 
   // ESC → pause (keyboard, 1P only)
@@ -304,6 +330,79 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
     const canvas = canvasRef.current;
     if (!canvas || !sprites) return;
 
+    // ── ONLINE GUEST — render-only client ────────────────────────────────────
+    // Sends our held inputs every frame, renders the host's snapshots.
+    // No simulation runs here: the host is authoritative over everything.
+    if (isGuest) {
+      const input = new InputManager().attach(window);
+      inputRef.current = input;
+      const gpad1 = new GamepadManager(0, inputRef, { onPause: () => {} });
+
+      const player = new Player({ x: 200, z: 30, characterId: 'katie' });
+      const enemy  = new Player({ x: 620, z: 30, characterId: 'david', facingLeft: true });
+      const renderer = new Renderer(canvas, sprites);
+
+      let snap = null;
+      let musicStarted = false;
+      let frameCount = 0;
+
+      net.onMessage = (m) => {
+        if (m.t === 's') snap = m;
+        else if (m.t === 'rematch') onRematchRef.current?.();
+        else if (m.t === 'quit') setOppLeft(true);
+      };
+      net.onClose = () => setOppLeft(true);
+
+      const applyF = (ent, a) => {
+        ent.x = a[0]; ent.z = a[1]; ent.jumpY = a[2];
+        ent.facingLeft = !!a[3]; ent.hurt = !!a[4];
+        ent.anim.animName = a[5]; ent.anim.frameIndex = a[6];
+      };
+
+      const loop = new GameLoop({
+        update() {
+          gpad1.poll();
+          // We're the DAVID slot — ship the full held-action set; the host
+          // derives press/release edges by diffing successive sets.
+          net.send({ t: 'i', h: input.heldActions() });
+          input.consumeFrame();
+
+          if (snap) {
+            applyF(player, snap.p);
+            applyF(enemy,  snap.e);
+            if (!musicStarted && snap.hud.ot === 'FIGHT!') { audio?.startBattleMusic(); musicStarted = true; }
+            if (snap.hud.over && musicStarted) { audio?.stopBattleMusic(); musicStarted = false; }
+          }
+        },
+        render(dt) {
+          renderer.draw({ player, entities: [enemy], background: sprites.get(level?.bgKey ?? 'bg_01') }, dt);
+          frameCount++;
+          if (snap && frameCount % 3 === 0) {
+            setHudState({
+              playerHp: snap.hud.ph, enemyHp: snap.hud.eh, maxHp: player.maxHp,
+              scores: { player: snap.hud.sp, enemy: snap.hud.se },
+              round: snap.hud.rd,
+              overlay: snap.paused
+                ? { text: 'PAUSED', style: 'ko' }
+                : (snap.hud.ot ? { text: snap.hud.ot, style: snap.hud.os } : null),
+              matchOver: snap.hud.over, winner: snap.hud.win,
+              playerCombo: snap.hud.pc, enemyCombo: snap.hud.ec,
+            });
+          }
+        },
+      });
+
+      loop.start();
+      return () => {
+        loop.stop();
+        input.detach();
+        inputRef.current = null;
+        gpad1.reset();
+        net.onMessage = null;
+        audio?.stopBattleMusic();
+      };
+    }
+
     // P1 input
     const input = new InputManager().attach(window);
     inputRef.current = input;
@@ -325,13 +424,37 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
       enemy = new Enemy({ x: 620, z: 30, characterId: cpuCharId, difficulty });
     }
 
-    // Gamepad managers — poll inside the game loop update each frame
+    // Gamepad managers — poll inside the game loop update each frame.
+    // Online host: P2 is remote, so no second local gamepad.
     const gpad1 = new GamepadManager(0, inputRef,  { onPause: togglePause });
-    const gpad2 = twoPlayer ? new GamepadManager(1, inputRef2, { onPause: togglePause }) : null;
+    const gpad2 = twoPlayer && !isHost ? new GamepadManager(1, inputRef2, { onPause: togglePause }) : null;
 
     const renderer = new Renderer(canvas, sprites);
     const combat   = new CombatSystem();
     const rounds   = new RoundManager();
+
+    // ── ONLINE HOST — guest inputs arrive over the DataChannel ───────────────
+    // The guest ships its full held-action set every frame; we diff against
+    // the previous set to produce the press/release edges P2's InputManager
+    // expects, then the sim runs exactly like local 2P.
+    let prevHeld = new Set();
+    if (isHost) {
+      net.onMessage = (m) => {
+        if (m.t === 'i' && input2) {
+          const held = new Set(m.h ?? []);
+          for (const a of held)     if (!prevHeld.has(a)) input2.injectPress(a);
+          for (const a of prevHeld) if (!held.has(a))     input2.injectRelease(a);
+          prevHeld = held;
+        } else if (m.t === 'rematchreq') {
+          net.send({ t: 'rematch' });
+          onRematchRef.current?.();
+        } else if (m.t === 'quit') {
+          setOppLeft(true);
+          pausedRef.current = true;
+        }
+      };
+      net.onClose = () => { setOppLeft(true); pausedRef.current = true; };
+    }
 
     combat.onAudio = (type) => audio?.play(type);
     combat.onShake = (intensity, dur) => renderer.triggerShake(intensity, dur);
@@ -407,6 +530,26 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
             enemyCombo:  enemy.hitCombo  ?? 0,
           });
         }
+
+        // Online host → broadcast authoritative state at ~30Hz (every 2nd frame).
+        // Keeps flowing after the match ends so the guest sees the final state.
+        if (isHost && frameCount % 2 === 0) {
+          const packF = (f) => [f.x, f.z, f.jumpY, f.facingLeft ? 1 : 0, f.hurt ? 1 : 0, f.anim.animName, f.anim.frameIndex];
+          net.send({
+            t: 's',
+            p: packF(player),
+            e: packF(enemy),
+            hud: {
+              ph: player.hp, eh: enemy.hp,
+              sp: rounds.scores.player, se: rounds.scores.enemy,
+              rd: rounds.round,
+              ot: rounds.overlayText, os: rounds.overlayStyle,
+              over: rounds.isOver, win: rounds.winner,
+              pc: player.hitCombo ?? 0, ec: enemy.hitCombo ?? 0,
+            },
+            paused: pausedRef.current,
+          });
+        }
       },
     });
 
@@ -418,6 +561,7 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
       inputRef2.current = null;
       gpad1.reset();
       gpad2?.reset();
+      if (isHost) net.onMessage = null;
       audio?.stopBattleMusic();
     };
   }, [sprites]);
@@ -453,21 +597,40 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
         <Overlay text={hudState.overlay.text} style={hudState.overlay.style} />
       )}
 
-      {paused && !hudState.matchOver && (
-        <PauseOverlay onResume={resume} onQuit={onQuit} />
+      {paused && !hudState.matchOver && !oppLeft && (
+        <PauseOverlay onResume={resume} onQuit={doQuit} />
       )}
 
-      {hudState.matchOver && (
+      {hudState.matchOver && !oppLeft && (
         <MatchOver
           winner={hudState.winner}
           pts={hudState.winner === 'player' && !twoPlayer ? ptsEarned : null}
-          onRematch={onRematch}
-          onQuit={onQuit}
+          onRematch={doRematch}
+          onQuit={doQuit}
         />
       )}
 
-      {/* Touch controls — hidden in 2P mode (both players use physical controllers) */}
-      {!twoPlayer && <TouchControls inputRef={inputRef} />}
+      {/* Opponent disconnected / quit the online match */}
+      {oppLeft && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-auto select-none"
+          style={{ background: 'rgba(0,0,0,0.8)', zIndex: 50, fontFamily: 'var(--font-pixel)' }}
+        >
+          <p style={{ fontSize: '1rem', letterSpacing: '0.15em', color: '#f87171', textShadow: '0 0 20px #f87171' }}>
+            OPPONENT LEFT
+          </p>
+          <button
+            onClick={onQuit}
+            style={{ fontFamily: 'var(--font-pixel)', fontSize: '0.55rem', letterSpacing: '0.15em', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.1)', padding: '8px 24px', cursor: 'pointer' }}
+          >
+            QUIT
+          </button>
+        </div>
+      )}
+
+      {/* Touch controls — hidden in LOCAL 2P (both players on physical pads);
+          shown online since each player is on their own device */}
+      {(!twoPlayer || isOnline) && <TouchControls inputRef={inputRef} />}
 
       {/* Keyboard hint — hidden on touch devices */}
       {!IS_TOUCH && (

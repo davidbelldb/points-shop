@@ -243,6 +243,12 @@ export const api = {
   callsCancel:  () => request('/calls/cancel', { method: 'POST', body: JSON.stringify({}) }),
   callsSuperRain: () => request('/calls/super-rain', { method: 'POST', body: JSON.stringify({}) }),
 
+  // Cambs Rage online challenge
+  crChallenge:       () => request('/games/cambs-rage/challenge', { method: 'POST', body: JSON.stringify({}) }),
+  crChallengeStatus: () => request('/games/cambs-rage/challenge'),
+  crChallengeAnswer: () => request('/games/cambs-rage/challenge/answer', { method: 'POST', body: JSON.stringify({}) }),
+  crChallengeCancel: () => request('/games/cambs-rage/challenge/cancel', { method: 'POST', body: JSON.stringify({}) }),
+
   admin: {
     listProducts:    () => request('/admin/products'),
     createProduct:   (data) => request('/admin/products', { method: 'POST', body: JSON.stringify(data) }),

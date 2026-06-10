@@ -13,12 +13,76 @@
  */
 
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
-import { creditPoints }          from './games.repo.js';
+import { creditPoints, getPlayersFor } from './games.repo.js';
+import { sendPush }              from '../notifications/push.js';
 import { query }                 from '../../db.js';
 
 const PTS = { easy: 4, medium: 8, hard: 12 };
 
+// ── Online challenge ring (same pattern as SneakyTime calls) ─────────────────
+// challengedId → { fromId, fromName, at }
+const pendingChallenges = new Map();
+const CHALLENGE_TTL_MS = 60_000;
+
+function getPendingChallenge(id) {
+  const p = pendingChallenges.get(id);
+  if (!p) return null;
+  if (Date.now() - p.at > CHALLENGE_TTL_MS) {
+    pendingChallenges.delete(id);
+    return null;
+  }
+  return p;
+}
+
 export default async function cambsRageRoutes(fastify) {
+  // POST /api/games/cambs-rage/challenge — invite the partner to an online match.
+  fastify.post('/api/games/cambs-rage/challenge', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+
+    const { me, other } = await getPlayersFor(accountId);
+    if (!other) return reply.code(400).send({ error: 'No opponent found' });
+
+    pendingChallenges.set(other.id, { fromId: accountId, fromName: me?.name ?? 'someone', at: Date.now() });
+
+    sendPush(other.id, {
+      title: `Cambs Rage challenge from ${me?.name ?? 'someone'}!`,
+      body: 'Tap to Fight!',
+      url: '/games/streets-of-cambs-rage?join=1',
+      tag: 'cambs-challenge',
+    });
+
+    return { ok: true };
+  });
+
+  // GET /api/games/cambs-rage/challenge — is someone challenging me?
+  fastify.get('/api/games/cambs-rage/challenge', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+    const p = getPendingChallenge(accountId);
+    return { incoming: !!p, from: p?.fromName ?? null };
+  });
+
+  // POST /api/games/cambs-rage/challenge/answer — challengee accepted.
+  fastify.post('/api/games/cambs-rage/challenge/answer', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+    pendingChallenges.delete(accountId);
+    return { ok: true };
+  });
+
+  // POST /api/games/cambs-rage/challenge/cancel — challenger backed out.
+  fastify.post('/api/games/cambs-rage/challenge/cancel', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+    const { other } = await getPlayersFor(accountId);
+    if (other) {
+      const p = pendingChallenges.get(other.id);
+      if (p?.fromId === accountId) pendingChallenges.delete(other.id);
+    }
+    return { ok: true };
+  });
+
   fastify.post('/api/games/cambs-rage/win', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
     const { difficulty = 'easy', matchId } = req.body ?? {};
