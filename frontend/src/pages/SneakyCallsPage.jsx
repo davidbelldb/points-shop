@@ -41,8 +41,22 @@ const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css ?? 'none';
 const FLUTTER_EMOJIS = ['💜', '🍆', '🫦', '🍑', '😂'];
 const FLUTTER_COUNT = 40;
 const RAIN_COUNT = 30;
+const RAIN_SPREAD = 1.5;       // start-height spread (× viewport) — controls shower length
+const SUPER_RAIN = { kind: 'duck', count: 100, spread: 3.5 };
+const NORMAL_RAIN = (kind) => ({ kind, count: RAIN_COUNT, spread: RAIN_SPREAD });
 const DUCK_URL = '/models/ducks/duck_7.stl';
 const DUCK_COLOR = '#fcba03'; // global override — STL has no materials of its own
+const RINGTONE_URL = '/gamecube-marimba.m4r';
+const TEASE_BLUR = 'blur(26px)';
+
+/** Compose a filter id + optional tease blur into a CSS filter string. */
+function composeFilter(id, blurred = false) {
+  const parts = [];
+  const css = filterCss(id);
+  if (css !== 'none') parts.push(css);
+  if (blurred) parts.push(TEASE_BLUR);
+  return parts.length ? parts.join(' ') : 'none';
+}
 
 // ─── icons ────────────────────────────────────────────────────────────────────
 const ICON_PROPS = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -116,6 +130,17 @@ function SmileIcon({ className = '' }) {
       <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
       <line x1="9" y1="9.5" x2="9.01" y2="9.5" />
       <line x1="15" y1="9.5" x2="15.01" y2="9.5" />
+    </svg>
+  );
+}
+
+/** Eye — tease blur toggle (slashed when hiding). */
+function EyeIcon({ off = false, className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+      <circle cx="12" cy="12" r="3" />
+      {off && <line x1="3" y1="3" x2="21" y2="21" />}
     </svg>
   );
 }
@@ -253,7 +278,7 @@ function ModelButton({ onClick, disabled, title, children }) {
   );
 }
 
-function EmojiBar({ onPick, onRain, raining }) {
+function EmojiBar({ onPick, onRain, onSuperRain, raining }) {
   return (
     <div className="flex max-w-full items-center gap-1 overflow-x-auto px-1">
       {FLUTTER_EMOJIS.map((e) => (
@@ -272,6 +297,40 @@ function EmojiBar({ onPick, onRain, raining }) {
       <ModelButton onClick={() => onRain('duck')} disabled={!!raining} title="Make it rain ducks">
         <DuckThumb />
       </ModelButton>
+      <span className="relative shrink-0">
+        <ModelButton onClick={onSuperRain} disabled={!!raining} title="SUPER rain — 100 ducks, 25 pts">
+          <DuckThumb />
+        </ModelButton>
+        <span className="pointer-events-none absolute -right-0.5 -top-0.5 rounded-full bg-amber-400 px-1 text-[9px] font-bold leading-4 text-amber-950">
+          ×100
+        </span>
+      </span>
+    </div>
+  );
+}
+
+// ─── HeartPops — purple hearts popping where a double-tap landed ──────────────
+function HeartPops({ hearts }) {
+  if (!hearts.length) return null;
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[56] overflow-hidden">
+      <style>{`
+        @keyframes sneakyHeartPop {
+          0%   { transform: translate(-50%, -50%) scale(0);   opacity: 0; }
+          25%  { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
+          45%  { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+          100% { transform: translate(-50%, -110%) scale(1);  opacity: 0; }
+        }
+      `}</style>
+      {hearts.map((h) => (
+        <span
+          key={h.id}
+          className="absolute text-5xl"
+          style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%`, animation: 'sneakyHeartPop 1.2s ease-out forwards' }}
+        >
+          💜
+        </span>
+      ))}
     </div>
   );
 }
@@ -320,9 +379,9 @@ function EmojiFlutter({ bursts }) {
   );
 }
 
-// ─── Model rain — RAIN_COUNT objects raining top → bottom ─────────────────────
+// ─── Model rain — objects raining top → bottom ────────────────────────────────
 // Generic field: takes any THREE.Object3D template and clones it per drop.
-function RainItems({ template, onDone }) {
+function RainItems({ template, onDone, count = RAIN_COUNT, spread = RAIN_SPREAD }) {
   const { viewport } = useThree();
   const doneRef = useRef(false);
 
@@ -332,17 +391,17 @@ function RainItems({ template, onDone }) {
     const size = new THREE.Vector3();
     box.getSize(size);
     const norm = 1 / Math.max(size.x, size.y, size.z, 0.0001);
-    return Array.from({ length: RAIN_COUNT }, () => ({
+    return Array.from({ length: count }, () => ({
       obj: template.clone(true),
       x: (Math.random() - 0.5) * viewport.width * 0.95,
       // Staggered starting heights above the top edge → rain, not a curtain.
-      y: viewport.height / 2 + 1 + Math.random() * viewport.height * 1.5,
+      y: viewport.height / 2 + 1 + Math.random() * viewport.height * spread,
       speed: 2.2 + Math.random() * 2.4,
       rx: (Math.random() - 0.5) * 3,
       ry: (Math.random() - 0.5) * 3,
       scale: norm * (0.6 + Math.random() * 0.5),
     }));
-  }, [template, viewport.width, viewport.height]);
+  }, [template, viewport.width, viewport.height, count, spread]);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -369,9 +428,9 @@ function RainItems({ template, onDone }) {
   );
 }
 
-function TwirlRainSource({ onDone }) {
+function TwirlRainSource({ onDone, count, spread }) {
   const { scene } = useGLTF('/twirl.glb');
-  return <RainItems template={scene} onDone={onDone} />;
+  return <RainItems template={scene} onDone={onDone} count={count} spread={spread} />;
 }
 
 /** Gold duck — duck_7.stl with the global #fcba03 colour override. */
@@ -390,20 +449,23 @@ function useGoldDuck() {
   }, [geometry]);
 }
 
-function DuckRainSource({ onDone }) {
+function DuckRainSource({ onDone, count, spread }) {
   const duck = useGoldDuck();
-  return <RainItems template={duck} onDone={onDone} />;
+  return <RainItems template={duck} onDone={onDone} count={count} spread={spread} />;
 }
 
-function RainOverlay({ kind, onDone }) {
-  if (!kind) return null;
+function RainOverlay({ rain, onDone }) {
+  if (!rain) return null;
+  const { kind, count, spread } = rain;
   return (
     <div className="pointer-events-none fixed inset-0 z-[60]">
       <Canvas camera={{ position: [0, 0, 8], fov: 50 }} gl={{ alpha: true, antialias: true }}>
         <ambientLight intensity={1.1} />
         <directionalLight position={[3, 5, 6]} intensity={1.6} />
         <Suspense fallback={null}>
-          {kind === 'duck' ? <DuckRainSource onDone={onDone} /> : <TwirlRainSource onDone={onDone} />}
+          {kind === 'duck'
+            ? <DuckRainSource onDone={onDone} count={count} spread={spread} />
+            : <TwirlRainSource onDone={onDone} count={count} spread={spread} />}
         </Suspense>
       </Canvas>
     </div>
@@ -418,8 +480,10 @@ export default function SneakyCallsPage() {
   const joining = searchParams.get('join') === '1';
 
   const {
-    localStream, remoteStream, status, remoteCamOn, remoteFilter, emojiEvent, rainEvent, facing,
-    startCall, endCall, setLocalCam, setLocalMic, flipCamera, sendFilter, sendEmoji, sendRain,
+    localStream, remoteStream, status, remoteCamOn, remoteFilter, remoteBlur,
+    emojiEvent, rainEvent, tapEvent, facing,
+    startCall, endCall, setLocalCam, setLocalMic, flipCamera,
+    sendFilter, sendEmoji, sendRain, sendTap, sendBlur,
   } = useSneakyCall();
 
   const [players, setPlayers] = useState(null);
@@ -427,10 +491,20 @@ export default function SneakyCallsPage() {
   const [busy, setBusy]       = useState(false);
   const [micOn, setMicOn]     = useState(true);
   const [camOn, setCamOn]     = useState(true);
-  const [filter, setFilter]   = useState('none');
+  const [filter, setFilter]   = useState('vibrant'); // default for calls
   const [openTray, setOpenTray] = useState(null); // null | 'filters' | 'emoji'
   const [bursts, setBursts]   = useState([]);
-  const [raining, setRaining] = useState(null); // null | 'twirl' | 'duck'
+  const [raining, setRaining] = useState(null); // null | { kind, count, spread }
+  const [myBlur, setMyBlur]   = useState(false); // tease blur on MY outgoing feed
+  const [hearts, setHearts]   = useState([]);    // [{ id, x, y }] purple heart pops
+  const [callToast, setCallToast] = useState(null);
+  const toastTimerRef = useRef(null);
+
+  function showToast(msg) {
+    setCallToast(msg);
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setCallToast(null), 3000);
+  }
 
   const other = players?.other ?? null;
 
@@ -460,6 +534,23 @@ export default function SneakyCallsPage() {
     const t = setInterval(check, 3000);
     return () => { stopped = true; clearInterval(t); };
   }, [inCall]);
+
+  // ── Ringtone + vibration while an incoming call is ringing ─────────────────
+  useEffect(() => {
+    if (!incoming) return;
+    const audio = new Audio(RINGTONE_URL);
+    audio.loop = true;
+    audio.volume = 0.7;
+    audio.play().catch(() => { /* autoplay blocked — vibration still runs */ });
+    navigator.vibrate?.([400, 250, 400]);
+    const vib = setInterval(() => navigator.vibrate?.([400, 250, 400]), 2000);
+    return () => {
+      audio.pause();
+      audio.src = '';
+      clearInterval(vib);
+      navigator.vibrate?.(0);
+    };
+  }, [incoming]);
 
   // ── FaceTime-style lobby preview — front camera live from the moment the
   // page opens (video only; mic stays off until a call actually starts) ──────
@@ -496,7 +587,7 @@ export default function SneakyCallsPage() {
 
   // Reset toggles whenever a fresh local stream comes online.
   useEffect(() => {
-    if (localStream) { setMicOn(true); setCamOn(true); setOpenTray(null); }
+    if (localStream) { setMicOn(true); setCamOn(true); setOpenTray(null); setMyBlur(false); }
   }, [localStream]);
 
   // Tapped the "Tap to Join!" notification — join straight away.
@@ -521,8 +612,21 @@ export default function SneakyCallsPage() {
   }, [emojiEvent]);
 
   useEffect(() => {
-    if (rainEvent) setRaining((cur) => cur ?? rainEvent.kind);
+    if (rainEvent) {
+      setRaining((cur) => cur ?? (rainEvent.super ? SUPER_RAIN : NORMAL_RAIN(rainEvent.kind)));
+    }
   }, [rainEvent]);
+
+  // Partner double-tapped — pop a purple heart at the same spot.
+  useEffect(() => {
+    if (tapEvent) popHeart(tapEvent.x, tapEvent.y);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tapEvent]);
+
+  // Keep the partner's render of our feed in sync with the tease blur.
+  useEffect(() => {
+    if (status === 'connected') sendBlur(myBlur);
+  }, [myBlur, status, sendBlur]);
 
   function addBurst(emoji) {
     const burst = makeBurst(emoji);
@@ -537,10 +641,45 @@ export default function SneakyCallsPage() {
     sendEmoji(emoji);
   }
 
+  function popHeart(x, y) {
+    const id = `${Date.now()}-${Math.random()}`;
+    setHearts((prev) => [...prev, { id, x, y }]);
+    setTimeout(() => setHearts((prev) => prev.filter((h) => h.id !== id)), 1300);
+  }
+
+  // Double-tap detection on the call stage → purple heart on both screens.
+  const lastTapRef = useRef({ t: 0, x: 0, y: 0 });
+  function handleStageTap(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const now = Date.now();
+    const last = lastTapRef.current;
+    const isDouble = now - last.t < 320 && Math.abs(x - last.x) < 0.08 && Math.abs(y - last.y) < 0.08;
+    lastTapRef.current = { t: now, x, y };
+    if (isDouble) {
+      lastTapRef.current = { t: 0, x: 0, y: 0 };
+      popHeart(x, y);
+      sendTap(x, y);
+    }
+  }
+
   function startRain(kind) {
     if (raining) return;
-    setRaining(kind);
+    setRaining(NORMAL_RAIN(kind));
     sendRain(kind);
+  }
+
+  async function superRain() {
+    if (raining) return;
+    try {
+      const r = await api.callsSuperRain();
+      setRaining(SUPER_RAIN);
+      sendRain(SUPER_RAIN.kind, true);
+      showToast(`SUPER RAIN! −${r.cost} pts (${r.balance} left)`);
+    } catch (e) {
+      showToast(e.message);
+    }
   }
 
   async function start() {
@@ -563,7 +702,10 @@ export default function SneakyCallsPage() {
     setBusy(true);
     setError(null);
     setIncoming(false);
-    api.callsAnswer().catch(() => {}); // clear the ring server-side (no-op if not ringing)
+    // Clear the ring server-side; a fast pickup earns a points bonus.
+    api.callsAnswer()
+      .then((r) => { if (r?.bonus) showToast(`Quick answer! +${r.bonus} pts`); })
+      .catch(() => {});
     stopPreview();
     try {
       await startCall(false, previewFacing);
@@ -599,7 +741,7 @@ export default function SneakyCallsPage() {
     setOpenTray((cur) => (cur === name ? null : name));
   }
 
-  const myFilterCss = filterCss(filter);
+  const myFilterCss = composeFilter(filter, myBlur);
 
   // ── lobby (full-screen self preview, FaceTime style) ───────────────────────
   if (!inCall && previewStream) {
@@ -756,7 +898,7 @@ export default function SneakyCallsPage() {
           </div>
         )
       ) : showRemoteVideo ? (
-        <VideoCell stream={remoteStream} filter={filterCss(remoteFilter)} />
+        <VideoCell stream={remoteStream} filter={composeFilter(remoteFilter, remoteBlur)} />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#171717]">
           <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
@@ -765,6 +907,9 @@ export default function SneakyCallsPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-white/80">Camera off</p>
         </div>
       )}
+
+      {/* Double-tap catcher — purple heart reactions on both screens */}
+      {answered && <div className="absolute inset-0" onPointerUp={handleStageTap} />}
 
       {/* Ringing banner — partner avatar + status, while waiting for them */}
       {!answered && (
@@ -794,7 +939,8 @@ export default function SneakyCallsPage() {
 
       {/* Fun overlays */}
       <EmojiFlutter bursts={bursts} />
-      <RainOverlay kind={raining} onDone={() => setRaining(null)} />
+      <HeartPops hearts={hearts} />
+      <RainOverlay rain={raining} onDone={() => setRaining(null)} />
 
       {/* Control bar */}
       <div
@@ -804,8 +950,11 @@ export default function SneakyCallsPage() {
         <Tray open={openTray === 'filters'}>
           <FilterBar value={filter} onChange={setFilter} />
         </Tray>
+        {callToast && (
+          <p className="rounded-xl bg-black/60 px-4 py-2 text-center text-sm font-semibold text-white">{callToast}</p>
+        )}
         <Tray open={openTray === 'emoji'}>
-          <EmojiBar onPick={pickEmoji} onRain={startRain} raining={raining} />
+          <EmojiBar onPick={pickEmoji} onRain={startRain} onSuperRain={superRain} raining={raining} />
         </Tray>
         <div className="flex items-center gap-2">
           <button
@@ -831,6 +980,14 @@ export default function SneakyCallsPage() {
             className={`${CTRL_BTN} ${CTRL_ON}`}
           >
             <FlipIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMyBlur((b) => !b)}
+            title={myBlur ? 'Reveal yourself' : 'Hide behind the blur'}
+            className={`${CTRL_BTN} ${myBlur ? CTRL_OFF : CTRL_ON}`}
+          >
+            <EyeIcon off={myBlur} className="h-5 w-5" />
           </button>
           <button
             type="button"

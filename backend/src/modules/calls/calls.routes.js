@@ -9,6 +9,11 @@
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { getPlayersFor } from '../games/games.repo.js';
 import { sendPush } from '../notifications/push.js';
+import { pool } from '../../db.js';
+
+const QUICK_ANSWER_MS = 10_000;
+const QUICK_ANSWER_POINTS = 5;
+const SUPER_RAIN_COST = 25;
 
 // In-memory ring state: calleeId → { fromId, fromName, at }.
 // Lets the callee's open SneakyTime page show an Answer button while
@@ -63,11 +68,75 @@ export default async function callsRoutes(fastify) {
   });
 
   // POST /api/calls/answer — callee picked up; clear the ring.
+  // Answering within QUICK_ANSWER_MS earns a small points bonus
+  // (isolated transaction, same ledger pattern as the mini-games).
   fastify.post('/api/calls/answer', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
     if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+
+    const pending = getPending(accountId);
     pendingCalls.delete(accountId);
-    return { ok: true };
+
+    let bonus = 0;
+    if (pending && Date.now() - pending.at <= QUICK_ANSWER_MS) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `UPDATE accounts SET points_balance = points_balance + $1, updated_at = NOW() WHERE id = $2`,
+          [QUICK_ANSWER_POINTS, accountId],
+        );
+        await client.query(
+          `INSERT INTO points_ledger (account_id, delta, reason) VALUES ($1, $2, $3)`,
+          [accountId, QUICK_ANSWER_POINTS, 'sneakytime:quick-answer'],
+        );
+        await client.query('COMMIT');
+        bonus = QUICK_ANSWER_POINTS;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        req.log.error({ err }, 'quick-answer bonus failed');
+      } finally {
+        client.release();
+      }
+    }
+
+    return { ok: true, bonus };
+  });
+
+  // POST /api/calls/super-rain — charge points for a 100-duck downpour.
+  fastify.post('/api/calls/super-rain', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(
+        `SELECT points_balance FROM accounts WHERE id = $1 FOR UPDATE`,
+        [accountId],
+      );
+      const balance = rows[0]?.points_balance ?? 0;
+      if (balance < SUPER_RAIN_COST) {
+        await client.query('ROLLBACK');
+        return reply.code(400).send({ error: `Super rain costs ${SUPER_RAIN_COST} pts (you have ${balance})` });
+      }
+      await client.query(
+        `UPDATE accounts SET points_balance = points_balance - $1, updated_at = NOW() WHERE id = $2`,
+        [SUPER_RAIN_COST, accountId],
+      );
+      await client.query(
+        `INSERT INTO points_ledger (account_id, delta, reason) VALUES ($1, $2, $3)`,
+        [accountId, -SUPER_RAIN_COST, 'sneakytime:super-rain'],
+      );
+      await client.query('COMMIT');
+      return { ok: true, cost: SUPER_RAIN_COST, balance: balance - SUPER_RAIN_COST };
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      req.log.error({ err }, 'super-rain charge failed');
+      return reply.code(500).send({ error: 'Could not start super rain' });
+    } finally {
+      client.release();
+    }
   });
 
   // POST /api/calls/cancel — caller hung up before the callee answered.

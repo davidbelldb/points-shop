@@ -42,9 +42,11 @@ export function useSneakyCall() {
   const [remoteStream, setRemoteStream] = useState(null);
   const [status,       setStatus]       = useState('idle');
   const [remoteCamOn,  setRemoteCamOn]  = useState(true);
-  const [remoteFilter, setRemoteFilter] = useState('none');
+  const [remoteFilter, setRemoteFilter] = useState('vibrant'); // matches page default until partner says otherwise
   const [emojiEvent,   setEmojiEvent]   = useState(null); // { emoji, nonce } — partner sent a flutter
-  const [rainEvent,    setRainEvent]    = useState(null); // { kind, nonce } — partner sent rain
+  const [rainEvent,    setRainEvent]    = useState(null); // { kind, super, nonce } — partner sent rain
+  const [tapEvent,     setTapEvent]     = useState(null); // { x, y, nonce } — partner double-tapped
+  const [remoteBlur,   setRemoteBlur]   = useState(false); // partner is hiding behind the blur
   const facingRef = useRef('user');
   const [facing, setFacing] = useState('user');           // 'user' | 'environment'
 
@@ -104,7 +106,8 @@ export function useSneakyCall() {
 
     teardown();
     setRemoteCamOn(true);
-    setRemoteFilter('none');
+    setRemoteFilter('vibrant');
+    setRemoteBlur(false);
     facingRef.current = startFacing;
     setFacing(startFacing);
     setStatus(isInitiator ? 'ringing' : 'connecting');
@@ -192,8 +195,21 @@ export function useSneakyCall() {
           if (sig.type === 'rain') {
             setRainEvent({
               kind: sig.payload?.kind === 'duck' ? 'duck' : 'twirl',
+              super: !!sig.payload?.super,
               nonce: Date.now() + Math.random(),
             });
+            continue;
+          }
+          if (sig.type === 'tap') {
+            const x = Number(sig.payload?.x);
+            const y = Number(sig.payload?.y);
+            if (Number.isFinite(x) && Number.isFinite(y)) {
+              setTapEvent({ x, y, nonce: Date.now() + Math.random() });
+            }
+            continue;
+          }
+          if (sig.type === 'blurstate') {
+            setRemoteBlur(!!sig.payload?.blurOn);
             continue;
           }
           await handleSignal(p, isInitiator, sig);
@@ -270,8 +286,18 @@ export function useSneakyCall() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const sendRain = useCallback((kind = 'twirl') => {
-    sendSignal('rain', { kind });
+  const sendRain = useCallback((kind = 'twirl', isSuper = false) => {
+    sendSignal('rain', { kind, super: isSuper });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sendTap = useCallback((x, y) => {
+    sendSignal('tap', { x, y });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sendBlur = useCallback((blurOn) => {
+    sendSignal('blurstate', { blurOn });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -285,7 +311,9 @@ export function useSneakyCall() {
   }, []);
 
   return {
-    localStream, remoteStream, status, remoteCamOn, remoteFilter, emojiEvent, rainEvent, facing,
-    startCall, endCall, setLocalCam, setLocalMic, flipCamera, sendFilter, sendEmoji, sendRain,
+    localStream, remoteStream, status, remoteCamOn, remoteFilter, remoteBlur,
+    emojiEvent, rainEvent, tapEvent, facing,
+    startCall, endCall, setLocalCam, setLocalMic, flipCamera,
+    sendFilter, sendEmoji, sendRain, sendTap, sendBlur,
   };
 }

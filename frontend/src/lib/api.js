@@ -241,6 +241,7 @@ export const api = {
   callsStatus:  () => request('/calls/status'),
   callsAnswer:  () => request('/calls/answer', { method: 'POST', body: JSON.stringify({}) }),
   callsCancel:  () => request('/calls/cancel', { method: 'POST', body: JSON.stringify({}) }),
+  callsSuperRain: () => request('/calls/super-rain', { method: 'POST', body: JSON.stringify({}) }),
 
   admin: {
     listProducts:    () => request('/admin/products'),
