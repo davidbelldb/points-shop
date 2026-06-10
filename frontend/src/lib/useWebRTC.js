@@ -103,13 +103,23 @@ export function useWebRTC(gameId) {
     // Add local tracks to connection
     stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
-    // Collect remote tracks into a single MediaStream
+    // Collect remote tracks into a single MediaStream.
+    // iOS Safari can be flaky about a <video> picking up tracks added to a
+    // MediaStream *after* it's already assigned to srcObject, so each time a
+    // new track arrives we publish a fresh MediaStream wrapping the same
+    // tracks — this re-triggers VideoCell's effect and forces a rebind.
     const remote = new MediaStream();
     setRemoteStream(remote);
     pc.ontrack = (e) => {
-      e.streams[0]?.getTracks().forEach(t => {
-        if (!remote.getTracks().includes(t)) remote.addTrack(t);
+      const incoming = e.streams[0]?.getTracks() ?? (e.track ? [e.track] : []);
+      let changed = false;
+      incoming.forEach(t => {
+        if (!remote.getTracks().includes(t)) {
+          remote.addTrack(t);
+          changed = true;
+        }
       });
+      if (changed) setRemoteStream(new MediaStream(remote.getTracks()));
     };
 
     // Trickle ICE candidates to partner

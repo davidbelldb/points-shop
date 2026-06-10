@@ -174,36 +174,43 @@ function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, 
 
   const canPlayInBoard = !resolved && isMyTurn && isActive;
 
+  // Square sizing via the padding-top trick rather than `aspect-square`:
+  // Safari (iOS Safari + PWA) doesn't reliably size CSS-grid auto rows from
+  // `aspect-ratio` on a grid item, which left this cell's row height
+  // determined by sibling cells — collapsing/squashing the video circle.
+  // Padding-top is percentage-of-width and works regardless of row sizing.
   return (
-    <div className={`relative aspect-square rounded-xl border-2 transition p-1 ${outerBorder}`} style={{ backgroundColor: '#1f1f1e' }}>
-      {resolved ? (
-        <div className="flex h-full w-full items-center justify-center">
-          {globalCell === 'draw'
-            ? <DrawMacroCell players={players} />
-            : <WonMacroCell
-                tone={globalCell === myMark ? 'me' : 'other'}
+    <div className="relative w-full" style={{ paddingTop: '100%' }}>
+      <div className={`absolute inset-0 rounded-xl border-2 transition p-1 ${outerBorder}`} style={{ backgroundColor: '#1f1f1e' }}>
+        {resolved ? (
+          <div className="flex h-full w-full items-center justify-center">
+            {globalCell === 'draw'
+              ? <DrawMacroCell players={players} />
+              : <WonMacroCell
+                  tone={globalCell === myMark ? 'me' : 'other'}
+                  players={players}
+                  myStream={myStream}
+                  theirStream={theirStream}
+                  myCamOn={myCamOn}
+                  theirCamOn={theirCamOn}
+                />
+            }
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-0.5">
+            {localBoard.map((cell, ci) => (
+              <MiniCell
+                key={ci}
+                value={cell}
+                myMark={myMark}
+                canPlay={canPlayInBoard && !cell}
+                onClick={() => onMove(index, ci)}
                 players={players}
-                myStream={myStream}
-                theirStream={theirStream}
-                myCamOn={myCamOn}
-                theirCamOn={theirCamOn}
               />
-          }
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-0.5">
-          {localBoard.map((cell, ci) => (
-            <MiniCell
-              key={ci}
-              value={cell}
-              myMark={myMark}
-              canPlay={canPlayInBoard && !cell}
-              onClick={() => onMove(index, ci)}
-              players={players}
-            />
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
