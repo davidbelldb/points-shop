@@ -30,6 +30,7 @@ import CalendarPage from './pages/CalendarPage.jsx';
 import SneakyFeedPage from './pages/SneakyFeedPage.jsx';
 import SneakyStorePage from './pages/SneakyStorePage.jsx';
 import NotesPage from './pages/NotesPage.jsx';
+import SneakyCallsPage from './pages/SneakyCallsPage.jsx';
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
@@ -103,6 +104,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="stories" element={<SneakyFeedPage />} />
               <Route path="store" element={<SneakyStorePage />} />
               <Route path="notes" element={<NotesPage />} />
+              <Route path="call" element={<SneakyCallsPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>

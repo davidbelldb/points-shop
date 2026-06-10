@@ -235,6 +235,10 @@ export const api = {
   rtcSignal: (type, payload) => request('/rtc/signal', { method: 'POST', body: JSON.stringify({ type, payload }) }),
   rtcPoll:   () => request('/rtc/signal'),
 
+  // Sneaky Calls
+  callsPlayers: () => request('/calls/players'),
+  callsRing:    () => request('/calls/ring', { method: 'POST', body: JSON.stringify({}) }),
+
   admin: {
     listProducts:    () => request('/admin/products'),
     createProduct:   (data) => request('/admin/products', { method: 'POST', body: JSON.stringify(data) }),

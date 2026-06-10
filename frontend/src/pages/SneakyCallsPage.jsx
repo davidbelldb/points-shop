@@ -1,0 +1,278 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { api } from '../lib/api.js';
+import { useSneakyCall } from '../lib/useSneakyCall.js';
+
+// ─── styling constants ────────────────────────────────────────────────────────
+const TEAL_BTN =
+  'inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40';
+
+// End-call button — dark maroon with soft pink text (per design reference).
+const END_CALL_BTN =
+  'inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-[#3B1D1D] px-6 py-3 text-base font-bold text-[#F2B8B5] transition hover:bg-[#4A2424] active:scale-95';
+
+const CTRL_BTN =
+  'flex h-12 w-12 items-center justify-center rounded-full transition active:scale-95';
+
+// ─── icons (shared style with Tic-Tac-Face call controls) ─────────────────────
+const ICON_PROPS = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+
+function MicIcon({ off = false, className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <rect x="9" y="2" width="6" height="11" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+      <line x1="8" y1="22" x2="16" y2="22" />
+      {off && <line x1="3" y1="3" x2="21" y2="21" />}
+    </svg>
+  );
+}
+
+function CameraIcon({ off = false, className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <rect x="2" y="6" width="13" height="12" rx="2" />
+      <path d="M15 10.5l6-3.5v10l-6-3.5" />
+      {off && <line x1="2" y1="3" x2="21" y2="21" />}
+    </svg>
+  );
+}
+
+function HangupIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} fill="currentColor" stroke="none" className={className} style={{ transform: 'rotate(135deg)' }}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+function VideoIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <rect x="2" y="6" width="13" height="12" rx="2" />
+      <path d="M15 10.5l6-3.5v10l-6-3.5" />
+    </svg>
+  );
+}
+
+// ─── VideoCell — binds a MediaStream to a <video> ─────────────────────────────
+function VideoCell({ stream, mirror = false, muted = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.srcObject = stream ?? null;
+    if (stream) el.play().catch(() => {});
+  }, [stream]);
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      playsInline
+      muted={muted}
+      className={`h-full w-full object-cover${mirror ? ' scale-x-[-1]' : ''}`}
+    />
+  );
+}
+
+// ─── Avatar fallback ──────────────────────────────────────────────────────────
+function Avatar({ person, className = '' }) {
+  const initial = (person?.name ?? '?').slice(0, 1).toUpperCase();
+  if (person?.photo_url) {
+    return <img src={person.photo_url} alt="" className={`object-cover ${className}`} />;
+  }
+  return (
+    <span className={`flex items-center justify-center bg-pink-200 font-bold text-pink-900 ${className}`}>
+      {initial}
+    </span>
+  );
+}
+
+// ─── page ─────────────────────────────────────────────────────────────────────
+export default function SneakyCallsPage() {
+  const [searchParams] = useSearchParams();
+  const joining = searchParams.get('join') === '1';
+
+  const { localStream, remoteStream, status, remoteCamOn, startCall, endCall, setLocalCam, setLocalMic } = useSneakyCall();
+
+  const [players, setPlayers] = useState(null);
+  const [error, setError]     = useState(null);
+  const [busy, setBusy]       = useState(false);
+  const [micOn, setMicOn]     = useState(true);
+  const [camOn, setCamOn]     = useState(true);
+
+  const other = players?.other ?? null;
+
+  useEffect(() => {
+    api.callsPlayers().then(setPlayers).catch((e) => setError(e.message));
+  }, []);
+
+  // Reset toggles whenever a fresh local stream comes online.
+  useEffect(() => {
+    if (localStream) { setMicOn(true); setCamOn(true); }
+  }, [localStream]);
+
+  // Tapped the "Tap to Join!" notification — join straight away.
+  const autoJoinedRef = useRef(false);
+  useEffect(() => {
+    if (joining && !autoJoinedRef.current) {
+      autoJoinedRef.current = true;
+      join();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joining]);
+
+  async function start() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await startCall(true);          // camera first, so we don't ring on a blocked cam
+      await api.callsRing();          // then fire the "SneakyTime call from {name}" push
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function join() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await startCall(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleMic() {
+    setMicOn((prev) => {
+      const next = !prev;
+      setLocalMic(next);
+      return next;
+    });
+  }
+
+  function toggleCam() {
+    setCamOn((prev) => {
+      const next = !prev;
+      setLocalCam(next);
+      return next;
+    });
+  }
+
+  const inCall = status === 'ringing' || status === 'connecting' || status === 'connected';
+  const remoteHasVideo = !!remoteStream?.getVideoTracks().length;
+  const showRemoteVideo = remoteHasVideo && remoteCamOn;
+  const waitingLabel = status === 'ringing' ? 'Ringing…' : 'Connecting…';
+
+  return (
+    <div className="space-y-4 py-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Sneaky Calls</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            {inCall
+              ? (status === 'connected' ? `On a SneakyTime call with ${other?.name ?? 'them'}` : waitingLabel)
+              : 'FaceTime, but sneakier.'}
+          </p>
+        </div>
+        <Link to="/" className="text-sm text-neutral-500 dark:text-neutral-400">Back</Link>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* ── idle / ended lobby ── */}
+      {!inCall && (
+        <div className="flex flex-col items-center gap-5 rounded-3xl bg-neutral-900 px-6 py-12 text-center shadow-lg">
+          <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
+            <Avatar person={other} className="h-full w-full" />
+          </span>
+          <div>
+            <p className="text-lg font-semibold text-neutral-100">{other?.name ?? '…'}</p>
+            <p className="text-sm text-neutral-400">
+              {status === 'ended' ? 'Call ended' : 'Ready for some SneakyTime?'}
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <button type="button" onClick={start} disabled={busy || !other} className={TEAL_BTN}>
+              <VideoIcon className="mr-2 h-4 w-4" />
+              {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
+            </button>
+            <button
+              type="button"
+              onClick={join}
+              disabled={busy}
+              className="text-xs text-neutral-500 underline-offset-2 transition hover:text-neutral-300 hover:underline"
+            >
+              Joining a call? Tap here
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── live call stage ── */}
+      {inCall && (
+        <div className="relative overflow-hidden rounded-3xl bg-black shadow-lg" style={{ height: '65vh' }}>
+          {/* Remote feed (or photo while waiting / cam off) */}
+          {showRemoteVideo ? (
+            <VideoCell stream={remoteStream} />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-neutral-900">
+              <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
+                <Avatar person={other} className="h-full w-full" />
+              </span>
+              <p className="animate-pulse text-xs font-bold uppercase tracking-widest text-neutral-300">
+                {status === 'connected' ? 'Camera off' : waitingLabel}
+              </p>
+            </div>
+          )}
+
+          {/* Local PiP — selfie-mirrored */}
+          {localStream && (
+            <div className="absolute right-3 top-3 h-36 w-24 overflow-hidden rounded-2xl bg-neutral-800 shadow-lg ring-2 ring-white/20 sm:h-44 sm:w-32">
+              {camOn
+                ? <VideoCell stream={localStream} mirror muted />
+                : <Avatar person={players?.me} className="h-full w-full" />}
+            </div>
+          )}
+
+          {/* Control bar */}
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-6 pb-5 pt-10">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={toggleMic}
+                title={micOn ? 'Mute microphone' : 'Unmute microphone'}
+                className={`${CTRL_BTN} ${micOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-white text-neutral-900'}`}
+              >
+                <MicIcon off={!micOn} className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={toggleCam}
+                title={camOn ? 'Turn camera off' : 'Turn camera on'}
+                className={`${CTRL_BTN} ${camOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-white text-neutral-900'}`}
+              >
+                <CameraIcon off={!camOn} className="h-5 w-5" />
+              </button>
+            </div>
+            <button type="button" onClick={endCall} className={END_CALL_BTN}>
+              <HangupIcon className="h-5 w-5" />
+              End Call
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
