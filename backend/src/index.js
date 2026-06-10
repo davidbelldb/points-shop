@@ -40,6 +40,7 @@ import notesRoutes from './modules/notes/notes.routes.js';
 import { momentsRoutes } from './modules/moments/moments.routes.js';
 import { rtcRoutes } from './modules/games/rtc.routes.js';
 import callsRoutes from './modules/calls/calls.routes.js';
+import spreadsheetsRoutes from './modules/spreadsheets/spreadsheets.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 import { sendPush } from './modules/notifications/push.js';
 import { query as dbQuery } from './db.js';
@@ -125,6 +126,7 @@ await fastify.register(notesRoutes);
 await fastify.register(momentsRoutes);
 await fastify.register(rtcRoutes);
 await fastify.register(callsRoutes);
+await fastify.register(spreadsheetsRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 

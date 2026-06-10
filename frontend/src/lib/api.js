@@ -250,6 +250,12 @@ export const api = {
   crChallengeCancel: () => request('/games/cambs-rage/challenge/cancel', { method: 'POST', body: JSON.stringify({}) }),
   crOnlineWin:       (matchId) => request('/games/cambs-rage/online-win', { method: 'POST', body: JSON.stringify({ matchId }) }),
 
+  // Sneaky Spreadsheets
+  sheetTabs:      () => request('/spreadsheets/tabs'),
+  sheetCreateTab: (name) => request('/spreadsheets/tabs', { method: 'POST', body: JSON.stringify({ name }) }),
+  sheetUpdateTab: (id, patch) => request(`/spreadsheets/tabs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  sheetDeleteTab: (id) => request(`/spreadsheets/tabs/${id}`, { method: 'DELETE' }),
+
   admin: {
     listProducts:    () => request('/admin/products'),
     createProduct:   (data) => request('/admin/products', { method: 'POST', body: JSON.stringify(data) }),

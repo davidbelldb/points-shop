@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import App from './App.jsx';
@@ -31,6 +31,9 @@ import SneakyFeedPage from './pages/SneakyFeedPage.jsx';
 import SneakyStorePage from './pages/SneakyStorePage.jsx';
 import NotesPage from './pages/NotesPage.jsx';
 import SneakyCallsPage from './pages/SneakyCallsPage.jsx';
+
+// Lazy — Handsontable is a big bundle; only fetched when the page is opened.
+const SneakySpreadsheetsPage = lazy(() => import('./pages/SneakySpreadsheetsPage.jsx'));
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
@@ -105,6 +108,14 @@ createRoot(document.getElementById('root')).render(
               <Route path="store" element={<SneakyStorePage />} />
               <Route path="notes" element={<NotesPage />} />
               <Route path="sneakytime" element={<SneakyCallsPage />} />
+              <Route
+                path="sneakyspreadsheets"
+                element={
+                  <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">Loading spreadsheets…</div>}>
+                    <SneakySpreadsheetsPage />
+                  </Suspense>
+                }
+              />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>
