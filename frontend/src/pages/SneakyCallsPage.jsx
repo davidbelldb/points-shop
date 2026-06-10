@@ -197,13 +197,13 @@ export default function SneakyCallsPage() {
 
       {/* ── idle / ended lobby ── */}
       {!inCall && (
-        <div className="flex flex-col items-center gap-5 rounded-3xl bg-[#171717] px-6 py-12 text-center shadow-lg">
+        <div className="flex flex-col items-center gap-5 rounded-3xl bg-white px-6 py-12 text-center shadow-lg">
           <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
             <Avatar person={other} className="h-full w-full" />
           </span>
           <div>
-            <p className="text-lg font-semibold text-white">{other?.name ?? '…'}</p>
-            <p className="text-sm text-white/60">
+            <p className="text-lg font-semibold text-neutral-900">{other?.name ?? '…'}</p>
+            <p className="text-sm text-neutral-500">
               {status === 'ended' ? 'Call ended' : 'Ready for some SneakyTime?'}
             </p>
           </div>
@@ -216,7 +216,7 @@ export default function SneakyCallsPage() {
               type="button"
               onClick={join}
               disabled={busy}
-              className="text-xs text-white/50 underline-offset-2 transition hover:text-white/80 hover:underline"
+              className="text-xs text-neutral-500 underline-offset-2 transition hover:text-neutral-700 hover:underline"
             >
               Joining a call? Tap here
             </button>
