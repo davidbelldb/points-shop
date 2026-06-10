@@ -55,7 +55,7 @@ export default async function notesRoutes(fastify) {
     if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
     const type = req.body?.type === 'shared' ? 'shared' : 'personal';
     const note = await createNote(accountId, type);
-    notifyPartner(accountId, 'added'); // fire-and-forget
+    if (type === 'shared') notifyPartner(accountId, 'added'); // fire-and-forget
     return reply.code(201).send(note);
   });
 
@@ -67,7 +67,6 @@ export default async function notesRoutes(fastify) {
     if (typeof body !== 'string') return reply.code(400).send({ error: 'body (string) required' });
     try {
       const note = await updateNote(req.params.id, accountId, body);
-      notifyPartner(accountId, 'updated'); // fire-and-forget
       return note;
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
