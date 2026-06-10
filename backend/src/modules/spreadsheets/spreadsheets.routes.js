@@ -18,6 +18,7 @@ const shape = (r) => ({
   position: r.position,
   columns: r.columns,
   data: r.data,
+  formats: r.formats ?? {},
   updated_at: r.updated_at,
 });
 
@@ -75,6 +76,10 @@ export default async function spreadsheetsRoutes(fastify) {
     }
     if (Array.isArray(data)) {
       fields.push(`data = $${i++}`); values.push(JSON.stringify(data));
+    }
+    const { formats } = req.body ?? {};
+    if (formats && typeof formats === 'object' && !Array.isArray(formats)) {
+      fields.push(`formats = $${i++}`); values.push(JSON.stringify(formats));
     }
     if (!fields.length) return reply.code(400).send({ error: 'Nothing to update' });
 
