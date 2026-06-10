@@ -111,7 +111,7 @@ createRoot(document.getElementById('root')).render(
               <Route
                 path="sneakyspreadsheets"
                 element={
-                  <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">Loading spreadsheets…</div>}>
+                  <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">Loading those sneaky sheets...</div>}>
                     <SneakySpreadsheetsPage />
                   </Suspense>
                 }

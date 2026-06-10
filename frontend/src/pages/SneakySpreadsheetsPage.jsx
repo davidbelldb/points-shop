@@ -392,7 +392,7 @@ export default function SneakySpreadsheetsPage() {
         style={{ height: 'calc(100dvh - 300px)', minHeight: 420, position: 'relative', zIndex: 0, isolation: 'isolate' }}
       >
         {!tabs && (
-          <div className="flex h-full items-center justify-center text-sm text-neutral-500">Loading workbook…</div>
+          <div className="flex h-full items-center justify-center text-sm text-neutral-500">Loading those sneaky sheets...</div>
         )}
         {active && (
           <HotTable
