@@ -5,8 +5,9 @@
  * Media:     peer-to-peer via WebRTC after ICE negotiation.
  *
  * Usage:
- *   const { localStream, remoteStream, initCall } = useWebRTC(gameId);
+ *   const { localStream, remoteStream, initCall, endCall, callEnded } = useWebRTC(gameId);
  *   // Call initCall(true) on p1, initCall(false) on p2, once per game.
+ *   // Call endCall() to hang up — won't auto-restart for this gameId.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -29,6 +30,7 @@ export function useWebRTC(gameId) {
 
   const [localStream,  setLocalStream]  = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
+  const [callEnded,    setCallEnded]    = useState(false);
 
   // ── internal helpers ──────────────────────────────────────────────────────
 
@@ -70,6 +72,7 @@ export function useWebRTC(gameId) {
     pcRef.current = null;
     localRef.current?.getTracks().forEach(t => t.stop());
     localRef.current = null;
+    setCallEnded(false);
 
     // ── 1. Get local camera stream ────────────────────────────────────────
     let stream;
@@ -133,11 +136,40 @@ export function useWebRTC(gameId) {
         const { signals } = await api.rtcPoll();
         const p = pcRef.current;
         if (!p) return;
-        for (const sig of signals) await handleSignal(p, sig);
+        for (const sig of signals) {
+          if (sig.type === 'hangup') {
+            // Partner ended the call — tear down our side too.
+            clearInterval(pollerRef.current);
+            p.close();
+            pcRef.current = null;
+            localRef.current?.getTracks().forEach(t => t.stop());
+            localRef.current = null;
+            setLocalStream(null);
+            setRemoteStream(null);
+            setCallEnded(true);
+            return;
+          }
+          await handleSignal(p, sig);
+        }
       } catch { /* ignore */ }
     }, POLL_MS);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
+
+  // ── hang up — tears down the connection and prevents auto-restart ─────────
+  const endCall = useCallback(() => {
+    clearInterval(pollerRef.current);
+    sendSignal('hangup', {});
+    pcRef.current?.close();
+    pcRef.current = null;
+    localRef.current?.getTracks().forEach(t => t.stop());
+    localRef.current = null;
+    setLocalStream(null);
+    setRemoteStream(null);
+    setCallEnded(true);
+    // Leave calledRef.current as gameId so initCall's guard stops it
+    // re-initiating the call for this game.
+  }, []);
 
   // ── cleanup when gameId changes or component unmounts ─────────────────────
   useEffect(() => {
@@ -150,8 +182,9 @@ export function useWebRTC(gameId) {
       calledRef.current = null;
       setLocalStream(null);
       setRemoteStream(null);
+      setCallEnded(false);
     };
   }, [gameId]);
 
-  return { localStream, remoteStream, initCall };
+  return { localStream, remoteStream, initCall, endCall, callEnded };
 }

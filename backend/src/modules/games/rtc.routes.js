@@ -29,7 +29,7 @@ function pruneOld() {
 }
 
 export async function rtcRoutes(fastify) {
-  // POST /api/rtc/signal  { type: 'offer'|'answer'|'ice', payload: {} }
+  // POST /api/rtc/signal  { type: 'offer'|'answer'|'ice'|'hangup', payload: {} }
   // Delivers the signal to the calling user's partner.
   fastify.post('/api/rtc/signal', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);

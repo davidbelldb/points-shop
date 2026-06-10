@@ -30,6 +30,39 @@ function VideoCell({ stream, mirror = false, muted = false }) {
   );
 }
 
+// ─── Call control icons ─────────────────────────────────────────────────────
+const ICON_PROPS = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+
+function MicIcon({ off = false, className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <rect x="9" y="2" width="6" height="11" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+      <line x1="8" y1="22" x2="16" y2="22" />
+      {off && <line x1="3" y1="3" x2="21" y2="21" />}
+    </svg>
+  );
+}
+
+function CameraIcon({ off = false, className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <rect x="2" y="6" width="13" height="12" rx="2" />
+      <path d="M15 10.5l6-3.5v10l-6-3.5" />
+      {off && <line x1="2" y1="3" x2="21" y2="22" />}
+    </svg>
+  );
+}
+
+function HangupIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} fill="currentColor" stroke="none" className={className} style={{ transform: 'rotate(135deg)' }}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
 // ─── sub-components ───────────────────────────────────────────────────────────
 function PlayerImage({ tone, players, className = '' }) {
   const player = tone === 'me' ? players.me : players.other;
@@ -141,7 +174,7 @@ function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, 
   const canPlayInBoard = !resolved && isMyTurn && isActive;
 
   return (
-    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder}`} style={{ backgroundColor: '#1f1f1e' }}>
+    <div className={`relative aspect-square rounded-xl border-2 transition p-1 ${outerBorder}`} style={{ backgroundColor: '#1f1f1e' }}>
       {resolved ? (
         <div className="flex h-full w-full items-center justify-center">
           {globalCell === 'draw'
@@ -275,7 +308,7 @@ export default function TicTacFacePage() {
   // Video only activates once both players have claimed at least one mini-board
   const videoEnabled = !!(game && !game.finished && myBoardWins >= 1 && oppBoardWins >= 1);
 
-  const { localStream, remoteStream, initCall } = useWebRTC(game?.id ?? null);
+  const { localStream, remoteStream, initCall, endCall, callEnded } = useWebRTC(game?.id ?? null);
 
   // Trigger call setup the moment the condition is met (surprise reveal)
   useEffect(() => {
@@ -295,9 +328,60 @@ export default function TicTacFacePage() {
     if (remoteStream) el.play().catch(() => {});
   }, [remoteStream]);
 
+  // If the game finishes (win/draw/resign) while a call is live, hang up
+  // automatically — the call shouldn't outlive the game it belongs to.
+  useEffect(() => {
+    if (game?.finished && (localStream || remoteStream)) endCall();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.finished]);
+
   // Streams to pass into the board (null when video not yet active)
-  const myStream    = videoEnabled ? localStream  : null;
-  const theirStream = videoEnabled ? remoteStream : null;
+  const callActive = videoEnabled && !callEnded;
+  const myStream    = callActive ? localStream  : null;
+  const theirStream = callActive ? remoteStream : null;
+
+  // ── Mic / camera toggles ────────────────────────────────────────────────────
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+
+  // Reset toggle state whenever a fresh local stream comes online
+  useEffect(() => {
+    if (localStream) { setMicOn(true); setCamOn(true); }
+  }, [localStream]);
+
+  function toggleMic() {
+    setMicOn(prev => {
+      const next = !prev;
+      localStream?.getAudioTracks().forEach(t => { t.enabled = next; });
+      return next;
+    });
+  }
+
+  function toggleCam() {
+    setCamOn(prev => {
+      const next = !prev;
+      localStream?.getVideoTracks().forEach(t => { t.enabled = next; });
+      return next;
+    });
+  }
+
+  function hangUp() {
+    if (!confirm('End the video call? The game will continue.')) return;
+    endCall();
+  }
+
+  // ── "It's Time For..." game-show announcement ──────────────────────────────
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const announcedRef = useRef(null);
+
+  useEffect(() => {
+    if (videoEnabled && game?.id && announcedRef.current !== game.id) {
+      announcedRef.current = game.id;
+      setShowAnnouncement(true);
+      const t = setTimeout(() => setShowAnnouncement(false), 2800);
+      return () => clearTimeout(t);
+    }
+  }, [videoEnabled, game?.id]);
 
   // ── game actions ────────────────────────────────────────────────────────────
   async function start() {
@@ -416,7 +500,34 @@ export default function TicTacFacePage() {
             <PlayerChip tone="other" label={otherName} active={!!game && !game.finished && !isMyTurn} status={otherStatus} score={oppBoardWins} players={players} />
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center">
+          <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-4 text-center">
+            {/* Floating call controls — overlays the turn-status area while a call is live */}
+            {callActive && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center gap-3 bg-white">
+                <button
+                  onClick={toggleMic}
+                  aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 transition active:scale-90"
+                >
+                  <MicIcon off={!micOn} className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={toggleCam}
+                  aria-label={camOn ? 'Turn camera off' : 'Turn camera on'}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 transition active:scale-90"
+                >
+                  <CameraIcon off={!camOn} className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={hangUp}
+                  aria-label="Terminate call"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 transition active:scale-90 hover:bg-red-600"
+                >
+                  <HangupIcon className="h-5 w-5" />
+                </button>
+              </div>
+            )}
+
             {!game && !match?.finished && (
               <>
                 <p className="text-sm text-neutral-500">No game in progress.</p>
@@ -497,10 +608,30 @@ export default function TicTacFacePage() {
         </div>
       )}
 
+      {/* Game-show style "call starting" announcement */}
+      {showAnnouncement && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 text-center">
+          <div className="animate-[gameshowPop_0.5s_cubic-bezier(0.34,1.56,0.64,1)]">
+            <p className="text-lg font-extrabold uppercase tracking-[0.4em] text-yellow-300 animate-pulse">
+              It's time for...
+            </p>
+            <p className="mt-2 bg-gradient-to-r from-teal-300 via-yellow-300 to-pink-400 bg-clip-text text-4xl font-black uppercase tracking-tight text-transparent sm:text-5xl">
+              Tic-Tic-FaceTime!
+            </p>
+            <p className="mt-3 text-sm text-white/70">📹 Cameras incoming...</p>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes zoomIn {
           from { opacity: 0; transform: scale(0.5); }
           to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes gameshowPop {
+          0%   { opacity: 0; transform: scale(0.4) rotate(-6deg); }
+          60%  { opacity: 1; transform: scale(1.08) rotate(2deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); }
         }
       `}</style>
     </div>
