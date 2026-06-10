@@ -171,7 +171,7 @@ export default function SneakySpreadsheetsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-3 py-4" style={{ minHeight: 'calc(100dvh - 140px)' }}>
+    <div className="flex flex-col gap-3 py-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Sneaky Spreadsheets</h1>
@@ -220,10 +220,11 @@ export default function SneakySpreadsheetsPage() {
         </button>
       </div>
 
-      {/* Grid */}
+      {/* Grid — explicit height: Handsontable's height="100%" needs a parent
+          with a definite height, not one derived from flex/min-height */}
       <div
-        className={`flex-1 overflow-hidden rounded-xl ${theme === 'dark' ? 'ht-theme-main-dark' : 'ht-theme-main'}`}
-        style={{ minHeight: 420 }}
+        className={`overflow-hidden rounded-xl ${theme === 'dark' ? 'ht-theme-main-dark' : 'ht-theme-main'}`}
+        style={{ height: 'calc(100dvh - 300px)', minHeight: 420 }}
       >
         {!tabs && (
           <div className="flex h-full items-center justify-center text-sm text-neutral-500">Loading workbook…</div>
