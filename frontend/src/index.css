@@ -152,11 +152,11 @@ html.dark .border-teal-200 { border-color: #2a5a4f !important; }
 }
 html.dark .notes-toolbar { background: #1c1c1e; border-top-color: #2e2e2c; }
 
-/* Grid rows inside toolbar — 3 button rows × 56px, 2 divider rows × 1px */
+/* Grid rows inside toolbar — 4 button rows × 56px, 3 divider rows × 1px */
 .notes-tb-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: 56px 1px 56px 1px 56px;
+  grid-template-rows: 56px 1px 56px 1px 56px 1px 56px;
 }
 
 /* Separator (row dividers drawn via border-bottom on each row's last button group) */
@@ -261,6 +261,31 @@ html.dark .notes-content-ro mark { background: #713f12; color: #fef3c7; }
 html.dark .notes-content .tiptap code,
 html.dark .notes-content-ro code { background: #252523; }
 
+/* Links */
+.notes-content .tiptap a, .notes-content-ro a {
+  color: #1f8a6b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  word-break: break-word;
+}
+html.dark .notes-content .tiptap a,
+html.dark .notes-content-ro a { color: #61dbbb; }
+
+/* Images */
+.notes-content .tiptap img, .notes-content-ro img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.4em 0;
+  display: block;
+}
+/* Selected image outline in the editor */
+.notes-content .tiptap img.ProseMirror-selectednode {
+  outline: 2px solid #61dbbb;
+  outline-offset: 2px;
+}
+
 /* Lists */
 .notes-content .tiptap ul:not([data-type="taskList"]),
 .notes-content-ro ul:not([data-type="taskList"]) { list-style: disc; padding-left: 1.4em; margin: 0.3em 0; }
@@ -273,6 +298,17 @@ html.dark .notes-content-ro code { background: #252523; }
 /* ── Task list / Checklist ────────────────────────────────────────────────── */
 .notes-content .tiptap ul[data-type="taskList"],
 .notes-content-ro ul[data-type="taskList"] { list-style: none; padding: 0; margin: 0.3em 0; }
+
+/* Nested checklists need their own left padding (the top-level rule zeroes it,
+   which made "increase indent" on checklist items invisible). */
+.notes-content .tiptap ul[data-type="taskList"] ul[data-type="taskList"],
+.notes-content-ro ul[data-type="taskList"] ul[data-type="taskList"] {
+  padding-left: 1.6em;
+  margin: 0.1em 0 0;
+}
+/* The nested list lives inside the item's content div — let it take the row */
+.notes-content .tiptap ul[data-type="taskList"] li > div,
+.notes-content-ro ul[data-type="taskList"] li > div { flex: 1 1 auto; min-width: 0; }
 
 .notes-content .tiptap ul[data-type="taskList"] li,
 .notes-content-ro ul[data-type="taskList"] li {

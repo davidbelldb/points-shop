@@ -9,12 +9,87 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Highlight from '@tiptap/extension-highlight';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import TipTapLink from '@tiptap/extension-link';
+import TipTapImage from '@tiptap/extension-image';
+
+// ─── Indent extension ─────────────────────────────────────────────────────────
+// Apple-Notes-style indentation for plain paragraphs and headings (lists keep
+// using sink/lift). Stored as an `indent` attr rendered as margin-left, so it
+// round-trips through the saved HTML. Tab / Shift-Tab work too.
+const INDENT_STEP = 24; // px per level
+const Indent = Extension.create({
+  name: 'indent',
+
+  addGlobalAttributes() {
+    return [{
+      types: ['paragraph', 'heading'],
+      attributes: {
+        indent: {
+          default: 0,
+          parseHTML: (el) => {
+            const ml = parseInt(el.style?.marginLeft || '0', 10);
+            return Number.isFinite(ml) && ml > 0 ? Math.round(ml / INDENT_STEP) : 0;
+          },
+          renderHTML: (attrs) =>
+            attrs.indent ? { style: `margin-left: ${attrs.indent * INDENT_STEP}px` } : {},
+        },
+      },
+    }];
+  },
+
+  addCommands() {
+    const apply = (delta) => ({ tr, state, dispatch }) => {
+      const { from, to } = state.selection;
+      let changed = false;
+      state.doc.nodesBetween(from, to, (node, pos) => {
+        if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+          // Skip blocks living inside list items — lists indent via sink/lift.
+          const $pos = state.doc.resolve(pos);
+          for (let d = $pos.depth; d > 0; d--) {
+            const parent = $pos.node(d).type.name;
+            if (parent === 'listItem' || parent === 'taskItem') return;
+          }
+          const cur = node.attrs.indent || 0;
+          const next = Math.max(0, Math.min(8, cur + delta));
+          if (next !== cur) {
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: next });
+            changed = true;
+          }
+        }
+      });
+      if (changed && dispatch) dispatch(tr);
+      return changed;
+    };
+    return {
+      indentBlock:  () => apply(1),
+      outdentBlock: () => apply(-1),
+    };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        const e = this.editor;
+        if (e.isActive('taskItem')) return e.chain().focus().sinkListItem('taskItem').run() || true;
+        if (e.isActive('listItem')) return e.chain().focus().sinkListItem('listItem').run() || true;
+        return e.chain().focus().indentBlock().run() || true; // swallow Tab either way
+      },
+      'Shift-Tab': () => {
+        const e = this.editor;
+        if (e.isActive('taskItem')) return e.chain().focus().liftListItem('taskItem').run() || true;
+        if (e.isActive('listItem')) return e.chain().focus().liftListItem('listItem').run() || true;
+        return e.chain().focus().outdentBlock().run() || true;
+      },
+    };
+  },
+});
 import { api } from '../lib/api.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -314,6 +389,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
 
 function NoteToolbar({ editor }) {
   const [showStyles, setShowStyles] = useState(false);
+  const fileRef = useRef(null);
   if (!editor) return null;
 
   const Btn = ({ active, onMd, title: t, children }) => (
@@ -341,10 +417,36 @@ function NoteToolbar({ editor }) {
   function indent() {
     if (editor.isActive('taskList')) editor.chain().focus().sinkListItem('taskItem').run();
     else if (editor.isActive('bulletList') || editor.isActive('orderedList')) editor.chain().focus().sinkListItem('listItem').run();
+    else editor.chain().focus().indentBlock().run(); // plain paragraphs/headings
   }
   function outdent() {
     if (editor.isActive('taskList')) editor.chain().focus().liftListItem('taskItem').run();
     else if (editor.isActive('bulletList') || editor.isActive('orderedList')) editor.chain().focus().liftListItem('listItem').run();
+    else editor.chain().focus().outdentBlock().run();
+  }
+
+  function setLink() {
+    const prev = editor.getAttributes('link').href || '';
+    const url = window.prompt('Link URL', prev || 'https://');
+    if (url === null) return; // cancelled
+    if (url.trim() === '' || url.trim() === 'https://') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+    const href = /^(https?:\/\/|mailto:|tel:)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
+    editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+  }
+
+  async function pickImage(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const { url } = await api.upload(file);
+      editor.chain().focus().setImage({ src: url }).run();
+    } catch (err) {
+      alert(`Image upload failed: ${err.message}`);
+    }
   }
 
   /* 3 × 4 grid — 12 cells */
@@ -438,7 +540,29 @@ function NoteToolbar({ editor }) {
             <line x1="3" y1="3" x2="21" y2="21"/>
           </svg>
         </Btn>
+
+        {ROW_DIVIDER}
+
+        {/* ── Row 4: Link · Image ── */}
+        <Btn active={editor.isActive('link')} onMd={(e) => { e.preventDefault(); setLink(); }} title="Link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+        </Btn>
+        <Btn active={false} onMd={(e) => { e.preventDefault(); fileRef.current?.click(); }} title="Insert image">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+            <path d="M21 15l-5-5L5 21" />
+          </svg>
+        </Btn>
+        <span />
+        <span />
       </div>
+
+      {/* Hidden file input for image inserts */}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
     </div>
   );
 }
@@ -495,6 +619,9 @@ function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
       Highlight,
       Underline,
       Placeholder.configure({ placeholder: 'Start writing…' }),
+      TipTapLink.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+      TipTapImage,
+      Indent,
     ],
     content: initHtml,
     editable: !readOnly,

@@ -17,6 +17,8 @@
     "@react-three/fiber": "^9.6.1",
     "@react-three/rapier": "^2.0.1",
     "@tiptap/extension-highlight": "^2.0.0",
+    "@tiptap/extension-image": "^2.0.0",
+    "@tiptap/extension-link": "^2.0.0",
     "@tiptap/extension-placeholder": "^2.0.0",
     "@tiptap/extension-task-item": "^2.0.0",
     "@tiptap/extension-task-list": "^2.0.0",
