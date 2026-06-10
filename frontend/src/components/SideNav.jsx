@@ -79,6 +79,16 @@ function UserIcon() {
     </svg>
   );
 }
+function SheetIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="3" y1="9" x2="21" y2="9" />
+      <line x1="3" y1="15" x2="21" y2="15" />
+      <line x1="9" y1="3" x2="9" y2="21" />
+    </svg>
+  );
+}
 function VideoCallIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -153,7 +163,8 @@ export default function SideNav() {
           <NavItem to="/rewatch"  label="Watch list" icon={<TvIcon />} />
           <NavItem to="/calendar" label="Calendar"   icon={<CalendarIcon />} />
           <NavItem to="/messages" label="Chat"       icon={<ChatIcon />} />
-          <NavItem to="/sneakytime" label="SneakyTime" icon={<VideoCallIcon />} />
+          <NavItem to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} />
+          <NavItem to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} />
         </div>
 
         {/* Account at bottom of nav */}

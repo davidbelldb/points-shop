@@ -77,6 +77,16 @@ function StoreIcon() {
     </svg>
   );
 }
+function SheetIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="3" y1="9" x2="21" y2="9" />
+      <line x1="3" y1="15" x2="21" y2="15" />
+      <line x1="9" y1="3" x2="9" y2="21" />
+    </svg>
+  );
+}
 function VideoCallIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -169,7 +179,8 @@ export default function MenuDrawer({ open, onClose }) {
             <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
             <Item to="/calendar" label="Sneaky Calendar" icon={<CalendarIcon />} onClose={onClose} />
             <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
-            <Item to="/sneakytime" label="SneakyTime" icon={<VideoCallIcon />} onClose={onClose} />
+            <Item to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} onClose={onClose} />
+            <Item to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} onClose={onClose} />
           </div>
           <div className="mt-auto pt-2">
             <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />
