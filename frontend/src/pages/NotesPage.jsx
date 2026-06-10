@@ -426,15 +426,48 @@ function NoteToolbar({ editor }) {
   }
 
   function setLink() {
-    const prev = editor.getAttributes('link').href || '';
-    const url = window.prompt('Link URL', prev || 'https://');
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const prevHref = editor.getAttributes('link').href || '';
+    const { from, to, empty } = editor.state.selection;
+    const selectedText = empty ? '' : editor.state.doc.textBetween(from, to, ' ');
+
+    const url = window.prompt('Link URL', prevHref || 'https://');
     if (url === null) return; // cancelled
     if (url.trim() === '' || url.trim() === 'https://') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
     }
     const href = /^(https?:\/\/|mailto:|tel:)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
-    editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+
+    // Title — the visible text, so the raw URL stays hidden.
+    // Blank = keep the existing/selected text (or fall back to the URL).
+    const title = window.prompt(
+      'Link title (text shown instead of the URL)',
+      selectedText || '',
+    );
+    if (title === null) return; // cancelled
+
+    const cleanTitle = title.trim();
+
+    if (editor.isActive('link') || !empty) {
+      // Editing an existing link, or linking selected text.
+      if (cleanTitle && cleanTitle !== selectedText) {
+        // New title — replace the text within the (extended) link range
+        editor.chain().focus().extendMarkRange('link')
+          .insertContent(`<a href="${esc(href)}">${esc(cleanTitle)}</a>`)
+          .run();
+      } else {
+        // Keep the text, just (re)point the link
+        editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+      }
+    } else {
+      // Nothing selected — insert a fresh titled link
+      const text = cleanTitle || href.replace(/^https?:\/\//i, '');
+      editor.chain().focus()
+        .insertContent(`<a href="${esc(href)}">${esc(text)}</a>&nbsp;`)
+        .run();
+    }
   }
 
   async function pickImage(e) {
@@ -619,7 +652,8 @@ function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
       Highlight,
       Underline,
       Placeholder.configure({ placeholder: 'Start writing…' }),
-      TipTapLink.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+      // openOnClick: links navigate on press even while editing (opens new tab)
+      TipTapLink.configure({ openOnClick: true, autolink: true, linkOnPaste: true }),
       TipTapImage,
       Indent,
     ],
