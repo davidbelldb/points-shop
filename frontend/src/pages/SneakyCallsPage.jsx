@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import * as THREE from 'three';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import { api } from '../lib/api.js';
 import { useSneakyCall } from '../lib/useSneakyCall.js';
 
@@ -16,6 +19,9 @@ const END_CALL_BTN =
 
 const CTRL_BTN =
   'flex h-12 w-12 items-center justify-center rounded-full transition active:scale-95';
+const CTRL_ON  = 'bg-white/20 text-white hover:bg-white/30';
+const CTRL_LIT = 'bg-amber-400 text-amber-950';          // tray open / active
+const CTRL_OFF = 'bg-[#ffffff] text-[#171717]';          // muted / cam off
 
 // ─── filters — applied as CSS locally; the partner is told via a 'filter'
 // signal so their device renders our feed the same way ───────────────────────
@@ -28,7 +34,11 @@ const FILTERS = [
 ];
 const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css ?? 'none';
 
-// ─── icons (shared style with Tic-Tac-Face call controls) ─────────────────────
+const FLUTTER_EMOJIS = ['❤️', '😂', '😍', '😘', '🔥', '🍑'];
+const FLUTTER_COUNT = 40;
+const RAIN_COUNT = 20;
+
+// ─── icons ────────────────────────────────────────────────────────────────────
 const ICON_PROPS = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
 
 function MicIcon({ off = false, className = '' }) {
@@ -70,6 +80,55 @@ function VideoIcon({ className = '' }) {
   );
 }
 
+/** Sliders — the filter tray toggle. */
+function FilterIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+      <circle cx="9"  cy="6"  r="2" fill="currentColor" />
+      <circle cx="15" cy="12" r="2" fill="currentColor" />
+      <circle cx="7"  cy="18" r="2" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Smiley — the emoji flutter tray toggle. */
+function SmileIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+      <line x1="9" y1="9.5" x2="9.01" y2="9.5" />
+      <line x1="15" y1="9.5" x2="15.01" y2="9.5" />
+    </svg>
+  );
+}
+
+/** Flip camera — front/rear toggle. */
+function FlipIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  );
+}
+
+/** Wrapped candy — the twirl rain trigger (placeholder icon). */
+function CandyIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} className={className}>
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M8.2 9.5 L4 6.5 L5 12 L4 17.5 L8.2 14.5" />
+      <path d="M15.8 9.5 L20 6.5 L19 12 L20 17.5 L15.8 14.5" />
+    </svg>
+  );
+}
+
 // ─── VideoCell — binds a MediaStream to a <video> ─────────────────────────────
 function VideoCell({ stream, mirror = false, muted = false, filter = 'none' }) {
   const ref = useRef(null);
@@ -104,19 +163,29 @@ function Avatar({ person, className = '' }) {
   );
 }
 
-// ─── FilterBar — pill picker, designed to overlay video ──────────────────────
+// ─── Trays — slide-up flyouts above the control bar ───────────────────────────
+function Tray({ open, children }) {
+  return (
+    <div
+      className={`overflow-hidden transition-all duration-200 ease-out ${
+        open ? 'max-h-24 translate-y-0 opacity-100' : 'max-h-0 translate-y-3 opacity-0'
+      }`}
+    >
+      <div className="rounded-2xl bg-black/50 px-2 py-2 backdrop-blur-sm">{children}</div>
+    </div>
+  );
+}
+
 function FilterBar({ value, onChange }) {
   return (
-    <div className="flex max-w-full items-center gap-2 overflow-x-auto px-2 py-1">
+    <div className="flex max-w-full items-center gap-2 overflow-x-auto px-1">
       {FILTERS.map((f) => (
         <button
           key={f.id}
           type="button"
           onClick={() => onChange(f.id)}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition active:scale-95 ${
-            value === f.id
-              ? 'bg-amber-400 text-amber-950'
-              : 'bg-white/15 text-white hover:bg-white/25'
+            value === f.id ? 'bg-amber-400 text-amber-950' : 'bg-white/15 text-white hover:bg-white/25'
           }`}
         >
           {f.label}
@@ -126,14 +195,141 @@ function FilterBar({ value, onChange }) {
   );
 }
 
+function EmojiBar({ onPick }) {
+  return (
+    <div className="flex max-w-full items-center gap-1 overflow-x-auto px-1">
+      {FLUTTER_EMOJIS.map((e) => (
+        <button
+          key={e}
+          type="button"
+          onClick={() => onPick(e)}
+          className="shrink-0 rounded-full px-2 py-1 text-2xl transition hover:bg-white/15 active:scale-90"
+        >
+          {e}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── EmojiFlutter — 40 emojis fluttering up the screen ────────────────────────
+function makeBurst(emoji) {
+  return {
+    id: `${Date.now()}-${Math.random()}`,
+    emoji,
+    items: Array.from({ length: FLUTTER_COUNT }, (_, k) => ({
+      k,
+      left: 2 + Math.random() * 92,            // vw
+      dur: 2.8 + Math.random() * 2.6,          // rise duration s
+      delay: Math.random() * 1.4,              // stagger s
+      size: 18 + Math.random() * 26,           // px
+      sway: 0.8 + Math.random() * 1.2,         // sway period s
+    })),
+  };
+}
+
+function EmojiFlutter({ bursts }) {
+  if (!bursts.length) return null;
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[55] overflow-hidden">
+      <style>{`
+        @keyframes sneakyFloatUp { 0% { transform: translateY(0); opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(-115vh); opacity: 0; } }
+        @keyframes sneakySway { from { transform: translateX(-16px) rotate(-14deg); } to { transform: translateX(16px) rotate(14deg); } }
+      `}</style>
+      {bursts.map((b) =>
+        b.items.map((it) => (
+          <span
+            key={`${b.id}-${it.k}`}
+            className="absolute bottom-[-60px]"
+            style={{ left: `${it.left}vw`, animation: `sneakyFloatUp ${it.dur}s linear ${it.delay}s forwards` }}
+          >
+            <span
+              className="inline-block"
+              style={{ fontSize: `${it.size}px`, animation: `sneakySway ${it.sway}s ease-in-out ${it.delay}s infinite alternate` }}
+            >
+              {b.emoji}
+            </span>
+          </span>
+        )),
+      )}
+    </div>
+  );
+}
+
+// ─── TwirlRain — 20 twirl.glb objects raining top → bottom ────────────────────
+function TwirlField({ onDone }) {
+  const { scene } = useGLTF('/twirl.glb');
+  const { viewport } = useThree();
+  const doneRef = useRef(false);
+
+  const items = useMemo(() => {
+    // Normalise the model so its largest dimension is ~1 world unit.
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const norm = 1 / Math.max(size.x, size.y, size.z, 0.0001);
+    return Array.from({ length: RAIN_COUNT }, () => ({
+      obj: scene.clone(true),
+      x: (Math.random() - 0.5) * viewport.width * 0.95,
+      // Staggered starting heights above the top edge → rain, not a curtain.
+      y: viewport.height / 2 + 1 + Math.random() * viewport.height * 1.5,
+      speed: 2.2 + Math.random() * 2.4,
+      rx: (Math.random() - 0.5) * 3,
+      ry: (Math.random() - 0.5) * 3,
+      scale: norm * (0.6 + Math.random() * 0.5),
+    }));
+  }, [scene, viewport.width, viewport.height]);
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05);
+    let allBelow = true;
+    for (const it of items) {
+      it.y -= it.speed * dt;
+      it.obj.position.set(it.x, it.y, 0);
+      it.obj.rotation.x += it.rx * dt;
+      it.obj.rotation.y += it.ry * dt;
+      if (it.y > -viewport.height / 2 - 1.5) allBelow = false;
+    }
+    if (allBelow && !doneRef.current) {
+      doneRef.current = true;
+      onDone?.();
+    }
+  });
+
+  return (
+    <group>
+      {items.map((it, i) => (
+        <primitive key={i} object={it.obj} scale={it.scale} position={[it.x, it.y, 0]} />
+      ))}
+    </group>
+  );
+}
+
+function TwirlRain({ active, onDone }) {
+  if (!active) return null;
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[60]">
+      <Canvas camera={{ position: [0, 0, 8], fov: 50 }} gl={{ alpha: true, antialias: true }}>
+        <ambientLight intensity={1.1} />
+        <directionalLight position={[3, 5, 6]} intensity={1.6} />
+        <Suspense fallback={null}>
+          <TwirlField onDone={onDone} />
+        </Suspense>
+      </Canvas>
+    </div>
+  );
+}
+
+useGLTF.preload('/twirl.glb');
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 export default function SneakyCallsPage() {
   const [searchParams] = useSearchParams();
   const joining = searchParams.get('join') === '1';
 
   const {
-    localStream, remoteStream, status, remoteCamOn, remoteFilter,
-    startCall, endCall, setLocalCam, setLocalMic, sendFilter,
+    localStream, remoteStream, status, remoteCamOn, remoteFilter, emojiEvent, rainEvent, facing,
+    startCall, endCall, setLocalCam, setLocalMic, flipCamera, sendFilter, sendEmoji, sendRain,
   } = useSneakyCall();
 
   const [players, setPlayers] = useState(null);
@@ -142,6 +338,9 @@ export default function SneakyCallsPage() {
   const [micOn, setMicOn]     = useState(true);
   const [camOn, setCamOn]     = useState(true);
   const [filter, setFilter]   = useState('none');
+  const [openTray, setOpenTray] = useState(null); // null | 'filters' | 'emoji'
+  const [bursts, setBursts]   = useState([]);
+  const [raining, setRaining] = useState(false);
 
   const other = players?.other ?? null;
 
@@ -159,11 +358,15 @@ export default function SneakyCallsPage() {
   // page opens (video only; mic stays off until a call actually starts) ──────
   const previewRef = useRef(null);
   const [previewStream, setPreviewStream] = useState(null);
+  const [previewFacing, setPreviewFacing] = useState('user');
 
   useEffect(() => {
     if (inCall || busy) return;
     let cancelled = false;
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: previewFacing === 'environment' ? { ideal: 'environment' } : 'user' },
+      audio: false,
+    })
       .then((s) => {
         if (cancelled) { s.getTracks().forEach((t) => t.stop()); return; }
         previewRef.current = s;
@@ -176,7 +379,7 @@ export default function SneakyCallsPage() {
       previewRef.current = null;
       setPreviewStream(null);
     };
-  }, [inCall, busy]);
+  }, [inCall, busy, previewFacing]);
 
   function stopPreview() {
     previewRef.current?.getTracks().forEach((t) => t.stop());
@@ -186,7 +389,7 @@ export default function SneakyCallsPage() {
 
   // Reset toggles whenever a fresh local stream comes online.
   useEffect(() => {
-    if (localStream) { setMicOn(true); setCamOn(true); }
+    if (localStream) { setMicOn(true); setCamOn(true); setOpenTray(null); }
   }, [localStream]);
 
   // Tapped the "Tap to Join!" notification — join straight away.
@@ -204,13 +407,42 @@ export default function SneakyCallsPage() {
     if (status === 'connected') sendFilter(filter);
   }, [filter, status, sendFilter]);
 
+  // Partner sent an emoji flutter / twirl rain — mirror it on our screen.
+  useEffect(() => {
+    if (emojiEvent) addBurst(emojiEvent.emoji);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emojiEvent]);
+
+  useEffect(() => {
+    if (rainEvent > 0) setRaining(true);
+  }, [rainEvent]);
+
+  function addBurst(emoji) {
+    const burst = makeBurst(emoji);
+    setBursts((prev) => [...prev, burst]);
+    setTimeout(() => {
+      setBursts((prev) => prev.filter((b) => b.id !== burst.id));
+    }, 8000);
+  }
+
+  function pickEmoji(emoji) {
+    addBurst(emoji);
+    sendEmoji(emoji);
+  }
+
+  function startRain() {
+    if (raining) return;
+    setRaining(true);
+    sendRain();
+  }
+
   async function start() {
     if (busy) return;
     setBusy(true);
     setError(null);
     stopPreview(); // release the camera for the call's own stream
     try {
-      await startCall(true);          // camera first, so we don't ring on a blocked cam
+      await startCall(true, previewFacing);  // camera first, so we don't ring on a blocked cam
       await api.callsRing();          // then fire the "SneakyTime call from {name}" push
     } catch (e) {
       setError(e.message);
@@ -225,7 +457,7 @@ export default function SneakyCallsPage() {
     setError(null);
     stopPreview();
     try {
-      await startCall(false);
+      await startCall(false, previewFacing);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -249,13 +481,17 @@ export default function SneakyCallsPage() {
     });
   }
 
+  function toggleTray(name) {
+    setOpenTray((cur) => (cur === name ? null : name));
+  }
+
   const myFilterCss = filterCss(filter);
 
   // ── lobby (full-screen self preview, FaceTime style) ───────────────────────
   if (!inCall && previewStream) {
     return (
       <div className="fixed inset-0 z-50 overflow-hidden bg-black">
-        <VideoCell stream={previewStream} mirror muted filter={myFilterCss} />
+        <VideoCell stream={previewStream} mirror={previewFacing === 'user'} muted filter={myFilterCss} />
 
         {/* Top banner — back link + partner identity */}
         <div
@@ -274,7 +510,7 @@ export default function SneakyCallsPage() {
           </p>
         </div>
 
-        {/* Bottom controls — filters + start */}
+        {/* Bottom controls — filter flyout + start */}
         <div
           className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-6 pt-10"
           style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
@@ -282,11 +518,31 @@ export default function SneakyCallsPage() {
           {error && (
             <p className="rounded-xl bg-black/60 px-4 py-2 text-center text-sm text-[#F2B8B5]">{error}</p>
           )}
-          <FilterBar value={filter} onChange={setFilter} />
-          <button type="button" onClick={start} disabled={busy || !other} className={TEAL_BTN}>
-            <VideoIcon className="mr-2 h-4 w-4" />
-            {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
-          </button>
+          <Tray open={openTray === 'filters'}>
+            <FilterBar value={filter} onChange={setFilter} />
+          </Tray>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => toggleTray('filters')}
+              title="Filters"
+              className={`${CTRL_BTN} ${openTray === 'filters' || filter !== 'none' ? CTRL_LIT : CTRL_ON}`}
+            >
+              <FilterIcon className="h-5 w-5" />
+            </button>
+            <button type="button" onClick={start} disabled={busy || !other} className={TEAL_BTN}>
+              <VideoIcon className="mr-2 h-4 w-4" />
+              {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewFacing((f) => (f === 'user' ? 'environment' : 'user'))}
+              title="Flip camera"
+              className={`${CTRL_BTN} ${CTRL_ON}`}
+            >
+              <FlipIcon className="h-5 w-5" />
+            </button>
+          </div>
           <button
             type="button"
             onClick={join}
@@ -355,7 +611,7 @@ export default function SneakyCallsPage() {
           - once answered           → THEIR feed fills the screen */}
       {!answered ? (
         camOn && localStream ? (
-          <VideoCell stream={localStream} mirror muted filter={myFilterCss} />
+          <VideoCell stream={localStream} mirror={facing === 'user'} muted filter={myFilterCss} />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-[#171717]">
             <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
@@ -395,23 +651,65 @@ export default function SneakyCallsPage() {
           style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
         >
           {camOn
-            ? <VideoCell stream={localStream} mirror muted filter={myFilterCss} />
+            ? <VideoCell stream={localStream} mirror={facing === 'user'} muted filter={myFilterCss} />
             : <Avatar person={players?.me} className="h-full w-full" />}
         </div>
       )}
+
+      {/* Fun overlays */}
+      <EmojiFlutter bursts={bursts} />
+      <TwirlRain active={raining} onDone={() => setRaining(false)} />
 
       {/* Control bar */}
       <div
         className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-6 pt-10"
         style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
       >
-        <FilterBar value={filter} onChange={setFilter} />
-        <div className="flex items-center gap-3">
+        <Tray open={openTray === 'filters'}>
+          <FilterBar value={filter} onChange={setFilter} />
+        </Tray>
+        <Tray open={openTray === 'emoji'}>
+          <EmojiBar onPick={pickEmoji} />
+        </Tray>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => toggleTray('filters')}
+            title="Filters"
+            className={`${CTRL_BTN} ${openTray === 'filters' || filter !== 'none' ? CTRL_LIT : CTRL_ON}`}
+          >
+            <FilterIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleTray('emoji')}
+            title="Send emojis"
+            className={`${CTRL_BTN} ${openTray === 'emoji' ? CTRL_LIT : CTRL_ON}`}
+          >
+            <SmileIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={flipCamera}
+            title="Flip camera"
+            className={`${CTRL_BTN} ${CTRL_ON}`}
+          >
+            <FlipIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={startRain}
+            disabled={raining}
+            title="Make it rain"
+            className={`${CTRL_BTN} ${raining ? CTRL_LIT : CTRL_ON} disabled:opacity-60`}
+          >
+            <CandyIcon className="h-5 w-5" />
+          </button>
           <button
             type="button"
             onClick={toggleMic}
             title={micOn ? 'Mute microphone' : 'Unmute microphone'}
-            className={`${CTRL_BTN} ${micOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-[#ffffff] text-[#171717]'}`}
+            className={`${CTRL_BTN} ${micOn ? CTRL_ON : CTRL_OFF}`}
           >
             <MicIcon off={!micOn} className="h-5 w-5" />
           </button>
@@ -419,7 +717,7 @@ export default function SneakyCallsPage() {
             type="button"
             onClick={toggleCam}
             title={camOn ? 'Turn camera off' : 'Turn camera on'}
-            className={`${CTRL_BTN} ${camOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-[#ffffff] text-[#171717]'}`}
+            className={`${CTRL_BTN} ${camOn ? CTRL_ON : CTRL_OFF}`}
           >
             <CameraIcon off={!camOn} className="h-5 w-5" />
           </button>

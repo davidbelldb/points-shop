@@ -43,6 +43,10 @@ export function useSneakyCall() {
   const [status,       setStatus]       = useState('idle');
   const [remoteCamOn,  setRemoteCamOn]  = useState(true);
   const [remoteFilter, setRemoteFilter] = useState('none');
+  const [emojiEvent,   setEmojiEvent]   = useState(null); // { emoji, nonce } — partner sent a flutter
+  const [rainEvent,    setRainEvent]    = useState(0);    // increments — partner sent twirl rain
+  const facingRef = useRef('user');
+  const [facing, setFacing] = useState('user');           // 'user' | 'environment'
 
   function teardown() {
     clearInterval(pollerRef.current);
@@ -93,7 +97,7 @@ export function useSneakyCall() {
 
   // ── main entry point ──────────────────────────────────────────────────────
 
-  const startCall = useCallback(async (isInitiator) => {
+  const startCall = useCallback(async (isInitiator, startFacing = 'user') => {
     if (activeRef.current) return;
     activeRef.current = true;
     offeredRef.current = false;
@@ -101,13 +105,15 @@ export function useSneakyCall() {
     teardown();
     setRemoteCamOn(true);
     setRemoteFilter('none');
+    facingRef.current = startFacing;
+    setFacing(startFacing);
     setStatus(isInitiator ? 'ringing' : 'connecting');
 
     // ── 1. Local camera + mic ─────────────────────────────────────────────
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: startFacing, width: { ideal: 640 }, height: { ideal: 480 } },
         audio: true,
       });
     } catch {
@@ -179,6 +185,14 @@ export function useSneakyCall() {
             setRemoteFilter(sig.payload?.id ?? 'none');
             continue;
           }
+          if (sig.type === 'emoji') {
+            setEmojiEvent({ emoji: sig.payload?.emoji ?? '❤️', nonce: Date.now() + Math.random() });
+            continue;
+          }
+          if (sig.type === 'rain') {
+            setRainEvent((n) => n + 1);
+            continue;
+          }
           await handleSignal(p, isInitiator, sig);
         }
       } catch { /* ignore */ }
@@ -207,9 +221,54 @@ export function useSneakyCall() {
     localRef.current?.getAudioTracks().forEach(t => { t.enabled = enabled; });
   }, []);
 
+  // ── camera flip — swap front/rear via replaceTrack (no renegotiation) ─────
+  const flipCamera = useCallback(async () => {
+    const local = localRef.current;
+    if (!local) return;
+    const next = facingRef.current === 'user' ? 'environment' : 'user';
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: next === 'environment' ? { ideal: 'environment' } : 'user',
+          width: { ideal: 640 }, height: { ideal: 480 },
+        },
+      });
+      const newTrack = s.getVideoTracks()[0];
+      if (!newTrack) return;
+
+      const oldTracks = local.getVideoTracks();
+      newTrack.enabled = oldTracks[0]?.enabled ?? true; // respect cam-off toggle
+
+      // Swap the outgoing track in the peer connection.
+      const sender = pcRef.current?.getSenders().find((x) => x.track?.kind === 'video');
+      if (sender) await sender.replaceTrack(newTrack);
+
+      // Swap it in the local stream + publish a fresh stream to rebind <video>.
+      oldTracks.forEach((t) => { local.removeTrack(t); t.stop(); });
+      local.addTrack(newTrack);
+      setLocalStream(new MediaStream(local.getTracks()));
+
+      facingRef.current = next;
+      setFacing(next);
+    } catch (err) {
+      console.warn('[SneakyCall] camera flip failed:', err?.message);
+    }
+  }, []);
+
   // ── filter — tell the partner which filter to render our feed with ───────
   const sendFilter = useCallback((id) => {
     sendSignal('filter', { id });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── fun stuff — emoji flutter + twirl rain, mirrored on partner's screen ──
+  const sendEmoji = useCallback((emoji) => {
+    sendSignal('emoji', { emoji });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sendRain = useCallback(() => {
+    sendSignal('rain', {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -222,5 +281,8 @@ export function useSneakyCall() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { localStream, remoteStream, status, remoteCamOn, remoteFilter, startCall, endCall, setLocalCam, setLocalMic, sendFilter };
+  return {
+    localStream, remoteStream, status, remoteCamOn, remoteFilter, emojiEvent, rainEvent, facing,
+    startCall, endCall, setLocalCam, setLocalMic, flipCamera, sendFilter, sendEmoji, sendRain,
+  };
 }
