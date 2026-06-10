@@ -104,13 +104,25 @@ function WonMacroCell({ tone, players, myStream, theirStream, myCamOn, theirCamO
   const camOn  = tone === 'me' ? myCamOn  : theirCamOn;
   const mirror = tone === 'me'; // selfie-mirror own feed
 
+  // A call is live (`stream` exists) but no video track has arrived from this
+  // player yet — they haven't opened the app / granted camera access. Show
+  // their profile photo with a pulsing "WAITING" badge instead of a black circle.
+  const hasVideo = !!stream?.getVideoTracks().length;
+  const showVideo = hasVideo && camOn;
+  const waiting = !!stream && !hasVideo;
+
   return (
     <div className="flex h-full w-full items-center justify-center p-1">
-      <span className={`block h-full w-full overflow-hidden rounded-full ring-4 ${ring} shadow-lg animate-[zoomIn_220ms_ease-out]`}>
-        {stream && camOn
+      <span className={`relative block h-full w-full overflow-hidden rounded-full ring-4 ${ring} shadow-lg animate-[zoomIn_220ms_ease-out]`}>
+        {showVideo
           ? <VideoCell stream={stream} mirror={mirror} muted />
           : <PlayerImage tone={tone} players={players} />
         }
+        {waiting && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <span className="animate-pulse text-[11px] font-bold uppercase tracking-widest text-white">Waiting</span>
+          </span>
+        )}
       </span>
     </div>
   );
