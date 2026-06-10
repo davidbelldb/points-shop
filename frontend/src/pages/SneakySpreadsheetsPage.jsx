@@ -51,8 +51,6 @@ export default function SneakySpreadsheetsPage() {
 
   const [tabs, setTabs]         = useState(null);  // null = loading
   const [activeId, setActiveId] = useState(null);
-  const [saving, setSaving]     = useState(false);
-  const [savedAt, setSavedAt]   = useState(null);
   const [error, setError]       = useState(null);
   const [query, setQuery]       = useState('');
 
@@ -73,22 +71,18 @@ export default function SneakySpreadsheetsPage() {
       .catch((e) => setError(e.message));
   }, []);
 
-  // ── Debounced whole-tab save ────────────────────────────────────────────────
+  // ── Debounced whole-tab save — quiet and unhurried (low throughput) ─────────
   const saveTimer = useRef(null);
   const scheduleSave = useCallback((tabId, patch) => {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      setSaving(true);
       try {
         const saved = await api.sheetUpdateTab(tabId, patch);
         setTabs((prev) => prev?.map((t) => (t.id === saved.id ? saved : t)));
-        setSavedAt(new Date());
       } catch (e) {
         setError(e.message);
-      } finally {
-        setSaving(false);
       }
-    }, 800);
+    }, 3000);
   }, []);
   useEffect(() => () => clearTimeout(saveTimer.current), []);
 
@@ -281,9 +275,6 @@ export default function SneakySpreadsheetsPage() {
           <h1 className="text-2xl font-bold text-neutral-900">Sneaky Sheets</h1>
           <p className="text-sm text-neutral-500">Double-tap a tab or column header to rename it.</p>
         </div>
-        <span className="text-[11px] text-neutral-400">
-          {saving ? 'Saving…' : savedAt ? 'Saved' : ''}
-        </span>
       </div>
 
       {error && tabs && (
