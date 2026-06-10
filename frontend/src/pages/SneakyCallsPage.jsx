@@ -171,6 +171,7 @@ export default function SneakyCallsPage() {
 
   const inCall = status === 'ringing' || status === 'connecting' || status === 'connected';
   const remoteHasVideo = !!remoteStream?.getVideoTracks().length;
+  const answered = remoteHasVideo || status === 'connected';
   const showRemoteVideo = remoteHasVideo && remoteCamOn;
   const waitingLabel = status === 'ringing' ? 'Ringing…' : 'Connecting…';
 
@@ -223,26 +224,49 @@ export default function SneakyCallsPage() {
         </div>
       )}
 
-      {/* ── live call stage ── */}
+      {/* ── live call stage — full-screen overlay, FaceTime style ── */}
       {inCall && (
-        <div className="relative overflow-hidden rounded-3xl bg-black shadow-lg" style={{ height: '65vh' }}>
-          {/* Remote feed (or photo while waiting / cam off) */}
-          {showRemoteVideo ? (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-black">
+          {/* Full-screen layer:
+              - while ringing/connecting → YOUR camera fills the screen
+              - once answered           → THEIR feed fills the screen */}
+          {!answered ? (
+            camOn && localStream ? (
+              <VideoCell stream={localStream} mirror muted />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-[#171717]">
+                <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
+                  <Avatar person={players?.me} className="h-full w-full" />
+                </span>
+              </div>
+            )
+          ) : showRemoteVideo ? (
             <VideoCell stream={remoteStream} />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#171717]">
               <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
                 <Avatar person={other} className="h-full w-full" />
               </span>
-              <p className="animate-pulse text-xs font-bold uppercase tracking-widest text-white/80">
-                {status === 'connected' ? 'Camera off' : waitingLabel}
-              </p>
+              <p className="text-xs font-bold uppercase tracking-widest text-white/80">Camera off</p>
             </div>
           )}
 
-          {/* Local PiP — selfie-mirrored */}
-          {localStream && (
-            <div className="absolute right-3 top-3 h-36 w-24 overflow-hidden rounded-2xl bg-black/60 shadow-lg ring-2 ring-white/20 sm:h-44 sm:w-32">
+          {/* Ringing banner — partner avatar + status, while waiting for them */}
+          {!answered && (
+            <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 bg-gradient-to-b from-black/70 to-transparent px-6 pb-10 pt-6"
+                 style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}>
+              <span className="block h-14 w-14 overflow-hidden rounded-full ring-2 ring-pink-400">
+                <Avatar person={other} className="h-full w-full" />
+              </span>
+              <p className="text-sm font-semibold text-white">{other?.name ?? '…'}</p>
+              <p className="animate-pulse text-xs font-bold uppercase tracking-widest text-white/70">{waitingLabel}</p>
+            </div>
+          )}
+
+          {/* Local PiP — appears once they've answered, selfie-mirrored, rounded */}
+          {answered && localStream && (
+            <div className="absolute right-3 h-36 w-24 overflow-hidden rounded-2xl bg-black/60 shadow-lg ring-2 ring-white/20 sm:h-44 sm:w-32"
+                 style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}>
               {camOn
                 ? <VideoCell stream={localStream} mirror muted />
                 : <Avatar person={players?.me} className="h-full w-full" />}
@@ -250,7 +274,8 @@ export default function SneakyCallsPage() {
           )}
 
           {/* Control bar */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-6 pb-5 pt-10">
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-6 pt-10"
+               style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
             <div className="flex items-center gap-3">
               <button
                 type="button"
