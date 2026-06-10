@@ -524,18 +524,18 @@ export default function TicTacFacePage() {
                   <MicIcon off={!micOn} className="h-5 w-5" />
                 </button>
                 <button
+                  onClick={hangUp}
+                  aria-label="Terminate call"
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-700 shadow-lg transition active:scale-90"
+                >
+                  <HangupIcon className="h-5 w-5" />
+                </button>
+                <button
                   onClick={toggleCam}
                   aria-label={camOn ? 'Turn camera off' : 'Turn camera on'}
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 transition active:scale-90"
                 >
                   <CameraIcon off={!camOn} className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={hangUp}
-                  aria-label="Terminate call"
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ef4444] text-white shadow-lg shadow-[#ef4444]/30 transition active:scale-90 hover:bg-[#dc2626]"
-                >
-                  <HangupIcon className="h-5 w-5" />
                 </button>
               </div>
             )}
