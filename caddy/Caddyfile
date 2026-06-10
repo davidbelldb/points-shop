@@ -13,6 +13,18 @@ sneakypoints.com {
 
     handle {
         root * /srv
+
+        # Hashed build assets are immutable — cache hard.
+        @assets path /assets/*
+        header @assets Cache-Control "public, max-age=31536000, immutable"
+
+        # Everything else (index.html, SPA routes, sw.js, public files) must
+        # always revalidate, otherwise phones keep running stale app bundles
+        # after a deploy (old clients can't complete the SneakyTime call
+        # handshake against new ones). Revalidation is a cheap 304.
+        @entry not path /assets/*
+        header @entry Cache-Control "no-cache"
+
         try_files {path} /index.html
         file_server
     }

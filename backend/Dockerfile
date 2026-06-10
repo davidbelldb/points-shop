@@ -4,7 +4,9 @@ WORKDIR /app
 # ffmpeg powers the server-side video transcode that normalises iPhone HEVC
 # (and other oddball codecs) into H.264+AAC MP4 so every browser can play
 # uploaded story videos. Adds ~70MB to the image.
-RUN apk add --no-cache ffmpeg
+# Retried up to 3x — Alpine's CDN occasionally throws transient DNS errors
+# mid-fetch, which otherwise kills the whole build.
+RUN for i in 1 2 3; do apk add --no-cache ffmpeg && break || { echo "apk attempt $i failed, retrying..."; sleep 5; }; done && ffmpeg -version >/dev/null
 
 COPY package*.json ./
 RUN npm install --omit=dev
