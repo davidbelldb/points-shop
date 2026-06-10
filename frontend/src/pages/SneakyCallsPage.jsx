@@ -18,6 +18,10 @@ const TEAL_BTN =
 const END_CALL_BTN =
   'inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-[#3B1D1D] px-6 py-3 text-base font-bold text-[#F2B8B5] transition hover:bg-[#4A2424] active:scale-95';
 
+// Answer button — FaceTime green, literal hex so theming never touches it.
+const ANSWER_BTN =
+  'inline-flex items-center justify-center gap-2 rounded-2xl bg-[#34c759] px-8 py-3 text-base font-bold text-[#ffffff] transition hover:bg-[#2eb350] active:scale-95 disabled:opacity-40';
+
 const CTRL_BTN =
   'flex h-12 w-12 items-center justify-center rounded-full transition active:scale-95';
 const CTRL_ON  = 'bg-white/20 text-white hover:bg-white/30';
@@ -68,6 +72,14 @@ function CameraIcon({ off = false, className = '' }) {
 function HangupIcon({ className = '' }) {
   return (
     <svg {...ICON_PROPS} fill="currentColor" stroke="none" className={className} style={{ transform: 'rotate(135deg)' }}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+function AnswerIcon({ className = '' }) {
+  return (
+    <svg {...ICON_PROPS} fill="currentColor" stroke="none" className={className}>
       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
     </svg>
   );
@@ -432,6 +444,23 @@ export default function SneakyCallsPage() {
     api.callsPlayers().then(setPlayers).catch((e) => setError(e.message));
   }, []);
 
+  // ── Incoming-call ring — poll while idle so an Answer button can appear ────
+  const [incoming, setIncoming] = useState(false);
+
+  useEffect(() => {
+    if (inCall) { setIncoming(false); return; }
+    let stopped = false;
+    const check = async () => {
+      try {
+        const { incoming: ringing } = await api.callsStatus();
+        if (!stopped) setIncoming(ringing);
+      } catch { /* ignore */ }
+    };
+    check();
+    const t = setInterval(check, 3000);
+    return () => { stopped = true; clearInterval(t); };
+  }, [inCall]);
+
   // ── FaceTime-style lobby preview — front camera live from the moment the
   // page opens (video only; mic stays off until a call actually starts) ──────
   const previewRef = useRef(null);
@@ -533,6 +562,8 @@ export default function SneakyCallsPage() {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setIncoming(false);
+    api.callsAnswer().catch(() => {}); // clear the ring server-side (no-op if not ringing)
     stopPreview();
     try {
       await startCall(false, previewFacing);
@@ -541,6 +572,11 @@ export default function SneakyCallsPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function hangUp() {
+    if (!answered) api.callsCancel().catch(() => {}); // hung up while still ringing
+    endCall();
   }
 
   function toggleMic() {
@@ -579,12 +615,14 @@ export default function SneakyCallsPage() {
           <Link to="/" className="absolute left-4 top-[max(1.5rem,env(safe-area-inset-top))] text-sm text-white/80">
             Back
           </Link>
-          <span className="mt-10 block h-14 w-14 overflow-hidden rounded-full ring-2 ring-pink-400">
+          <span className={`mt-10 block h-14 w-14 overflow-hidden rounded-full ring-2 ring-pink-400 ${incoming ? 'animate-pulse' : ''}`}>
             <Avatar person={other} className="h-full w-full" />
           </span>
           <p className="text-sm font-semibold text-white">{other?.name ?? '…'}</p>
-          <p className="text-xs text-white/70">
-            {status === 'ended' ? 'Call ended' : 'Ready for some SneakyTime?'}
+          <p className={`text-xs text-white/70 ${incoming ? 'animate-pulse font-bold' : ''}`}>
+            {incoming
+              ? `SneakyTime call from ${other?.name ?? 'them'}…`
+              : status === 'ended' ? 'Call ended' : 'Ready for some SneakyTime?'}
           </p>
         </div>
 
@@ -608,10 +646,17 @@ export default function SneakyCallsPage() {
             >
               <FilterIcon className="h-5 w-5" />
             </button>
-            <button type="button" onClick={start} disabled={busy || !other} className={`${TEAL_BTN} h-12`}>
-              <VideoIcon className="mr-2 h-4 w-4" />
-              {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
-            </button>
+            {incoming ? (
+              <button type="button" onClick={join} disabled={busy} className={`${ANSWER_BTN} h-12`}>
+                <AnswerIcon className="h-5 w-5" />
+                Answer
+              </button>
+            ) : (
+              <button type="button" onClick={start} disabled={busy || !other} className={`${TEAL_BTN} h-12`}>
+                <VideoIcon className="mr-2 h-4 w-4" />
+                {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setPreviewFacing((f) => (f === 'user' ? 'environment' : 'user'))}
@@ -621,14 +666,16 @@ export default function SneakyCallsPage() {
               <FlipIcon className="h-5 w-5" />
             </button>
           </div>
-          <button
-            type="button"
-            onClick={join}
-            disabled={busy}
-            className="text-xs text-white/60 underline-offset-2 transition hover:text-white/90 hover:underline"
-          >
-            Joining a call? Tap here
-          </button>
+          {!incoming && (
+            <button
+              type="button"
+              onClick={join}
+              disabled={busy}
+              className="text-xs text-white/60 underline-offset-2 transition hover:text-white/90 hover:underline"
+            >
+              Joining a call? Tap here
+            </button>
+          )}
         </div>
       </div>
     );
@@ -653,28 +700,39 @@ export default function SneakyCallsPage() {
         )}
 
         <div className="flex flex-col items-center gap-5 rounded-3xl bg-white px-6 py-12 text-center shadow-lg">
-          <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
+          <span className={`block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400 ${incoming ? 'animate-pulse' : ''}`}>
             <Avatar person={other} className="h-full w-full" />
           </span>
           <div>
             <p className="text-lg font-semibold text-neutral-900">{other?.name ?? '…'}</p>
-            <p className="text-sm text-neutral-500">
-              {status === 'ended' ? 'Call ended' : 'Ready for some SneakyTime?'}
+            <p className={`text-sm text-neutral-500 ${incoming ? 'animate-pulse font-semibold' : ''}`}>
+              {incoming
+                ? `SneakyTime call from ${other?.name ?? 'them'}…`
+                : status === 'ended' ? 'Call ended' : 'Ready for some SneakyTime?'}
             </p>
           </div>
           <div className="flex flex-col items-center gap-2">
-            <button type="button" onClick={start} disabled={busy || !other} className={TEAL_BTN}>
-              <VideoIcon className="mr-2 h-4 w-4" />
-              {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
-            </button>
-            <button
-              type="button"
-              onClick={join}
-              disabled={busy}
-              className="text-xs text-neutral-500 underline-offset-2 transition hover:text-neutral-700 hover:underline"
-            >
-              Joining a call? Tap here
-            </button>
+            {incoming ? (
+              <button type="button" onClick={join} disabled={busy} className={ANSWER_BTN}>
+                <AnswerIcon className="h-5 w-5" />
+                Answer
+              </button>
+            ) : (
+              <>
+                <button type="button" onClick={start} disabled={busy || !other} className={TEAL_BTN}>
+                  <VideoIcon className="mr-2 h-4 w-4" />
+                  {status === 'ended' ? 'Call Again' : 'Start SneakyTime'}
+                </button>
+                <button
+                  type="button"
+                  onClick={join}
+                  disabled={busy}
+                  className="text-xs text-neutral-500 underline-offset-2 transition hover:text-neutral-700 hover:underline"
+                >
+                  Joining a call? Tap here
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -791,7 +849,7 @@ export default function SneakyCallsPage() {
             <CameraIcon off={!camOn} className="h-5 w-5" />
           </button>
         </div>
-        <button type="button" onClick={endCall} className={END_CALL_BTN}>
+        <button type="button" onClick={hangUp} className={END_CALL_BTN}>
           <HangupIcon className="h-5 w-5" />
           End Call
         </button>

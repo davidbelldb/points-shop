@@ -77,6 +77,14 @@ function StoreIcon() {
     </svg>
   );
 }
+function VideoCallIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="13" height="12" rx="2" />
+      <path d="M15 10.5l6-3.5v10l-6-3.5" />
+    </svg>
+  );
+}
 function UserIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -161,6 +169,7 @@ export default function MenuDrawer({ open, onClose }) {
             <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
             <Item to="/calendar" label="Sneaky Calendar" icon={<CalendarIcon />} onClose={onClose} />
             <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
+            <Item to="/sneakytime" label="SneakyTime" icon={<VideoCallIcon />} onClose={onClose} />
           </div>
           <div className="mt-auto pt-2">
             <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />

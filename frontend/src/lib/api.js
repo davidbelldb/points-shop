@@ -238,6 +238,9 @@ export const api = {
   // Sneaky Calls
   callsPlayers: () => request('/calls/players'),
   callsRing:    () => request('/calls/ring', { method: 'POST', body: JSON.stringify({}) }),
+  callsStatus:  () => request('/calls/status'),
+  callsAnswer:  () => request('/calls/answer', { method: 'POST', body: JSON.stringify({}) }),
+  callsCancel:  () => request('/calls/cancel', { method: 'POST', body: JSON.stringify({}) }),
 
   admin: {
     listProducts:    () => request('/admin/products'),

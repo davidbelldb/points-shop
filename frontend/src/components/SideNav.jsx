@@ -79,6 +79,14 @@ function UserIcon() {
     </svg>
   );
 }
+function VideoCallIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="13" height="12" rx="2" />
+      <path d="M15 10.5l6-3.5v10l-6-3.5" />
+    </svg>
+  );
+}
 
 /* ── Single nav item ─────────────────────────────────────────────────────── */
 function NavItem({ to, label, icon }) {
@@ -145,6 +153,7 @@ export default function SideNav() {
           <NavItem to="/rewatch"  label="Watch list" icon={<TvIcon />} />
           <NavItem to="/calendar" label="Calendar"   icon={<CalendarIcon />} />
           <NavItem to="/messages" label="Chat"       icon={<ChatIcon />} />
+          <NavItem to="/sneakytime" label="SneakyTime" icon={<VideoCallIcon />} />
         </div>
 
         {/* Account at bottom of nav */}
