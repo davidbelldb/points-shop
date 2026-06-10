@@ -526,7 +526,7 @@ export default function SneakyCallsPage() {
               type="button"
               onClick={() => toggleTray('filters')}
               title="Filters"
-              className={`${CTRL_BTN} ${openTray === 'filters' || filter !== 'none' ? CTRL_LIT : CTRL_ON}`}
+              className={`${CTRL_BTN} ${CTRL_ON}`}
             >
               <FilterIcon className="h-5 w-5" />
             </button>
@@ -676,7 +676,7 @@ export default function SneakyCallsPage() {
             type="button"
             onClick={() => toggleTray('filters')}
             title="Filters"
-            className={`${CTRL_BTN} ${openTray === 'filters' || filter !== 'none' ? CTRL_LIT : CTRL_ON}`}
+            className={`${CTRL_BTN} ${CTRL_ON}`}
           >
             <FilterIcon className="h-5 w-5" />
           </button>
