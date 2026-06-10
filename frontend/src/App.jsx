@@ -9,6 +9,7 @@ import SurveyBanner from './components/SurveyBanner.jsx';
 import MenuDrawer from './components/MenuDrawer.jsx';
 import SideNav from './components/SideNav.jsx';
 import BasketDrawer from './components/BasketDrawer.jsx';
+import IncomingCallBanner from './components/IncomingCallBanner.jsx';
 import { countdownClock } from './lib/countdown.js';
 
 function AvatarFallback() {
@@ -196,6 +197,8 @@ export default function App() {
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       {/* Basket drawer — all devices */}
       <BasketDrawer open={basketOpen} onClose={() => setBasketOpen(false)} />
+      {/* Incoming SneakyTime call — rings on every page */}
+      <IncomingCallBanner />
       {isHome && bannerOn && (() => {
         const bannerLink = (settings.banner_link_url || '').trim();
         const inner = (
