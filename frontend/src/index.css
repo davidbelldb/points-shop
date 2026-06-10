@@ -152,11 +152,11 @@ html.dark .border-teal-200 { border-color: #2a5a4f !important; }
 }
 html.dark .notes-toolbar { background: #1c1c1e; border-top-color: #2e2e2c; }
 
-/* Grid rows inside toolbar */
+/* Grid rows inside toolbar — 3 button rows × 56px, 2 divider rows × 1px */
 .notes-tb-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(3, 56px);
+  grid-template-rows: 56px 1px 56px 1px 56px;
 }
 
 /* Separator (row dividers drawn via border-bottom on each row's last button group) */
