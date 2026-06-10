@@ -533,7 +533,7 @@ export default function TicTacFacePage() {
                 <button
                   onClick={hangUp}
                   aria-label="Terminate call"
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 transition active:scale-90 hover:bg-red-600"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ef4444] text-white shadow-lg shadow-[#ef4444]/30 transition active:scale-90 hover:bg-[#dc2626]"
                 >
                   <HangupIcon className="h-5 w-5" />
                 </button>
