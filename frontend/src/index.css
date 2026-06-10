@@ -467,6 +467,13 @@ html .ht-theme-main-dark .handsontable th {
   font-weight: 700 !important;
 }
 
+/* Match the grid canvas (incl. the empty area below the rows) to the app's
+   dark grey — the theme's own dark background is near-black #0f0f10 */
+html .ht-theme-main-dark,
+html .ht-theme-main-dark .handsontable {
+  --ht-background-color: #1f1f1e !important;
+}
+
 /* Search hits — teal highlight, beats theme + cell fills in both modes */
 html .ht-theme-main .handsontable td.htSearchResult,
 html .ht-theme-main-dark .handsontable td.htSearchResult {
