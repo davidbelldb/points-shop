@@ -164,7 +164,7 @@ export default function SideNav() {
           <NavItem to="/calendar" label="Calendar"   icon={<CalendarIcon />} />
           <NavItem to="/messages" label="Chat"       icon={<ChatIcon />} />
           <NavItem to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} />
-          <NavItem to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} />
+          <NavItem to="/sneakyspreadsheets" label="Sheets" icon={<SheetIcon />} />
         </div>
 
         {/* Account at bottom of nav */}
