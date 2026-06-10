@@ -411,62 +411,92 @@ function MediaSection({ media, momentId, canEdit, onMediaAdded, onMediaRemoved }
   );
 }
 
-// ─── Moment Toolbar (matches NoteToolbar icons exactly) ────────────────────────
+// ─── Moment Toolbar (identical grid layout to NoteToolbar) ────────────────────
 
 function MomentToolbar({ editor }) {
   if (!editor) return null;
-  const inTaskList = editor.isActive('taskList');
+
   const Btn = ({ active, onMd, title: t, children }) => (
-    <button onMouseDown={onMd} title={t}
-      className={`notes-tb-btn flex h-8 min-w-[2rem] flex-shrink-0 items-center justify-center rounded-lg px-1.5 transition-colors${active ? ' notes-tb-active' : ''}`}>
+    <button onMouseDown={onMd} title={t} className={`notes-tb-btn${active ? ' notes-tb-active' : ''}`}>
       {children}
     </button>
   );
-  const Sep = () => <div className="notes-tb-sep mx-0.5 h-5 w-px flex-shrink-0" />;
+
+  function indent() {
+    if (editor.isActive('taskList')) editor.chain().focus().sinkListItem('taskItem').run();
+    else if (editor.isActive('bulletList') || editor.isActive('orderedList')) editor.chain().focus().sinkListItem('listItem').run();
+  }
+  function outdent() {
+    if (editor.isActive('taskList')) editor.chain().focus().liftListItem('taskItem').run();
+    else if (editor.isActive('bulletList') || editor.isActive('orderedList')) editor.chain().focus().liftListItem('listItem').run();
+  }
+
+  const ROW_DIVIDER = <div className="notes-tb-row-break" />;
 
   return (
     <div className="notes-toolbar relative select-none">
-      <div className="flex items-center overflow-x-auto px-2 py-1.5 gap-0">
+      <div className="notes-tb-grid">
+        {/* Row 1 */}
         <Btn active={editor.isActive('bold')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }} title="Bold">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h8a4 4 0 0 1 0 8H6V4zM6 12h9a4 4 0 0 1 0 8H6V12z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h8a4 4 0 0 1 0 8H6V4zM6 12h9a4 4 0 0 1 0 8H6V12z"/></svg>
         </Btn>
         <Btn active={editor.isActive('italic')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }} title="Italic">
-          <svg width="11" height="13" viewBox="0 0 22 24" fill="currentColor"><path d="M10 4h6M6 20h6M14 4 8 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>
+          <svg width="20" height="22" viewBox="0 0 22 24" fill="currentColor"><path d="M10 4h6M6 20h6M14 4 8 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>
         </Btn>
         <Btn active={editor.isActive('underline')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }} title="Underline">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 4v6a6 6 0 0 0 12 0V4"/><line x1="4" y1="22" x2="20" y2="22"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 4v6a6 6 0 0 0 12 0V4"/><line x1="4" y1="22" x2="20" y2="22"/></svg>
         </Btn>
         <Btn active={editor.isActive('strike')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }} title="Strikethrough">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6c0 0-1-2-4-2s-4.5 1.5-4.5 3.5C7.5 10 9.5 11 12 12"/><path d="M8 18c0 0 1 2 4 2s4.5-1.5 4.5-3.5C16.5 14.5 15 13 12 12"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6c0 0-1-2-4-2s-4.5 1.5-4.5 3.5C7.5 10 9.5 11 12 12"/><path d="M8 18c0 0 1 2 4 2s4.5-1.5 4.5-3.5C16.5 14.5 15 13 12 12"/></svg>
         </Btn>
+
+        {ROW_DIVIDER}
+
+        {/* Row 2 */}
         <Btn active={editor.isActive('highlight')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleHighlight().run(); }} title="Highlight">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
         </Btn>
-        <Sep />
         <Btn active={editor.isActive('taskList')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleTaskList().run(); }} title="Checklist">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </Btn>
         <Btn active={editor.isActive('bulletList')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleBulletList().run(); }} title="Bullet list">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="4" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="2" fill="currentColor" stroke="none"/>
             <line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/>
           </svg>
         </Btn>
         <Btn active={editor.isActive('orderedList')} onMd={e => { e.preventDefault(); editor.chain().focus().toggleOrderedList().run(); }} title="Numbered list">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="10" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="18" x2="20" y2="18"/>
-            <text x="2" y="8" fontSize="7" fill="currentColor" stroke="none" fontWeight="700">1</text>
-            <text x="2" y="14" fontSize="7" fill="currentColor" stroke="none" fontWeight="700">2</text>
-            <text x="2" y="20" fontSize="7" fill="currentColor" stroke="none" fontWeight="700">3</text>
+            <text x="1.5" y="8.5" fontSize="8" fill="currentColor" stroke="none" fontWeight="700">1</text>
+            <text x="1.5" y="14.5" fontSize="8" fill="currentColor" stroke="none" fontWeight="700">2</text>
+            <text x="1.5" y="20.5" fontSize="8" fill="currentColor" stroke="none" fontWeight="700">3</text>
           </svg>
         </Btn>
-        <Sep />
-        <Btn active={false} onMd={e => { e.preventDefault(); inTaskList ? editor.chain().focus().liftListItem('taskItem').run() : editor.chain().focus().liftListItem('listItem').run(); }} title="Outdent">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/><polyline points="11 7 8 10 11 13"/></svg>
+
+        {ROW_DIVIDER}
+
+        {/* Row 3 */}
+        <Btn active={false} onMd={e => { e.preventDefault(); outdent(); }} title="Decrease indent">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/>
+            <polyline points="11 7 8 10 11 13"/>
+          </svg>
         </Btn>
-        <Btn active={false} onMd={e => { e.preventDefault(); inTaskList ? editor.chain().focus().sinkListItem('taskItem').run() : editor.chain().focus().sinkListItem('listItem').run(); }} title="Indent">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/><polyline points="7 7 10 10 7 13"/></svg>
+        <Btn active={false} onMd={e => { e.preventDefault(); indent(); }} title="Increase indent">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/>
+            <polyline points="7 7 10 10 7 13"/>
+          </svg>
         </Btn>
+        <Btn active={false} onMd={e => { e.preventDefault(); editor.chain().focus().unsetAllMarks().clearNodes().run(); }} title="Clear formatting">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 1.397.009l2.596 2.595a1 1 0 0 1 .009 1.397L8.059 19.39a1 1 0 0 1-.728.312H4.586a1 1 0 0 1-.707-1.707z"/>
+            <line x1="3" y1="3" x2="21" y2="21"/>
+          </svg>
+        </Btn>
+        {/* empty 12th cell for even grid */}
+        <div />
       </div>
     </div>
   );
