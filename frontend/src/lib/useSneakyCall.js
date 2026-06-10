@@ -193,8 +193,10 @@ export function useSneakyCall() {
             continue;
           }
           if (sig.type === 'rain') {
+            const kind = ['duck', 'popcorn', 'twirl'].includes(sig.payload?.kind)
+              ? sig.payload.kind : 'twirl';
             setRainEvent({
-              kind: sig.payload?.kind === 'duck' ? 'duck' : 'twirl',
+              kind,
               super: !!sig.payload?.super,
               nonce: Date.now() + Math.random(),
             });

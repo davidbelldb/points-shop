@@ -44,6 +44,10 @@ const RAIN_COUNT = 30;
 const RAIN_SPREAD = 1.5;       // start-height spread (× viewport) — controls shower length
 const SUPER_RAIN = { kind: 'duck', count: 100, spread: 3.5 };
 const NORMAL_RAIN = (kind) => ({ kind, count: RAIN_COUNT, spread: RAIN_SPREAD });
+// Popcorn: 50 pieces, fast + tight stagger ≈ a 3-second downpour.
+const POPCORN_RAIN = { kind: 'popcorn', count: 50, spread: 0.8, speedMin: 5, speedMax: 7 };
+const rainConfig = (kind, isSuper = false) =>
+  isSuper ? SUPER_RAIN : kind === 'popcorn' ? POPCORN_RAIN : NORMAL_RAIN(kind);
 const DUCK_URL = '/models/ducks/duck_7.stl';
 const DUCK_COLOR = '#fcba03'; // global override — STL has no materials of its own
 const RINGTONE_URL = '/gamecube-marimba.m4r';
@@ -247,6 +251,12 @@ function TwirlThumb() {
   return <SpinningPreview object={clone} />;
 }
 
+function PopcornThumb() {
+  const { scene } = useGLTF('/popcorn.glb');
+  const clone = useMemo(() => scene.clone(true), [scene]);
+  return <SpinningPreview object={clone} />;
+}
+
 function DuckThumb() {
   const duck = useGoldDuck();
   const oriented = useMemo(() => {
@@ -296,6 +306,9 @@ function EmojiBar({ onPick, onRain, onSuperRain, raining }) {
       </ModelButton>
       <ModelButton onClick={() => onRain('duck')} disabled={!!raining} title="Make it rain ducks">
         <DuckThumb />
+      </ModelButton>
+      <ModelButton onClick={() => onRain('popcorn')} disabled={!!raining} title="Make it rain popcorn">
+        <PopcornThumb />
       </ModelButton>
       <span className="relative shrink-0">
         <ModelButton onClick={onSuperRain} disabled={!!raining} title="SUPER rain — 100 ducks, 25 pts">
@@ -381,7 +394,7 @@ function EmojiFlutter({ bursts }) {
 
 // ─── Model rain — objects raining top → bottom ────────────────────────────────
 // Generic field: takes any THREE.Object3D template and clones it per drop.
-function RainItems({ template, onDone, count = RAIN_COUNT, spread = RAIN_SPREAD }) {
+function RainItems({ template, onDone, count = RAIN_COUNT, spread = RAIN_SPREAD, speedMin = 2.2, speedMax = 4.6 }) {
   const { viewport } = useThree();
   const doneRef = useRef(false);
 
@@ -396,12 +409,12 @@ function RainItems({ template, onDone, count = RAIN_COUNT, spread = RAIN_SPREAD 
       x: (Math.random() - 0.5) * viewport.width * 0.95,
       // Staggered starting heights above the top edge → rain, not a curtain.
       y: viewport.height / 2 + 1 + Math.random() * viewport.height * spread,
-      speed: 2.2 + Math.random() * 2.4,
+      speed: speedMin + Math.random() * (speedMax - speedMin),
       rx: (Math.random() - 0.5) * 3,
       ry: (Math.random() - 0.5) * 3,
       scale: norm * (0.6 + Math.random() * 0.5),
     }));
-  }, [template, viewport.width, viewport.height, count, spread]);
+  }, [template, viewport.width, viewport.height, count, spread, speedMin, speedMax]);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -428,9 +441,14 @@ function RainItems({ template, onDone, count = RAIN_COUNT, spread = RAIN_SPREAD 
   );
 }
 
-function TwirlRainSource({ onDone, count, spread }) {
+function TwirlRainSource({ onDone, ...rest }) {
   const { scene } = useGLTF('/twirl.glb');
-  return <RainItems template={scene} onDone={onDone} count={count} spread={spread} />;
+  return <RainItems template={scene} onDone={onDone} {...rest} />;
+}
+
+function PopcornRainSource({ onDone, ...rest }) {
+  const { scene } = useGLTF('/popcorn.glb');
+  return <RainItems template={scene} onDone={onDone} {...rest} />;
 }
 
 /** Gold duck — duck_7.stl with the global #fcba03 colour override. */
@@ -449,23 +467,22 @@ function useGoldDuck() {
   }, [geometry]);
 }
 
-function DuckRainSource({ onDone, count, spread }) {
+function DuckRainSource({ onDone, ...rest }) {
   const duck = useGoldDuck();
-  return <RainItems template={duck} onDone={onDone} count={count} spread={spread} />;
+  return <RainItems template={duck} onDone={onDone} {...rest} />;
 }
 
 function RainOverlay({ rain, onDone }) {
   if (!rain) return null;
-  const { kind, count, spread } = rain;
+  const { kind, ...rest } = rain;
+  const Source = kind === 'duck' ? DuckRainSource : kind === 'popcorn' ? PopcornRainSource : TwirlRainSource;
   return (
     <div className="pointer-events-none fixed inset-0 z-[60]">
       <Canvas camera={{ position: [0, 0, 8], fov: 50 }} gl={{ alpha: true, antialias: true }}>
         <ambientLight intensity={1.1} />
         <directionalLight position={[3, 5, 6]} intensity={1.6} />
         <Suspense fallback={null}>
-          {kind === 'duck'
-            ? <DuckRainSource onDone={onDone} count={count} spread={spread} />
-            : <TwirlRainSource onDone={onDone} count={count} spread={spread} />}
+          <Source onDone={onDone} {...rest} />
         </Suspense>
       </Canvas>
     </div>
@@ -473,6 +490,7 @@ function RainOverlay({ rain, onDone }) {
 }
 
 useGLTF.preload('/twirl.glb');
+useGLTF.preload('/popcorn.glb');
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 export default function SneakyCallsPage() {
@@ -613,7 +631,7 @@ export default function SneakyCallsPage() {
 
   useEffect(() => {
     if (rainEvent) {
-      setRaining((cur) => cur ?? (rainEvent.super ? SUPER_RAIN : NORMAL_RAIN(rainEvent.kind)));
+      setRaining((cur) => cur ?? rainConfig(rainEvent.kind, rainEvent.super));
     }
   }, [rainEvent]);
 
@@ -666,7 +684,7 @@ export default function SneakyCallsPage() {
 
   function startRain(kind) {
     if (raining) return;
-    setRaining(NORMAL_RAIN(kind));
+    setRaining(rainConfig(kind));
     sendRain(kind);
   }
 
