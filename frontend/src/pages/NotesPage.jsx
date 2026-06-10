@@ -389,8 +389,16 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
 
 function NoteToolbar({ editor }) {
   const [showStyles, setShowStyles] = useState(false);
+  const [trayOpen, setTrayOpen]     = useState(false);
   const fileRef = useRef(null);
   if (!editor) return null;
+
+  const toggleTray = () => {
+    setTrayOpen((open) => {
+      if (open) setShowStyles(false); // closing — collapse sub-panels too
+      return !open;
+    });
+  };
 
   const Btn = ({ active, onMd, title: t, children }) => (
     <button
@@ -562,6 +570,11 @@ function NoteToolbar({ editor }) {
         </>
       )}
 
+      {/* Collapsible tray — the full formatting grid slides open/closed */}
+      <div
+        className="overflow-hidden transition-all duration-200 ease-out"
+        style={{ maxHeight: trayOpen ? 260 : 0, opacity: trayOpen ? 1 : 0 }}
+      >
       <div className="notes-tb-grid">
         {/* ── Row 1: Text style · Bold · Italic · Underline ── */}
         <Btn active={showStyles} onMd={(e) => { e.preventDefault(); setShowStyles(v => !v); }} title="Text style">
@@ -645,6 +658,24 @@ function NoteToolbar({ editor }) {
         <span />
         <span />
       </div>
+      </div>{/* end collapsible tray */}
+
+      {/* Tray handle — toggles the formatting tools open/closed */}
+      <button
+        onMouseDown={(e) => { e.preventDefault(); toggleTray(); }}
+        title={trayOpen ? 'Hide formatting' : 'Show formatting'}
+        className={`notes-tb-btn flex w-full items-center justify-center gap-2 ${trayOpen ? 'notes-tb-active' : ''}`}
+        style={{ height: 40, borderTop: trayOpen ? '1px solid var(--color-neutral-200, #e5e5e3)' : 'none' }}
+      >
+        <span className="text-[15px] font-bold tracking-tight">Aa</span>
+        <svg
+          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ transition: 'transform 200ms ease', transform: trayOpen ? 'rotate(180deg)' : 'none' }}
+        >
+          <polyline points="18 15 12 9 6 15" />
+        </svg>
+      </button>
 
       {/* Hidden file input for image inserts */}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
