@@ -4,8 +4,11 @@ import { api } from '../lib/api.js';
 import { useSneakyCall } from '../lib/useSneakyCall.js';
 
 // ─── styling constants ────────────────────────────────────────────────────────
+// Bright teal accent — uses the remapped amber palette, which index.css
+// deliberately keeps saturated in BOTH light and dark mode (the teal-*
+// palette gets flipped to muted dark green by html.dark overrides).
 const TEAL_BTN =
-  'inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40';
+  'inline-flex items-center justify-center rounded-xl bg-amber-400 px-5 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-500 active:scale-95 disabled:opacity-40';
 
 // End-call button — dark maroon with soft pink text (per design reference).
 const END_CALL_BTN =
@@ -175,31 +178,31 @@ export default function SneakyCallsPage() {
     <div className="space-y-4 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Sneaky Calls</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          <h1 className="text-2xl font-bold text-neutral-900">Sneaky Calls</h1>
+          <p className="text-sm text-neutral-500">
             {inCall
               ? (status === 'connected' ? `On a SneakyTime call with ${other?.name ?? 'them'}` : waitingLabel)
               : 'FaceTime, but sneakier.'}
           </p>
         </div>
-        <Link to="/" className="text-sm text-neutral-500 dark:text-neutral-400">Back</Link>
+        <Link to="/" className="text-sm text-neutral-500">Back</Link>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {/* ── idle / ended lobby ── */}
       {!inCall && (
-        <div className="flex flex-col items-center gap-5 rounded-3xl bg-neutral-900 px-6 py-12 text-center shadow-lg">
+        <div className="flex flex-col items-center gap-5 rounded-3xl bg-[#171717] px-6 py-12 text-center shadow-lg">
           <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
             <Avatar person={other} className="h-full w-full" />
           </span>
           <div>
-            <p className="text-lg font-semibold text-neutral-100">{other?.name ?? '…'}</p>
-            <p className="text-sm text-neutral-400">
+            <p className="text-lg font-semibold text-white">{other?.name ?? '…'}</p>
+            <p className="text-sm text-white/60">
               {status === 'ended' ? 'Call ended' : 'Ready for some SneakyTime?'}
             </p>
           </div>
@@ -212,7 +215,7 @@ export default function SneakyCallsPage() {
               type="button"
               onClick={join}
               disabled={busy}
-              className="text-xs text-neutral-500 underline-offset-2 transition hover:text-neutral-300 hover:underline"
+              className="text-xs text-white/50 underline-offset-2 transition hover:text-white/80 hover:underline"
             >
               Joining a call? Tap here
             </button>
@@ -227,11 +230,11 @@ export default function SneakyCallsPage() {
           {showRemoteVideo ? (
             <VideoCell stream={remoteStream} />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-neutral-900">
+            <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#171717]">
               <span className="block h-28 w-28 overflow-hidden rounded-full ring-4 ring-pink-400">
                 <Avatar person={other} className="h-full w-full" />
               </span>
-              <p className="animate-pulse text-xs font-bold uppercase tracking-widest text-neutral-300">
+              <p className="animate-pulse text-xs font-bold uppercase tracking-widest text-white/80">
                 {status === 'connected' ? 'Camera off' : waitingLabel}
               </p>
             </div>
@@ -239,7 +242,7 @@ export default function SneakyCallsPage() {
 
           {/* Local PiP — selfie-mirrored */}
           {localStream && (
-            <div className="absolute right-3 top-3 h-36 w-24 overflow-hidden rounded-2xl bg-neutral-800 shadow-lg ring-2 ring-white/20 sm:h-44 sm:w-32">
+            <div className="absolute right-3 top-3 h-36 w-24 overflow-hidden rounded-2xl bg-black/60 shadow-lg ring-2 ring-white/20 sm:h-44 sm:w-32">
               {camOn
                 ? <VideoCell stream={localStream} mirror muted />
                 : <Avatar person={players?.me} className="h-full w-full" />}
