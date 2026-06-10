@@ -18,7 +18,7 @@ import StickerContent from './StickerContent.jsx';
    authored — Katie can't manage David's stories and vice versa. */
 const DEFAULT_IMG_DURATION_MS = 5000;
 // Heart removed — 6 quick reactions surfaced via swipe-up over the story.
-const QUICK_EMOJIS = ['🫦', '🫠', '😂', '🥹', '😮', '💜'];
+const QUICK_EMOJIS = ['🫦', '🫠', '😂', '🍆', '😮', '💜'];
 const LONG_PRESS_MS = 220;
 const SWIPE_UP_THRESHOLD = 60;
 const SWIPE_DOWN_THRESHOLD = 60;
