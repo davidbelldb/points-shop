@@ -317,8 +317,6 @@ function LeaderboardModal({ onClose, today }) {
   const [data,       setData]       = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [viewDate,   setViewDate]   = useState(today);
-  const [sharing,    setSharing]    = useState(false);
-  const [shared,     setShared]     = useState(false);
   const { theme } = useTheme();
   const { user }  = useAuth();
   const dark = theme === 'dark';
@@ -355,23 +353,6 @@ function LeaderboardModal({ onClose, today }) {
     d.setDate(d.getDate() + delta);
     const next = d.toISOString().slice(0, 10);
     if (next >= minDate && next <= today) setViewDate(next);
-  }
-
-  async function shareToChat() {
-    if (!data?.allTime?.length) return;
-    setSharing(true);
-    try {
-      const blob = await buildGridBlob(data.allTime, data.today, viewDate);
-      const file = new File([blob], 'wordle-result.png', { type: 'image/png' });
-      const { url } = await api.upload(file);
-      await api.sendMessage(url);
-      setShared(true);
-      setTimeout(() => setShared(false), 2500);
-    } catch (e) {
-      console.error('Share failed', e);
-    } finally {
-      setSharing(false);
-    }
   }
 
   useEffect(() => {
@@ -500,18 +481,6 @@ function LeaderboardModal({ onClose, today }) {
                     );
                   })}
                 </div>
-
-                {/* Share to chat button — only show when both players have played */}
-                {data.today.length === 2 && (
-                  <button
-                    onClick={shareToChat}
-                    disabled={sharing || shared}
-                    className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-50"
-                    style={{ background: '#61dbbb', color: '#0d3d2e' }}
-                  >
-                    {shared ? '✓ Sent to chat!' : sharing ? 'Sending…' : 'Share in chat'}
-                  </button>
-                )}
               </div>
 
               {/* ── All-time stats ── */}
@@ -703,8 +672,15 @@ export default function DirtyWordlePage() {
   async function shareResultToChat() {
     setSharing(true);
     try {
-      const data = await api.dirtyWordleLeaderboard(today);
-      const blob = await buildGridBlob(data.allTime, data.today, today);
+      const player = { name: user?.name, photo_url: user?.photo_url };
+      const todayRow = {
+        name: user?.name,
+        guess_grid: resultGrid,
+        won,
+        guesses_taken: guesses.length,
+        pts: ptsEarned ?? 0,
+      };
+      const blob = await buildGridBlob([player], [todayRow], today);
       const file = new File([blob], 'wordle-result.png', { type: 'image/png' });
       const { url } = await api.upload(file);
       await api.sendMessage(url);
