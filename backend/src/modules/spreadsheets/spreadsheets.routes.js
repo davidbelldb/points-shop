@@ -10,7 +10,7 @@ import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { query } from '../../db.js';
 
 const DEFAULT_COLUMNS = ['A', 'B', 'C', 'D', 'E'];
-const DEFAULT_ROWS = 12;
+const DEFAULT_ROWS = 16;
 
 const shape = (r) => ({
   id: r.id,

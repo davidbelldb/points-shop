@@ -413,6 +413,7 @@ export default function SneakySpreadsheetsPage() {
             contextMenu={true}
             search={true}
             outsideClickDeselects={false}
+            minRows={16}
             minSpareRows={1}
             manualColumnResize={true}
             manualRowResize={true}
