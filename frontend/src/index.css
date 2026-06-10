@@ -430,3 +430,18 @@ html.dark .moments-page > div:last-child { background: #1c1c1e; color: #ededea; 
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
+/* ── Handsontable (Sneaky Spreadsheets) — pink selection in both themes ────── */
+.ht-theme-main,
+.ht-theme-main-dark {
+  --ht-cell-selection-border-color: #f968b7;
+  --ht-cell-selection-background-color: rgba(249, 104, 183, 0.12);
+  --ht-cell-editor-border-color: #f968b7;
+  /* Fill handle (the drag dot) + autofill preview */
+  --ht-cell-autofill-background-color: #f968b7;
+  --ht-cell-autofill-border-color: #f968b7;
+  --ht-cell-autofill-fill-border-color: #f968b7;
+  /* Touch selection handles on mobile */
+  --ht-cell-mobile-handle-background-color: #f968b7;
+  --ht-cell-mobile-handle-border-color: #f968b7;
+}
+
