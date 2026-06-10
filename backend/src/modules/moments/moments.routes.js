@@ -34,11 +34,15 @@ async function notifyPartner(actorId, action) {
 }
 
 export async function momentsRoutes(fastify) {
-  // GET /api/moments
+  // GET /api/moments — returns { moments, partner }
   fastify.get('/api/moments', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
     if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
-    return listMoments(accountId);
+    const [moments, partner] = await Promise.all([
+      listMoments(accountId),
+      findOtherUser(accountId).catch(() => null),
+    ]);
+    return { moments, partner: partner ? { id: partner.id, name: partner.name } : null };
   });
 
   // POST /api/moments  { type: 'personal'|'shared' }

@@ -221,7 +221,7 @@ export const api = {
   deleteNote: (id) => request(`/notes/${id}`, { method: 'DELETE' }),
   hardDeleteNote: (id) => request(`/notes/${id}/permanent`, { method: 'DELETE' }),
 
-  // Moments
+  // Moments — returns { moments, partner }
   listMoments: () => request('/moments'),
   createMoment: (type = 'personal') => request('/moments', { method: 'POST', body: JSON.stringify({ type }) }),
   getMoment: (id) => request(`/moments/${id}`),
