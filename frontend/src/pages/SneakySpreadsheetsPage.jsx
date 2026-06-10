@@ -54,6 +54,7 @@ export default function SneakySpreadsheetsPage() {
   const [saving, setSaving]     = useState(false);
   const [savedAt, setSavedAt]   = useState(null);
   const [error, setError]       = useState(null);
+  const [query, setQuery]       = useState('');
 
   const active = tabs?.find((t) => t.id === activeId) ?? null;
 
@@ -107,11 +108,22 @@ export default function SneakySpreadsheetsPage() {
     if (f.b) td.style.fontWeight = '700';
     if (f.i) td.style.fontStyle = 'italic';
     if (f.u) td.style.textDecoration = 'underline';
-    if (f.fill) {
+    // Don't paint over a search hit — the highlight should stay visible
+    if (f.fill && !td.classList.contains('htSearchResult')) {
       td.style.backgroundColor = f.fill;
       td.style.color = '#1c1c1e'; // fills are light — keep text readable in dark mode
     }
   }, []);
+
+  // ── Search — built-in plugin highlights matches via .htSearchResult ─────────
+  useEffect(() => {
+    const hot = hotRef.current?.hotInstance;
+    if (!hot) return;
+    const plugin = hot.getPlugin('search');
+    if (!plugin) return;
+    plugin.query(query);
+    hot.render();
+  }, [query, activeId]);
 
   /** Shift format coordinates after structural row/col changes. */
   const remapFormats = useCallback((axis, index, amount, removed) => {
@@ -356,6 +368,27 @@ export default function SneakySpreadsheetsPage() {
             <circle cx="12" cy="12" r="8" /><line x1="6.5" y1="17.5" x2="17.5" y2="6.5" />
           </svg>
         </button>
+
+        {/* Search — highlights matching cells as you type */}
+        <div className="relative ml-auto" onMouseDown={(e) => e.stopPropagation()}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search…"
+            className="h-8 w-36 rounded-lg border border-neutral-200 bg-white px-3 pr-7 text-sm text-neutral-900 outline-none sm:w-48"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              title="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Grid — explicit height: Handsontable's height="100%" needs a parent
@@ -378,6 +411,7 @@ export default function SneakySpreadsheetsPage() {
             colHeaders={active.columns?.length ? active.columns : true}
             rowHeaders={true}
             contextMenu={true}
+            search={true}
             outsideClickDeselects={false}
             minSpareRows={1}
             manualColumnResize={true}

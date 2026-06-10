@@ -467,6 +467,13 @@ html .ht-theme-main-dark .handsontable th {
   font-weight: 700 !important;
 }
 
+/* Search hits — teal highlight, beats theme + cell fills in both modes */
+html .ht-theme-main .handsontable td.htSearchResult,
+html .ht-theme-main-dark .handsontable td.htSearchResult {
+  background-color: #7adfcf !important;
+  color: #0a2a23 !important;
+}
+
 /* Belt and braces — the classic selection border elements, in case any part
    of the grid still draws from the legacy classes rather than theme vars. */
 html .ht-theme-main .wtBorder.current,
