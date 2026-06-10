@@ -33,7 +33,7 @@ function trimData(rows) {
 }
 
 // Fill palette for the formatting toolbar
-const FILLS = ['#f968b7', '#61dbbb', '#fbbf24', '#60a5fa', '#f87171'];
+const FILLS = ['#f968b7', '#a78bfa', '#fbbf24', '#60a5fa', '#f87171'];
 
 /** Set/clear one format key on a "row,col" entry, pruning empties. */
 function setFmt(fmts, r, c, key, val) {
