@@ -448,6 +448,15 @@ html .ht-theme-main-dark .handsontable {
   /* Touch selection handles on mobile */
   --ht-cell-mobile-handle-background-color: #f968b7 !important;
   --ht-cell-mobile-handle-border-color: #f968b7 !important;
+  /* Column/row headers when their cells are selected (highlighted) or the
+     whole column/row is selected (active) — were still theme blue */
+  --ht-header-active-background-color: #f968b7 !important;
+  --ht-header-active-border-color: #f968b7 !important;
+  --ht-header-active-foreground-color: #2b0a1d !important;
+  --ht-header-highlighted-background-color: rgba(249, 104, 183, 0.22) !important;
+  --ht-header-row-active-background-color: #f968b7 !important;
+  --ht-header-row-active-foreground-color: #2b0a1d !important;
+  --ht-header-row-highlighted-background-color: rgba(249, 104, 183, 0.22) !important;
 }
 
 /* Belt and braces — the classic selection border elements, in case any part
