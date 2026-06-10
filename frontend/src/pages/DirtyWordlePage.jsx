@@ -589,7 +589,8 @@ export default function DirtyWordlePage() {
   const [won,              setWon]              = useState(saved.won          ?? false);
   const [ptsEarned,        setPtsEarned]        = useState(saved.ptsEarned    ?? null);
   const [shake,            setShake]            = useState(false);
-  const [copied,           setCopied]           = useState(false);
+  const [sharing,          setSharing]          = useState(false);
+  const [shared,           setShared]           = useState(false);
   const [modalDismissed,   setModalDismissed]   = useState(saved.modalAcked   ?? false);
   const [resultSaved,      setResultSaved]      = useState(saved.resultSaved  ?? false);
   const [showLeaderboard,  setShowLeaderboard]  = useState(false);
@@ -699,17 +700,22 @@ export default function DirtyWordlePage() {
     return () => window.removeEventListener('keydown', handler);
   }, [onKey]);
 
-  const emojiGrid = guesses.map(g =>
-    evaluateGuess(g, target).map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('')
-  ).join('\n');
-  const shareText = `Dirty Wordle ${today}\n${won ? guesses.length : 'X'}/${MAX_GUESSES}\n\n${emojiGrid}`;
-
-  const copyResult = () => {
-    navigator.clipboard?.writeText(shareText).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
+  async function shareResultToChat() {
+    setSharing(true);
+    try {
+      const data = await api.dirtyWordleLeaderboard(today);
+      const blob = await buildGridBlob(data.allTime, data.today, today);
+      const file = new File([blob], 'wordle-result.png', { type: 'image/png' });
+      const { url } = await api.upload(file);
+      await api.sendMessage(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 2500);
+    } catch (e) {
+      console.error('Share failed', e);
+    } finally {
+      setSharing(false);
+    }
+  }
 
   const winMessage = () => {
     if (guesses.length === 1) return 'First try. You filthy genius.';
@@ -811,7 +817,9 @@ export default function DirtyWordlePage() {
 
             <div className="flex flex-row gap-2">
               <button onClick={() => setModalDismissed(true)} className={GHOST_BTN}>Close</button>
-              <button onClick={copyResult} className={TEAL_BTN}>{copied ? 'Copied!' : 'Copy result'}</button>
+              <button onClick={shareResultToChat} disabled={sharing || shared} className={`${TEAL_BTN} disabled:opacity-50`}>
+                {shared ? '✓ Sent to chat!' : sharing ? 'Sending…' : 'Share in chat'}
+              </button>
             </div>
           </div>
         </div>
