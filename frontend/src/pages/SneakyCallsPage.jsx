@@ -179,7 +179,7 @@ export default function SneakyCallsPage() {
     <div className="space-y-4 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Sneaky Calls</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">SneakyTime</h1>
           <p className="text-sm text-neutral-500">
             {inCall
               ? (status === 'connected' ? `On a SneakyTime call with ${other?.name ?? 'them'}` : waitingLabel)

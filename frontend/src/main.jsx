@@ -104,7 +104,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="stories" element={<SneakyFeedPage />} />
               <Route path="store" element={<SneakyStorePage />} />
               <Route path="notes" element={<NotesPage />} />
-              <Route path="call" element={<SneakyCallsPage />} />
+              <Route path="sneakytime" element={<SneakyCallsPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
             </Route>

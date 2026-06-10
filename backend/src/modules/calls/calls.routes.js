@@ -1,5 +1,5 @@
 /**
- * Sneaky Calls — FaceTime-style 1:1 video calling.
+ * SneakyTime — FaceTime-style 1:1 video calling (/sneakytime).
  *
  * Media + signaling are fully reused from the Tic-Tac-Face WebRTC stack
  * (/api/rtc/signal relay). This module only adds the "ring" step: when a
@@ -29,7 +29,7 @@ export default async function callsRoutes(fastify) {
     sendPush(other.id, {
       title: `SneakyTime call from ${me?.name ?? 'someone'}`,
       body: 'Tap to Join!',
-      url: '/call?join=1',
+      url: '/sneakytime?join=1',
       tag: 'sneaky-call',
     });
 
