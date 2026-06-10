@@ -91,7 +91,7 @@ function ComboDisplay({ count, align = 'left' }) {
   );
 }
 
-function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo, onPause, paused, p1Name = 'KATIE', p2Name = 'DAVID' }) {
+function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo, onPause, onQuitMatch, paused, p1Name = 'KATIE', p2Name = 'DAVID' }) {
   return (
     <>
       <div className="absolute top-0 left-0 right-0 flex items-start justify-between px-3 pt-2 select-none" style={{ zIndex: 10, pointerEvents: 'none' }}>
@@ -104,15 +104,27 @@ function HUD({ playerHp, enemyHp, maxHp, scores, round, playerCombo, enemyCombo,
         <div className="flex flex-col items-center gap-1 pt-1" style={{ fontFamily: 'var(--font-pixel)', color: '#ffffff99' }}>
           <span style={{ fontSize: '0.45rem', letterSpacing: '0.2em' }}>ROUND</span>
           <span style={{ fontSize: '1.2rem', color: '#fff', textShadow: '0 0 10px #fff8' }}>{round}</span>
-          {IS_TOUCH && (
+          {IS_TOUCH && onPause && (
             <button
-              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onPause?.(); }}
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onPause(); }}
               style={{ pointerEvents: 'auto', touchAction: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent', marginTop: 4, width: 34, height: 34, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.28)', background: paused ? 'rgba(255,255,255,0.14)' : 'rgba(6,6,14,0.60)', color: 'rgba(255,255,255,0.70)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
             >
               {paused
                 ? <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2 2 L9 6 L2 10 Z"/></svg>
                 : <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="3" height="8" rx="1"/><rect x="6" y="1" width="3" height="8" rx="1"/></svg>
               }
+            </button>
+          )}
+          {/* Online: no pausing (it would freeze the opponent) — quit instead */}
+          {onQuitMatch && (
+            <button
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onQuitMatch(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              style={{ pointerEvents: 'auto', touchAction: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent', marginTop: 4, width: 34, height: 34, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.28)', background: 'rgba(6,6,14,0.60)', color: 'rgba(255,255,255,0.70)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
+            >
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" />
+              </svg>
             </button>
           )}
         </div>
@@ -294,12 +306,17 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
   });
 
   // Toggle pause helper — shared by ESC key, touch button, and gamepad Start.
-  // Guests can't pause — the host owns the simulation (they see the host's
-  // PAUSED state via snapshots instead).
+  // Disabled entirely online: a pause would freeze the opponent's match.
   const togglePause = () => {
-    if (isGuest) return;
+    if (isOnline) return;
     pausedRef.current = !pausedRef.current;
     setPaused(p => !p);
+  };
+
+  // Online mid-match exit — confirm, tell the opponent, leave.
+  const quitOnlineMatch = () => {
+    if (!confirm('Quit the online match?')) return;
+    doQuit();
   };
 
   // Online rematch/quit coordination
@@ -616,7 +633,8 @@ export default function GameScreen({ sprites, character, level, difficulty = 'ea
         round={hudState.round}
         playerCombo={hudState.playerCombo}
         enemyCombo={hudState.enemyCombo}
-        onPause={togglePause}
+        onPause={isOnline ? null : togglePause}
+        onQuitMatch={isOnline && !hudState.matchOver && !oppLeft ? quitOnlineMatch : null}
         paused={paused}
         p1Name={p1Name}
         p2Name={p2Name}
