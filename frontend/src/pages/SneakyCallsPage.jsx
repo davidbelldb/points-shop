@@ -28,15 +28,14 @@ const CTRL_OFF = 'bg-[#ffffff] text-[#171717]';          // muted / cam off
 const FILTERS = [
   { id: 'none',    label: 'None',    css: 'none' },
   { id: 'noir',    label: 'Noir',    css: 'grayscale(1) contrast(1.15)' },
-  { id: 'vintage', label: 'Vintage', css: 'sepia(0.55) contrast(1.05) saturate(1.3)' },
+  { id: 'vibrant', label: 'Vibrant', css: 'saturate(1.45) contrast(1.06)' },
   { id: 'pop',     label: 'Pop',     css: 'saturate(1.9) contrast(1.1)' },
-  { id: 'dreamy',  label: 'Dreamy',  css: 'brightness(1.12) saturate(1.25) blur(1px)' },
 ];
 const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css ?? 'none';
 
-const FLUTTER_EMOJIS = ['❤️', '😂', '😍', '😘', '🔥', '🍑'];
+const FLUTTER_EMOJIS = ['💜', '🍆', '🫦', '🍑', '😂'];
 const FLUTTER_COUNT = 40;
-const RAIN_COUNT = 20;
+const RAIN_COUNT = 30;
 
 // ─── icons ────────────────────────────────────────────────────────────────────
 const ICON_PROPS = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -118,17 +117,6 @@ function FlipIcon({ className = '' }) {
   );
 }
 
-/** Wrapped candy — the twirl rain trigger (placeholder icon). */
-function CandyIcon({ className = '' }) {
-  return (
-    <svg {...ICON_PROPS} className={className}>
-      <circle cx="12" cy="12" r="4.5" />
-      <path d="M8.2 9.5 L4 6.5 L5 12 L4 17.5 L8.2 14.5" />
-      <path d="M15.8 9.5 L20 6.5 L19 12 L20 17.5 L15.8 14.5" />
-    </svg>
-  );
-}
-
 // ─── VideoCell — binds a MediaStream to a <video> ─────────────────────────────
 function VideoCell({ stream, mirror = false, muted = false, filter = 'none' }) {
   const ref = useRef(null);
@@ -195,7 +183,27 @@ function FilterBar({ value, onChange }) {
   );
 }
 
-function EmojiBar({ onPick }) {
+/** Tiny spinning render of twirl.glb — the rain trigger inside the tray. */
+function TwirlThumb() {
+  const { scene } = useGLTF('/twirl.glb');
+  const obj = useMemo(() => {
+    const clone = scene.clone(true);
+    const box = new THREE.Box3().setFromObject(clone);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const s = 1.9 / Math.max(size.x, size.y, size.z, 0.0001);
+    clone.scale.setScalar(s);
+    clone.position.copy(center).multiplyScalar(-s); // centre in frame
+    return clone;
+  }, [scene]);
+  const ref = useRef();
+  useFrame((_, dt) => { if (ref.current) ref.current.rotation.y += dt * 1.4; });
+  return <group ref={ref}><primitive object={obj} /></group>;
+}
+
+function EmojiBar({ onPick, onRain, raining }) {
   return (
     <div className="flex max-w-full items-center gap-1 overflow-x-auto px-1">
       {FLUTTER_EMOJIS.map((e) => (
@@ -208,6 +216,23 @@ function EmojiBar({ onPick }) {
           {e}
         </button>
       ))}
+      <button
+        type="button"
+        onClick={onRain}
+        disabled={raining}
+        title="Make it rain"
+        className="shrink-0 rounded-full px-1 py-1 transition hover:bg-white/15 active:scale-90 disabled:opacity-50"
+      >
+        <span className="block h-9 w-9">
+          <Canvas camera={{ position: [0, 0, 2.6], fov: 45 }} gl={{ alpha: true, antialias: true }}>
+            <ambientLight intensity={1.2} />
+            <directionalLight position={[2, 3, 4]} intensity={1.6} />
+            <Suspense fallback={null}>
+              <TwirlThumb />
+            </Suspense>
+          </Canvas>
+        </span>
+      </button>
     </div>
   );
 }
@@ -669,7 +694,7 @@ export default function SneakyCallsPage() {
           <FilterBar value={filter} onChange={setFilter} />
         </Tray>
         <Tray open={openTray === 'emoji'}>
-          <EmojiBar onPick={pickEmoji} />
+          <EmojiBar onPick={pickEmoji} onRain={startRain} raining={raining} />
         </Tray>
         <div className="flex items-center gap-2">
           <button
@@ -695,15 +720,6 @@ export default function SneakyCallsPage() {
             className={`${CTRL_BTN} ${CTRL_ON}`}
           >
             <FlipIcon className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={startRain}
-            disabled={raining}
-            title="Make it rain"
-            className={`${CTRL_BTN} ${raining ? CTRL_LIT : CTRL_ON} disabled:opacity-60`}
-          >
-            <CandyIcon className="h-5 w-5" />
           </button>
           <button
             type="button"
