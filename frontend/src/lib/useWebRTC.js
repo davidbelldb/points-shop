@@ -5,9 +5,10 @@
  * Media:     peer-to-peer via WebRTC after ICE negotiation.
  *
  * Usage:
- *   const { localStream, remoteStream, initCall, endCall, callEnded } = useWebRTC(gameId);
+ *   const { localStream, remoteStream, initCall, endCall, callEnded, remoteCamOn, setLocalCam } = useWebRTC(gameId);
  *   // Call initCall(true) on p1, initCall(false) on p2, once per game.
  *   // Call endCall() to hang up — won't auto-restart for this gameId.
+ *   // Call setLocalCam(false/true) to toggle your camera and tell your partner.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -31,6 +32,7 @@ export function useWebRTC(gameId) {
   const [localStream,  setLocalStream]  = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [callEnded,    setCallEnded]    = useState(false);
+  const [remoteCamOn,  setRemoteCamOn]  = useState(true);
 
   // ── internal helpers ──────────────────────────────────────────────────────
 
@@ -73,6 +75,7 @@ export function useWebRTC(gameId) {
     localRef.current?.getTracks().forEach(t => t.stop());
     localRef.current = null;
     setCallEnded(false);
+    setRemoteCamOn(true);
 
     // ── 1. Get local camera stream ────────────────────────────────────────
     let stream;
@@ -149,6 +152,10 @@ export function useWebRTC(gameId) {
             setCallEnded(true);
             return;
           }
+          if (sig.type === 'camstate') {
+            setRemoteCamOn(!!sig.payload?.camOn);
+            continue;
+          }
           await handleSignal(p, sig);
         }
       } catch { /* ignore */ }
@@ -171,6 +178,14 @@ export function useWebRTC(gameId) {
     // re-initiating the call for this game.
   }, []);
 
+  // ── camera toggle — flips local track + tells partner so they can fall
+  // back to the profile photo instead of showing a frozen/black frame ──────
+  const setLocalCam = useCallback((enabled) => {
+    localRef.current?.getVideoTracks().forEach(t => { t.enabled = enabled; });
+    sendSignal('camstate', { camOn: enabled });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── cleanup when gameId changes or component unmounts ─────────────────────
   useEffect(() => {
     return () => {
@@ -183,8 +198,9 @@ export function useWebRTC(gameId) {
       setLocalStream(null);
       setRemoteStream(null);
       setCallEnded(false);
+      setRemoteCamOn(true);
     };
   }, [gameId]);
 
-  return { localStream, remoteStream, initCall, endCall, callEnded };
+  return { localStream, remoteStream, initCall, endCall, callEnded, remoteCamOn, setLocalCam };
 }

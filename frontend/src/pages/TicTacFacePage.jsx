@@ -98,15 +98,16 @@ function PlayerChip({ tone, label, active, status, score, players }) {
  * tone='me'    → show myStream (or static photo if not ready)
  * tone='other' → show theirStream (or static photo if not ready)
  */
-function WonMacroCell({ tone, players, myStream, theirStream }) {
+function WonMacroCell({ tone, players, myStream, theirStream, myCamOn, theirCamOn }) {
   const ring   = tone === 'me' ? 'ring-teal-400' : 'ring-pink-400';
   const stream = tone === 'me' ? myStream : theirStream;
+  const camOn  = tone === 'me' ? myCamOn  : theirCamOn;
   const mirror = tone === 'me'; // selfie-mirror own feed
 
   return (
     <div className="flex h-full w-full items-center justify-center p-1">
       <span className={`block h-full w-full overflow-hidden rounded-full ring-4 ${ring} shadow-lg animate-[zoomIn_220ms_ease-out]`}>
-        {stream
+        {stream && camOn
           ? <VideoCell stream={stream} mirror={mirror} muted />
           : <PlayerImage tone={tone} players={players} />
         }
@@ -162,7 +163,7 @@ function MiniCell({ value, myMark, canPlay, onClick, players }) {
 }
 
 /** One macro cell: resolved (face/split) or an active mini 3×3 grid. */
-function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, onMove, players, myStream, theirStream }) {
+function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, onMove, players, myStream, theirStream, myCamOn, theirCamOn }) {
   const resolved = globalCell !== null;
 
   let outerBorder = 'border-neutral-200';
@@ -184,6 +185,8 @@ function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, 
                 players={players}
                 myStream={myStream}
                 theirStream={theirStream}
+                myCamOn={myCamOn}
+                theirCamOn={theirCamOn}
               />
           }
         </div>
@@ -308,7 +311,7 @@ export default function TicTacFacePage() {
   // Video only activates once both players have claimed at least one mini-board
   const videoEnabled = !!(game && !game.finished && myBoardWins >= 1 && oppBoardWins >= 1);
 
-  const { localStream, remoteStream, initCall, endCall, callEnded } = useWebRTC(game?.id ?? null);
+  const { localStream, remoteStream, initCall, endCall, callEnded, remoteCamOn, setLocalCam } = useWebRTC(game?.id ?? null);
 
   // Trigger call setup the moment the condition is met (surprise reveal)
   useEffect(() => {
@@ -360,7 +363,7 @@ export default function TicTacFacePage() {
   function toggleCam() {
     setCamOn(prev => {
       const next = !prev;
-      localStream?.getVideoTracks().forEach(t => { t.enabled = next; });
+      setLocalCam(next);
       return next;
     });
   }
@@ -486,6 +489,8 @@ export default function TicTacFacePage() {
                     players={players}
                     myStream={myStream}
                     theirStream={theirStream}
+                    myCamOn={camOn}
+                    theirCamOn={remoteCamOn}
                   />
                 );
               })}
@@ -618,7 +623,7 @@ export default function TicTacFacePage() {
             <p className="mt-2 bg-gradient-to-r from-teal-300 via-yellow-300 to-pink-400 bg-clip-text text-4xl font-black uppercase tracking-tight text-transparent sm:text-5xl">
               Tic-Tic-FaceTime!
             </p>
-            <p className="mt-3 text-sm text-white/70">📹 Cameras incoming...</p>
+            <p className="mt-3 text-sm text-white/70">Cameras incoming...</p>
           </div>
         </div>
       )}
