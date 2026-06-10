@@ -42,6 +42,7 @@ export function useSneakyCall() {
   const [remoteStream, setRemoteStream] = useState(null);
   const [status,       setStatus]       = useState('idle');
   const [remoteCamOn,  setRemoteCamOn]  = useState(true);
+  const [remoteFilter, setRemoteFilter] = useState('none');
 
   function teardown() {
     clearInterval(pollerRef.current);
@@ -99,6 +100,7 @@ export function useSneakyCall() {
 
     teardown();
     setRemoteCamOn(true);
+    setRemoteFilter('none');
     setStatus(isInitiator ? 'ringing' : 'connecting');
 
     // ── 1. Local camera + mic ─────────────────────────────────────────────
@@ -173,6 +175,10 @@ export function useSneakyCall() {
             setRemoteCamOn(!!sig.payload?.camOn);
             continue;
           }
+          if (sig.type === 'filter') {
+            setRemoteFilter(sig.payload?.id ?? 'none');
+            continue;
+          }
           await handleSignal(p, isInitiator, sig);
         }
       } catch { /* ignore */ }
@@ -201,6 +207,12 @@ export function useSneakyCall() {
     localRef.current?.getAudioTracks().forEach(t => { t.enabled = enabled; });
   }, []);
 
+  // ── filter — tell the partner which filter to render our feed with ───────
+  const sendFilter = useCallback((id) => {
+    sendSignal('filter', { id });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -210,5 +222,5 @@ export function useSneakyCall() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { localStream, remoteStream, status, remoteCamOn, startCall, endCall, setLocalCam, setLocalMic };
+  return { localStream, remoteStream, status, remoteCamOn, remoteFilter, startCall, endCall, setLocalCam, setLocalMic, sendFilter };
 }
