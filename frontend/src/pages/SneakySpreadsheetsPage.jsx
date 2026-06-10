@@ -267,7 +267,7 @@ export default function SneakySpreadsheetsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Sneaky Sheets</h1>
-          <p className="text-sm text-neutral-500">Tabs upon tabs. Double-tap a tab or column header to rename it.</p>
+          <p className="text-sm text-neutral-500">Double-tap a tab or column header to rename it.</p>
         </div>
         <span className="text-[11px] text-neutral-400">
           {saving ? 'Saving…' : savedAt ? 'Saved' : ''}
