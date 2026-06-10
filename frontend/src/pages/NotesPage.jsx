@@ -425,49 +425,50 @@ function NoteToolbar({ editor }) {
     else editor.chain().focus().outdentBlock().run();
   }
 
-  function setLink() {
-    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // ── Link dialog — Title + URL together (window.prompt chains are unreliable
+  // and the second prompt can be silently suppressed by the browser) ─────────
+  const [linkDlg, setLinkDlg] = useState(null); // { url, title, selectedText } | null
 
+  function openLinkDialog() {
     const prevHref = editor.getAttributes('link').href || '';
     const { from, to, empty } = editor.state.selection;
     const selectedText = empty ? '' : editor.state.doc.textBetween(from, to, ' ');
+    setLinkDlg({ url: prevHref || 'https://', title: selectedText, selectedText });
+  }
 
-    const url = window.prompt('Link URL', prevHref || 'https://');
-    if (url === null) return; // cancelled
-    if (url.trim() === '' || url.trim() === 'https://') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
-    }
-    const href = /^(https?:\/\/|mailto:|tel:)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
+  function saveLink() {
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const dlg = linkDlg;
+    setLinkDlg(null);
+    if (!dlg) return;
 
-    // Title — the visible text, so the raw URL stays hidden.
-    // Blank = keep the existing/selected text (or fall back to the URL).
-    const title = window.prompt(
-      'Link title (text shown instead of the URL)',
-      selectedText || '',
-    );
-    if (title === null) return; // cancelled
+    const url = dlg.url.trim();
+    if (!url || url === 'https://') return;
+    const href = /^(https?:\/\/|mailto:|tel:)/i.test(url) ? url : `https://${url}`;
+    const cleanTitle = dlg.title.trim();
 
-    const cleanTitle = title.trim();
-
+    const { empty } = editor.state.selection;
     if (editor.isActive('link') || !empty) {
       // Editing an existing link, or linking selected text.
-      if (cleanTitle && cleanTitle !== selectedText) {
-        // New title — replace the text within the (extended) link range
+      if (cleanTitle && cleanTitle !== dlg.selectedText) {
         editor.chain().focus().extendMarkRange('link')
           .insertContent(`<a href="${esc(href)}">${esc(cleanTitle)}</a>`)
           .run();
       } else {
-        // Keep the text, just (re)point the link
         editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
       }
     } else {
-      // Nothing selected — insert a fresh titled link
+      // Nothing selected — insert a fresh titled link (URL hidden behind it)
       const text = cleanTitle || href.replace(/^https?:\/\//i, '');
       editor.chain().focus()
         .insertContent(`<a href="${esc(href)}">${esc(text)}</a>&nbsp;`)
         .run();
     }
+  }
+
+  function removeLink() {
+    setLinkDlg(null);
+    editor.chain().focus().extendMarkRange('link').unsetLink().run();
   }
 
   async function pickImage(e) {
@@ -487,6 +488,57 @@ function NoteToolbar({ editor }) {
 
   return (
     <div className="notes-toolbar relative select-none">
+      {/* Link dialog — title + URL */}
+      {linkDlg && (
+        <>
+          <div className="fixed inset-0 z-40" onMouseDown={() => setLinkDlg(null)} />
+          <div className="notes-styles-panel absolute bottom-full left-0 right-0 z-50 space-y-3 p-4 shadow-xl">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Title</span>
+              <input
+                value={linkDlg.title}
+                onChange={(e) => setLinkDlg((d) => ({ ...d, title: e.target.value }))}
+                placeholder="Text shown instead of the URL"
+                autoFocus
+                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-neutral-500">URL</span>
+              <input
+                value={linkDlg.url}
+                onChange={(e) => setLinkDlg((d) => ({ ...d, url: e.target.value }))}
+                inputMode="url"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck="false"
+                placeholder="https://"
+                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none"
+              />
+            </label>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              {editor.isActive('link') && (
+                <button
+                  onClick={removeLink}
+                  className="mr-auto rounded-lg px-3 py-2 text-sm font-semibold text-red-700"
+                >
+                  Remove
+                </button>
+              )}
+              <button onClick={() => setLinkDlg(null)} className="rounded-lg px-3 py-2 text-sm text-neutral-500">
+                Cancel
+              </button>
+              <button
+                onClick={saveLink}
+                className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-amber-950"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Text-style dropdown */}
       {showStyles && (
         <>
@@ -577,7 +629,7 @@ function NoteToolbar({ editor }) {
         {ROW_DIVIDER}
 
         {/* ── Row 4: Link · Image ── */}
-        <Btn active={editor.isActive('link')} onMd={(e) => { e.preventDefault(); setLink(); }} title="Link">
+        <Btn active={editor.isActive('link')} onMd={(e) => { e.preventDefault(); openLinkDialog(); }} title="Link">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
