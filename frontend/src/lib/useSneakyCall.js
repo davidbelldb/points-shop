@@ -44,7 +44,7 @@ export function useSneakyCall() {
   const [remoteCamOn,  setRemoteCamOn]  = useState(true);
   const [remoteFilter, setRemoteFilter] = useState('none');
   const [emojiEvent,   setEmojiEvent]   = useState(null); // { emoji, nonce } — partner sent a flutter
-  const [rainEvent,    setRainEvent]    = useState(0);    // increments — partner sent twirl rain
+  const [rainEvent,    setRainEvent]    = useState(null); // { kind, nonce } — partner sent rain
   const facingRef = useRef('user');
   const [facing, setFacing] = useState('user');           // 'user' | 'environment'
 
@@ -190,7 +190,10 @@ export function useSneakyCall() {
             continue;
           }
           if (sig.type === 'rain') {
-            setRainEvent((n) => n + 1);
+            setRainEvent({
+              kind: sig.payload?.kind === 'duck' ? 'duck' : 'twirl',
+              nonce: Date.now() + Math.random(),
+            });
             continue;
           }
           await handleSignal(p, isInitiator, sig);
@@ -267,8 +270,8 @@ export function useSneakyCall() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const sendRain = useCallback(() => {
-    sendSignal('rain', {});
+  const sendRain = useCallback((kind = 'twirl') => {
+    sendSignal('rain', { kind });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

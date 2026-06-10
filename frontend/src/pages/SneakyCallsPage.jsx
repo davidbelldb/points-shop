@@ -1,8 +1,9 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import * as THREE from 'three';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { api } from '../lib/api.js';
 import { useSneakyCall } from '../lib/useSneakyCall.js';
 
@@ -36,6 +37,8 @@ const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css ?? 'none';
 const FLUTTER_EMOJIS = ['💜', '🍆', '🫦', '🍑', '😂'];
 const FLUTTER_COUNT = 40;
 const RAIN_COUNT = 30;
+const DUCK_URL = '/models/ducks/duck_7.stl';
+const DUCK_COLOR = '#fcba03'; // global override — STL has no materials of its own
 
 // ─── icons ────────────────────────────────────────────────────────────────────
 const ICON_PROPS = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -183,24 +186,59 @@ function FilterBar({ value, onChange }) {
   );
 }
 
-/** Tiny spinning render of twirl.glb — the rain trigger inside the tray. */
-function TwirlThumb() {
-  const { scene } = useGLTF('/twirl.glb');
+/** Spinning preview — normalises any THREE.Object3D into frame and rotates it. */
+function SpinningPreview({ object }) {
   const obj = useMemo(() => {
-    const clone = scene.clone(true);
-    const box = new THREE.Box3().setFromObject(clone);
+    const box = new THREE.Box3().setFromObject(object);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
     box.getSize(size);
     box.getCenter(center);
     const s = 1.9 / Math.max(size.x, size.y, size.z, 0.0001);
-    clone.scale.setScalar(s);
-    clone.position.copy(center).multiplyScalar(-s); // centre in frame
-    return clone;
-  }, [scene]);
+    object.scale.setScalar(s);
+    object.position.copy(center).multiplyScalar(-s); // centre in frame
+    return object;
+  }, [object]);
   const ref = useRef();
   useFrame((_, dt) => { if (ref.current) ref.current.rotation.y += dt * 1.4; });
   return <group ref={ref}><primitive object={obj} /></group>;
+}
+
+function TwirlThumb() {
+  const { scene } = useGLTF('/twirl.glb');
+  const clone = useMemo(() => scene.clone(true), [scene]);
+  return <SpinningPreview object={clone} />;
+}
+
+function DuckThumb() {
+  const duck = useGoldDuck();
+  const oriented = useMemo(() => {
+    const m = duck.clone(true);
+    m.rotation.x = -Math.PI / 2; // STL exports are usually Z-up — stand it upright
+    return m;
+  }, [duck]);
+  return <SpinningPreview object={oriented} />;
+}
+
+/** Tray button with a live 3D model preview inside. */
+function ModelButton({ onClick, disabled, title, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="shrink-0 rounded-full px-1 py-1 transition hover:bg-white/15 active:scale-90 disabled:opacity-50"
+    >
+      <span className="block h-9 w-9">
+        <Canvas camera={{ position: [0, 0, 2.6], fov: 45 }} gl={{ alpha: true, antialias: true }}>
+          <ambientLight intensity={1.2} />
+          <directionalLight position={[2, 3, 4]} intensity={1.6} />
+          <Suspense fallback={null}>{children}</Suspense>
+        </Canvas>
+      </span>
+    </button>
+  );
 }
 
 function EmojiBar({ onPick, onRain, raining }) {
@@ -216,23 +254,12 @@ function EmojiBar({ onPick, onRain, raining }) {
           {e}
         </button>
       ))}
-      <button
-        type="button"
-        onClick={onRain}
-        disabled={raining}
-        title="Make it rain"
-        className="shrink-0 rounded-full px-1 py-1 transition hover:bg-white/15 active:scale-90 disabled:opacity-50"
-      >
-        <span className="block h-9 w-9">
-          <Canvas camera={{ position: [0, 0, 2.6], fov: 45 }} gl={{ alpha: true, antialias: true }}>
-            <ambientLight intensity={1.2} />
-            <directionalLight position={[2, 3, 4]} intensity={1.6} />
-            <Suspense fallback={null}>
-              <TwirlThumb />
-            </Suspense>
-          </Canvas>
-        </span>
-      </button>
+      <ModelButton onClick={() => onRain('twirl')} disabled={!!raining} title="Make it rain twirls">
+        <TwirlThumb />
+      </ModelButton>
+      <ModelButton onClick={() => onRain('duck')} disabled={!!raining} title="Make it rain ducks">
+        <DuckThumb />
+      </ModelButton>
     </div>
   );
 }
@@ -281,20 +308,20 @@ function EmojiFlutter({ bursts }) {
   );
 }
 
-// ─── TwirlRain — 20 twirl.glb objects raining top → bottom ────────────────────
-function TwirlField({ onDone }) {
-  const { scene } = useGLTF('/twirl.glb');
+// ─── Model rain — RAIN_COUNT objects raining top → bottom ─────────────────────
+// Generic field: takes any THREE.Object3D template and clones it per drop.
+function RainItems({ template, onDone }) {
   const { viewport } = useThree();
   const doneRef = useRef(false);
 
   const items = useMemo(() => {
     // Normalise the model so its largest dimension is ~1 world unit.
-    const box = new THREE.Box3().setFromObject(scene);
+    const box = new THREE.Box3().setFromObject(template);
     const size = new THREE.Vector3();
     box.getSize(size);
     const norm = 1 / Math.max(size.x, size.y, size.z, 0.0001);
     return Array.from({ length: RAIN_COUNT }, () => ({
-      obj: scene.clone(true),
+      obj: template.clone(true),
       x: (Math.random() - 0.5) * viewport.width * 0.95,
       // Staggered starting heights above the top edge → rain, not a curtain.
       y: viewport.height / 2 + 1 + Math.random() * viewport.height * 1.5,
@@ -303,7 +330,7 @@ function TwirlField({ onDone }) {
       ry: (Math.random() - 0.5) * 3,
       scale: norm * (0.6 + Math.random() * 0.5),
     }));
-  }, [scene, viewport.width, viewport.height]);
+  }, [template, viewport.width, viewport.height]);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -330,15 +357,41 @@ function TwirlField({ onDone }) {
   );
 }
 
-function TwirlRain({ active, onDone }) {
-  if (!active) return null;
+function TwirlRainSource({ onDone }) {
+  const { scene } = useGLTF('/twirl.glb');
+  return <RainItems template={scene} onDone={onDone} />;
+}
+
+/** Gold duck — duck_7.stl with the global #fcba03 colour override. */
+function useGoldDuck() {
+  const geometry = useLoader(STLLoader, DUCK_URL);
+  return useMemo(() => {
+    const g = geometry.clone();
+    g.computeVertexNormals();
+    // Auto-centre — STL files from CAD tools are rarely origin-centred.
+    g.computeBoundingBox();
+    const centre = new THREE.Vector3();
+    g.boundingBox.getCenter(centre);
+    g.translate(-centre.x, -centre.y, -centre.z);
+    const material = new THREE.MeshStandardMaterial({ color: DUCK_COLOR, roughness: 0.45, metalness: 0.15 });
+    return new THREE.Mesh(g, material);
+  }, [geometry]);
+}
+
+function DuckRainSource({ onDone }) {
+  const duck = useGoldDuck();
+  return <RainItems template={duck} onDone={onDone} />;
+}
+
+function RainOverlay({ kind, onDone }) {
+  if (!kind) return null;
   return (
     <div className="pointer-events-none fixed inset-0 z-[60]">
       <Canvas camera={{ position: [0, 0, 8], fov: 50 }} gl={{ alpha: true, antialias: true }}>
         <ambientLight intensity={1.1} />
         <directionalLight position={[3, 5, 6]} intensity={1.6} />
         <Suspense fallback={null}>
-          <TwirlField onDone={onDone} />
+          {kind === 'duck' ? <DuckRainSource onDone={onDone} /> : <TwirlRainSource onDone={onDone} />}
         </Suspense>
       </Canvas>
     </div>
@@ -365,7 +418,7 @@ export default function SneakyCallsPage() {
   const [filter, setFilter]   = useState('none');
   const [openTray, setOpenTray] = useState(null); // null | 'filters' | 'emoji'
   const [bursts, setBursts]   = useState([]);
-  const [raining, setRaining] = useState(false);
+  const [raining, setRaining] = useState(null); // null | 'twirl' | 'duck'
 
   const other = players?.other ?? null;
 
@@ -439,7 +492,7 @@ export default function SneakyCallsPage() {
   }, [emojiEvent]);
 
   useEffect(() => {
-    if (rainEvent > 0) setRaining(true);
+    if (rainEvent) setRaining((cur) => cur ?? rainEvent.kind);
   }, [rainEvent]);
 
   function addBurst(emoji) {
@@ -455,10 +508,10 @@ export default function SneakyCallsPage() {
     sendEmoji(emoji);
   }
 
-  function startRain() {
+  function startRain(kind) {
     if (raining) return;
-    setRaining(true);
-    sendRain();
+    setRaining(kind);
+    sendRain(kind);
   }
 
   async function start() {
@@ -683,7 +736,7 @@ export default function SneakyCallsPage() {
 
       {/* Fun overlays */}
       <EmojiFlutter bursts={bursts} />
-      <TwirlRain active={raining} onDone={() => setRaining(false)} />
+      <RainOverlay kind={raining} onDone={() => setRaining(null)} />
 
       {/* Control bar */}
       <div
