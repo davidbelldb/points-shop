@@ -2,10 +2,33 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
+import { useWebRTC } from '../lib/useWebRTC.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const TEAL_BTN = "inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40";
 const POLL_MS  = 3000;
+
+// ─── VideoCell ────────────────────────────────────────────────────────────────
+// Renders a live video stream inside whatever container it's placed in.
+// muted=true for local stream (no echo); mirror=true for selfie view.
+function VideoCell({ stream, mirror = false, muted = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.srcObject = stream ?? null;
+    if (stream) el.play().catch(() => {});
+  }, [stream]);
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      playsInline
+      muted={muted}
+      className={`h-full w-full object-cover${mirror ? ' scale-x-[-1]' : ''}`}
+    />
+  );
+}
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 function PlayerImage({ tone, players, className = '' }) {
@@ -27,20 +50,33 @@ function PlayerChip({ tone, label, active, status, score, players }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">{label}</p>
-        <p className="text-[11px] uppercase tracking-wide opacity-70">{status || ' '}</p>
+        <p className="text-[11px] uppercase tracking-wide opacity-70">{status || ' '}</p>
       </div>
       <span className={`rounded-full px-2 py-0.5 text-sm font-bold ${tone === 'me' ? 'bg-teal-400 text-teal-950' : 'bg-pink-400 text-pink-950'}`}>{score}</span>
     </div>
   );
 }
 
-/** Large round photo for a won macro cell. */
-function WonMacroCell({ tone, players }) {
-  const ring = tone === 'me' ? 'ring-teal-400' : 'ring-pink-400';
+/**
+ * Large round marker for a won macro cell.
+ * When video is live, replaces the static photo with the player's live feed.
+ * - myStream    = local camera stream (my face)
+ * - theirStream = remote WebRTC stream (their face)
+ * tone='me'    → show myStream (or static photo if not ready)
+ * tone='other' → show theirStream (or static photo if not ready)
+ */
+function WonMacroCell({ tone, players, myStream, theirStream }) {
+  const ring   = tone === 'me' ? 'ring-teal-400' : 'ring-pink-400';
+  const stream = tone === 'me' ? myStream : theirStream;
+  const mirror = tone === 'me'; // selfie-mirror own feed
+
   return (
     <div className="flex h-full w-full items-center justify-center p-1">
       <span className={`block h-full w-full overflow-hidden rounded-full ring-4 ${ring} shadow-lg animate-[zoomIn_220ms_ease-out]`}>
-        <PlayerImage tone={tone} players={players} />
+        {stream
+          ? <VideoCell stream={stream} mirror={mirror} muted />
+          : <PlayerImage tone={tone} players={players} />
+        }
       </span>
     </div>
   );
@@ -50,15 +86,12 @@ function WonMacroCell({ tone, players }) {
 function DrawMacroCell({ players }) {
   return (
     <div className="relative h-full w-full overflow-hidden rounded-full animate-[zoomIn_220ms_ease-out]">
-      {/* p1 (teal) — top-left triangle */}
       <div className="absolute inset-0" style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}>
         <PlayerImage tone="me" players={players} className="absolute inset-0" />
       </div>
-      {/* p2 (pink) — bottom-right triangle */}
       <div className="absolute inset-0" style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}>
         <PlayerImage tone="other" players={players} className="absolute inset-0" />
       </div>
-      {/* diagonal divider line */}
       <div className="pointer-events-none absolute inset-0" style={{
         background: 'linear-gradient(to bottom right, transparent calc(50% - 1px), white calc(50% - 1px), white calc(50% + 1px), transparent calc(50% + 1px))',
       }} />
@@ -73,7 +106,7 @@ function MiniCell({ value, myMark, canPlay, onClick, players }) {
     <button
       onClick={canPlay ? onClick : undefined}
       disabled={!canPlay}
-      style={{backgroundColor:'#1f1f1e'}}
+      style={{ backgroundColor: '#1f1f1e' }}
       className={[
         'relative aspect-square overflow-hidden rounded-md border transition',
         'border-neutral-200',
@@ -95,8 +128,8 @@ function MiniCell({ value, myMark, canPlay, onClick, players }) {
   );
 }
 
-/** One macro cell: either resolved (photo/split) or an active mini 3×3 grid. */
-function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, onMove, players }) {
+/** One macro cell: resolved (face/split) or an active mini 3×3 grid. */
+function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, onMove, players, myStream, theirStream }) {
   const resolved = globalCell !== null;
 
   let outerBorder = 'border-neutral-200';
@@ -108,12 +141,18 @@ function MacroCell({ index, globalCell, localBoard, isActive, isMyTurn, myMark, 
   const canPlayInBoard = !resolved && isMyTurn && isActive;
 
   return (
-    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder}`} style={{backgroundColor:'#1f1f1e'}}>
+    <div className={`relative rounded-xl border-2 transition p-1 ${outerBorder}`} style={{ backgroundColor: '#1f1f1e' }}>
       {resolved ? (
         <div className="flex h-full w-full items-center justify-center">
           {globalCell === 'draw'
             ? <DrawMacroCell players={players} />
-            : <WonMacroCell tone={globalCell === myMark ? 'me' : 'other'} players={players} />}
+            : <WonMacroCell
+                tone={globalCell === myMark ? 'me' : 'other'}
+                players={players}
+                myStream={myStream}
+                theirStream={theirStream}
+              />
+          }
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-0.5">
@@ -195,6 +234,9 @@ export default function TicTacFacePage() {
   const [modalDismissed, setModalDismissed] = useState(false);
   const { refresh: refreshBasket } = useBasket();
 
+  // Audio element for remote stream (avoids duplicated audio from multiple video elements)
+  const remoteAudioRef = useRef(null);
+
   async function load(markRead = true) {
     try {
       const data = await api.ttfState();
@@ -222,6 +264,42 @@ export default function TicTacFacePage() {
     }
   }, [state?.match?.id, state?.match?.finished]);
 
+  // ── WebRTC ──────────────────────────────────────────────────────────────────
+  const game         = state?.game ?? null;
+  const myMark       = game?.you;
+  const oppMark      = myMark === 'p1' ? 'p2' : 'p1';
+  const globalBoard  = game?.global_board ?? Array(9).fill(null);
+  const myBoardWins  = globalBoard.filter(c => c === myMark).length;
+  const oppBoardWins = globalBoard.filter(c => c === oppMark).length;
+
+  // Video only activates once both players have claimed at least one mini-board
+  const videoEnabled = !!(game && !game.finished && myBoardWins >= 1 && oppBoardWins >= 1);
+
+  const { localStream, remoteStream, initCall } = useWebRTC(game?.id ?? null);
+
+  // Trigger call setup the moment the condition is met (surprise reveal)
+  useEffect(() => {
+    if (videoEnabled && game?.id) {
+      // p1 is always the WebRTC initiator — deterministic, no coordination needed
+      initCall(myMark === 'p1');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoEnabled, game?.id]);
+
+  // Route remote audio through a single hidden <audio> element
+  // so we don't play the audio track N times (once per won cell)
+  useEffect(() => {
+    const el = remoteAudioRef.current;
+    if (!el) return;
+    el.srcObject = remoteStream ?? null;
+    if (remoteStream) el.play().catch(() => {});
+  }, [remoteStream]);
+
+  // Streams to pass into the board (null when video not yet active)
+  const myStream    = videoEnabled ? localStream  : null;
+  const theirStream = videoEnabled ? remoteStream : null;
+
+  // ── game actions ────────────────────────────────────────────────────────────
   async function start() {
     if (busy) return;
     setBusy(true);
@@ -254,6 +332,7 @@ export default function TicTacFacePage() {
     navigate('/');
   }
 
+  // ── render ──────────────────────────────────────────────────────────────────
   if (error) {
     return (
       <div className="space-y-4 py-6">
@@ -266,31 +345,28 @@ export default function TicTacFacePage() {
     return <div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">Loading board...</div>;
   }
 
-  const { players, game, match } = state;
+  const { players, match } = state;
   const meName    = players.me?.name    || 'You';
   const otherName = players.other?.name || 'Them';
 
-  const myMark      = game?.you;           // 'p1' or 'p2'
-  const oppMark     = myMark === 'p1' ? 'p2' : 'p1';
   const isMyTurn    = game && !game.finished && game.turn === myMark;
   const localBoards = game?.local_boards ?? Array(9).fill(null).map(() => Array(9).fill(null));
-  const globalBoard = game?.global_board ?? Array(9).fill(null);
-  const activeBoard = game?.active_board ?? null;  // null = any unresolved board
-
-  // Score = local boards won in the current game
-  const myBoardWins    = globalBoard.filter(c => c === myMark).length;
-  const otherBoardWins = globalBoard.filter(c => c === oppMark).length;
+  const activeBoard = game?.active_board ?? null;
 
   const winnerTone = game?.winner === 'draw' ? null
     : game?.winner ? (game.winner === myMark ? 'me' : 'other') : null;
 
-  const showModal        = !!match?.finished && !modalDismissed;
-  const matchInProgress  = match && !match.finished;
+  const showModal       = !!match?.finished && !modalDismissed;
+  const matchInProgress = match && !match.finished;
   const meStatus    = !game ? '' : game.finished ? '' : (isMyTurn ? 'Your turn' : 'Waiting');
   const otherStatus = !game ? '' : game.finished ? '' : (isMyTurn ? 'Waiting' : 'Their go');
 
   return (
     <div className="space-y-4 py-2">
+      {/* Hidden audio element — plays remote audio once (prevents N duplicate tracks) */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
+
       {/* header */}
       <div className="flex items-center justify-between">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
@@ -300,17 +376,17 @@ export default function TicTacFacePage() {
           disabled={!game || game.finished || busy}
           className="text-sm font-medium text-neutral-500 disabled:opacity-30"
         >
-          {game && !game.finished ? 'Resign' : ' '}
+          {game && !game.finished ? 'Resign' : ' '}
         </button>
       </div>
 
-      {/* Responsive: board left, controls right — lg+ proportional grid */}
+      {/* Responsive: board left, controls right */}
       <div className="lg:grid lg:grid-cols-[3fr_2fr] lg:gap-6 lg:items-start">
 
         {/* ultimate board */}
         {game && (
           <div className="relative rounded-2xl bg-gradient-to-br from-teal-400 to-pink-400 p-[3px] shadow-md">
-            <div className="grid grid-cols-3 gap-2 rounded-[13px] p-2" style={{backgroundColor:'#2a2a28'}}>
+            <div className="grid grid-cols-3 gap-2 rounded-[13px] p-2" style={{ backgroundColor: '#2a2a28' }}>
               {globalBoard.map((globalCell, bi) => {
                 const isBoardActive = globalCell === null && (activeBoard === null || activeBoard === bi);
                 return (
@@ -324,7 +400,8 @@ export default function TicTacFacePage() {
                     myMark={myMark}
                     onMove={play}
                     players={players}
-                    game={game}
+                    myStream={myStream}
+                    theirStream={theirStream}
                   />
                 );
               })}
@@ -332,11 +409,11 @@ export default function TicTacFacePage() {
           </div>
         )}
 
-        {/* right column: player chips + status bar */}
+        {/* right column */}
         <div className="space-y-4 mt-4 lg:mt-0">
           <div className="flex lg:flex-col gap-2.5">
-            <PlayerChip tone="me"    label={meName}    active={isMyTurn}                              status={meStatus}    score={myBoardWins}    players={players} />
-            <PlayerChip tone="other" label={otherName} active={!!game && !game.finished && !isMyTurn} status={otherStatus} score={otherBoardWins} players={players} />
+            <PlayerChip tone="me"    label={meName}    active={isMyTurn}                              status={meStatus}    score={myBoardWins}  players={players} />
+            <PlayerChip tone="other" label={otherName} active={!!game && !game.finished && !isMyTurn} status={otherStatus} score={oppBoardWins} players={players} />
           </div>
 
           <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center">
@@ -365,15 +442,15 @@ export default function TicTacFacePage() {
             )}
             {game?.finished && matchInProgress && (
               <>
-                {game.winner === 'draw'   && <p className="text-base font-semibold text-neutral-700">Game drawn</p>}
-                {winnerTone === 'me'      && <p className="text-base font-semibold"><span className="text-teal-600">{meName}</span> wins!</p>}
-                {winnerTone === 'other'   && <p className="text-base font-semibold"><span className="text-pink-600">{otherName}</span> wins!</p>}
+                {game.winner === 'draw'  && <p className="text-base font-semibold text-neutral-700">Game drawn</p>}
+                {winnerTone === 'me'     && <p className="text-base font-semibold"><span className="text-teal-600">{meName}</span> wins!</p>}
+                {winnerTone === 'other'  && <p className="text-base font-semibold"><span className="text-pink-600">{otherName}</span> wins!</p>}
               </>
             )}
           </div>
           <TtfLeaderboard />
         </div>
-      </div>{/* end responsive grid */}
+      </div>
 
       {/* match over modal */}
       {showModal && match && (

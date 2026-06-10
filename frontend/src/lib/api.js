@@ -231,6 +231,10 @@ export const api = {
   addMomentMedia: (id, url, type) => request(`/moments/${id}/media`, { method: 'POST', body: JSON.stringify({ url, type }) }),
   removeMomentMedia: (momentId, mediaId) => request(`/moments/${momentId}/media/${mediaId}`, { method: 'DELETE' }),
 
+  // WebRTC signaling
+  rtcSignal: (type, payload) => request('/rtc/signal', { method: 'POST', body: JSON.stringify({ type, payload }) }),
+  rtcPoll:   () => request('/rtc/signal'),
+
   admin: {
     listProducts:    () => request('/admin/products'),
     createProduct:   (data) => request('/admin/products', { method: 'POST', body: JSON.stringify(data) }),
