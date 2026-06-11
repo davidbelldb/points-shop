@@ -34,6 +34,7 @@ export default function IncomingCallBanner() {
     if (onCallPage) { setIncoming(false); return; }
     let stopped = false;
     const check = async () => {
+      if (document.hidden) return; // backgrounded tab — skip the round-trip
       try {
         const { incoming: ringing, from } = await api.callsStatus();
         if (stopped) return;

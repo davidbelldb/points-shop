@@ -50,6 +50,7 @@ export const api = {
     request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me'),
+  bootstrap: () => request('/bootstrap'),
   getMessages: () => request('/messages'),
   sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>
     request('/messages', {

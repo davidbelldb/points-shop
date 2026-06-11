@@ -116,6 +116,7 @@ export default function OnlineLobbyScreen({ autoJoin = false, onConnected, onBac
     if (status !== 'idle') return;
     let stopped = false;
     const check = async () => {
+      if (document.hidden) return; // backgrounded — skip the round-trip
       try {
         const { incoming: ringing, from } = await api.crChallengeStatus();
         if (!stopped) setIncoming(ringing ? (from ?? 'someone') : null);

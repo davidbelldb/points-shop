@@ -1,7 +1,64 @@
-/* Sneaky Points service worker — push notifications only (no offline caching). */
+/* Sneaky Points service worker — push notifications + runtime caching.
+
+   Caching strategy (deliberately conservative so deploys are never stale):
+   - /assets/*  → cache-first. Vite content-hashes these filenames, so a
+                  cached entry can never be wrong.
+   - navigations → network-first, falling back to the last good shell when
+                  offline. The fresh index.html always wins when online.
+   - /api/* and /media/* are untouched (media has HTTP immutable caching). */
+
+const ASSET_CACHE = 'sneaky-assets-v1';
+const SHELL_CACHE = 'sneaky-shell-v1';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    // Drop caches from older versions of this worker.
+    const keep = new Set([ASSET_CACHE, SHELL_CACHE]);
+    for (const key of await caches.keys()) {
+      if (key.startsWith('sneaky-') && !keep.has(key)) await caches.delete(key);
+    }
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/media/')) return;
+
+  // Hashed build assets — cache-first, immutable by construction.
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith((async () => {
+      const cache = await caches.open(ASSET_CACHE);
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) cache.put(req, res.clone());
+      return res;
+    })());
+    return;
+  }
+
+  // App navigations — network-first with offline fallback to the last shell.
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const res = await fetch(req);
+        if (res.ok) {
+          const cache = await caches.open(SHELL_CACHE);
+          cache.put('/index.html', res.clone());
+        }
+        return res;
+      } catch {
+        const fallback = await caches.match('/index.html');
+        return fallback ?? Response.error();
+      }
+    })());
+  }
+});
 
 self.addEventListener('push', (event) => {
   let data = {};

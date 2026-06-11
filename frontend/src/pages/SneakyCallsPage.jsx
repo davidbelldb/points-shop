@@ -543,6 +543,7 @@ export default function SneakyCallsPage() {
     if (inCall) { setIncoming(false); return; }
     let stopped = false;
     const check = async () => {
+      if (document.hidden) return; // backgrounded — skip the round-trip
       try {
         const { incoming: ringing } = await api.callsStatus();
         if (!stopped) setIncoming(ringing);

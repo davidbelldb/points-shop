@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from './api.js';
+import { getBootstrap } from './bootstrap.js';
 
 const SettingsContext = createContext(null);
 
@@ -8,7 +9,13 @@ export function SettingsProvider({ children }) {
   const refresh = useCallback(async () => {
     try { setSettings(await api.getSettings()); } catch (e) { console.error(e); }
   }, []);
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    (async () => {
+      const boot = await getBootstrap();
+      if (boot?.settings) setSettings(boot.settings);
+      else refresh();
+    })();
+  }, [refresh]);
   return (
     <SettingsContext.Provider value={{ settings, refresh }}>{children}</SettingsContext.Provider>
   );

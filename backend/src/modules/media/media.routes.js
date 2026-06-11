@@ -69,6 +69,22 @@ export default async function mediaRoutes(fastify) {
     if (type === 'video') {
       const thumb = await extractVideoThumbnail(out.filepath);
       if (thumb) thumbnail_url = `/media/${thumb.filename}`;
+    } else if (type === 'image' && !['.gif', '.svg'].includes(ext.toLowerCase())) {
+      // Small webp thumbnail for images — list views render 40-80px thumbs,
+      // so shipping the full screenshot is ~95% wasted bytes. Soft-fails:
+      // uploads still succeed without a thumbnail.
+      try {
+        const { default: sharp } = await import('sharp');
+        const thumbName = `${id}_thumb.webp`;
+        await sharp(out.filepath ?? filepath)
+          .rotate() // respect EXIF orientation
+          .resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 78 })
+          .toFile(path.join(MEDIA_DIR, thumbName));
+        thumbnail_url = `/media/${thumbName}`;
+      } catch (err) {
+        req.log?.warn({ err }, 'image thumbnail failed');
+      }
     }
     return { url: `/media/${out.filename}`, type, mimetype: data.mimetype, thumbnail_url };
   });

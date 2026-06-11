@@ -57,8 +57,10 @@ export default function AdminGroceriesSection() {
     e.target.value = '';
     if (!file) return;
     try {
-      const { url } = await api.upload(file);
-      setImageUrl(url);
+      // Prefer the server-generated thumbnail — lists only ever render this
+      // image small, so the full screenshot is wasted bytes.
+      const { url, thumbnail_url } = await api.upload(file);
+      setImageUrl(thumbnail_url ?? url);
     } catch (err) { setError(`Photo upload failed: ${err.message}`); }
   }
 

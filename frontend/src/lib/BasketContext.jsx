@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from './api.js';
+import { getBootstrap } from './bootstrap.js';
 
 const BasketContext = createContext(null);
 
@@ -15,7 +16,18 @@ export function BasketProvider({ children }) {
     setNotifications(n);
   }, []);
 
-  useEffect(() => { refresh().catch(console.error); }, [refresh]);
+  useEffect(() => {
+    (async () => {
+      const boot = await getBootstrap();
+      if (boot?.account || boot?.basket) {
+        setBasket(boot.basket);
+        setAccount(boot.account);
+        setNotifications(boot.notifications ?? { items: [], unread_count: 0 });
+      } else {
+        refresh().catch(console.error);
+      }
+    })();
+  }, [refresh]);
 
   const addItem      = useCallback(async (id, qty = 1) => { const b = await api.addToBasket(id, qty); setBasket(b); return b; }, []);
   const setItemQty   = useCallback(async (id, qty)     => { const b = await api.setBasketItemQty(id, qty); setBasket(b); return b; }, []);
