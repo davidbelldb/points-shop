@@ -43,20 +43,35 @@ async function offFetch(url) {
   return data;
 }
 
-/** UK product search — popularity-sorted so well-known products come first.
-    Brand/shop names are not sent to the frontend (clean names only). */
+const shapeProduct = (p) => ({
+  name: String(p.product_name ?? '').trim(),
+  image_url: p.image_small_url ?? p.image_url ?? null,
+  barcode: p.code ?? null,
+});
+
+/** UK product search. Tries the modern Search-a-licious API first (built for
+    programmatic access — the legacy cgi/search.pl sits behind anti-bot
+    protection that can block datacenter IPs), then falls back to legacy. */
 async function offSearch(q) {
+  // 1. Search-a-licious
+  try {
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}` +
+      `&page_size=10&langs=en&countries_tags=en:united-kingdom`;
+    const data = await offFetch(url);
+    const hits = (data.hits ?? [])
+      .map(shapeProduct)
+      .filter((p) => p.name);
+    if (hits.length) return hits;
+  } catch { /* fall through to legacy */ }
+
+  // 2. Legacy full-text search, popularity-sorted
   const url = `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}` +
     `&search_simple=1&action=process&json=1&page_size=10` +
     `&sort_by=unique_scans_n&fields=${OFF_FIELDS}`;
   const data = await offFetch(url);
   return (data.products ?? [])
-    .filter((p) => p?.product_name?.trim())
-    .map((p) => ({
-      name: p.product_name.trim(),
-      image_url: p.image_small_url ?? null,
-      barcode: p.code ?? null,
-    }));
+    .map(shapeProduct)
+    .filter((p) => p.name);
 }
 
 const shapeItem = (r) => ({
@@ -349,7 +364,7 @@ export default async function shoppingRoutes(fastify) {
       return { products };
     } catch (err) {
       req.log.warn({ err }, 'OFF search failed');
-      return { products: [], error: 'Product search unavailable' };
+      return { products: [], error: `Product search unavailable (${err.message})` };
     }
   });
 
