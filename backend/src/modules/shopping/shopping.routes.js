@@ -73,21 +73,16 @@ async function fsApi(params) {
   return data;
 }
 
-/** Text search via FatSecret — Waitrose products only. */
+/** Text search via FatSecret. Brand/shop names are intentionally not sent
+    to the frontend — the lookup shows clean product names only. */
 async function fsSearch(q) {
-  const res = await fsApi({
-    method: 'foods.search',
-    search_expression: `waitrose ${q}`,
-    max_results: '20',
-  });
+  const res = await fsApi({ method: 'foods.search', search_expression: q, max_results: '10' });
   let foods = res?.foods?.food ?? [];
   if (!Array.isArray(foods)) foods = [foods]; // single result comes unwrapped
   return foods
-    .filter((f) => f?.food_name && (f.brand_name ?? '').toLowerCase().includes('waitrose'))
-    .slice(0, 10)
+    .filter((f) => f?.food_name)
     .map((f) => ({
       name: f.food_name,
-      brand: f.brand_name ?? null,
       image_url: null, // images are Premier-only on search
       barcode: null,
     }));

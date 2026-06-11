@@ -111,7 +111,7 @@ export default function ShoppingListPage() {
   const [upcoming, setUpcoming] = useState([]);
   useEffect(() => {
     if (!addTripOpen || upcoming.length) return;
-    api.getCalendarUpcoming(10)
+    api.listCalendarUpcoming(10)
       .then((res) => setUpcoming(Array.isArray(res) ? res : (res?.events ?? [])))
       .catch(() => {});
   }, [addTripOpen, upcoming.length]);
@@ -249,7 +249,7 @@ export default function ShoppingListPage() {
             )}
             {usuals.length > 0 && (
               <>
-                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Your usuals</p>
+                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">The usuals</p>
                 {usuals.map((s) => (
                   <button
                     key={`u-${s.name}`}
@@ -264,7 +264,7 @@ export default function ShoppingListPage() {
             )}
             {products.length > 0 && (
               <>
-                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Waitrose · powered by fatsecret</p>
+                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Products · powered by fatsecret</p>
                 {products.map((p, i) => (
                   <button
                     key={`p-${i}`}
