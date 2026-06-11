@@ -10,37 +10,13 @@ import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { query } from '../../db.js';
 import { config } from '../../config.js';
 
-const OFF_BASE = 'https://world.openfoodfacts.org';
-const OFF_UA = 'SneakyPoints/1.0 (private household app)';
-const OFF_FIELDS = 'product_name,brands,image_small_url,code';
-
 // Tiny in-memory cache: key → { at, data }
 const offCache = new Map();
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-async function offFetch(url) {
-  const hit = offCache.get(url);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
-  const res = await fetch(url, { headers: { 'User-Agent': OFF_UA } });
-  if (!res.ok) throw new Error(`Open Food Facts ${res.status}`);
-  const data = await res.json();
-  offCache.set(url, { at: Date.now(), data });
-  if (offCache.size > 500) offCache.delete(offCache.keys().next().value);
-  return data;
-}
-
-const shapeOffProduct = (p) => ({
-  name: p?.product_name?.trim() || null,
-  brand: (p?.brands ?? '').split(',')[0].trim() || null,
-  image_url: p?.image_small_url ?? null,
-  barcode: p?.code ?? null,
-});
-
-// ── FatSecret Platform (free tier) — fallback provider ───────────────────────
-// OAuth2 client credentials; token cached until near expiry. Used when Open
-// Food Facts comes up empty: better UK barcode hit rates (90%+ coverage).
-// Configure FATSECRET_CLIENT_ID / FATSECRET_CLIENT_SECRET in .env — without
-// them everything silently degrades to OFF-only.
+// ── FatSecret Platform — THE product provider (testing FatSecret-only) ───────
+// OAuth2 client credentials; token cached until near expiry.
+// Configure FATSECRET_CLIENT_ID / FATSECRET_CLIENT_SECRET in .env.
 const FS_TOKEN_URL = 'https://oauth.fatsecret.com/connect/token';
 const FS_API_URL = 'https://platform.fatsecret.com/rest/server.api';
 let fsToken = null; // { token, exp }
@@ -88,7 +64,7 @@ async function fsApi(params) {
 
 /** Text search via FatSecret. */
 async function fsSearch(q) {
-  const res = await fsApi({ method: 'foods.search', search_expression: q, max_results: '8' });
+  const res = await fsApi({ method: 'foods.search', search_expression: q, max_results: '10' });
   let foods = res?.foods?.food ?? [];
   if (!Array.isArray(foods)) foods = [foods]; // single result comes unwrapped
   return foods
@@ -99,6 +75,24 @@ async function fsSearch(q) {
       image_url: null, // images are Premier-only on search
       barcode: null,
     }));
+}
+
+/** Barcode → product via FatSecret (needs the barcode scope / Premier Free). */
+async function fsBarcodeLookup(barcode) {
+  // FatSecret expects GTIN-13 — left-pad shorter UPC/EAN-8 codes.
+  const gtin = barcode.padStart(13, '0');
+  const idRes = await fsApi({ method: 'food.find_id_for_barcode', barcode: gtin });
+  const foodId = idRes?.food_id?.value;
+  if (!foodId || foodId === '0') return null;
+  const foodRes = await fsApi({ method: 'food.get.v4', food_id: foodId });
+  const food = foodRes?.food;
+  if (!food?.food_name) return null;
+  return {
+    name: food.food_name,
+    brand: food.brand_name ?? null,
+    image_url: food.food_images?.food_image?.[0]?.image_url ?? null,
+    barcode,
+  };
 }
 
 const shapeItem = (r) => ({
@@ -283,50 +277,33 @@ export default async function shoppingRoutes(fastify) {
     if (!requireAuth(req, reply)) return;
     const q = (req.query?.q ?? '').toString().trim().slice(0, 60);
     if (q.length < 3) return { products: [] };
-    // FatSecret is the primary provider; Open Food Facts tops up thin results
-    // (and brings product images, which FatSecret's free search doesn't).
-    let products = [];
-    if (fsEnabled()) {
-      try {
-        products = await fsSearch(q);
-      } catch (err) {
-        req.log.warn({ err }, 'FatSecret search failed');
-      }
+    // FatSecret ONLY — errors are surfaced so a misconfigured key/IP
+    // allow-list is visible in the UI rather than silently empty.
+    if (!fsEnabled()) return { products: [], error: 'FatSecret not configured (.env)' };
+    try {
+      const token = await fsGetToken();
+      if (!token) return { products: [], error: 'FatSecret auth failed — check credentials / IP allow-list' };
+      const products = await fsSearch(q);
+      return { products };
+    } catch (err) {
+      req.log.warn({ err }, 'FatSecret search failed');
+      return { products: [], error: 'FatSecret search failed' };
     }
-
-    if (products.length < 5) {
-      try {
-        const url = `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=${OFF_FIELDS}`;
-        const data = await offFetch(url);
-        const off = (data.products ?? []).map(shapeOffProduct).filter((p) => p.name);
-        const seen = new Set(products.map((p) => p.name.toLowerCase()));
-        for (const p of off) {
-          if (!seen.has(p.name.toLowerCase())) {
-            products.push(p);
-            seen.add(p.name.toLowerCase());
-          }
-        }
-      } catch (err) {
-        req.log.warn({ err }, 'OFF search failed');
-      }
-    }
-
-    return { products: products.slice(0, 10) };
   });
 
-  // GET /api/shopping/off-product/:barcode — barcode lookup via Open Food
-  // Facts (free; FatSecret's barcode endpoint is Premier-only).
+  // GET /api/shopping/off-product/:barcode — barcode lookup via FatSecret
+  // (requires the barcode scope — Premier Free approval).
   fastify.get('/api/shopping/off-product/:barcode', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
     const barcode = (req.params.barcode ?? '').toString().replace(/\D/g, '').slice(0, 20);
     if (!barcode) return reply.code(400).send({ error: 'Bad barcode' });
+    if (!fsEnabled()) return { found: false, barcode, error: 'FatSecret not configured (.env)' };
     try {
-      const data = await offFetch(`${OFF_BASE}/api/v2/product/${barcode}.json?fields=${OFF_FIELDS}`);
-      if (data.status === 1 && data.product) {
-        return { found: true, product: shapeOffProduct(data.product) };
-      }
+      const product = await fsBarcodeLookup(barcode);
+      if (product) return { found: true, product };
     } catch (err) {
-      req.log.warn({ err }, 'OFF product lookup failed');
+      req.log.warn({ err }, 'FatSecret barcode lookup failed');
+      return { found: false, barcode, error: 'FatSecret barcode lookup failed' };
     }
     return { found: false, barcode };
   });

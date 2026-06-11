@@ -152,6 +152,7 @@ export default function ShoppingListPage() {
   const [q, setQ]             = useState('');
   const [usuals, setUsuals]   = useState([]);
   const [offResults, setOffResults] = useState([]);
+  const [searchError, setSearchError] = useState(null);
   const [searching, setSearching]   = useState(false);
   const [scanning, setScanning]     = useState(false);
   const [toast, setToast]     = useState(null);
@@ -213,7 +214,7 @@ export default function ShoppingListPage() {
   // ── Lookup — debounced usuals + OFF search ─────────────────────────────────
   useEffect(() => {
     const term = q.trim();
-    if (!term) { setUsuals([]); setOffResults([]); setSearching(false); return; }
+    if (!term) { setUsuals([]); setOffResults([]); setSearchError(null); setSearching(false); return; }
     setSearching(true);
     const t = setTimeout(async () => {
       try {
@@ -223,6 +224,7 @@ export default function ShoppingListPage() {
         ]);
         setUsuals(suggestions);
         setOffResults(off.products);
+        setSearchError(off.error ?? null);
       } catch { /* soft fail */ }
       setSearching(false);
     }, 350);
@@ -270,13 +272,17 @@ export default function ShoppingListPage() {
     showToast('Looking up barcode…');
     try {
       const res = await api.shopOffProduct(code);
+      if (res.error) {
+        showToast(res.error);
+        return;
+      }
       if (res.found && res.product.name) {
         const label = res.product.brand && !res.product.name.toLowerCase().includes(res.product.brand.toLowerCase())
           ? `${res.product.name} (${res.product.brand})`
           : res.product.name;
         addItem({ name: label, image_url: res.product.image_url, barcode: code });
       } else {
-        showToast('Not in Open Food Facts — add it by name');
+        showToast('Barcode not recognised — add it by name');
         inputRef.current?.focus();
       }
     } catch {
@@ -382,9 +388,12 @@ export default function ShoppingListPage() {
                 ))}
               </>
             )}
+            {searchError && (
+              <p className="px-4 py-2 text-xs font-semibold text-red-700">{searchError}</p>
+            )}
             {offResults.length > 0 && (
               <>
-                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Open Food Facts</p>
+                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Products · powered by fatsecret</p>
                 {offResults.map((p, i) => (
                   <button
                     key={`o-${p.barcode ?? i}`}
