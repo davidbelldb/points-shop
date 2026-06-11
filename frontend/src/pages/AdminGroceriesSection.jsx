@@ -28,6 +28,15 @@ export default function AdminGroceriesSection() {
 
   const productFileRef = useRef(null);
   const barcodeFileRef = useRef(null);
+  const formRef = useRef(null);
+
+  // Bring the form into view when it opens — on a phone it renders below the
+  // list, so without this a tap on Edit looks like it did nothing.
+  useEffect(() => {
+    if (editing !== null) {
+      setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    }
+  }, [editing]);
 
   useEffect(() => {
     api.shopGroceries().then(({ groceries: g }) => setGroceries(g)).catch((e) => setError(e.message));
@@ -129,15 +138,35 @@ export default function AdminGroceriesSection() {
               <span className="block truncate text-sm font-medium text-neutral-900">{g.name}</span>
               {g.barcode && <span className="block text-[11px] text-neutral-500">barcode {g.barcode}</span>}
             </span>
-            <button onClick={() => startEdit(g)} className="text-xs font-semibold text-amber-700">Edit</button>
-            <button onClick={() => remove(g)} className="px-1 text-xs font-semibold text-neutral-400 hover:text-red-700">Delete</button>
+            <button
+              type="button"
+              onClick={() => startEdit(g)}
+              title="Edit"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-amber-700 active:scale-95"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => remove(g)}
+              title="Delete"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-neutral-400 hover:text-red-700 active:scale-95"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
           </div>
         ))}
       </div>
 
       {/* Add / edit form */}
       {editing !== null ? (
-        <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-3">
+        <div ref={formRef} className="space-y-3 rounded-xl border border-neutral-200 bg-white p-3">
           <div>
             <label className="text-xs font-semibold text-neutral-500">Name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Waitrose Houmous 200g" className={`mt-1 ${INPUT_CLS}`} />
