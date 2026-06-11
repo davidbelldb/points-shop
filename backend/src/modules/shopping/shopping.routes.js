@@ -139,6 +139,26 @@ export async function syncEventSnacks(event, accountId, tripId = null) {
   return { trip: shapeTrip(trip), added, skipped: snacks.length - added };
 }
 
+/**
+ * One-shot backfill, run at server startup: sync every upcoming event that
+ * already has snacks. Brings pre-existing events (created before the
+ * bi-directional sync shipped) into the fold. Idempotent — linked pairs
+ * mirror each other, so repeat runs are no-ops.
+ */
+export async function backfillEventSnackSync() {
+  const { rows: events } = await query(
+    `SELECT * FROM calendar_events
+      WHERE COALESCE(ends_at, starts_at) >= NOW()
+        AND jsonb_array_length(snack_list) > 0`,
+  );
+  for (const ev of events) {
+    try {
+      await syncEventSnacks(ev, ev.created_by ?? null);
+    } catch { /* keep going — one bad event shouldn't block the rest */ }
+  }
+  return events.length;
+}
+
 async function bumpHistory(name, imageUrl, barcode) {
   const key = name.trim().toLowerCase();
   if (!key) return;

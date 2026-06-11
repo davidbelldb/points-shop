@@ -504,29 +504,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
   const [icon, setIcon]             = useState(seed.icon ?? 'calendar');
   const [busy, setBusy]   = useState(false);
   const [err, setErr]     = useState(null);
-  const [snackMsg, setSnackMsg] = useState(null);
-
-
   const valid = title.trim() && startsAt;
-
-  // Push this event's (saved) snack list onto the shopping list for its date —
-  // creates the trip named after the event if one doesn't exist yet.
-  async function sendSnacksToList() {
-    if (busy || !initial?.id) return;
-    setSnackMsg(null);
-    try {
-      const r = await api.shopFromEvent(initial.id);
-      setSnackMsg(
-        !r.trip
-          ? 'Event has no snacks listed'
-          : r.added > 0
-            ? `Added ${r.added} snack${r.added === 1 ? '' : 's'} to "${r.trip.name}"${r.skipped ? ` (${r.skipped} already on it)` : ''}`
-            : 'All snacks are already on that list',
-      );
-    } catch (e) {
-      setSnackMsg(e.message);
-    }
-  }
 
   async function save() {
     if (!valid || busy) return;
@@ -703,16 +681,6 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
                 </div>
               ))}
             </div>
-            {!isNew && snackList.some((s) => s.trim()) && (
-              <button
-                type="button"
-                onClick={sendSnacksToList}
-                className="mt-2 w-full rounded-xl bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900"
-              >
-                Add snacks to shopping list
-              </button>
-            )}
-            {snackMsg && <p className="mt-1.5 text-xs font-semibold text-amber-700">{snackMsg}</p>}
           </div>
 
           {err && <p className="text-xs text-red-600">{err}</p>}

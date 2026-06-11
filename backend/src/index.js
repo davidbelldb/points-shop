@@ -41,7 +41,7 @@ import { momentsRoutes } from './modules/moments/moments.routes.js';
 import { rtcRoutes } from './modules/games/rtc.routes.js';
 import callsRoutes from './modules/calls/calls.routes.js';
 import spreadsheetsRoutes from './modules/spreadsheets/spreadsheets.routes.js';
-import shoppingRoutes from './modules/shopping/shopping.routes.js';
+import shoppingRoutes, { backfillEventSnackSync } from './modules/shopping/shopping.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 import { sendPush } from './modules/notifications/push.js';
 import { query as dbQuery } from './db.js';
@@ -131,6 +131,11 @@ await fastify.register(spreadsheetsRoutes);
 await fastify.register(shoppingRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
+
+// One-shot: sync snack lists of pre-existing upcoming events to shopping trips.
+backfillEventSnackSync()
+  .then((n) => fastify.log.info(`event snack backfill: ${n} event(s) checked`))
+  .catch((e) => fastify.log.warn({ err: e }, 'event snack backfill failed'));
 
 // ── Scheduled push notification poller (every 60s) ───────────────────────────
 async function fireScheduledPushes() {
