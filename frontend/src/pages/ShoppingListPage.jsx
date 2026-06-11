@@ -16,6 +16,10 @@ import { api } from '../lib/api.js';
 // ── Date helpers ──────────────────────────────────────────────────────────────
 const dayStr = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD, local tz
 
+// Belt-and-braces: trip_date should arrive as YYYY-MM-DD, but never trust a
+// date that may have travelled as an ISO timestamp.
+const normTrip = (t) => ({ ...t, trip_date: t.trip_date ? String(t.trip_date).slice(0, 10) : null });
+
 function tripLabel(dateStr) {
   if (!dateStr) return 'GENERAL';
   const today = new Date();
@@ -94,13 +98,23 @@ export default function ShoppingListPage() {
   useEffect(() => {
     Promise.all([api.shopItems(), api.shopTrips()])
       .then(([{ items: it }, { trips: tr }]) => {
+        const norm = tr.map(normTrip);
         setItems(it);
-        setTrips(tr);
-        setOpenKey(nearestKey(tr));
+        setTrips(norm);
+        setOpenKey(nearestKey(norm));
       })
       .catch((e) => setError(e.message));
     return () => clearTimeout(toastTimer.current);
   }, []);
+
+  // Upcoming calendar events — offered as trip name/date when adding a trip
+  const [upcoming, setUpcoming] = useState([]);
+  useEffect(() => {
+    if (!addTripOpen || upcoming.length) return;
+    api.getCalendarUpcoming(10)
+      .then((res) => setUpcoming(Array.isArray(res) ? res : (res?.events ?? [])))
+      .catch(() => {});
+  }, [addTripOpen, upcoming.length]);
 
   // ── Search — usuals + Waitrose products (FatSecret) ───────────────────────
   useEffect(() => {
@@ -162,7 +176,7 @@ export default function ShoppingListPage() {
   async function addTrip() {
     if (!newTripDate) return;
     try {
-      const trip = await api.shopAddTrip(newTripName.trim() || 'Shop', newTripDate);
+      const trip = normTrip(await api.shopAddTrip(newTripName.trim() || 'Shop', newTripDate));
       setTrips((prev) => [...(prev ?? []), trip]);
       setOpenKey(trip.id);
       setAddTripOpen(false);
@@ -206,7 +220,7 @@ export default function ShoppingListPage() {
     <div className="mx-auto w-full max-w-2xl space-y-4 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Shopping List</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">Sneaky Shopping List</h1>
           <p className="text-sm text-neutral-500">Adds to the open trip below.</p>
         </div>
         <Link to="/" className="text-sm text-neutral-500">Back</Link>
@@ -291,6 +305,25 @@ export default function ShoppingListPage() {
           />
           <button onClick={addTrip} className="h-10 rounded-lg bg-amber-400 px-4 text-sm font-semibold text-amber-950">Add</button>
           <button onClick={() => setAddTripOpen(false)} className="h-10 px-2 text-sm text-neutral-500">Cancel</button>
+          {upcoming.length > 0 && (
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                const ev = upcoming[Number(e.target.value)];
+                if (!ev) return;
+                setNewTripName(ev.title);
+                setNewTripDate(dayStr(new Date(ev.starts_at)));
+              }}
+              className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-600 outline-none"
+            >
+              <option value="" disabled>…or pick a calendar event</option>
+              {upcoming.map((ev, i) => (
+                <option key={ev.id} value={i}>
+                  {new Date(ev.starts_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} — {ev.title}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       ) : (
         <button
@@ -351,7 +384,7 @@ export default function ShoppingListPage() {
                   )}
 
                   {unchecked.length === 0 && checked.length === 0 && (
-                    <p className="px-1 py-2 text-sm text-neutral-400">Nothing yet — type above to add.</p>
+                    <p className="px-1 py-2 text-sm text-neutral-400">List's empty. Such a little porker.</p>
                   )}
 
                   {unchecked.map((item) => (

@@ -9,6 +9,17 @@
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { query } from '../../db.js';
 import { config } from '../../config.js';
+import { getEvent } from '../calendar/calendar.repo.js';
+
+// DATE columns come back from pg as JS Date objects — normalise to
+// 'YYYY-MM-DD' so the frontend never sees an ISO timestamp (the cause of
+// the "INVALID DATE" header bug).
+const ymd = (d) => {
+  if (!d) return null;
+  if (typeof d === 'string') return d.slice(0, 10);
+  return d.toLocaleDateString('en-CA');
+};
+const shapeTrip = (r) => ({ id: r.id, name: r.name, trip_date: ymd(r.trip_date), created_at: r.created_at });
 
 // Tiny in-memory cache: key → { at, data }
 const offCache = new Map();
@@ -206,7 +217,7 @@ export default async function shoppingRoutes(fastify) {
   fastify.get('/api/shopping/trips', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
     const { rows } = await query(`SELECT * FROM shopping_trips ORDER BY created_at`);
-    return { trips: rows };
+    return { trips: rows.map(shapeTrip) };
   });
 
   const DATE_RX = /^\d{4}-\d{2}-\d{2}$/;
@@ -221,7 +232,7 @@ export default async function shoppingRoutes(fastify) {
       `INSERT INTO shopping_trips (name, trip_date) VALUES ($1, $2) RETURNING *`,
       [name || 'Shop', tripDate],
     );
-    return rows[0];
+    return shapeTrip(rows[0]);
   });
 
   // PATCH /api/shopping/trips/:id — rename and/or redate.
@@ -243,7 +254,57 @@ export default async function shoppingRoutes(fastify) {
       values,
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Trip not found' });
-    return rows[0];
+    return shapeTrip(rows[0]);
+  });
+
+  // POST /api/shopping/from-event — pull a calendar event's snack list onto
+  // the shopping list for that date. Creates the trip (named after the
+  // event) if no trip exists on that date; skips snacks already listed.
+  fastify.post('/api/shopping/from-event', async (req, reply) => {
+    const accountId = requireAuth(req, reply);
+    if (!accountId) return;
+    const eventId = req.body?.event_id;
+    if (!eventId) return reply.code(400).send({ error: 'event_id required' });
+
+    const event = await getEvent(eventId);
+    if (!event) return reply.code(404).send({ error: 'Event not found' });
+    const snacks = (Array.isArray(event.snack_list) ? event.snack_list : [])
+      .map((s) => String(s ?? '').trim()).filter(Boolean);
+    if (!snacks.length) return reply.code(400).send({ error: 'Event has no snacks listed' });
+
+    // Event date in UK local time
+    const tripDate = new Date(event.starts_at).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+
+    // Find (or create) the trip for that date
+    let trip = (await query(
+      `SELECT * FROM shopping_trips WHERE trip_date = $1 ORDER BY created_at LIMIT 1`,
+      [tripDate],
+    )).rows[0];
+    if (!trip) {
+      trip = (await query(
+        `INSERT INTO shopping_trips (name, trip_date) VALUES ($1, $2) RETURNING *`,
+        [event.title.slice(0, 60), tripDate],
+      )).rows[0];
+    }
+
+    // Add snacks not already on the trip
+    const existing = new Set(
+      (await query(`SELECT lower(name) AS n FROM shopping_items WHERE trip_id = $1`, [trip.id]))
+        .rows.map((r) => r.n),
+    );
+    let added = 0;
+    for (const snack of snacks) {
+      if (existing.has(snack.toLowerCase())) continue;
+      await query(
+        `INSERT INTO shopping_items (name, added_by, trip_id) VALUES ($1, $2, $3)`,
+        [snack.slice(0, 120), accountId, trip.id],
+      );
+      await bumpHistory(snack, null, null);
+      existing.add(snack.toLowerCase());
+      added++;
+    }
+
+    return { trip: shapeTrip(trip), added, skipped: snacks.length - added };
   });
 
   // DELETE /api/shopping/trips/:id — items fall back to General (FK SET NULL).

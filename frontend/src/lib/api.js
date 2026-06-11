@@ -261,6 +261,7 @@ export const api = {
   shopUpdateTrip:  (id, patch) => request(`/shopping/trips/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   shopDeleteTrip:  (id) => request(`/shopping/trips/${id}`, { method: 'DELETE' }),
   shopSuggest:     (q) => request(`/shopping/suggest?q=${encodeURIComponent(q)}`),
+  shopFromEvent:   (eventId) => request('/shopping/from-event', { method: 'POST', body: JSON.stringify({ event_id: eventId }) }),
   shopOffSearch:   (q) => request(`/shopping/off-search?q=${encodeURIComponent(q)}`),
 
   // Sneaky Spreadsheets
