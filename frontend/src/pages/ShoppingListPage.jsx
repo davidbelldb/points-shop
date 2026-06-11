@@ -13,6 +13,105 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
+const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
+
+function BarcodeIcon({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className={className}>
+      <path d="M3 5v14M7 5v14M11 5v9M14 5v14M18 5v9M21 5v14" />
+    </svg>
+  );
+}
+
+// ── Barcode scanner overlay — native BarcodeDetector (Android/Chrome) with a
+// dynamically-imported ZXing fallback (iOS Safari) ────────────────────────────
+function ScannerOverlay({ onHit, onClose }) {
+  const videoRef = useRef(null);
+  const [status, setStatus] = useState('Starting camera…');
+
+  useEffect(() => {
+    let stopped = false;
+    let stream = null;
+    let zxingControls = null;
+
+    const stop = () => {
+      stopped = true;
+      stream?.getTracks().forEach((t) => t.stop());
+      zxingControls?.stop();
+    };
+
+    (async () => {
+      const video = videoRef.current;
+      if (!video) return;
+      try {
+        if ('BarcodeDetector' in window) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+          });
+          if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
+          video.srcObject = stream;
+          await video.play().catch(() => {});
+          setStatus('Point at a barcode');
+          const detector = new window.BarcodeDetector({ formats: BARCODE_FORMATS });
+          const tick = async () => {
+            if (stopped) return;
+            try {
+              const codes = await detector.detect(video);
+              if (codes.length && codes[0].rawValue) {
+                stop();
+                onHit(codes[0].rawValue);
+                return;
+              }
+            } catch { /* frame not ready */ }
+            requestAnimationFrame(tick);
+          };
+          tick();
+        } else {
+          setStatus('Loading scanner…');
+          const { BrowserMultiFormatReader } = await import('@zxing/browser');
+          if (stopped) return;
+          const reader = new BrowserMultiFormatReader();
+          setStatus('Point at a barcode');
+          zxingControls = await reader.decodeFromVideoDevice(undefined, video, (result, _err, controls) => {
+            if (stopped) { controls.stop(); return; }
+            if (result?.getText()) {
+              controls.stop();
+              stopped = true;
+              onHit(result.getText());
+            }
+          });
+        }
+      } catch (err) {
+        setStatus(err?.name === 'NotAllowedError' ? 'Camera access blocked' : 'Camera unavailable');
+      }
+    })();
+
+    return stop;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+      <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="h-36 w-72 rounded-2xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+      </div>
+      <div
+        className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 px-6"
+        style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+      >
+        <p className="text-sm font-semibold text-white/90">{status}</p>
+        <button
+          onClick={onClose}
+          className="rounded-2xl bg-[#3B1D1D] px-8 py-3 text-base font-bold text-[#F2B8B5] active:scale-95"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 const dayStr = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD, local tz
 
@@ -83,6 +182,7 @@ export default function ShoppingListPage() {
   const [products, setProducts] = useState([]);
   const [searchError, setSearchError] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [addTripOpen, setAddTripOpen] = useState(false);
   const [newTripName, setNewTripName] = useState('');
   const [newTripDate, setNewTripDate] = useState(() => dayStr(new Date()));
@@ -173,6 +273,22 @@ export default function ShoppingListPage() {
     api.shopClearChecked(tripId).catch(() => {});
   }
 
+  // Barcode hit → Open Food Facts lookup → add to the open trip
+  async function onBarcode(code) {
+    setScanning(false);
+    showToast('Looking up barcode…');
+    try {
+      const res = await api.shopOffProduct(code);
+      if (res.found && res.product.name) {
+        addItem({ name: res.product.name, image_url: res.product.image_url, barcode: res.product.barcode });
+      } else {
+        showToast('Barcode not recognised — add it by name');
+      }
+    } catch {
+      showToast('Lookup failed — add it by name');
+    }
+  }
+
   // ── Trip actions ───────────────────────────────────────────────────────────
   async function addTrip() {
     if (!newTripDate) return;
@@ -254,8 +370,15 @@ export default function ShoppingListPage() {
           placeholder="Add something sneaky…"
           autoCapitalize="off"
           autoCorrect="off"
-          className="h-14 w-full rounded-2xl border border-neutral-200 bg-white px-4 text-base text-neutral-900 shadow-sm outline-none placeholder:text-neutral-400"
+          className="h-14 w-full rounded-2xl border border-neutral-200 bg-white pl-4 pr-14 text-base text-neutral-900 shadow-sm outline-none placeholder:text-neutral-400"
         />
+        <button
+          onClick={() => setScanning(true)}
+          title="Scan a barcode"
+          className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400 text-amber-950 transition hover:bg-amber-500 active:scale-95"
+        >
+          <BarcodeIcon className="h-5 w-5" />
+        </button>
 
         {hasSuggestions && (
           <div className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl">
@@ -459,6 +582,8 @@ export default function ShoppingListPage() {
           <p className="rounded-xl bg-[#171717]/95 px-4 py-2 text-sm font-semibold text-white shadow-xl">{toast}</p>
         </div>
       )}
+
+      {scanning && <ScannerOverlay onHit={onBarcode} onClose={() => setScanning(false)} />}
     </div>
   );
 }

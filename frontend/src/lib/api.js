@@ -263,6 +263,7 @@ export const api = {
   shopSuggest:     (q) => request(`/shopping/suggest?q=${encodeURIComponent(q)}`),
   shopFromEvent:   (eventId, tripId = null) => request('/shopping/from-event', { method: 'POST', body: JSON.stringify({ event_id: eventId, trip_id: tripId }) }),
   shopOffSearch:   (q) => request(`/shopping/off-search?q=${encodeURIComponent(q)}`),
+  shopOffProduct:  (barcode) => request(`/shopping/off-product/${encodeURIComponent(barcode)}`),
 
   // Sneaky Spreadsheets
   sheetTabs:      () => request('/spreadsheets/tabs'),

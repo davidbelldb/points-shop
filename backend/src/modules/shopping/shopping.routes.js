@@ -276,6 +276,29 @@ export default async function shoppingRoutes(fastify) {
     return shapeTrip(rows[0]);
   });
 
+  // GET /api/shopping/off-product/:barcode — barcode lookup (Open Food Facts).
+  fastify.get('/api/shopping/off-product/:barcode', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const barcode = (req.params.barcode ?? '').toString().replace(/\D/g, '').slice(0, 20);
+    if (!barcode) return reply.code(400).send({ error: 'Bad barcode' });
+    try {
+      const data = await offFetch(`${OFF_BASE}/api/v2/product/${barcode}.json?fields=${OFF_FIELDS}`);
+      if (data.status === 1 && data.product?.product_name) {
+        return {
+          found: true,
+          product: {
+            name: data.product.product_name.trim(),
+            image_url: data.product.image_small_url ?? null,
+            barcode: data.product.code ?? barcode,
+          },
+        };
+      }
+    } catch (err) {
+      req.log.warn({ err }, 'OFF product lookup failed');
+    }
+    return { found: false, barcode };
+  });
+
   // POST /api/shopping/from-event — pull a calendar event's snack list onto
   // the shopping list. Optional trip_id targets a specific trip (used when
   // a trip was just created from the event picker).
