@@ -42,7 +42,9 @@ export default function IncomingCallBanner() {
       } catch { /* ignore */ }
     };
     check();
-    const t = setInterval(check, 4000);
+    // 8s keeps the battery/network cost low while still catching a ring
+    // well inside its 45s window (the push notification is the instant path).
+    const t = setInterval(check, 8000);
     return () => { stopped = true; clearInterval(t); };
   }, [onCallPage]);
 

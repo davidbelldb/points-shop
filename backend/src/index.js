@@ -86,6 +86,11 @@ await fastify.register(fastifyStatic, {
   root: MEDIA_DIR,
   prefix: '/media/',
   decorateReply: false,
+  // Uploaded files get unique generated filenames and never change, so
+  // browsers can cache them hard — stops every photo/sprite/voice note
+  // re-downloading on each visit.
+  maxAge: '365d',
+  immutable: true,
 });
 
 fastify.get('/health', async () => {
