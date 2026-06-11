@@ -501,7 +501,7 @@ export default function ShoppingListPage() {
                   <span className="truncate text-sm text-neutral-500">{trip.name}</span>
                 )}
                 <span className="ml-auto text-xs font-semibold text-neutral-400">
-                  {unchecked.length > 0 ? `${unchecked.length} to get` : checked.length > 0 ? 'all in hand' : 'empty'}
+                  {unchecked.length > 0 ? `${unchecked.length} to find` : checked.length > 0 ? 'all in hand' : 'empty'}
                 </span>
               </button>
 
@@ -527,18 +527,18 @@ export default function ShoppingListPage() {
                   )}
 
                   {unchecked.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2.5">
+                    <div key={item.id} className="flex items-center gap-2 rounded-xl bg-neutral-100 px-2.5 py-2.5">
                       <button onClick={() => toggleItem(item)} aria-label="Tick off">
                         <CheckCircle checked={false} />
                       </button>
                       <Thumb item={item} />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">{item.name}</span>
-                      <span className="flex shrink-0 items-center gap-1">
-                        <button onClick={() => bumpQty(item, -1)} className="h-8 w-8 rounded-lg bg-white text-base font-bold text-neutral-600">−</button>
-                        <span className="w-7 text-center text-sm font-bold text-neutral-900">{item.qty}</span>
-                        <button onClick={() => bumpQty(item, 1)} className="h-8 w-8 rounded-lg bg-white text-base font-bold text-neutral-600">+</button>
+                      <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-neutral-900 line-clamp-2">{item.name}</span>
+                      <span className="flex shrink-0 items-center gap-0.5">
+                        <button onClick={() => bumpQty(item, -1)} className="h-8 w-7 rounded-lg bg-white text-base font-bold text-neutral-600">−</button>
+                        <span className="w-6 text-center text-sm font-bold text-neutral-900">{item.qty}</span>
+                        <button onClick={() => bumpQty(item, 1)} className="h-8 w-7 rounded-lg bg-white text-base font-bold text-neutral-600">+</button>
                       </span>
-                      <button onClick={() => removeItem(item)} title="Remove" className="px-1 text-neutral-300 hover:text-red-700">
+                      <button onClick={() => removeItem(item)} title="Remove" className="pl-0.5 text-neutral-300 hover:text-red-700">
                         <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                           <line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" />
                         </svg>
@@ -558,12 +558,12 @@ export default function ShoppingListPage() {
                         </button>
                       </div>
                       {checked.map((item) => (
-                        <div key={item.id} className="flex items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2.5 opacity-55">
+                        <div key={item.id} className="flex items-center gap-2 rounded-xl bg-neutral-100 px-2.5 py-2.5 opacity-55">
                           <button onClick={() => toggleItem(item)} aria-label="Untick">
                             <CheckCircle checked />
                           </button>
                           <Thumb item={item} />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900 line-through">{item.name}</span>
+                          <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-neutral-900 line-clamp-2 line-through">{item.name}</span>
                           {item.qty > 1 && <span className="text-xs font-bold text-neutral-500">×{item.qty}</span>}
                         </div>
                       ))}
