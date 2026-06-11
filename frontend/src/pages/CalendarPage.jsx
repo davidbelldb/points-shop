@@ -452,6 +452,14 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
   const [err, setErr]     = useState(null);
   const [snackMsg, setSnackMsg] = useState(null);
 
+  // House grocery catalogue — offered as type-ahead in the snack inputs
+  const [groceryNames, setGroceryNames] = useState([]);
+  useEffect(() => {
+    api.shopGroceries()
+      .then(({ groceries }) => setGroceryNames(groceries.map((g) => g.name)))
+      .catch(() => {});
+  }, []);
+
   const valid = title.trim() && startsAt;
 
   // Push this event's (saved) snack list onto the shopping list for its date —
@@ -637,6 +645,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
                     value={s}
                     onChange={(e) => setSnackList((list) => list.map((v, i) => (i === idx ? e.target.value : v)))}
                     placeholder="e.g. Sweet Chilli Sensations"
+                    list="grocery-names"
                     className="block flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
                   />
                   <button
@@ -660,6 +669,10 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
               </button>
             )}
             {snackMsg && <p className="mt-1.5 text-xs font-semibold text-amber-700">{snackMsg}</p>}
+            {/* Type-ahead source for the snack inputs — house grocery catalogue */}
+            <datalist id="grocery-names">
+              {groceryNames.map((n) => <option key={n} value={n} />)}
+            </datalist>
           </div>
 
           {err && <p className="text-xs text-red-600">{err}</p>}

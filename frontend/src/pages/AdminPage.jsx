@@ -13,6 +13,7 @@ import AdminShutTheBox15Section from './AdminShutTheBox15Section.jsx';
 import AdminDuckySection from './AdminDuckySection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
+import AdminGroceriesSection from './AdminGroceriesSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
 const inputCls =
@@ -95,6 +96,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Push notification" storageKey="admin::push">
         <AdminPushSection />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Grocery catalogue" storageKey="admin::groceries">
+        <AdminGroceriesSection />
       </AdminCollapsible>
 
       <AdminCollapsible title="Voice notes" storageKey="admin::audio">

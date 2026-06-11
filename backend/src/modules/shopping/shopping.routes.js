@@ -291,11 +291,100 @@ export default async function shoppingRoutes(fastify) {
     return shapeTrip(rows[0]);
   });
 
-  // GET /api/shopping/off-product/:barcode — barcode lookup (Open Food Facts).
+  // ── House grocery catalogue ─────────────────────────────────────────────────
+
+  const shapeGrocery = (r) => ({
+    id: r.id,
+    name: r.name,
+    image_url: r.image_url,
+    barcode: r.barcode,
+    barcode_image_url: r.barcode_image_url,
+  });
+
+  // GET /api/shopping/groceries?q= — all (admin) or matches on type.
+  fastify.get('/api/shopping/groceries', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const q = (req.query?.q ?? '').toString().trim().toLowerCase().slice(0, 60);
+    const { rows } = q
+      ? await query(
+          `SELECT * FROM groceries WHERE lower(name) LIKE '%' || $1 || '%' ORDER BY name LIMIT 8`,
+          [q],
+        )
+      : await query(`SELECT * FROM groceries ORDER BY name`);
+    return { groceries: rows.map(shapeGrocery) };
+  });
+
+  // POST /api/shopping/groceries — add to the catalogue.
+  fastify.post('/api/shopping/groceries', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const name = (req.body?.name ?? '').toString().trim().slice(0, 120);
+    if (!name) return reply.code(400).send({ error: 'Name required' });
+    const barcode = (req.body?.barcode ?? '').toString().replace(/\D/g, '').slice(0, 20) || null;
+    try {
+      const { rows } = await query(
+        `INSERT INTO groceries (name, image_url, barcode, barcode_image_url)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [name, req.body?.image_url || null, barcode, req.body?.barcode_image_url || null],
+      );
+      return shapeGrocery(rows[0]);
+    } catch (err) {
+      if (err.code === '23505') return reply.code(400).send({ error: 'That barcode is already on another grocery' });
+      throw err;
+    }
+  });
+
+  // PATCH /api/shopping/groceries/:id
+  fastify.patch('/api/shopping/groceries/:id', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Bad id' });
+    const fields = [];
+    const values = [];
+    let i = 1;
+    const { name, image_url, barcode, barcode_image_url } = req.body ?? {};
+    if (typeof name === 'string' && name.trim()) { fields.push(`name = $${i++}`); values.push(name.trim().slice(0, 120)); }
+    if (image_url !== undefined) { fields.push(`image_url = $${i++}`); values.push(image_url || null); }
+    if (barcode !== undefined) { fields.push(`barcode = $${i++}`); values.push(String(barcode ?? '').replace(/\D/g, '').slice(0, 20) || null); }
+    if (barcode_image_url !== undefined) { fields.push(`barcode_image_url = $${i++}`); values.push(barcode_image_url || null); }
+    if (!fields.length) return reply.code(400).send({ error: 'Nothing to update' });
+    fields.push('updated_at = NOW()');
+    values.push(id);
+    try {
+      const { rows } = await query(
+        `UPDATE groceries SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
+        values,
+      );
+      if (!rows[0]) return reply.code(404).send({ error: 'Grocery not found' });
+      return shapeGrocery(rows[0]);
+    } catch (err) {
+      if (err.code === '23505') return reply.code(400).send({ error: 'That barcode is already on another grocery' });
+      throw err;
+    }
+  });
+
+  // DELETE /api/shopping/groceries/:id
+  fastify.delete('/api/shopping/groceries/:id', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Bad id' });
+    await query(`DELETE FROM groceries WHERE id = $1`, [id]);
+    return { ok: true };
+  });
+
+  // GET /api/shopping/off-product/:barcode — barcode lookup. The house
+  // catalogue wins; Open Food Facts is the fallback.
   fastify.get('/api/shopping/off-product/:barcode', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
     const barcode = (req.params.barcode ?? '').toString().replace(/\D/g, '').slice(0, 20);
     if (!barcode) return reply.code(400).send({ error: 'Bad barcode' });
+
+    // 1. House catalogue
+    const mine = (await query(`SELECT * FROM groceries WHERE barcode = $1 LIMIT 1`, [barcode])).rows[0];
+    if (mine) {
+      return { found: true, product: { name: mine.name, image_url: mine.image_url, barcode } };
+    }
+
+    // 2. Open Food Facts
     try {
       const data = await offFetch(`${OFF_BASE}/api/v2/product/${barcode}.json?fields=${OFF_FIELDS}`);
       if (data.status === 1 && data.product?.product_name) {
