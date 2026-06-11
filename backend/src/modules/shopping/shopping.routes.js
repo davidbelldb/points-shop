@@ -100,6 +100,59 @@ const shapeItem = (r) => ({
   created_at: r.created_at,
 });
 
+/**
+ * Sync a calendar event's snack list onto the shopping list.
+ * Exported — the calendar module calls this after every event create/update,
+ * so lists auto-create the moment snacks exist and new snacks append later.
+ *
+ * - No snacks → no-op ({ trip: null }).
+ * - Uses tripId when given; otherwise finds the trip on the event's date
+ *   (UK time) or creates one named after the event.
+ * - Skips snacks already on the trip (case-insensitive).
+ */
+export async function syncEventSnacks(event, accountId, tripId = null) {
+  const snacks = (Array.isArray(event.snack_list) ? event.snack_list : [])
+    .map((s) => String(s ?? '').trim()).filter(Boolean);
+  if (!snacks.length) return { trip: null, added: 0, skipped: 0 };
+
+  const tripDate = new Date(event.starts_at).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+
+  let trip = null;
+  if (tripId) {
+    trip = (await query(`SELECT * FROM shopping_trips WHERE id = $1`, [tripId])).rows[0] ?? null;
+  }
+  if (!trip) {
+    trip = (await query(
+      `SELECT * FROM shopping_trips WHERE trip_date = $1 ORDER BY created_at LIMIT 1`,
+      [tripDate],
+    )).rows[0] ?? null;
+  }
+  if (!trip) {
+    trip = (await query(
+      `INSERT INTO shopping_trips (name, trip_date) VALUES ($1, $2) RETURNING *`,
+      [(event.title ?? 'Shop').slice(0, 60), tripDate],
+    )).rows[0];
+  }
+
+  const existing = new Set(
+    (await query(`SELECT lower(name) AS n FROM shopping_items WHERE trip_id = $1`, [trip.id]))
+      .rows.map((r) => r.n),
+  );
+  let added = 0;
+  for (const snack of snacks) {
+    if (existing.has(snack.toLowerCase())) continue;
+    await query(
+      `INSERT INTO shopping_items (name, added_by, trip_id) VALUES ($1, $2, $3)`,
+      [snack.slice(0, 120), accountId, trip.id],
+    );
+    await bumpHistory(snack, null, null);
+    existing.add(snack.toLowerCase());
+    added++;
+  }
+
+  return { trip: shapeTrip(trip), added, skipped: snacks.length - added };
+}
+
 async function bumpHistory(name, imageUrl, barcode) {
   const key = name.trim().toLowerCase();
   if (!key) return;
@@ -253,8 +306,8 @@ export default async function shoppingRoutes(fastify) {
   });
 
   // POST /api/shopping/from-event — pull a calendar event's snack list onto
-  // the shopping list for that date. Creates the trip (named after the
-  // event) if no trip exists on that date; skips snacks already listed.
+  // the shopping list. Optional trip_id targets a specific trip (used when
+  // a trip was just created from the event picker).
   fastify.post('/api/shopping/from-event', async (req, reply) => {
     const accountId = requireAuth(req, reply);
     if (!accountId) return;
@@ -263,43 +316,9 @@ export default async function shoppingRoutes(fastify) {
 
     const event = await getEvent(eventId);
     if (!event) return reply.code(404).send({ error: 'Event not found' });
-    const snacks = (Array.isArray(event.snack_list) ? event.snack_list : [])
-      .map((s) => String(s ?? '').trim()).filter(Boolean);
-    if (!snacks.length) return reply.code(400).send({ error: 'Event has no snacks listed' });
 
-    // Event date in UK local time
-    const tripDate = new Date(event.starts_at).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
-
-    // Find (or create) the trip for that date
-    let trip = (await query(
-      `SELECT * FROM shopping_trips WHERE trip_date = $1 ORDER BY created_at LIMIT 1`,
-      [tripDate],
-    )).rows[0];
-    if (!trip) {
-      trip = (await query(
-        `INSERT INTO shopping_trips (name, trip_date) VALUES ($1, $2) RETURNING *`,
-        [event.title.slice(0, 60), tripDate],
-      )).rows[0];
-    }
-
-    // Add snacks not already on the trip
-    const existing = new Set(
-      (await query(`SELECT lower(name) AS n FROM shopping_items WHERE trip_id = $1`, [trip.id]))
-        .rows.map((r) => r.n),
-    );
-    let added = 0;
-    for (const snack of snacks) {
-      if (existing.has(snack.toLowerCase())) continue;
-      await query(
-        `INSERT INTO shopping_items (name, added_by, trip_id) VALUES ($1, $2, $3)`,
-        [snack.slice(0, 120), accountId, trip.id],
-      );
-      await bumpHistory(snack, null, null);
-      existing.add(snack.toLowerCase());
-      added++;
-    }
-
-    return { trip: shapeTrip(trip), added, skipped: snacks.length - added };
+    const tripId = Number.isInteger(req.body?.trip_id) ? req.body.trip_id : null;
+    return syncEventSnacks(event, accountId, tripId);
   });
 
   // DELETE /api/shopping/trips/:id — items fall back to General (FK SET NULL).

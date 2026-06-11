@@ -3,6 +3,7 @@ import {
   createEvent, updateEvent, deleteEvent,
 } from './calendar.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { syncEventSnacks } from '../shopping/shopping.routes.js';
 
 export default async function calendarRoutes(fastify) {
   /* Range query — caller supplies from/to as ISO strings. Used by the
@@ -28,7 +29,10 @@ export default async function calendarRoutes(fastify) {
   fastify.post('/api/calendar/events', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
     try {
-      return reply.code(201).send(await createEvent(accountId, req.body ?? {}));
+      const ev = await createEvent(accountId, req.body ?? {});
+      // Snacks on a new event → auto-create the shopping trip for its date.
+      syncEventSnacks(ev, accountId).catch((err) => req.log.warn({ err }, 'snack sync failed'));
+      return reply.code(201).send(ev);
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }
@@ -36,9 +40,13 @@ export default async function calendarRoutes(fastify) {
 
   /* Either account may edit any event — shared-calendar semantics. */
   fastify.patch('/api/calendar/events/:id', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
     try {
       const ev = await updateEvent(req.params.id, req.body ?? {});
       if (!ev) return reply.code(404).send({ error: 'not found' });
+      // Snacks added/changed later → create the trip then, and append any
+      // new snacks to it on every save.
+      syncEventSnacks(ev, accountId).catch((err) => req.log.warn({ err }, 'snack sync failed'));
       return ev;
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });

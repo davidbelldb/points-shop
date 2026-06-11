@@ -86,6 +86,7 @@ export default function ShoppingListPage() {
   const [addTripOpen, setAddTripOpen] = useState(false);
   const [newTripName, setNewTripName] = useState('');
   const [newTripDate, setNewTripDate] = useState(() => dayStr(new Date()));
+  const [newTripEvent, setNewTripEvent] = useState(null); // linked calendar event id
   const [toast, setToast]   = useState(null);
   const toastTimer = useRef(null);
 
@@ -179,9 +180,23 @@ export default function ShoppingListPage() {
       const trip = normTrip(await api.shopAddTrip(newTripName.trim() || 'Shop', newTripDate));
       setTrips((prev) => [...(prev ?? []), trip]);
       setOpenKey(trip.id);
+
+      // Linked to a calendar event → pull its snacks straight onto the trip
+      if (newTripEvent) {
+        try {
+          const r = await api.shopFromEvent(newTripEvent, trip.id);
+          if (r.added > 0) {
+            const { items: fresh } = await api.shopItems();
+            setItems(fresh);
+            showToast(`Imported ${r.added} snack${r.added === 1 ? '' : 's'} from the event`);
+          }
+        } catch { /* snacks are a bonus — trip itself succeeded */ }
+      }
+
       setAddTripOpen(false);
       setNewTripName('');
       setNewTripDate(dayStr(new Date()));
+      setNewTripEvent(null);
     } catch (e) { setError(e.message); }
   }
 
@@ -221,7 +236,7 @@ export default function ShoppingListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Sneaky Shopping List</h1>
-          <p className="text-sm text-neutral-500">Adds to the open trip below.</p>
+          <p className="text-sm text-neutral-500">You get the idea...</p>
         </div>
         <Link to="/" className="text-sm text-neutral-500">Back</Link>
       </div>
@@ -304,7 +319,7 @@ export default function ShoppingListPage() {
             className="h-10 min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none"
           />
           <button onClick={addTrip} className="h-10 rounded-lg bg-amber-400 px-4 text-sm font-semibold text-amber-950">Add</button>
-          <button onClick={() => setAddTripOpen(false)} className="h-10 px-2 text-sm text-neutral-500">Cancel</button>
+          <button onClick={() => { setAddTripOpen(false); setNewTripEvent(null); }} className="h-10 px-2 text-sm text-neutral-500">Cancel</button>
           {upcoming.length > 0 && (
             <select
               defaultValue=""
@@ -313,6 +328,7 @@ export default function ShoppingListPage() {
                 if (!ev) return;
                 setNewTripName(ev.title);
                 setNewTripDate(dayStr(new Date(ev.starts_at)));
+                setNewTripEvent(ev.id); // snacks import on Add
               }}
               className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-600 outline-none"
             >

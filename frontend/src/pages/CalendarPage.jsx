@@ -462,9 +462,11 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
     try {
       const r = await api.shopFromEvent(initial.id);
       setSnackMsg(
-        r.added > 0
-          ? `Added ${r.added} snack${r.added === 1 ? '' : 's'} to "${r.trip.name}"${r.skipped ? ` (${r.skipped} already on it)` : ''}`
-          : 'All snacks are already on that list',
+        !r.trip
+          ? 'Event has no snacks listed'
+          : r.added > 0
+            ? `Added ${r.added} snack${r.added === 1 ? '' : 's'} to "${r.trip.name}"${r.skipped ? ` (${r.skipped} already on it)` : ''}`
+            : 'All snacks are already on that list',
       );
     } catch (e) {
       setSnackMsg(e.message);
