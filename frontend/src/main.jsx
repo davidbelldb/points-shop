@@ -31,6 +31,7 @@ import SneakyFeedPage from './pages/SneakyFeedPage.jsx';
 import SneakyStorePage from './pages/SneakyStorePage.jsx';
 import NotesPage from './pages/NotesPage.jsx';
 import SneakyCallsPage from './pages/SneakyCallsPage.jsx';
+import ShoppingListPage from './pages/ShoppingListPage.jsx';
 
 // Lazy — Handsontable is a big bundle; only fetched when the page is opened.
 const SneakySpreadsheetsPage = lazy(() => import('./pages/SneakySpreadsheetsPage.jsx'));
@@ -108,6 +109,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="store" element={<SneakyStorePage />} />
               <Route path="notes" element={<NotesPage />} />
               <Route path="sneakytime" element={<SneakyCallsPage />} />
+              <Route path="shopping-list" element={<ShoppingListPage />} />
               <Route
                 path="sneakyspreadsheets"
                 element={
