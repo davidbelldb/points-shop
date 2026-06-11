@@ -279,7 +279,7 @@ export default function ShoppingListPage() {
             )}
             {products.length > 0 && (
               <>
-                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Products · powered by fatsecret</p>
+                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Products · Open Food Facts</p>
                 {products.map((p, i) => (
                   <button
                     key={`p-${i}`}

@@ -8,7 +8,6 @@
 
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { query } from '../../db.js';
-import { config } from '../../config.js';
 import { getEvent } from '../calendar/calendar.repo.js';
 
 // DATE columns come back from pg as JS Date objects — normalise to
@@ -21,70 +20,42 @@ const ymd = (d) => {
 };
 const shapeTrip = (r) => ({ id: r.id, name: r.name, trip_date: ymd(r.trip_date), created_at: r.created_at });
 
+// ── Open Food Facts — UK catalogue, popularity-sorted ─────────────────────────
+// Product-centric (real shelf items with barcodes + photos), unlike nutrition
+// APIs which return generic foods/meals. uk.openfoodfacts.org scopes results
+// to products sold in the UK; sort_by=unique_scans_n floats popular products.
+const OFF_BASE = 'https://uk.openfoodfacts.org';
+const OFF_UA = 'SneakyPoints/1.0 (private household app)';
+const OFF_FIELDS = 'product_name,image_small_url,code';
+
 // Tiny in-memory cache: key → { at, data }
 const offCache = new Map();
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-// ── FatSecret Platform — THE product provider (testing FatSecret-only) ───────
-// OAuth2 client credentials; token cached until near expiry.
-// Configure FATSECRET_CLIENT_ID / FATSECRET_CLIENT_SECRET in .env.
-const FS_TOKEN_URL = 'https://oauth.fatsecret.com/connect/token';
-const FS_API_URL = 'https://platform.fatsecret.com/rest/server.api';
-let fsToken = null; // { token, exp }
-
-const fsEnabled = () => !!(config.fatsecret.clientId && config.fatsecret.clientSecret);
-
-async function fsGetToken() {
-  if (!fsEnabled()) return null;
-  if (fsToken && Date.now() < fsToken.exp - 60_000) return fsToken.token;
-  const basic = Buffer.from(`${config.fatsecret.clientId}:${config.fatsecret.clientSecret}`).toString('base64');
-  // Ask for barcode scope first (Premier Free); fall back to basic-only.
-  for (const scope of ['basic barcode', 'basic']) {
-    try {
-      const res = await fetch(FS_TOKEN_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${basic}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ grant_type: 'client_credentials', scope }),
-      });
-      if (!res.ok) continue;
-      const d = await res.json();
-      if (!d.access_token) continue;
-      fsToken = { token: d.access_token, exp: Date.now() + (d.expires_in ?? 86400) * 1000 };
-      return fsToken.token;
-    } catch { /* try next scope */ }
-  }
-  return null;
-}
-
-async function fsApi(params) {
-  const token = await fsGetToken();
-  if (!token) return null;
-  const url = `${FS_API_URL}?${new URLSearchParams({ ...params, format: 'json' })}`;
+async function offFetch(url) {
   const hit = offCache.get(url);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) return null;
+  const res = await fetch(url, { headers: { 'User-Agent': OFF_UA } });
+  if (!res.ok) throw new Error(`Open Food Facts ${res.status}`);
   const data = await res.json();
-  if (data?.error) return null;
   offCache.set(url, { at: Date.now(), data });
+  if (offCache.size > 500) offCache.delete(offCache.keys().next().value);
   return data;
 }
 
-/** Text search via FatSecret. Brand/shop names are intentionally not sent
-    to the frontend — the lookup shows clean product names only. */
-async function fsSearch(q) {
-  const res = await fsApi({ method: 'foods.search', search_expression: q, max_results: '10' });
-  let foods = res?.foods?.food ?? [];
-  if (!Array.isArray(foods)) foods = [foods]; // single result comes unwrapped
-  return foods
-    .filter((f) => f?.food_name)
-    .map((f) => ({
-      name: f.food_name,
-      image_url: null, // images are Premier-only on search
-      barcode: null,
+/** UK product search — popularity-sorted so well-known products come first.
+    Brand/shop names are not sent to the frontend (clean names only). */
+async function offSearch(q) {
+  const url = `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}` +
+    `&search_simple=1&action=process&json=1&page_size=10` +
+    `&sort_by=unique_scans_n&fields=${OFF_FIELDS}`;
+  const data = await offFetch(url);
+  return (data.products ?? [])
+    .filter((p) => p?.product_name?.trim())
+    .map((p) => ({
+      name: p.product_name.trim(),
+      image_url: p.image_small_url ?? null,
+      barcode: p.code ?? null,
     }));
 }
 
@@ -350,17 +321,12 @@ export default async function shoppingRoutes(fastify) {
     if (!requireAuth(req, reply)) return;
     const q = (req.query?.q ?? '').toString().trim().slice(0, 60);
     if (q.length < 3) return { products: [] };
-    // FatSecret ONLY — errors are surfaced so a misconfigured key/IP
-    // allow-list is visible in the UI rather than silently empty.
-    if (!fsEnabled()) return { products: [], error: 'FatSecret not configured (.env)' };
     try {
-      const token = await fsGetToken();
-      if (!token) return { products: [], error: 'FatSecret auth failed — check credentials / IP allow-list' };
-      const products = await fsSearch(q);
+      const products = await offSearch(q);
       return { products };
     } catch (err) {
-      req.log.warn({ err }, 'FatSecret search failed');
-      return { products: [], error: 'FatSecret search failed' };
+      req.log.warn({ err }, 'OFF search failed');
+      return { products: [], error: 'Product search unavailable' };
     }
   });
 
