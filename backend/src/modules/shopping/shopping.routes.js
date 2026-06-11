@@ -62,37 +62,24 @@ async function fsApi(params) {
   return data;
 }
 
-/** Text search via FatSecret. */
+/** Text search via FatSecret — Waitrose products only. */
 async function fsSearch(q) {
-  const res = await fsApi({ method: 'foods.search', search_expression: q, max_results: '10' });
+  const res = await fsApi({
+    method: 'foods.search',
+    search_expression: `waitrose ${q}`,
+    max_results: '20',
+  });
   let foods = res?.foods?.food ?? [];
   if (!Array.isArray(foods)) foods = [foods]; // single result comes unwrapped
   return foods
-    .filter((f) => f?.food_name)
+    .filter((f) => f?.food_name && (f.brand_name ?? '').toLowerCase().includes('waitrose'))
+    .slice(0, 10)
     .map((f) => ({
       name: f.food_name,
       brand: f.brand_name ?? null,
       image_url: null, // images are Premier-only on search
       barcode: null,
     }));
-}
-
-/** Barcode → product via FatSecret (needs the barcode scope / Premier Free). */
-async function fsBarcodeLookup(barcode) {
-  // FatSecret expects GTIN-13 — left-pad shorter UPC/EAN-8 codes.
-  const gtin = barcode.padStart(13, '0');
-  const idRes = await fsApi({ method: 'food.find_id_for_barcode', barcode: gtin });
-  const foodId = idRes?.food_id?.value;
-  if (!foodId || foodId === '0') return null;
-  const foodRes = await fsApi({ method: 'food.get.v4', food_id: foodId });
-  const food = foodRes?.food;
-  if (!food?.food_name) return null;
-  return {
-    name: food.food_name,
-    brand: food.brand_name ?? null,
-    image_url: food.food_images?.food_image?.[0]?.image_url ?? null,
-    barcode,
-  };
 }
 
 const shapeItem = (r) => ({
@@ -222,27 +209,38 @@ export default async function shoppingRoutes(fastify) {
     return { trips: rows };
   });
 
-  // POST /api/shopping/trips — create a trip.
+  const DATE_RX = /^\d{4}-\d{2}-\d{2}$/;
+
+  // POST /api/shopping/trips — create a trip (date required, name optional).
   fastify.post('/api/shopping/trips', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
     const name = (req.body?.name ?? '').toString().trim().slice(0, 60);
-    if (!name) return reply.code(400).send({ error: 'Name required' });
+    const tripDate = (req.body?.trip_date ?? '').toString();
+    if (!DATE_RX.test(tripDate)) return reply.code(400).send({ error: 'trip_date required (YYYY-MM-DD)' });
     const { rows } = await query(
-      `INSERT INTO shopping_trips (name) VALUES ($1) RETURNING *`,
-      [name],
+      `INSERT INTO shopping_trips (name, trip_date) VALUES ($1, $2) RETURNING *`,
+      [name || 'Shop', tripDate],
     );
     return rows[0];
   });
 
-  // PATCH /api/shopping/trips/:id — rename.
+  // PATCH /api/shopping/trips/:id — rename and/or redate.
   fastify.patch('/api/shopping/trips/:id', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
     const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Bad id' });
+    const fields = [];
+    const values = [];
+    let i = 1;
     const name = (req.body?.name ?? '').toString().trim().slice(0, 60);
-    if (!Number.isInteger(id) || !name) return reply.code(400).send({ error: 'Bad request' });
+    const tripDate = (req.body?.trip_date ?? '').toString();
+    if (name) { fields.push(`name = $${i++}`); values.push(name); }
+    if (DATE_RX.test(tripDate)) { fields.push(`trip_date = $${i++}`); values.push(tripDate); }
+    if (!fields.length) return reply.code(400).send({ error: 'Nothing to update' });
+    values.push(id);
     const { rows } = await query(
-      `UPDATE shopping_trips SET name = $1 WHERE id = $2 RETURNING *`,
-      [name, id],
+      `UPDATE shopping_trips SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
+      values,
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Trip not found' });
     return rows[0];
@@ -291,20 +289,4 @@ export default async function shoppingRoutes(fastify) {
     }
   });
 
-  // GET /api/shopping/off-product/:barcode — barcode lookup via FatSecret
-  // (requires the barcode scope — Premier Free approval).
-  fastify.get('/api/shopping/off-product/:barcode', async (req, reply) => {
-    if (!requireAuth(req, reply)) return;
-    const barcode = (req.params.barcode ?? '').toString().replace(/\D/g, '').slice(0, 20);
-    if (!barcode) return reply.code(400).send({ error: 'Bad barcode' });
-    if (!fsEnabled()) return { found: false, barcode, error: 'FatSecret not configured (.env)' };
-    try {
-      const product = await fsBarcodeLookup(barcode);
-      if (product) return { found: true, product };
-    } catch (err) {
-      req.log.warn({ err }, 'FatSecret barcode lookup failed');
-      return { found: false, barcode, error: 'FatSecret barcode lookup failed' };
-    }
-    return { found: false, barcode };
-  });
 }

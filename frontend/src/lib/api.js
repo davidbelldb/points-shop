@@ -257,12 +257,11 @@ export const api = {
   shopDeleteItem:  (id) => request(`/shopping/items/${id}`, { method: 'DELETE' }),
   shopClearChecked:(tripId = null) => request('/shopping/clear-checked', { method: 'POST', body: JSON.stringify({ trip_id: tripId }) }),
   shopTrips:       () => request('/shopping/trips'),
-  shopAddTrip:     (name) => request('/shopping/trips', { method: 'POST', body: JSON.stringify({ name }) }),
-  shopRenameTrip:  (id, name) => request(`/shopping/trips/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  shopAddTrip:     (name, tripDate) => request('/shopping/trips', { method: 'POST', body: JSON.stringify({ name, trip_date: tripDate }) }),
+  shopUpdateTrip:  (id, patch) => request(`/shopping/trips/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   shopDeleteTrip:  (id) => request(`/shopping/trips/${id}`, { method: 'DELETE' }),
   shopSuggest:     (q) => request(`/shopping/suggest?q=${encodeURIComponent(q)}`),
   shopOffSearch:   (q) => request(`/shopping/off-search?q=${encodeURIComponent(q)}`),
-  shopOffProduct:  (barcode) => request(`/shopping/off-product/${encodeURIComponent(barcode)}`),
 
   // Sneaky Spreadsheets
   sheetTabs:      () => request('/spreadsheets/tabs'),

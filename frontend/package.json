@@ -17,8 +17,6 @@
     "@react-three/fiber": "^9.6.1",
     "@react-three/rapier": "^2.0.1",
     "@handsontable/react-wrapper": "^15.0.0",
-    "@zxing/browser": "^0.1.5",
-    "@zxing/library": "^0.21.3",
     "handsontable": "^15.0.0",
     "@tiptap/extension-highlight": "^2.0.0",
     "@tiptap/extension-image": "^2.0.0",
