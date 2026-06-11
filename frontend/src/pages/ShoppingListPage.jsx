@@ -372,7 +372,7 @@ export default function ShoppingListPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') addItem({ name: q }); }}
-          placeholder="Add something sneaky…"
+          placeholder="Add a sneaky snack..."
           autoCapitalize="off"
           autoCorrect="off"
           className="h-14 w-full rounded-2xl border border-neutral-200 bg-white pl-4 pr-14 text-base text-neutral-900 shadow-sm outline-none placeholder:text-neutral-400"

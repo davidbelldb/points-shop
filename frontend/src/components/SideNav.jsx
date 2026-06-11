@@ -89,6 +89,18 @@ function SheetIcon() {
     </svg>
   );
 }
+function ListIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="9" y1="6" x2="20" y2="6" />
+      <line x1="9" y1="12" x2="20" y2="12" />
+      <line x1="9" y1="18" x2="20" y2="18" />
+      <polyline points="3.5 5.5 4.5 6.5 6 4.5" />
+      <polyline points="3.5 11.5 4.5 12.5 6 10.5" />
+      <circle cx="4.5" cy="18" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 function VideoCallIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -165,6 +177,7 @@ export default function SideNav() {
           <NavItem to="/messages" label="Chat"       icon={<ChatIcon />} />
           <NavItem to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} />
           <NavItem to="/sneakyspreadsheets" label="Sheets" icon={<SheetIcon />} />
+          <NavItem to="/shopping-list" label="Lists" icon={<ListIcon />} />
         </div>
 
         {/* Account at bottom of nav */}

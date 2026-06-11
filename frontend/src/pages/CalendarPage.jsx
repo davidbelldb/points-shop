@@ -5,6 +5,60 @@ import StoryViewer from '../components/stories/StoryViewer.jsx';
 import { EVENT_ICONS, EventIcon, EVENT_ICON_COLOR } from '../lib/eventIcons.jsx';
 
 /* ============================================================
+   SnackInput — snack field with grocery-catalogue lookup.
+   Suggests house groceries (with photos) as you type.
+   ============================================================ */
+function SnackInput({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [matches, setMatches] = useState([]);
+
+  useEffect(() => {
+    const term = value.trim();
+    if (term.length < 2) { setMatches([]); return; }
+    const t = setTimeout(() => {
+      api.shopGroceries(term)
+        .then(({ groceries }) => setMatches(groceries))
+        .catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  const showDropdown = open && value.trim().length >= 2 && matches.length > 0 &&
+    !(matches.length === 1 && matches[0].name === value);
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="e.g. Sweet Chilli Sensations"
+        className="block w-full rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+      />
+      {showDropdown && (
+        <div className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg">
+          {matches.map((g) => (
+            <button
+              type="button"
+              key={g.id}
+              onMouseDown={(e) => e.preventDefault() /* keep input focus until click lands */}
+              onClick={() => { onChange(g.name); setOpen(false); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-neutral-100"
+            >
+              {g.image_url
+                ? <img src={g.image_url} alt="" className="h-8 w-8 shrink-0 rounded bg-white object-contain" />
+                : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-neutral-100 text-sm">🛒</span>}
+              <span className="truncate text-sm text-neutral-900">{g.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Date helpers — small, dependency-free, all local-TZ aware.
    ============================================================ */
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -452,13 +506,6 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
   const [err, setErr]     = useState(null);
   const [snackMsg, setSnackMsg] = useState(null);
 
-  // House grocery catalogue — offered as type-ahead in the snack inputs
-  const [groceryNames, setGroceryNames] = useState([]);
-  useEffect(() => {
-    api.shopGroceries()
-      .then(({ groceries }) => setGroceryNames(groceries.map((g) => g.name)))
-      .catch(() => {});
-  }, []);
 
   const valid = title.trim() && startsAt;
 
@@ -641,12 +688,9 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
               )}
               {snackList.map((s, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <input
+                  <SnackInput
                     value={s}
-                    onChange={(e) => setSnackList((list) => list.map((v, i) => (i === idx ? e.target.value : v)))}
-                    placeholder="e.g. Sweet Chilli Sensations"
-                    list="grocery-names"
-                    className="block flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+                    onChange={(v) => setSnackList((list) => list.map((x, i) => (i === idx ? v : x)))}
                   />
                   <button
                     type="button"
@@ -669,10 +713,6 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
               </button>
             )}
             {snackMsg && <p className="mt-1.5 text-xs font-semibold text-amber-700">{snackMsg}</p>}
-            {/* Type-ahead source for the snack inputs — house grocery catalogue */}
-            <datalist id="grocery-names">
-              {groceryNames.map((n) => <option key={n} value={n} />)}
-            </datalist>
           </div>
 
           {err && <p className="text-xs text-red-600">{err}</p>}

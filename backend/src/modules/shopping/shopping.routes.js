@@ -18,7 +18,27 @@ const ymd = (d) => {
   if (typeof d === 'string') return d.slice(0, 10);
   return d.toLocaleDateString('en-CA');
 };
-const shapeTrip = (r) => ({ id: r.id, name: r.name, trip_date: ymd(r.trip_date), created_at: r.created_at });
+const shapeTrip = (r) => ({ id: r.id, name: r.name, trip_date: ymd(r.trip_date), event_id: r.event_id ?? null, created_at: r.created_at });
+
+/**
+ * Trip → event mirror: write the linked trip's current item names back into
+ * the calendar event's snack_list. Called after any item change on a linked
+ * trip. Direct SQL — never routes back through the calendar API, so there's
+ * no sync recursion.
+ */
+async function mirrorTripToEvent(tripId) {
+  if (!tripId) return;
+  const trip = (await query(`SELECT id, event_id FROM shopping_trips WHERE id = $1`, [tripId])).rows[0];
+  if (!trip?.event_id) return;
+  const { rows } = await query(
+    `SELECT name FROM shopping_items WHERE trip_id = $1 ORDER BY created_at`,
+    [tripId],
+  );
+  await query(
+    `UPDATE calendar_events SET snack_list = $1, updated_at = NOW() WHERE id = $2`,
+    [JSON.stringify(rows.map((r) => r.name)), trip.event_id],
+  ).catch(() => {});
+}
 
 // External product APIs are retired — the hand-curated house grocery
 // catalogue (managed via /admin) is the product source now.
@@ -36,43 +56,62 @@ const shapeItem = (r) => ({
 });
 
 /**
- * Sync a calendar event's snack list onto the shopping list.
- * Exported — the calendar module calls this after every event create/update,
- * so lists auto-create the moment snacks exist and new snacks append later.
+ * Event → trip sync. Exported — the calendar module calls this after every
+ * event create/update; the from-event endpoint calls it on demand.
  *
- * - No snacks → no-op ({ trip: null }).
- * - Uses tripId when given; otherwise finds the trip on the event's date
- *   (UK time) or creates one named after the event.
- * - Skips snacks already on the trip (case-insensitive).
+ * Linking rules:
+ * - A trip already linked (event_id) is the event's mirror: reconcile fully —
+ *   add new snacks, REMOVE items no longer in the snack list (checked items
+ *   that survive stay checked).
+ * - First contact (matched by tripId param or by date, not yet linked):
+ *   link it, then UNION — add the event's snacks as items AND mirror the
+ *   trip's pre-existing items back into the event, so nothing is lost.
+ * - No trip + snacks exist → create one named after the event, linked.
+ * - No snacks at all and no linked trip → no-op (lists only appear once
+ *   snacks are added).
  */
 export async function syncEventSnacks(event, accountId, tripId = null) {
   const snacks = (Array.isArray(event.snack_list) ? event.snack_list : [])
     .map((s) => String(s ?? '').trim()).filter(Boolean);
-  if (!snacks.length) return { trip: null, added: 0, skipped: 0 };
 
   const tripDate = new Date(event.starts_at).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 
+  // Resolve the trip: explicit → linked → same-date → create
   let trip = null;
+  let firstLink = false;
   if (tripId) {
     trip = (await query(`SELECT * FROM shopping_trips WHERE id = $1`, [tripId])).rows[0] ?? null;
   }
   if (!trip) {
-    trip = (await query(
-      `SELECT * FROM shopping_trips WHERE trip_date = $1 ORDER BY created_at LIMIT 1`,
-      [tripDate],
-    )).rows[0] ?? null;
+    trip = (await query(`SELECT * FROM shopping_trips WHERE event_id = $1 LIMIT 1`, [event.id])).rows[0] ?? null;
   }
   if (!trip) {
     trip = (await query(
-      `INSERT INTO shopping_trips (name, trip_date) VALUES ($1, $2) RETURNING *`,
-      [(event.title ?? 'Shop').slice(0, 60), tripDate],
+      `SELECT * FROM shopping_trips WHERE trip_date = $1 AND event_id IS NULL ORDER BY created_at LIMIT 1`,
+      [tripDate],
+    )).rows[0] ?? null;
+    if (trip) firstLink = true;
+  }
+  if (!trip) {
+    if (!snacks.length) return { trip: null, added: 0, skipped: 0 };
+    trip = (await query(
+      `INSERT INTO shopping_trips (name, trip_date, event_id) VALUES ($1, $2, $3) RETURNING *`,
+      [(event.title ?? 'Shop').slice(0, 60), tripDate, event.id],
     )).rows[0];
+  } else if (!trip.event_id || trip.event_id !== event.id) {
+    firstLink = firstLink || !trip.event_id;
+    await query(`UPDATE shopping_trips SET event_id = $1 WHERE id = $2`, [event.id, trip.id]);
+    trip = { ...trip, event_id: event.id };
   }
 
-  const existing = new Set(
-    (await query(`SELECT lower(name) AS n FROM shopping_items WHERE trip_id = $1`, [trip.id]))
-      .rows.map((r) => r.n),
-  );
+  const existingRows = (await query(
+    `SELECT id, lower(name) AS n FROM shopping_items WHERE trip_id = $1`,
+    [trip.id],
+  )).rows;
+  const existing = new Set(existingRows.map((r) => r.n));
+  const snackSet = new Set(snacks.map((s) => s.toLowerCase()));
+
+  // Add snacks missing from the trip
   let added = 0;
   for (const snack of snacks) {
     if (existing.has(snack.toLowerCase())) continue;
@@ -83,6 +122,18 @@ export async function syncEventSnacks(event, accountId, tripId = null) {
     await bumpHistory(snack, null, null);
     existing.add(snack.toLowerCase());
     added++;
+  }
+
+  if (firstLink) {
+    // Union on first contact: fold the trip's pre-existing items back into
+    // the event's snack list rather than deleting anything.
+    await mirrorTripToEvent(trip.id);
+  } else {
+    // Established mirror: items removed from the event come off the trip too.
+    const toDelete = existingRows.filter((r) => !snackSet.has(r.n)).map((r) => r.id);
+    if (toDelete.length) {
+      await query(`DELETE FROM shopping_items WHERE id = ANY($1::int[])`, [toDelete]);
+    }
   }
 
   return { trip: shapeTrip(trip), added, skipped: snacks.length - added };
@@ -140,6 +191,7 @@ export default async function shoppingRoutes(fastify) {
       [name, qty, imageUrl, barcode, accountId, tripId],
     );
     await bumpHistory(name, imageUrl, barcode);
+    await mirrorTripToEvent(tripId); // linked trip → event snack list follows
     return shapeItem(rows[0]);
   });
 
@@ -178,7 +230,9 @@ export default async function shoppingRoutes(fastify) {
     if (!requireAuth(req, reply)) return;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Bad id' });
+    const item = (await query(`SELECT trip_id FROM shopping_items WHERE id = $1`, [id])).rows[0];
     await query(`DELETE FROM shopping_items WHERE id = $1`, [id]);
+    await mirrorTripToEvent(item?.trip_id ?? null); // linked trip → event follows
     return { ok: true };
   });
 
@@ -191,6 +245,7 @@ export default async function shoppingRoutes(fastify) {
       `DELETE FROM shopping_items WHERE checked = TRUE AND trip_id IS NOT DISTINCT FROM $1`,
       [tripId],
     );
+    await mirrorTripToEvent(tripId); // bought + cleared = off the event list too
     return { ok: true };
   });
 
