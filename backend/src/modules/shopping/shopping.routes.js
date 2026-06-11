@@ -20,59 +20,8 @@ const ymd = (d) => {
 };
 const shapeTrip = (r) => ({ id: r.id, name: r.name, trip_date: ymd(r.trip_date), created_at: r.created_at });
 
-// ── Open Food Facts — UK catalogue, popularity-sorted ─────────────────────────
-// Product-centric (real shelf items with barcodes + photos), unlike nutrition
-// APIs which return generic foods/meals. uk.openfoodfacts.org scopes results
-// to products sold in the UK; sort_by=unique_scans_n floats popular products.
-const OFF_BASE = 'https://uk.openfoodfacts.org';
-const OFF_UA = 'SneakyPoints/1.0 (private household app)';
-const OFF_FIELDS = 'product_name,image_small_url,code';
-
-// Tiny in-memory cache: key → { at, data }
-const offCache = new Map();
-const CACHE_TTL_MS = 10 * 60 * 1000;
-
-async function offFetch(url) {
-  const hit = offCache.get(url);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
-  const res = await fetch(url, { headers: { 'User-Agent': OFF_UA } });
-  if (!res.ok) throw new Error(`Open Food Facts ${res.status}`);
-  const data = await res.json();
-  offCache.set(url, { at: Date.now(), data });
-  if (offCache.size > 500) offCache.delete(offCache.keys().next().value);
-  return data;
-}
-
-const shapeProduct = (p) => ({
-  name: String(p.product_name ?? '').trim(),
-  image_url: p.image_small_url ?? p.image_url ?? null,
-  barcode: p.code ?? null,
-});
-
-/** UK product search. Tries the modern Search-a-licious API first (built for
-    programmatic access — the legacy cgi/search.pl sits behind anti-bot
-    protection that can block datacenter IPs), then falls back to legacy. */
-async function offSearch(q) {
-  // 1. Search-a-licious
-  try {
-    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}` +
-      `&page_size=10&langs=en&countries_tags=en:united-kingdom`;
-    const data = await offFetch(url);
-    const hits = (data.hits ?? [])
-      .map(shapeProduct)
-      .filter((p) => p.name);
-    if (hits.length) return hits;
-  } catch { /* fall through to legacy */ }
-
-  // 2. Legacy full-text search, popularity-sorted
-  const url = `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}` +
-    `&search_simple=1&action=process&json=1&page_size=10` +
-    `&sort_by=unique_scans_n&fields=${OFF_FIELDS}`;
-  const data = await offFetch(url);
-  return (data.products ?? [])
-    .map(shapeProduct)
-    .filter((p) => p.name);
-}
+// External product APIs are retired — the hand-curated house grocery
+// catalogue (managed via /admin) is the product source now.
 
 const shapeItem = (r) => ({
   id: r.id,
@@ -371,34 +320,16 @@ export default async function shoppingRoutes(fastify) {
     return { ok: true };
   });
 
-  // GET /api/shopping/off-product/:barcode — barcode lookup. The house
-  // catalogue wins; Open Food Facts is the fallback.
+  // GET /api/shopping/off-product/:barcode — barcode lookup against the
+  // house grocery catalogue only (external APIs retired).
   fastify.get('/api/shopping/off-product/:barcode', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
     const barcode = (req.params.barcode ?? '').toString().replace(/\D/g, '').slice(0, 20);
     if (!barcode) return reply.code(400).send({ error: 'Bad barcode' });
 
-    // 1. House catalogue
     const mine = (await query(`SELECT * FROM groceries WHERE barcode = $1 LIMIT 1`, [barcode])).rows[0];
     if (mine) {
       return { found: true, product: { name: mine.name, image_url: mine.image_url, barcode } };
-    }
-
-    // 2. Open Food Facts
-    try {
-      const data = await offFetch(`${OFF_BASE}/api/v2/product/${barcode}.json?fields=${OFF_FIELDS}`);
-      if (data.status === 1 && data.product?.product_name) {
-        return {
-          found: true,
-          product: {
-            name: data.product.product_name.trim(),
-            image_url: data.product.image_small_url ?? null,
-            barcode: data.product.code ?? barcode,
-          },
-        };
-      }
-    } catch (err) {
-      req.log.warn({ err }, 'OFF product lookup failed');
     }
     return { found: false, barcode };
   });
@@ -441,20 +372,6 @@ export default async function shoppingRoutes(fastify) {
       [q],
     );
     return { suggestions: rows };
-  });
-
-  // GET /api/shopping/off-search?q= — Open Food Facts text search (proxied).
-  fastify.get('/api/shopping/off-search', async (req, reply) => {
-    if (!requireAuth(req, reply)) return;
-    const q = (req.query?.q ?? '').toString().trim().slice(0, 60);
-    if (q.length < 3) return { products: [] };
-    try {
-      const products = await offSearch(q);
-      return { products };
-    } catch (err) {
-      req.log.warn({ err }, 'OFF search failed');
-      return { products: [], error: `Product search unavailable (${err.message})` };
-    }
   });
 
 }

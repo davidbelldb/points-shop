@@ -262,7 +262,6 @@ export const api = {
   shopDeleteTrip:  (id) => request(`/shopping/trips/${id}`, { method: 'DELETE' }),
   shopSuggest:     (q) => request(`/shopping/suggest?q=${encodeURIComponent(q)}`),
   shopFromEvent:   (eventId, tripId = null) => request('/shopping/from-event', { method: 'POST', body: JSON.stringify({ event_id: eventId, trip_id: tripId }) }),
-  shopOffSearch:   (q) => request(`/shopping/off-search?q=${encodeURIComponent(q)}`),
   shopOffProduct:  (barcode) => request(`/shopping/off-product/${encodeURIComponent(barcode)}`),
   shopGroceries:   (q = '') => request(`/shopping/groceries${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   shopAddGrocery:  (data) => request('/shopping/groceries', { method: 'POST', body: JSON.stringify(data) }),

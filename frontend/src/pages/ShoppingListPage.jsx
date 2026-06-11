@@ -1,6 +1,10 @@
 /**
- * Shopping list — shared between both accounts, Waitrose products only
- * (FatSecret search proxied via the backend).
+ * Shopping list — shared between both accounts.
+ *
+ * Product source: the hand-curated house grocery catalogue (managed via
+ * /admin) plus the self-learning "usuals" history — external product APIs
+ * are retired. Lookup suggests on type with product photos; the barcode
+ * scanner matches catalogue barcodes; free text always works.
  *
  * Layout: trips are dated, collapsible sections stacked down the page in
  * date order. The trip nearest today opens automatically; headers read
@@ -180,8 +184,6 @@ export default function ShoppingListPage() {
   const [q, setQ]           = useState('');
   const [usuals, setUsuals] = useState([]);
   const [groceries, setGroceries] = useState([]); // house catalogue matches
-  const [products, setProducts] = useState([]);
-  const [searchError, setSearchError] = useState(null);
   const [searching, setSearching] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [addTripOpen, setAddTripOpen] = useState(false);
@@ -218,25 +220,22 @@ export default function ShoppingListPage() {
       .catch(() => {});
   }, [addTripOpen, upcoming.length]);
 
-  // ── Search — usuals + Waitrose products (FatSecret) ───────────────────────
+  // ── Search — house catalogue + usuals, on type ─────────────────────────────
   useEffect(() => {
     const term = q.trim();
-    if (!term) { setUsuals([]); setGroceries([]); setProducts([]); setSearchError(null); setSearching(false); return; }
+    if (!term) { setUsuals([]); setGroceries([]); setSearching(false); return; }
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        const [{ suggestions }, mine, res] = await Promise.all([
+        const [{ suggestions }, mine] = await Promise.all([
           api.shopSuggest(term),
           api.shopGroceries(term),
-          term.length >= 3 ? api.shopOffSearch(term) : Promise.resolve({ products: [] }),
         ]);
         const g = mine.groceries ?? [];
         setGroceries(g);
         // Don't repeat catalogue items in the usuals
         const gNames = new Set(g.map((x) => x.name.toLowerCase()));
         setUsuals(suggestions.filter((s) => !gNames.has(s.name.toLowerCase())));
-        setProducts(res.products);
-        setSearchError(res.error ?? null);
       } catch { /* soft fail */ }
       setSearching(false);
     }, 350);
@@ -249,7 +248,6 @@ export default function ShoppingListPage() {
     setQ('');
     setUsuals([]);
     setGroceries([]);
-    setProducts([]);
     const tripId = openKey === 'general' || openKey === null ? null : openKey;
     try {
       const item = await api.shopAddItem({ name: name.trim(), image_url, barcode, trip_id: tripId });
@@ -289,7 +287,7 @@ export default function ShoppingListPage() {
       if (res.found && res.product.name) {
         addItem({ name: res.product.name, image_url: res.product.image_url, barcode: res.product.barcode });
       } else {
-        showToast('Barcode not recognised — add it by name');
+        showToast('Not in the catalogue — add it via /admin or by name');
       }
     } catch {
       showToast('Lookup failed — add it by name');
@@ -352,7 +350,7 @@ export default function ShoppingListPage() {
       : []),
   ];
 
-  const hasSuggestions = q.trim() && (usuals.length > 0 || groceries.length > 0 || products.length > 0 || searching || searchError);
+  const hasSuggestions = q.trim() && (usuals.length > 0 || groceries.length > 0 || searching);
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 py-6">
@@ -389,9 +387,6 @@ export default function ShoppingListPage() {
 
         {hasSuggestions && (
           <div className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl">
-            {searchError && (
-              <p className="px-4 py-2 text-xs font-semibold text-red-700">{searchError}</p>
-            )}
             {groceries.length > 0 && (
               <>
                 <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Our groceries</p>
@@ -418,21 +413,6 @@ export default function ShoppingListPage() {
                   >
                     <Thumb item={s} />
                     <span className="truncate text-sm font-medium text-neutral-900">{s.name}</span>
-                  </button>
-                ))}
-              </>
-            )}
-            {products.length > 0 && (
-              <>
-                <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Products · Open Food Facts</p>
-                {products.map((p, i) => (
-                  <button
-                    key={`p-${i}`}
-                    onClick={() => addItem({ name: p.name, image_url: p.image_url, barcode: p.barcode })}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-neutral-100"
-                  >
-                    <Thumb item={p} />
-                    <span className="truncate text-sm font-medium text-neutral-900">{p.name}</span>
                   </button>
                 ))}
               </>
