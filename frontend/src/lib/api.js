@@ -169,6 +169,19 @@ export const api = {
     request(`/games/dirty-wordle/progress?date=${date}`),
   dirtyWordleSaveProgress: (payload) =>
     request('/games/dirty-wordle/progress', { method: 'POST', body: JSON.stringify(payload) }),
+  // Games play list (IGDB-backed replica of rewatch)
+  playlistList: () => request('/playlist'),
+  playlistPartner: () => request('/playlist/partner'),
+  playlistSearch: (q) => request(`/playlist/search?q=${encodeURIComponent(q)}`),
+  playlistGet: (id) => request(`/playlist/${id}`),
+  playlistInvites: () => request('/playlist/invites'),
+  acceptPlaylistInvite: (id, playedBefore) =>
+    request(`/playlist/invites/${id}/accept`, { method: 'POST', body: JSON.stringify({ played_before: playedBefore }) }),
+  declinePlaylistInvite: (id) => request(`/playlist/invites/${id}/decline`, { method: 'POST' }),
+  addPlaylist: (data) => request('/playlist', { method: 'POST', body: JSON.stringify(data) }),
+  updatePlaylist: (id, patch) => request(`/playlist/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deletePlaylist: (id) => request(`/playlist/${id}`, { method: 'DELETE' }),
+
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),

@@ -31,6 +31,8 @@ const GameContainer        = lazy(() => import('./game/GameContainer.jsx'));
 const DirtyWordlePage      = lazy(() => import('./pages/DirtyWordlePage.jsx'));
 const RewatchListPage      = lazy(() => import('./pages/RewatchListPage.jsx'));
 const RewatchDetailPage    = lazy(() => import('./pages/RewatchDetailPage.jsx'));
+const PlaylistPage         = lazy(() => import('./pages/PlaylistPage.jsx'));
+const PlaylistDetailPage   = lazy(() => import('./pages/PlaylistDetailPage.jsx'));
 const CalendarPage         = lazy(() => import('./pages/CalendarPage.jsx'));
 const SneakyFeedPage       = lazy(() => import('./pages/SneakyFeedPage.jsx'));
 const SneakyStorePage      = lazy(() => import('./pages/SneakyStorePage.jsx'));
@@ -117,6 +119,8 @@ createRoot(document.getElementById('root')).render(
               <Route path="account/rewards" element={<RewardsPage />} />
               <Route path="rewatch" element={<RewatchListPage />} />
               <Route path="rewatch/:id" element={<RewatchDetailPage />} />
+              <Route path="playlist" element={<PlaylistPage />} />
+              <Route path="playlist/:id" element={<PlaylistDetailPage />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="stories" element={<SneakyFeedPage />} />
               <Route path="store" element={<SneakyStorePage />} />

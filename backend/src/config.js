@@ -24,4 +24,8 @@ export const config = {
     clientId: process.env.FATSECRET_CLIENT_ID ?? '',
     clientSecret: process.env.FATSECRET_CLIENT_SECRET ?? '',
   },
+  twitch: {
+    clientId: process.env.TWITCH_CLIENT_ID ?? '',
+    clientSecret: process.env.TWITCH_CLIENT_SECRET ?? '',
+  },
 };

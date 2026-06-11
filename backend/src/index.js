@@ -43,6 +43,7 @@ import callsRoutes from './modules/calls/calls.routes.js';
 import spreadsheetsRoutes from './modules/spreadsheets/spreadsheets.routes.js';
 import shoppingRoutes, { backfillEventSnackSync } from './modules/shopping/shopping.routes.js';
 import bootstrapRoutes from './modules/bootstrap/bootstrap.routes.js';
+import playlistRoutes from './modules/playlist/playlist.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 import { sendPush } from './modules/notifications/push.js';
 import { query as dbQuery } from './db.js';
@@ -136,6 +137,7 @@ await fastify.register(callsRoutes);
 await fastify.register(spreadsheetsRoutes);
 await fastify.register(shoppingRoutes);
 await fastify.register(bootstrapRoutes);
+await fastify.register(playlistRoutes);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 
