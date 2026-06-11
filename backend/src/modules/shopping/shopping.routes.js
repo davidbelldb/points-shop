@@ -8,6 +8,7 @@
 
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { query } from '../../db.js';
+import { config } from '../../config.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 const OFF_UA = 'SneakyPoints/1.0 (private household app)';
@@ -34,6 +35,71 @@ const shapeOffProduct = (p) => ({
   image_url: p?.image_small_url ?? null,
   barcode: p?.code ?? null,
 });
+
+// ── FatSecret Platform (free tier) — fallback provider ───────────────────────
+// OAuth2 client credentials; token cached until near expiry. Used when Open
+// Food Facts comes up empty: better UK barcode hit rates (90%+ coverage).
+// Configure FATSECRET_CLIENT_ID / FATSECRET_CLIENT_SECRET in .env — without
+// them everything silently degrades to OFF-only.
+const FS_TOKEN_URL = 'https://oauth.fatsecret.com/connect/token';
+const FS_API_URL = 'https://platform.fatsecret.com/rest/server.api';
+let fsToken = null; // { token, exp }
+
+const fsEnabled = () => !!(config.fatsecret.clientId && config.fatsecret.clientSecret);
+
+async function fsGetToken() {
+  if (!fsEnabled()) return null;
+  if (fsToken && Date.now() < fsToken.exp - 60_000) return fsToken.token;
+  const basic = Buffer.from(`${config.fatsecret.clientId}:${config.fatsecret.clientSecret}`).toString('base64');
+  // Ask for barcode scope first (Premier Free); fall back to basic-only.
+  for (const scope of ['basic barcode', 'basic']) {
+    try {
+      const res = await fetch(FS_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basic}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ grant_type: 'client_credentials', scope }),
+      });
+      if (!res.ok) continue;
+      const d = await res.json();
+      if (!d.access_token) continue;
+      fsToken = { token: d.access_token, exp: Date.now() + (d.expires_in ?? 86400) * 1000 };
+      return fsToken.token;
+    } catch { /* try next scope */ }
+  }
+  return null;
+}
+
+async function fsApi(params) {
+  const token = await fsGetToken();
+  if (!token) return null;
+  const url = `${FS_API_URL}?${new URLSearchParams({ ...params, format: 'json' })}`;
+  const hit = offCache.get(url);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (data?.error) return null;
+  offCache.set(url, { at: Date.now(), data });
+  return data;
+}
+
+/** Text search via FatSecret. */
+async function fsSearch(q) {
+  const res = await fsApi({ method: 'foods.search', search_expression: q, max_results: '8' });
+  let foods = res?.foods?.food ?? [];
+  if (!Array.isArray(foods)) foods = [foods]; // single result comes unwrapped
+  return foods
+    .filter((f) => f?.food_name)
+    .map((f) => ({
+      name: f.food_name,
+      brand: f.brand_name ?? null,
+      image_url: null, // images are Premier-only on search
+      barcode: null,
+    }));
+}
 
 const shapeItem = (r) => ({
   id: r.id,
@@ -217,31 +283,51 @@ export default async function shoppingRoutes(fastify) {
     if (!requireAuth(req, reply)) return;
     const q = (req.query?.q ?? '').toString().trim().slice(0, 60);
     if (q.length < 3) return { products: [] };
-    try {
-      const url = `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=${OFF_FIELDS}`;
-      const data = await offFetch(url);
-      const products = (data.products ?? [])
-        .map(shapeOffProduct)
-        .filter((p) => p.name);
-      return { products };
-    } catch (err) {
-      req.log.warn({ err }, 'OFF search failed');
-      return { products: [] }; // soft-fail — history suggestions still work
+    // FatSecret is the primary provider; Open Food Facts tops up thin results
+    // (and brings product images, which FatSecret's free search doesn't).
+    let products = [];
+    if (fsEnabled()) {
+      try {
+        products = await fsSearch(q);
+      } catch (err) {
+        req.log.warn({ err }, 'FatSecret search failed');
+      }
     }
+
+    if (products.length < 5) {
+      try {
+        const url = `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=${OFF_FIELDS}`;
+        const data = await offFetch(url);
+        const off = (data.products ?? []).map(shapeOffProduct).filter((p) => p.name);
+        const seen = new Set(products.map((p) => p.name.toLowerCase()));
+        for (const p of off) {
+          if (!seen.has(p.name.toLowerCase())) {
+            products.push(p);
+            seen.add(p.name.toLowerCase());
+          }
+        }
+      } catch (err) {
+        req.log.warn({ err }, 'OFF search failed');
+      }
+    }
+
+    return { products: products.slice(0, 10) };
   });
 
-  // GET /api/shopping/off-product/:barcode — barcode lookup (proxied).
+  // GET /api/shopping/off-product/:barcode — barcode lookup via Open Food
+  // Facts (free; FatSecret's barcode endpoint is Premier-only).
   fastify.get('/api/shopping/off-product/:barcode', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
     const barcode = (req.params.barcode ?? '').toString().replace(/\D/g, '').slice(0, 20);
     if (!barcode) return reply.code(400).send({ error: 'Bad barcode' });
     try {
       const data = await offFetch(`${OFF_BASE}/api/v2/product/${barcode}.json?fields=${OFF_FIELDS}`);
-      if (data.status !== 1 || !data.product) return { found: false, barcode };
-      return { found: true, product: shapeOffProduct(data.product) };
+      if (data.status === 1 && data.product) {
+        return { found: true, product: shapeOffProduct(data.product) };
+      }
     } catch (err) {
       req.log.warn({ err }, 'OFF product lookup failed');
-      return { found: false, barcode };
     }
+    return { found: false, barcode };
   });
 }

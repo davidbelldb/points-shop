@@ -1,14 +1,14 @@
 /**
- * Shopping list — shared between both accounts, powered by Open Food Facts.
+ * Shopping list — shared between both accounts.
  *
  * - Big lookup field: suggestions come from "your usuals" (purchase history)
- *   plus Open Food Facts text search (proxied via the backend). Enter adds
- *   whatever's typed as a free-text item.
- * - Barcode button inside the field opens a camera scanner: native
- *   BarcodeDetector where available (Android/Chrome), @zxing/browser
- *   fallback elsewhere (iOS Safari — dynamically imported only when used).
+ *   plus product search — FatSecret primary, Open Food Facts top-up —
+ *   proxied via the backend. Enter adds whatever's typed as free text.
+ * - Barcode scanner (Open Food Facts lookup — free, no Premier needed):
+ *   native BarcodeDetector on Android/Chrome, @zxing/browser fallback on
+ *   iOS Safari (dynamically imported only when used).
  * - Items: tick off, adjust qty, delete; ticked items sink to a "got it"
- *   section with a clear-all sweep.
+ *   section with a clear-all sweep. Trips group items per shop.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';

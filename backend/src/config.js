@@ -20,4 +20,8 @@ export const config = {
   lastfm: {
     apiKey: process.env.LASTFM_API_KEY ?? '',
   },
+  fatsecret: {
+    clientId: process.env.FATSECRET_CLIENT_ID ?? '',
+    clientSecret: process.env.FATSECRET_CLIENT_SECRET ?? '',
+  },
 };
