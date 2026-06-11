@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS shopping_items (
   image_url   TEXT,
   barcode     TEXT,
   checked     BOOLEAN     NOT NULL DEFAULT FALSE,
-  added_by    INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  added_by    UUID REFERENCES accounts(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   checked_at  TIMESTAMPTZ
 );
