@@ -146,6 +146,8 @@ function ScannerOverlay({ onHit, onClose }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ShoppingListPage() {
   const [items, setItems]     = useState(null);
+  const [trips, setTrips]     = useState([]);
+  const [activeTrip, setActiveTrip] = useState(null); // null = General
   const [error, setError]     = useState(null);
   const [q, setQ]             = useState('');
   const [usuals, setUsuals]   = useState([]);
@@ -164,8 +166,49 @@ export default function ShoppingListPage() {
 
   useEffect(() => {
     api.shopItems().then(({ items: loaded }) => setItems(loaded)).catch((e) => setError(e.message));
+    api.shopTrips().then(({ trips: loaded }) => setTrips(loaded)).catch(() => {});
     return () => clearTimeout(toastTimer.current);
   }, []);
+
+  // ── Trips ──────────────────────────────────────────────────────────────────
+  async function addTrip() {
+    const name = window.prompt('Trip name', '');
+    if (!name?.trim()) return;
+    try {
+      const trip = await api.shopAddTrip(name.trim());
+      setTrips((prev) => [...prev, trip]);
+      setActiveTrip(trip.id);
+    } catch (e) { setError(e.message); }
+  }
+
+  function renameTrip(trip) {
+    const name = window.prompt('Trip name', trip.name);
+    if (!name?.trim()) return;
+    setTrips((prev) => prev.map((t) => (t.id === trip.id ? { ...t, name: name.trim() } : t)));
+    api.shopRenameTrip(trip.id, name.trim()).catch((e) => setError(e.message));
+  }
+
+  async function deleteTrip(trip) {
+    if (!confirm(`Delete trip "${trip.name}"? Its items move to General.`)) return;
+    try {
+      await api.shopDeleteTrip(trip.id);
+      setTrips((prev) => prev.filter((t) => t.id !== trip.id));
+      setItems((prev) => prev?.map((i) => (i.trip_id === trip.id ? { ...i, trip_id: null } : i)) ?? prev);
+      if (activeTrip === trip.id) setActiveTrip(null);
+    } catch (e) { setError(e.message); }
+  }
+
+  const tripTapRef = useRef({ t: 0, id: null });
+  function onTripTap(id) {
+    const now = Date.now();
+    const last = tripTapRef.current;
+    tripTapRef.current = { t: now, id };
+    if (id !== null && id === activeTrip && last.id === id && now - last.t < 400) {
+      renameTrip(trips.find((t) => t.id === id));
+      return;
+    }
+    setActiveTrip(id);
+  }
 
   // ── Lookup — debounced usuals + OFF search ─────────────────────────────────
   useEffect(() => {
@@ -193,11 +236,11 @@ export default function ShoppingListPage() {
     setUsuals([]);
     setOffResults([]);
     try {
-      const item = await api.shopAddItem({ name: name.trim(), image_url, barcode });
+      const item = await api.shopAddItem({ name: name.trim(), image_url, barcode, trip_id: activeTrip });
       setItems((prev) => [item, ...(prev ?? [])]);
       showToast(`Added ${item.name}`);
     } catch (e) { setError(e.message); }
-  }, []);
+  }, [activeTrip]);
 
   async function toggleItem(item) {
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked: !item.checked } : i)));
@@ -217,8 +260,8 @@ export default function ShoppingListPage() {
   }
 
   async function clearChecked() {
-    setItems((prev) => prev.filter((i) => !i.checked));
-    api.shopClearChecked().catch(() => {});
+    setItems((prev) => prev.filter((i) => !(i.checked && (i.trip_id ?? null) === activeTrip)));
+    api.shopClearChecked(activeTrip).catch(() => {});
   }
 
   // Barcode hit → look it up on OFF, add with whatever we learn
@@ -242,8 +285,10 @@ export default function ShoppingListPage() {
   }
 
   const hasSuggestions = q.trim() && (usuals.length > 0 || offResults.length > 0 || searching);
-  const unchecked = (items ?? []).filter((i) => !i.checked);
-  const checked   = (items ?? []).filter((i) => i.checked);
+  const tripItems = (items ?? []).filter((i) => (i.trip_id ?? null) === activeTrip);
+  const unchecked = tripItems.filter((i) => !i.checked);
+  const checked   = tripItems.filter((i) => i.checked);
+  const tripCount = (id) => (items ?? []).filter((i) => (i.trip_id ?? null) === id && !i.checked).length;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 py-6">
@@ -258,6 +303,46 @@ export default function ShoppingListPage() {
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>
       )}
+
+      {/* ── Trips — items are added to the active trip ── */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <button
+          onClick={() => onTripTap(null)}
+          className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            activeTrip === null ? 'bg-amber-400 text-amber-950' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+          }`}
+        >
+          General{tripCount(null) > 0 ? ` (${tripCount(null)})` : ''}
+        </button>
+        {trips.map((trip) => (
+          <span key={trip.id} className="flex shrink-0 items-center">
+            <button
+              onClick={() => onTripTap(trip.id)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                activeTrip === trip.id ? 'bg-amber-400 text-amber-950' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+              }`}
+            >
+              {trip.name}{tripCount(trip.id) > 0 ? ` (${tripCount(trip.id)})` : ''}
+            </button>
+            {activeTrip === trip.id && (
+              <button
+                onClick={() => deleteTrip(trip)}
+                title="Delete trip"
+                className="ml-0.5 rounded px-1 text-neutral-400 hover:text-red-700"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        <button
+          onClick={addTrip}
+          title="New trip"
+          className="shrink-0 rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-bold text-neutral-700 hover:bg-neutral-200"
+        >
+          +
+        </button>
+      </div>
 
       {/* ── Lookup field — generous height, barcode button inside (right) ── */}
       <div className="relative">

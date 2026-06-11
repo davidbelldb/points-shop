@@ -43,6 +43,7 @@ const shapeItem = (r) => ({
   barcode: r.barcode,
   checked: r.checked,
   added_by: r.added_by,
+  trip_id: r.trip_id ?? null,
   created_at: r.created_at,
 });
 
@@ -90,10 +91,12 @@ export default async function shoppingRoutes(fastify) {
     const barcode = (req.body?.barcode ?? null) || null;
     const qty = Math.max(1, Math.min(99, Number(req.body?.qty) || 1));
 
+    const tripId = Number.isInteger(req.body?.trip_id) ? req.body.trip_id : null;
+
     const { rows } = await query(
-      `INSERT INTO shopping_items (name, qty, image_url, barcode, added_by)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [name, qty, imageUrl, barcode, accountId],
+      `INSERT INTO shopping_items (name, qty, image_url, barcode, added_by, trip_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [name, qty, imageUrl, barcode, accountId, tripId],
     );
     await bumpHistory(name, imageUrl, barcode);
     return shapeItem(rows[0]);
@@ -138,10 +141,59 @@ export default async function shoppingRoutes(fastify) {
     return { ok: true };
   });
 
-  // POST /api/shopping/clear-checked — sweep away everything ticked off.
+  // POST /api/shopping/clear-checked — sweep ticked items off the given trip
+  // (trip_id null = the General list).
   fastify.post('/api/shopping/clear-checked', async (req, reply) => {
     if (!requireAuth(req, reply)) return;
-    await query(`DELETE FROM shopping_items WHERE checked = TRUE`);
+    const tripId = Number.isInteger(req.body?.trip_id) ? req.body.trip_id : null;
+    await query(
+      `DELETE FROM shopping_items WHERE checked = TRUE AND trip_id IS NOT DISTINCT FROM $1`,
+      [tripId],
+    );
+    return { ok: true };
+  });
+
+  // ── Trips ───────────────────────────────────────────────────────────────────
+
+  // GET /api/shopping/trips
+  fastify.get('/api/shopping/trips', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const { rows } = await query(`SELECT * FROM shopping_trips ORDER BY created_at`);
+    return { trips: rows };
+  });
+
+  // POST /api/shopping/trips — create a trip.
+  fastify.post('/api/shopping/trips', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const name = (req.body?.name ?? '').toString().trim().slice(0, 60);
+    if (!name) return reply.code(400).send({ error: 'Name required' });
+    const { rows } = await query(
+      `INSERT INTO shopping_trips (name) VALUES ($1) RETURNING *`,
+      [name],
+    );
+    return rows[0];
+  });
+
+  // PATCH /api/shopping/trips/:id — rename.
+  fastify.patch('/api/shopping/trips/:id', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const id = Number(req.params.id);
+    const name = (req.body?.name ?? '').toString().trim().slice(0, 60);
+    if (!Number.isInteger(id) || !name) return reply.code(400).send({ error: 'Bad request' });
+    const { rows } = await query(
+      `UPDATE shopping_trips SET name = $1 WHERE id = $2 RETURNING *`,
+      [name, id],
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Trip not found' });
+    return rows[0];
+  });
+
+  // DELETE /api/shopping/trips/:id — items fall back to General (FK SET NULL).
+  fastify.delete('/api/shopping/trips/:id', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Bad id' });
+    await query(`DELETE FROM shopping_trips WHERE id = $1`, [id]);
     return { ok: true };
   });
 
