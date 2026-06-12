@@ -113,25 +113,26 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
   const glowTex = useMemo(() => makeWindowGlowTexture(), []);
 
-  // The single die-face "plaque" — a rounded triangular pad matching the
-  // icosahedron's face-6 triangle exactly (same vertices, in the face
-  // group's local frame), extruded with a soft bevel so it reads as one
-  // facet of the die floating to the top of the dark liquid, flush with
-  // the window glass. Movies/Games/confirm/answer text sits on top of it.
-  const faceGeo = useMemo(() => {
-    const shape = new THREE.Shape();
-    shape.moveTo(-0.376, 0);
-    shape.lineTo(0.188, -0.326);
-    shape.lineTo(0.188, 0.326);
-    shape.lineTo(-0.376, 0);
-    const geo = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.05,
-      bevelEnabled: true,
-      bevelThickness: 0.015,
-      bevelSize: 0.02,
-      bevelSegments: 4,
-    });
-    geo.translate(0, 0, -0.025);
+  // The die's own geometry — an icosahedron with one facet (face 6, the
+  // one that's face-on to the camera once REST_ROTATION is applied)
+  // painted a touch lighter via per-vertex colours, so that one facet
+  // reads as "the face that's landed" with no extra geometry layered on
+  // top. Movies/Games/confirm/answer text is anchored to that same facet
+  // via the face group below.
+  const dieGeo = useMemo(() => {
+    const geo = new THREE.IcosahedronGeometry(0.62, 0);
+    const count = geo.attributes.position.count;
+    const colors = new Float32Array(count * 3);
+    const base = new THREE.Color('#13132c');
+    const lit = new THREE.Color('#2a3578');
+    for (let i = 0; i < count; i++) {
+      const face = Math.floor(i / 3);
+      const c = face === 6 ? lit : base;
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     return geo;
   }, []);
 
@@ -220,15 +221,14 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
       </mesh>
 
       {/* The "inner core" — a 20-sided die that tumbles wildly while
-          shaking, otherwise drifts with a slow continuous spin. Its
-          material is kept close to the liquid colour so it stays mostly
-          hidden in the dark fluid — only the lighter "face plaque" below
-          (one actual facet of this die) is meant to read clearly, like the
-          die has floated face-up against the glass. */}
+          shaking, otherwise drifts with a slow continuous spin. Most of
+          its faces are kept close to the liquid colour so the die stays
+          mostly hidden in the dark fluid — only face 6 (painted lighter in
+          dieGeo) reads clearly, like that one facet has floated face-up
+          against the glass. */}
       <group ref={dieRef} position={[0, 0, 0.85]} rotation={[REST_ROTATION.x, REST_ROTATION.y, 0]} scale={0.67}>
-        <mesh castShadow>
-          <icosahedronGeometry args={[0.62, 0]} />
-          <meshStandardMaterial color="#13132c" roughness={0.5} metalness={0.05} flatShading />
+        <mesh castShadow geometry={dieGeo}>
+          <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} flatShading />
         </mesh>
 
         {/* "Face group" — sits flush on one specific facet (its centroid,
@@ -245,13 +245,6 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
             Each <Text> also gets rotation={[0,0,Math.PI/2]} to cancel that
             same spin so the glyphs themselves stay upright. */}
         <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, -Math.PI / 2]}>
-          {/* The visible "face plaque" — the one facet of the die that has
-              floated to the top, flush with the glass, lit a touch lighter
-              than the surrounding liquid so it reads clearly through it. */}
-          <mesh geometry={faceGeo}>
-            <meshStandardMaterial color="#1d2456" emissive="#222d6b" emissiveIntensity={0.35} roughness={0.35} metalness={0.05} />
-          </mesh>
-
           {showPicker && (
             <>
               {/* Upper hit zone — Movies & TV (screen pos 0, 0.03) */}
