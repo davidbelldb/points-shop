@@ -389,7 +389,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
         <div className="flex items-center gap-2">
           <div className={`flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs ${isDark ? 'bg-white/20' : 'bg-black/10'}`}>
             {story.author_photo
-              ? <img src={story.author_photo} alt="" className="h-full w-full object-cover" />
+              ? <img src={story.author_photo} alt="" className="h-full w-full object-cover" width={32} height={32} loading="lazy" decoding="async" />
               : story.author_name?.[0]?.toUpperCase() ?? '?'}
           </div>
           <div className="text-sm">
@@ -487,6 +487,8 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             src={story.media_url}
             alt=""
             className="absolute inset-0 h-full w-full object-contain"
+            decoding="async"
+            fetchPriority="high"
           />
         )}
 
@@ -695,6 +697,10 @@ function StorySeenBy({ story, isDark = true }) {
         <img
           src={first.photo}
           alt=""
+          width={20}
+          height={20}
+          loading="lazy"
+          decoding="async"
           className={`h-5 w-5 shrink-0 rounded-full object-cover ring-1 ${isDark ? 'ring-white/40' : 'ring-black/20'}`}
         />
       ) : (

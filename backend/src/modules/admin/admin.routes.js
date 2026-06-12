@@ -18,6 +18,7 @@ import {
 } from './admin.repo.js';
 import { listAllOrders, updateOrderStatus } from '../orders/orders.repo.js';
 import { transcodeVideoIfNeeded } from '../media/transcode.js';
+import { optimizeImage } from '../media/image.js';
 
 const MEDIA_DIR = config.mediaDir;
 
@@ -71,7 +72,20 @@ export default async function adminRoutes(fastify) {
     // Same H.264+AAC normalisation as /api/upload so admin-side uploads
     // (product videos, hero slides, etc.) also play in every browser.
     const out = await transcodeVideoIfNeeded(filepath, type);
-    return { url: `/media/${out.filename}`, type, mimetype: data.mimetype };
+    let mediaUrl = `/media/${out.filename}`;
+    if (type === 'image') {
+      // Re-encode to WebP capped at 1600px — product photos / hero slides
+      // come straight off a phone camera otherwise, and the storefront
+      // never displays them anywhere near full resolution. Soft-fails:
+      // keeps the original if sharp can't read it.
+      const optimized = await optimizeImage(out.filepath, ext);
+      if (optimized.optimized) {
+        mediaUrl = `/media/${optimized.filename}`;
+      } else if (optimized.error) {
+        req.log?.warn({ filename, err: optimized.error }, 'image optimize skipped');
+      }
+    }
+    return { url: mediaUrl, type, mimetype: data.mimetype };
   });
 
   fastify.get('/api/admin/products', async () => listAllProducts());

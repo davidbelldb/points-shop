@@ -42,6 +42,8 @@ export default function ProductGallery({ product }) {
             src={active.url}
             alt={product.name}
             className="h-full w-full object-cover"
+            decoding="async"
+            fetchPriority="high"
           />
         )}
       </div>
@@ -73,7 +75,15 @@ export default function ProductGallery({ product }) {
                   </span>
                 </>
               ) : (
-                <img src={item.url} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={item.url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  width={56}
+                  height={56}
+                  loading="lazy"
+                  decoding="async"
+                />
               )}
             </button>
           ))}

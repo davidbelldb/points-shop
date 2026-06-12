@@ -45,7 +45,15 @@ export default function StoryRing({
               // a poster URL we use that; otherwise fall back to a muted
               // <video> with preload=metadata for browsers that decode it.
               posterUrl ? (
-                <img src={posterUrl} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={posterUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  width={size}
+                  height={size}
+                  loading="lazy"
+                  decoding="async"
+                />
               ) : (
                 <video src={thumbnailUrl} className="h-full w-full object-cover" muted preload="metadata" playsInline />
               )
@@ -59,7 +67,15 @@ export default function StoryRing({
                 </svg>
               </span>
             ) : thumbnailUrl ? (
-              <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
+              <img
+                src={thumbnailUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                width={size}
+                height={size}
+                loading="lazy"
+                decoding="async"
+              />
             ) : (
               // Silhouette fallback — used when a profile-photo-based ring
               // has no photo set, so the circle still reads as a person.

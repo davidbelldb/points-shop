@@ -65,7 +65,7 @@ const NIGHT = {
 
 function DuckSprite({ ord, duckColour, billColour, w, h, isDark }) {
   const [broken, setBroken] = useState(false);
-  const src = isDark ? `/night_duck_${ord}.png` : `/duck_${ord}.png?v=6`;
+  const src = isDark ? `/night_duck_${ord}.webp` : `/duck_${ord}.webp`;
 
   if (broken) {
     return (

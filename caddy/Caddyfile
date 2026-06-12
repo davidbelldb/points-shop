@@ -25,6 +25,17 @@ sneakypoints.com {
         @entry not path /assets/*
         header @entry Cache-Control "no-cache"
 
+        # Stable public static files (sprites, icons, 3D models, fonts) —
+        # these rarely change once deployed, so let phones cache them across
+        # visits instead of revalidating on every load. Excludes sw.js and
+        # the manifest, which must stay no-cache so PWA clients pick up
+        # updates. 7 days balances freshness against repeat-visit speed.
+        @static {
+            path *.webp *.png *.jpg *.jpeg *.gif *.svg *.ico *.glb *.gltf *.bin *.mp3 *.mp4 *.woff *.woff2 *.ttf
+            not path /sw.js
+        }
+        header @static Cache-Control "public, max-age=604800"
+
         try_files {path} /index.html
         file_server
     }

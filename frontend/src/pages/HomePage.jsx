@@ -134,7 +134,13 @@ export default function HomePage() {
                 >
                   <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-400">
                     {p.thumbnail_url ? (
-                      <img src={p.thumbnail_url} alt={p.name} className="h-full w-full object-cover" />
+                      <img
+                        src={p.thumbnail_url}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
                       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                         <rect x="3" y="3" width="18" height="18" rx="2" />

@@ -9,6 +9,7 @@ import { pipeline } from 'stream/promises';
 import { randomUUID } from 'crypto';
 import { config } from '../../config.js';
 import { transcodeVideoIfNeeded, extractVideoThumbnail } from './transcode.js';
+import { optimizeImage, generateImageThumbnail } from './image.js';
 
 const MEDIA_DIR = config.mediaDir;
 
@@ -66,26 +67,29 @@ export default async function mediaRoutes(fastify) {
     // Generate a poster thumbnail for videos so the story circles can show
     // a still instead of trying to decode the whole video.
     let thumbnail_url = null;
+    let mediaUrl = `/media/${out.filename}`;
     if (type === 'video') {
       const thumb = await extractVideoThumbnail(out.filepath);
       if (thumb) thumbnail_url = `/media/${thumb.filename}`;
-    } else if (type === 'image' && !['.gif', '.svg'].includes(ext.toLowerCase())) {
-      // Small webp thumbnail for images — list views render 40-80px thumbs,
-      // so shipping the full screenshot is ~95% wasted bytes. Soft-fails:
-      // uploads still succeed without a thumbnail.
-      try {
-        const { default: sharp } = await import('sharp');
-        const thumbName = `${id}_thumb.webp`;
-        await sharp(out.filepath ?? filepath)
-          .rotate() // respect EXIF orientation
-          .resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true })
-          .webp({ quality: 78 })
-          .toFile(path.join(MEDIA_DIR, thumbName));
-        thumbnail_url = `/media/${thumbName}`;
-      } catch (err) {
-        req.log?.warn({ err }, 'image thumbnail failed');
+    } else if (type === 'image') {
+      // Re-encode to WebP capped at 1600px — phone photos are routinely
+      // 3-4000px / multi-MB, and nothing here displays anywhere near that.
+      // Soft-fails: keeps the original if sharp can't read it.
+      const optimized = await optimizeImage(out.filepath, ext);
+      if (optimized.optimized) {
+        mediaUrl = `/media/${optimized.filename}`;
+      } else if (optimized.error) {
+        req.log?.warn({ filename, err: optimized.error }, 'image optimize skipped');
+      }
+      // Small webp thumbnail for list views (story rings etc.) — render
+      // 40-80px thumbs, so shipping the full image is ~95% wasted bytes.
+      // Skipped for gif/svg (animation / already tiny).
+      if (!['.gif', '.svg'].includes(ext.toLowerCase())) {
+        const thumbName = await generateImageThumbnail(optimized.filepath, id);
+        if (thumbName) thumbnail_url = `/media/${thumbName}`;
+        else req.log?.warn({ filename }, 'image thumbnail failed');
       }
     }
-    return { url: `/media/${out.filename}`, type, mimetype: data.mimetype, thumbnail_url };
+    return { url: mediaUrl, type, mimetype: data.mimetype, thumbnail_url };
   });
 }
