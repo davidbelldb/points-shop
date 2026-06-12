@@ -176,6 +176,28 @@ export default function AccountPage() {
 
           {user?.username === 'david' && (
             <Link
+              to="/shopping-list"
+              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="9" y1="6" x2="20" y2="6" />
+                    <line x1="9" y1="12" x2="20" y2="12" />
+                    <line x1="9" y1="18" x2="20" y2="18" />
+                    <polyline points="3.5 5.5 4.5 6.5 6 4.5" />
+                    <polyline points="3.5 11.5 4.5 12.5 6 10.5" />
+                    <circle cx="4.5" cy="18" r="1" fill="currentColor" stroke="none" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium">Sneaky Lists</p>
+              </div>
+              <span className="text-neutral-400">→</span>
+            </Link>
+          )}
+
+          {user?.username === 'david' && (
+            <Link
               to="/admin"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
             >
