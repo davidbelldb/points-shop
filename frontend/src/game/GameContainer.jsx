@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import './pixelFont.css';
 import { SpriteManager }  from './engine/SpriteManager.js';
 import { AudioManager }   from './engine/AudioManager.js';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';

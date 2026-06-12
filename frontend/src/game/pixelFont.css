@@ -1,0 +1,11 @@
+/* "Press Start 2P" — used only by the Streets of Cambs Rage game UI
+   (--font-pixel, set in index.css). Previously loaded globally via a
+   render-blocking <link rel="stylesheet"> in index.html, which meant
+   EVERY page load (home, store, notes, account, etc.) opened
+   connections to fonts.googleapis.com + fonts.gstatic.com and blocked
+   first paint on a font that's only ever used on this one game route.
+
+   Importing it here means Vite bundles this into GameContainer's lazy
+   chunk, so the font request only fires when a user actually opens the
+   game — not on every visit to the site. */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
