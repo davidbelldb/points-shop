@@ -13,6 +13,18 @@ function num(v, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// Overwrite the per-vertex colour of one face (3 vertices) of a flat-shaded
+// BufferGeometry, used to fade the die's result facet between its "hidden"
+// and "revealed" colours.
+function setFaceColor(geo, faceIndex, color) {
+  const colorAttr = geo.attributes.color;
+  for (let v = 0; v < 3; v++) {
+    const idx = faceIndex * 3 + v;
+    colorAttr.setXYZ(idx, color.r, color.g, color.b);
+  }
+  colorAttr.needsUpdate = true;
+}
+
 /* ============================================================================
  * Magic 8-Ball — homepage embed
  * Same Three.js engine / lighting rig as Shut the Box 15 (day-mode values).
@@ -66,7 +78,10 @@ const DEFAULT_LIGHTING = {
   pointColor: '#88aaff',
 };
 const TEXT_COLOR = '#b7b7f7';                      // Movies/Games/confirm/answer text on the die face
-const RESULT_FACE_COLOR = '#100c7f';               // the die's "result" facet colour
+const RESULT_FACE_COLOR = '#100c7f';               // the die's "result" facet colour once revealed
+const RESULT_FACE_REST_COLOR = '#05050c';          // result facet colour while tumbling/settling — hidden in the liquid
+const RESULT_FACE_REVEAL_EPS = 0.015;              // how close to fully-settled before the reveal transition starts
+const RESULT_FACE_TRANSITION_SPEED = 6;            // higher = quicker colour transition once settled
 const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
 const DIE_Z_REST = 0.85;                           // resting depth, deep in the liquid
 const DIE_Z_FLOAT = 1.15;                          // how close to the glass it floats once the result settles
@@ -137,6 +152,14 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
   const dieRef = useRef();
   const shakeStartRef = useRef(0);
 
+  // Result-facet colour reveal — stays RESULT_FACE_REST_COLOR (blends into
+  // the liquid) while tumbling/settling, then transitions smoothly to
+  // RESULT_FACE_COLOR only once the die has fully come to rest.
+  const restFaceColor = useRef(new THREE.Color(RESULT_FACE_REST_COLOR));
+  const litFaceColor = useRef(new THREE.Color(RESULT_FACE_COLOR));
+  const faceColorScratch = useRef(new THREE.Color());
+  const faceRevealRef = useRef(0); // 0 = rest colour, 1 = fully revealed
+
   // The die's own geometry — an icosahedron with one facet (face 6, the
   // one that's face-on to the camera once REST_ROTATION is applied)
   // painted a touch lighter via per-vertex colours, so that one facet
@@ -148,7 +171,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
     const count = geo.attributes.position.count;
     const colors = new Float32Array(count * 3);
     const base = new THREE.Color('#13132c');
-    const lit = new THREE.Color(RESULT_FACE_COLOR);
+    const lit = new THREE.Color(RESULT_FACE_REST_COLOR);
     for (let i = 0; i < count; i++) {
       const face = Math.floor(i / 3);
       const c = face === 6 ? lit : base;
@@ -214,6 +237,27 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
       // glass, so the result reads through the murky filter below.
       const targetZ = phase === 'answer' ? DIE_Z_FLOAT : DIE_Z_REST;
       dieRef.current.position.z += (targetZ - dieRef.current.position.z) * Math.min(delta * 1.5, 1);
+
+      // Result-face colour reveal — only flip to the lit colour once the
+      // die has essentially stopped moving (rotation + float both settled),
+      // then fade smoothly into it. Any other time (tumbling, still
+      // floating into place) the facet stays the dark "hidden" colour.
+      const settled =
+        phase === 'answer' &&
+        Math.abs(dieRef.current.rotation.x - REST_ROTATION.x) < RESULT_FACE_REVEAL_EPS &&
+        Math.abs(dieRef.current.rotation.y - REST_ROTATION.y) < RESULT_FACE_REVEAL_EPS &&
+        Math.abs(dieRef.current.rotation.z - REST_Z) < RESULT_FACE_REVEAL_EPS &&
+        Math.abs(dieRef.current.position.z - targetZ) < RESULT_FACE_REVEAL_EPS;
+
+      const revealTarget = settled ? 1 : 0;
+      const prevReveal = faceRevealRef.current;
+      if (prevReveal !== revealTarget || (prevReveal > 0 && prevReveal < 1)) {
+        faceRevealRef.current += (revealTarget - prevReveal) * Math.min(delta * RESULT_FACE_TRANSITION_SPEED, 1);
+        const c = faceColorScratch.current
+          .copy(restFaceColor.current)
+          .lerp(litFaceColor.current, faceRevealRef.current);
+        setFaceColor(dieGeo, 6, c);
+      }
     }
   });
 
@@ -258,7 +302,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           against the glass. */}
       <group ref={dieRef} position={[0, 0, DIE_Z_REST]} rotation={[REST_ROTATION.x, REST_ROTATION.y, REST_Z]} scale={DIE_SCALE}>
         <mesh castShadow geometry={dieGeo}>
-          <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} flatShading />
+          <meshStandardMaterial vertexColors roughness={1} metalness={0} flatShading />
         </mesh>
 
         {/* "Face group" — sits flush on one specific facet (its centroid,
