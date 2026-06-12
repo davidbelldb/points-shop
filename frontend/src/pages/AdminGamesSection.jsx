@@ -18,6 +18,7 @@ export default function AdminGamesSection({ bare = false }) {
   const body = (
     <div className="space-y-3">
       <GamesSettingsCard />
+      <Magic8BallSettingsCard />
       <TodPromptsCard />
     </div>
   );
@@ -66,6 +67,47 @@ function GamesSettingsCard() {
           {busy ? 'Saving...' : 'Save'}
         </button>
       </div>
+    </div>
+  );
+}
+
+function Magic8BallSettingsCard() {
+  const { settings, refresh } = useSettings();
+  const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setVisible(settings.magic8ball_homepage_visible === 'true');
+  }, [settings.magic8ball_homepage_visible]);
+
+  async function save(next) {
+    setVisible(next);
+    setBusy(true);
+    try {
+      await api.admin.updateSettings({
+        magic8ball_homepage_visible: next ? 'true' : 'false',
+      });
+      await refresh();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-3">
+      <p className="text-sm font-semibold">Magic 8-Ball</p>
+      <p className="text-xs text-neutral-500">
+        Picks a movie/show or game from the watchlist or playlist. Playable at{' '}
+        <code>/magic-8-ball</code>.
+      </p>
+      <label className="flex items-center justify-between text-xs font-medium text-neutral-600">
+        Show on homepage
+        <input
+          type="checkbox"
+          checked={visible}
+          disabled={busy}
+          onChange={(e) => save(e.target.checked)}
+          className="h-4 w-4 accent-amber-600"
+        />
+      </label>
     </div>
   );
 }

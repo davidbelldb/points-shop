@@ -6,6 +6,7 @@ const ALLOWED = [
   'banner_countdown_date', 'banner_countdown_time',
   'audio_section_enabled', 'audio_title', 'audio_subtitle',
   'homepage_featured_enabled',
+  'magic8ball_homepage_visible',
 ];
 
 export async function getAllSettings() {
