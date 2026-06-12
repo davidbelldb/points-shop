@@ -30,7 +30,6 @@ import gamesRoutes from './games/games.routes.js';
 import giftsweeperRoutes from './games/giftsweeper.routes.js';
 import rewardsRoutes from './rewards/rewards.routes.js';
 import wheelRoutes from './wheel/wheel.routes.js';
-import stbRoutes from './games/stb.routes.js';
 import stb15Routes from './games/stb15.routes.js';
 import duckyRoutes from './games/ducky.routes.js';
 import cambsRageRoutes from './games/cambs-rage.routes.js';
@@ -70,7 +69,6 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(giftsweeperRoutes);
   await fastify.register(rewardsRoutes);
   await fastify.register(wheelRoutes);
-  await fastify.register(stbRoutes);
   await fastify.register(stb15Routes);
   await fastify.register(duckyRoutes);
   await fastify.register(cambsRageRoutes);

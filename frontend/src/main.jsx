@@ -24,7 +24,6 @@ const TruthOrDarePage      = lazy(() => import('./pages/TruthOrDarePage.jsx'));
 const TicTacFacePage       = lazy(() => import('./pages/TicTacFacePage.jsx'));
 const GiftsweeperPage      = lazy(() => import('./pages/GiftsweeperPage.jsx'));
 const WheelOfMisfortunePage = lazy(() => import('./pages/WheelOfMisfortunePage.jsx'));
-const ShutTheBoxPage       = lazy(() => import('./pages/ShutTheBoxPage.jsx'));
 const ShutTheBox15Page     = lazy(() => import('./pages/ShutTheBox15Page.jsx'));
 const DuckyDerbyPage       = lazy(() => import('./pages/DuckyDerbyPage.jsx'));
 const GameContainer        = lazy(() => import('./game/GameContainer.jsx'));
@@ -108,7 +107,6 @@ createRoot(document.getElementById('root')).render(
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />
               <Route path="games/giftsweeper" element={<GiftsweeperPage />} />
               <Route path="games/wheel-of-misfortune" element={<WheelOfMisfortunePage />} />
-              <Route path="games/shut-the-box" element={<ShutTheBoxPage />} />
               <Route path="games/shut-the-box-15" element={<ShutTheBox15Page />} />
               <Route path="games/ducky" element={<DuckyDerbyPage />} />
               <Route path="games/dirty-wordle" element={<DirtyWordlePage />} />

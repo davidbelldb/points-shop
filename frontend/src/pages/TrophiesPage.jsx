@@ -84,7 +84,7 @@ export default function TrophiesPage() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-5 text-center">
           <p className="text-sm text-neutral-500">No trophies yet.</p>
           <p className="mt-1 text-xs text-neutral-400">Shut the box to win one.</p>
-          <Link to="/games/shut-the-box" className="mt-3 inline-block text-xs font-medium text-teal-700 underline">Go play</Link>
+          <Link to="/games/shut-the-box-15" className="mt-3 inline-block text-xs font-medium text-teal-700 underline">Go play</Link>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
