@@ -15,6 +15,7 @@
  */
 import { query } from '../db.js';
 import { sendPush } from '../modules/notifications/push.js';
+import { backfillEventSnackSync } from '../modules/shopping/shopping.routes.js';
 
 const PUSH_POLL_MS = 60_000;
 const SESSION_CLEANUP_MS = 60 * 60_000; // hourly
@@ -26,9 +27,14 @@ export function registerBackgroundJobs(fastify) {
 }
 
 // One-shot backfills for legacy media that predates the optimized
-// upload/thumbnail pipelines. Don't block startup; log progress through
-// fastify.log.
+// upload/thumbnail pipelines, plus other startup data-sync jobs. Don't
+// block startup; log progress through fastify.log.
 function registerOneShotBackfills(fastify) {
+  // Sync snack lists of pre-existing upcoming events to shopping trips.
+  backfillEventSnackSync()
+    .then((n) => fastify.log.info(`event snack backfill: ${n} event(s) checked`))
+    .catch((e) => fastify.log.warn({ err: e }, 'event snack backfill failed'));
+
   import('../modules/stories/backfill_thumbnails.js')
     .then(({ backfillVideoThumbnails, backfillImageThumbnails }) => {
       backfillVideoThumbnails(fastify.log);

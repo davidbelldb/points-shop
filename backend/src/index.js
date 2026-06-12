@@ -6,44 +6,8 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { config } from './config.js';
 import { pool } from './db.js';
-import productsRoutes from './modules/products/products.routes.js';
-import accountsRoutes from './modules/accounts/accounts.routes.js';
-import basketRoutes from './modules/basket/basket.routes.js';
-import ordersRoutes from './modules/orders/orders.routes.js';
-import adminRoutes from './modules/admin/admin.routes.js';
-import settingsRoutes from './modules/settings/settings.routes.js';
-import discountsRoutes from './modules/discounts/discounts.routes.js';
-import deliveryRoutes from './modules/delivery/delivery.routes.js';
-import heroRoutes from './modules/hero/hero.routes.js';
-import reviewsRoutes from './modules/reviews/reviews.routes.js';
-import notificationsRoutes from './modules/notifications/notifications.routes.js';
-import surveysRoutes from './modules/surveys/surveys.routes.js';
-import authRoutes, { SESSION_COOKIE } from './modules/auth/auth.routes.js';
-import chatRoutes from './modules/chat/chat.routes.js';
-import todRoutes from './modules/tod/tod.routes.js';
-import gamesRoutes from './modules/games/games.routes.js';
-import giftsweeperRoutes from './modules/games/giftsweeper.routes.js';
-import rewardsRoutes from './modules/rewards/rewards.routes.js';
-import wheelRoutes from './modules/wheel/wheel.routes.js';
-import stbRoutes from './modules/games/stb.routes.js';
-import stb15Routes from './modules/games/stb15.routes.js';
-import duckyRoutes from './modules/games/ducky.routes.js';
-import cambsRageRoutes from './modules/games/cambs-rage.routes.js';
-import dirtyWordleRoutes from './modules/games/dirty-wordle.routes.js';
-import rewatchRoutes from './modules/rewatch/rewatch.routes.js';
-import audioRoutes from './modules/audio/audio.routes.js';
-import calendarRoutes from './modules/calendar/calendar.routes.js';
-import storiesRoutes from './modules/stories/stories.routes.js';
-import lastfmRoutes from './modules/stories/lastfm.routes.js';
-import mediaRoutes from './modules/media/media.routes.js';
-import notesRoutes from './modules/notes/notes.routes.js';
-import { momentsRoutes } from './modules/moments/moments.routes.js';
-import { rtcRoutes } from './modules/games/rtc.routes.js';
-import callsRoutes from './modules/calls/calls.routes.js';
-import spreadsheetsRoutes from './modules/spreadsheets/spreadsheets.routes.js';
-import shoppingRoutes, { backfillEventSnackSync } from './modules/shopping/shopping.routes.js';
-import bootstrapRoutes from './modules/bootstrap/bootstrap.routes.js';
-import playlistRoutes from './modules/playlist/playlist.routes.js';
+import { registerAppRoutes } from './modules/routes.js';
+import { SESSION_COOKIE } from './modules/auth/auth.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
 import { registerBackgroundJobs } from './jobs/index.js';
 
@@ -99,53 +63,13 @@ fastify.get('/health', async () => {
   return { status: 'ok', db: rows[0].ok === 1, ts: new Date().toISOString() };
 });
 
-await fastify.register(productsRoutes);
-await fastify.register(accountsRoutes);
-await fastify.register(basketRoutes);
-await fastify.register(ordersRoutes);
-await fastify.register(adminRoutes);
-await fastify.register(settingsRoutes);
-await fastify.register(discountsRoutes);
-await fastify.register(deliveryRoutes);
-await fastify.register(heroRoutes);
-await fastify.register(reviewsRoutes);
-await fastify.register(notificationsRoutes);
-await fastify.register(surveysRoutes);
-await fastify.register(authRoutes);
-await fastify.register(chatRoutes);
-await fastify.register(todRoutes);
-await fastify.register(gamesRoutes);
-await fastify.register(giftsweeperRoutes);
-await fastify.register(rewardsRoutes);
-await fastify.register(wheelRoutes);
-await fastify.register(stbRoutes);
-await fastify.register(stb15Routes);
-await fastify.register(duckyRoutes);
-await fastify.register(cambsRageRoutes);
-await fastify.register(dirtyWordleRoutes);
-await fastify.register(rewatchRoutes);
-await fastify.register(audioRoutes);
-await fastify.register(calendarRoutes);
-await fastify.register(storiesRoutes);
-await fastify.register(lastfmRoutes);
-await fastify.register(mediaRoutes);
-await fastify.register(notesRoutes);
-await fastify.register(momentsRoutes);
-await fastify.register(rtcRoutes);
-await fastify.register(callsRoutes);
-await fastify.register(spreadsheetsRoutes);
-await fastify.register(shoppingRoutes);
-await fastify.register(bootstrapRoutes);
-await fastify.register(playlistRoutes);
+// All API routes are registered here — see modules/routes.js for the full
+// list and instructions for adding a new module.
+await registerAppRoutes(fastify);
 
 await ensureDefaultPasswords().catch((e) => fastify.log.error({ err: e }, 'password seed failed'));
 
-// One-shot: sync snack lists of pre-existing upcoming events to shopping trips.
-backfillEventSnackSync()
-  .then((n) => fastify.log.info(`event snack backfill: ${n} event(s) checked`))
-  .catch((e) => fastify.log.warn({ err: e }, 'event snack backfill failed'));
-
-// All recurring/one-shot background work (media backfills, scheduled push
+// All recurring/one-shot background work (data backfills, scheduled push
 // poller, expired-session cleanup) lives in ./jobs — see that module for
 // details on what runs and why.
 registerBackgroundJobs(fastify);
