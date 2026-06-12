@@ -23,6 +23,19 @@ export async function listReels(ownerAccountId = null) {
                 WHERE rs2.reel_id = r.id
                 ORDER BY rs2.added_at DESC LIMIT 1)
             ) AS cover_url,
+            -- Small generated thumbnail for the cover, when one exists —
+            -- reel circles render at ~74px, so the home/feed strips were
+            -- shipping the full 1600px-capped cover_url (hundreds of KB to
+            -- a couple MB) just to fill a tiny circle. cover_image_url
+            -- (custom admin-uploaded covers) has no thumbnail counterpart
+            -- and falls back to cover_url in the frontend.
+            COALESCE(
+              cs.thumbnail_url,
+              (SELECT s.thumbnail_url FROM reel_stories rs2
+                 JOIN sneaky_stories s ON s.id = rs2.story_id
+                WHERE rs2.reel_id = r.id
+                ORDER BY rs2.added_at DESC LIMIT 1)
+            ) AS cover_thumbnail_url,
             CASE
               WHEN r.cover_image_url IS NOT NULL THEN 'image'
               ELSE COALESCE(
@@ -37,7 +50,7 @@ export async function listReels(ownerAccountId = null) {
        LEFT JOIN reel_stories rs ON rs.reel_id = r.id
        LEFT JOIN sneaky_stories cs ON cs.id = r.cover_story_id
       ${filter}
-      GROUP BY r.id, cs.media_url, cs.media_type
+      GROUP BY r.id, cs.media_url, cs.media_type, cs.thumbnail_url
       ORDER BY MAX(rs.added_at) DESC NULLS LAST, r.created_at DESC`,
     params,
   );

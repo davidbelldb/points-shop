@@ -226,6 +226,7 @@ export default function SneakyFeedPage() {
               {reels.map((r) => (
                 <StoryRing
                   key={r.id}
+                  posterUrl={r.cover_thumbnail_url}
                   thumbnailUrl={r.cover_url}
                   mediaType={r.cover_media_type}
                   glow={false}

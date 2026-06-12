@@ -178,6 +178,7 @@ export default function StoriesStrip() {
     ...visibleReels.map((r) => (
       <StoryRing
         key={`reel-${r.id}`}
+        posterUrl={r.cover_thumbnail_url}
         thumbnailUrl={r.cover_url}
         mediaType={r.cover_media_type}
         glow={false}
@@ -224,6 +225,7 @@ export default function StoriesStrip() {
           {visibleReels.map((r) => (
             <StoryRing
               key={`reel-${r.id}`}
+              posterUrl={r.cover_thumbnail_url}
               thumbnailUrl={r.cover_url}
               mediaType={r.cover_media_type}
               glow={false}
