@@ -66,13 +66,13 @@ const DEFAULT_LIGHTING = {
   pointColor: '#88aaff',
 };
 const TEXT_COLOR = '#b7b7f7';                      // Movies/Games/confirm/answer text on the die face
-const RESULT_FACE_COLOR = '#08055d';               // the die's "result" facet colour
+const RESULT_FACE_COLOR = '#100c7f';               // the die's "result" facet colour
 const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
 const DIE_Z_REST = 0.85;                           // resting depth, deep in the liquid
 const DIE_Z_FLOAT = 1.15;                          // how close to the glass it floats once the result settles
 const FILTER_COLOR = '#10173a';                    // murky liquid filter drawn over the window
 const FILTER_OPACITY = 0.8;
-const WINDOW_SCALE = 0.55;                         // window/portal elements scaled to 55% (45% smaller)
+const WINDOW_SCALE = 1;                            // window/portal elements at full size (shrink reverted — was creating a nested "second ball" look)
 const WINDOW_FILL_COLOR = '#05050c';               // flat "liquid" fill inside the 8-ball window
 
 /* ----------------------------------------------------------------------
@@ -87,6 +87,10 @@ function SceneLighting({ lighting }) {
       <directionalLight position={[4, 8, 4]} intensity={lighting.dir1Intensity} />
       <directionalLight position={[-5, 4, -2]} intensity={lighting.dir2Intensity} />
       <pointLight position={[-5, 6, -3]} intensity={lighting.pointIntensity} color={lighting.pointColor} distance={16} decay={2} />
+      {/* Warm "lamp" accent — a cosy amber glow from one side, paired with a
+          cool blue accent from the other for contrast. */}
+      <pointLight position={[4, 2.5, 3]} intensity={0.9} color="#ffb066" distance={14} decay={2} />
+      <pointLight position={[-4, 1.5, 2.5]} intensity={0.7} color="#4d8cff" distance={14} decay={2} />
     </>
   );
 }
@@ -102,15 +106,21 @@ function SceneLighting({ lighting }) {
  * -------------------------------------------------------------------- */
 const INTRO_CAMERA = { pos: [0, 1.6, 9.5], fov: 42 };
 
-function CameraRig({ phase, cameraView }) {
+// Two-finger pinch zoom multiplies the target FOV by this factor — values
+// below 1 zoom in (narrower FOV), above 1 zoom out (wider FOV).
+const MIN_PINCH_ZOOM = 0.5;
+const MAX_PINCH_ZOOM = 1.8;
+
+function CameraRig({ phase, cameraView, zoomRef }) {
   const { camera } = useThree();
   const targetVec = useRef(new THREE.Vector3());
 
   useFrame(() => {
     const target = phase === 'intro' ? INTRO_CAMERA : cameraView;
+    const zoom = zoomRef?.current ?? 1;
     targetVec.current.set(...target.pos);
     camera.position.lerp(targetVec.current, 0.045);
-    camera.fov += (target.fov - camera.fov) * 0.045;
+    camera.fov += (target.fov * zoom - camera.fov) * 0.045;
     camera.lookAt(0, 0, 0.6);
     camera.updateProjectionMatrix();
   });
@@ -373,12 +383,32 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
  * -------------------------------------------------------------------- */
 function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture, onFirstInteract, cameraView, lighting }) {
   const swipeRef = useRef({ active: false, lastX: 0, lastDir: 0, accum: 0, lastT: 0 });
+  // Tracks active touch points by pointerId, plus pinch state, so a
+  // two-finger pinch can zoom the camera in/out without triggering swipes.
+  const pointersRef = useRef(new Map());
+  const pinchRef = useRef({ active: false, startDist: 0, startZoom: 1 });
+  const zoomRef = useRef(1);
 
   function resetSwipe() {
     swipeRef.current = { active: false, lastX: 0, lastDir: 0, accum: 0, lastT: 0 };
   }
 
+  function pinchDistance() {
+    const pts = [...pointersRef.current.values()];
+    if (pts.length < 2) return 0;
+    const [a, b] = pts;
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
   function handlePointerDown(e) {
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size >= 2) {
+      // A second finger landed — start (or restart) the pinch and cancel
+      // any in-progress swipe so the two gestures don't fight.
+      resetSwipe();
+      pinchRef.current = { active: true, startDist: pinchDistance(), startZoom: zoomRef.current };
+      return;
+    }
     swipeRef.current = { active: true, lastX: e.clientX, lastDir: 0, accum: 0, lastT: performance.now() };
     // Piggyback the iOS motion-permission prompt onto the very first tap —
     // requestPermission() must be called from inside a user gesture, so
@@ -387,6 +417,20 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
   }
 
   function handlePointerMove(e) {
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (pinchRef.current.active && pointersRef.current.size >= 2) {
+      const dist = pinchDistance();
+      if (dist > 0 && pinchRef.current.startDist > 0) {
+        const scale = pinchRef.current.startDist / dist;
+        const next = pinchRef.current.startZoom * scale;
+        zoomRef.current = Math.min(MAX_PINCH_ZOOM, Math.max(MIN_PINCH_ZOOM, next));
+      }
+      return;
+    }
+
     const s = swipeRef.current;
     if (!s.active) return;
     const dx = e.clientX - s.lastX;
@@ -408,6 +452,14 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
     }
   }
 
+  function handlePointerUp(e) {
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size < 2) {
+      pinchRef.current.active = false;
+    }
+    resetSwipe();
+  }
+
   return (
     <div
       className="touch-none overflow-hidden rounded-2xl shadow-lg"
@@ -417,12 +469,13 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
-      onPointerUp={resetSwipe}
-      onPointerLeave={resetSwipe}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
       <Canvas shadows dpr={[1, 2]} camera={{ position: INTRO_CAMERA.pos, fov: INTRO_CAMERA.fov }} gl={{ antialias: true, alpha: true }}>
         <SceneLighting lighting={lighting} />
-        <CameraRig phase={phase} cameraView={cameraView} />
+        <CameraRig phase={phase} cameraView={cameraView} zoomRef={zoomRef} />
         <MagicBall phase={phase} answer={answer} shakeSeed={shakeSeed} onPick={onPick} onReroll={onReroll} />
       </Canvas>
     </div>
