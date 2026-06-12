@@ -32,9 +32,9 @@ const REST_ROTATION = { x: 0.06, y: -0.1 };
 const IDLE_SPIN = 0.12;
 
 /* ----------------------------------------------------------------------
- * Window background — flat mid-grey with a soft vignette, matching the
- * classic 8-ball's recessed window. The only colour in the scene is the
- * blue triangle floating inside it.
+ * Window "liquid" — deep dark blue (#0e0e29) filling the whole window,
+ * with the faintest lighter glow at the centre for depth. The white die
+ * floats in this fluid.
  * -------------------------------------------------------------------- */
 function makeWindowGlowTexture() {
   const size = 256;
@@ -42,9 +42,9 @@ function makeWindowGlowTexture() {
   c.width = c.height = size;
   const ctx = c.getContext('2d');
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, '#3a3a3b');
-  grad.addColorStop(0.6, '#2c2c2d');
-  grad.addColorStop(1, '#1c1c1d');
+  grad.addColorStop(0, '#1a1a3c');
+  grad.addColorStop(0.6, '#121230');
+  grad.addColorStop(1, '#0e0e29');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(c);
@@ -109,25 +109,6 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
   const shakeStartRef = useRef(0);
 
   const glowTex = useMemo(() => makeWindowGlowTexture(), []);
-
-  // Downward-pointing triangle (one face of the d20), like the classic
-  // 8-ball's floating die.
-  const triangleGeo = useMemo(() => {
-    const shape = new THREE.Shape();
-    shape.moveTo(-0.58, -0.46);
-    shape.lineTo(0.58, -0.46);
-    shape.lineTo(0, 0.56);
-    shape.lineTo(-0.58, -0.46);
-    const geo = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.16,
-      bevelEnabled: true,
-      bevelThickness: 0.025,
-      bevelSize: 0.025,
-      bevelSegments: 3,
-    });
-    geo.translate(0, 0, -0.08);
-    return geo;
-  }, []);
 
   useEffect(() => {
     if (shakeSeed) shakeStartRef.current = performance.now();
@@ -212,60 +193,48 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         <meshStandardMaterial color="#0c0c0c" roughness={0.4} metalness={0.2} />
       </mesh>
 
-      {/* The "inner core" — a faceted blue triangle (one face of the d20)
-          that tumbles wildly while shaking and otherwise drifts with a
-          slow continuous spin, like the classic 8-ball's die floating in
-          its window. Movies/Games/confirm/answer text is printed on its
-          face. */}
+      {/* The "inner core" — a white 20-sided die that tumbles wildly while
+          shaking and otherwise drifts with a slow continuous spin, like a
+          d20 floating in the deep blue liquid. Movies/Games/confirm/answer
+          text is printed straight onto its face. */}
       <group ref={dieRef} position={[0, 0, 0.85]} rotation={[REST_ROTATION.x, REST_ROTATION.y, 0]} scale={0.67}>
-        {/* The 20-sided die body — dark/neutral so it reads as the
-            faceted core of the ball, with one bright blue facet (below)
-            carrying the result. */}
         <mesh castShadow>
           <icosahedronGeometry args={[0.62, 0]} />
-          <meshStandardMaterial color="#3a3a3c" roughness={0.4} metalness={0.15} flatShading />
+          <meshStandardMaterial color="#f5f5f0" roughness={0.4} metalness={0.05} flatShading />
         </mesh>
         {/* Faint edge highlight so the facets read clearly */}
         <mesh scale={1.01}>
           <icosahedronGeometry args={[0.62, 0]} />
-          <meshBasicMaterial color="#9aa0aa" wireframe transparent opacity={0.2} depthWrite={false} />
-        </mesh>
-
-        {/* The active blue facet, sitting just proud of the die's surface,
-            with the result printed on it. Text/hit-zones share this
-            group's scale so the original layout numbers still line up. */}
-        <group position={[0, 0, 0.45]} scale={0.75}>
-        <mesh castShadow geometry={triangleGeo}>
-          <meshStandardMaterial color="#1f3fe6" emissive="#2c4dff" emissiveIntensity={0.6} roughness={0.3} metalness={0.1} />
+          <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.25} depthWrite={false} />
         </mesh>
 
         {showPicker && (
           <>
             {/* Upper hit zone — Movies & TV */}
             <mesh
-              position={[0, -0.02, 0.1]}
+              position={[0, 0.08, 0.48]}
               onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
               onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
               onPointerOut={() => setCursor(false)}
             >
-              <planeGeometry args={[0.65, 0.28]} />
+              <planeGeometry args={[0.85, 0.3]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
-            <Text position={[0, -0.02, 0.105]} fontSize={0.12} color="#eaf6ff" maxWidth={0.65} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
+            <Text position={[0, 0.08, 0.5]} fontSize={0.16} color="#23264a" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
               Movies
             </Text>
 
             {/* Lower hit zone — Video Games */}
             <mesh
-              position={[0, -0.3, 0.1]}
+              position={[0, -0.22, 0.48]}
               onClick={(e) => { e.stopPropagation(); onPick('games'); }}
               onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
               onPointerOut={() => setCursor(false)}
             >
-              <planeGeometry args={[0.9, 0.26]} />
+              <planeGeometry args={[0.85, 0.28]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
-            <Text position={[0, -0.3, 0.105]} fontSize={0.105} color="#eaf6ff" maxWidth={0.9} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
+            <Text position={[0, -0.22, 0.5]} fontSize={0.14} color="#23264a" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
               Games
             </Text>
           </>
@@ -274,15 +243,15 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         {showConfirm && (
           <>
             <mesh
-              position={[0, -0.15, 0.1]}
+              position={[0, -0.05, 0.48]}
               onClick={(e) => { e.stopPropagation(); onReroll(); }}
               onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
               onPointerOut={() => setCursor(false)}
             >
-              <planeGeometry args={[0.9, 0.7]} />
+              <planeGeometry args={[0.95, 0.7]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
-            <Text position={[0, -0.15, 0.105]} fontSize={0.095} lineHeight={1.25} color="#eaf6ff" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
+            <Text position={[0, -0.05, 0.5]} fontSize={0.115} lineHeight={1.25} color="#23264a" maxWidth={0.9} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
               {'Okay, then.\nGive me a shake!'}
             </Text>
           </>
@@ -291,20 +260,19 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         {showAnswer && (
           <>
             <mesh
-              position={[0, -0.15, 0.1]}
+              position={[0, -0.05, 0.48]}
               onClick={(e) => { e.stopPropagation(); onReroll(); }}
               onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
               onPointerOut={() => setCursor(false)}
             >
-              <planeGeometry args={[0.9, 0.7]} />
+              <planeGeometry args={[0.95, 0.7]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
-            <Text position={[0, -0.15, 0.105]} fontSize={0.105} lineHeight={1.25} color="#eaf6ff" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
+            <Text position={[0, -0.05, 0.5]} fontSize={0.13} lineHeight={1.25} color="#23264a" maxWidth={0.92} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
               {answer}
             </Text>
           </>
         )}
-        </group>
       </group>
 
       {/* Heading prompt — fixed in the window, not on the die */}
