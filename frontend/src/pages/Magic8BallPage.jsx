@@ -66,34 +66,14 @@ const DEFAULT_LIGHTING = {
   pointColor: '#88aaff',
 };
 const TEXT_COLOR = '#b7b7f7';                      // Movies/Games/confirm/answer text on the die face
-const RESULT_FACE_COLOR = '#050c47';               // the die's "result" facet colour
+const RESULT_FACE_COLOR = '#08055d';               // the die's "result" facet colour
 const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
 const DIE_Z_REST = 0.85;                           // resting depth, deep in the liquid
 const DIE_Z_FLOAT = 1.15;                          // how close to the glass it floats once the result settles
 const FILTER_COLOR = '#10173a';                    // murky liquid filter drawn over the window
 const FILTER_OPACITY = 0.8;
 const WINDOW_SCALE = 0.55;                         // window/portal elements scaled to 55% (45% smaller)
-
-/* ----------------------------------------------------------------------
- * Window "liquid" — deep dark blue (#0e0e29) filling the whole window,
- * with the faintest lighter glow at the centre for depth. The white die
- * floats in this fluid.
- * -------------------------------------------------------------------- */
-function makeWindowGlowTexture() {
-  const size = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, '#1a1a3c');
-  grad.addColorStop(0.6, '#121230');
-  grad.addColorStop(1, '#0e0e29');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
+const WINDOW_FILL_COLOR = '#05050c';               // flat "liquid" fill inside the 8-ball window
 
 /* ----------------------------------------------------------------------
  * Lighting — matches Stb15Scene's day-mode rig (SceneLighting w/ isNight=false)
@@ -146,8 +126,6 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
   const ballRef = useRef();
   const dieRef = useRef();
   const shakeStartRef = useRef(0);
-
-  const glowTex = useMemo(() => makeWindowGlowTexture(), []);
 
   // The die's own geometry — an icosahedron with one facet (face 6, the
   // one that's face-on to the camera once REST_ROTATION is applied)
@@ -245,10 +223,10 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         <meshStandardMaterial color="#0c0c10" roughness={0.18} metalness={0.4} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Window background — flat mid-grey, the resting colour of the window */}
+      {/* Window background — flat deep-liquid fill, the resting colour of the window */}
       <mesh position={[0, 0, 0.7]}>
         <circleGeometry args={[1.06 * WINDOW_SCALE, 48]} />
-        <meshBasicMaterial map={glowTex} depthWrite={false} />
+        <meshBasicMaterial color={WINDOW_FILL_COLOR} depthWrite={false} />
       </mesh>
 
       {/* Double ring inset around the window, like the real 8-ball's
@@ -359,7 +337,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
       {/* Heading prompt — fixed in the window, not on the die */}
       {showPicker && (
-        <Text position={[0, 0.62, 1.0]} fontSize={0.078} lineHeight={1.15} color="#fdf6e3" maxWidth={1.35} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.004} outlineColor="#0a0a14">
+        <Text position={[0, 0.62 * WINDOW_SCALE, 1.0]} fontSize={0.078 * WINDOW_SCALE} lineHeight={1.15} color="#fdf6e3" maxWidth={1.35 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.004 * WINDOW_SCALE} outlineColor="#0a0a14">
           {'Need Help Choosing\na Movie or Game?'}
         </Text>
       )}
