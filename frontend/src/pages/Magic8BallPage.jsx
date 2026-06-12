@@ -36,6 +36,20 @@ const REST_Z = -Math.PI / 2;
 // — like it's gently turning in the fluid.
 const IDLE_SPIN = 0.12;
 
+// ---------------------------------------------------------------------
+// Tunable scene settings — change these to restyle, reposition or
+// recolour the ball without hunting through the JSX below.
+// ---------------------------------------------------------------------
+const SCENE_BACKGROUND = '#2a0e52';                // flat colour behind the whole 8-ball
+const CAMERA_VIEW = { pos: [0, 0.3, 4], fov: 35 }; // camera position/fov once settled on the window
+const TEXT_COLOR = '#b7b7f7';                      // Movies/Games/confirm/answer text on the die face
+const RESULT_FACE_COLOR = '#08055d';               // the die's "result" facet colour
+const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
+const DIE_Z_REST = 0.85;                           // resting depth, deep in the liquid
+const DIE_Z_FLOAT = 1.15;                          // how close to the glass it floats once the result settles
+const FILTER_COLOR = '#10173a';                    // murky liquid filter drawn over the window
+const FILTER_OPACITY = 0.8;
+
 /* ----------------------------------------------------------------------
  * Window "liquid" — deep dark blue (#0e0e29) filling the whole window,
  * with the faintest lighter glow at the centre for depth. The white die
@@ -82,10 +96,10 @@ function SceneLighting() {
  * -------------------------------------------------------------------- */
 const CAMERA_TARGETS = {
   intro: { pos: [0, 1.6, 9.5], fov: 42 },
-  select: { pos: [0, 0.3, 4], fov: 35 },
-  confirm: { pos: [0, 0.3, 4], fov: 35 },
-  shaking: { pos: [0, 0.3, 4], fov: 35 },
-  answer: { pos: [0, 0.3, 4], fov: 35 },
+  select: CAMERA_VIEW,
+  confirm: CAMERA_VIEW,
+  shaking: CAMERA_VIEW,
+  answer: CAMERA_VIEW,
 };
 
 function CameraRig({ phase }) {
@@ -126,7 +140,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
     const count = geo.attributes.position.count;
     const colors = new Float32Array(count * 3);
     const base = new THREE.Color('#13132c');
-    const lit = new THREE.Color('#2a3578');
+    const lit = new THREE.Color(RESULT_FACE_COLOR);
     for (let i = 0; i < count; i++) {
       const face = Math.floor(i / 3);
       const c = face === 6 ? lit : base;
@@ -186,6 +200,12 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           dieRef.current.rotation.z += (REST_Z - dieRef.current.rotation.z) * Math.min(delta * 2, 1);
         }
       }
+
+      // Once the result face has settled, the die drifts forward —
+      // floating up through the deep liquid to sit close against the
+      // glass, so the result reads through the murky filter below.
+      const targetZ = phase === 'answer' ? DIE_Z_FLOAT : DIE_Z_REST;
+      dieRef.current.position.z += (targetZ - dieRef.current.position.z) * Math.min(delta * 1.5, 1);
     }
   });
 
@@ -228,7 +248,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           mostly hidden in the dark fluid — only face 6 (painted lighter in
           dieGeo) reads clearly, like that one facet has floated face-up
           against the glass. */}
-      <group ref={dieRef} position={[0, 0, 0.85]} rotation={[REST_ROTATION.x, REST_ROTATION.y, REST_Z]} scale={0.67}>
+      <group ref={dieRef} position={[0, 0, DIE_Z_REST]} rotation={[REST_ROTATION.x, REST_ROTATION.y, REST_Z]} scale={DIE_SCALE}>
         <mesh castShadow geometry={dieGeo}>
           <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} flatShading />
         </mesh>
@@ -259,7 +279,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.16, 0.38]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[-0.03, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color="#d8d8f8" maxWidth={0.38} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[-0.03, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.38} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
                 Movies
               </Text>
 
@@ -273,7 +293,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.18, 0.55]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.15, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color="#d8d8f8" maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[0.15, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
                 Games
               </Text>
             </>
@@ -291,7 +311,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.35, 0.46]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.058} lineHeight={1.25} color="#d8d8f8" maxWidth={0.46} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.058} lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.46} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
                 {'Okay, then.\nGive me a shake!'}
               </Text>
             </>
@@ -309,7 +329,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.35, 0.48]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} lineHeight={1.25} color="#d8d8f8" maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
                 {answer}
               </Text>
             </>
@@ -323,6 +343,17 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           {'Need Help Choosing\na Movie or Game?'}
         </Text>
       )}
+
+      {/* Murky liquid filter — a near-opaque tinted pane sitting in front
+          of the die at rest but behind the glass. The die's far half sits
+          behind this and reads as dim and murky; as it floats forward
+          toward DIE_Z_FLOAT, more of the result facet pokes in front of
+          the filter and reads clearly, like it's risen up against the
+          glass through the fluid. */}
+      <mesh position={[0, 0, 1.0]}>
+        <circleGeometry args={[1.06, 48]} />
+        <meshBasicMaterial color={FILTER_COLOR} transparent opacity={FILTER_OPACITY} depthWrite={false} />
+      </mesh>
 
       {/* Glass tint */}
       <mesh position={[0, 0, 1.46]}>
@@ -384,7 +415,7 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
       className="touch-none overflow-hidden rounded-2xl shadow-lg"
       style={{
         aspectRatio: '4 / 3',
-        background: 'radial-gradient(circle at 50% 38%, #b34bf0 0%, #7a1fc9 35%, #4a1078 65%, #1c0a35 100%)',
+        background: SCENE_BACKGROUND,
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
