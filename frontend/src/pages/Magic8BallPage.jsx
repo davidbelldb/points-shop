@@ -24,11 +24,13 @@ const CATEGORIES = {
 const SHAKE_DURATION = 1400; // ms — wobble + liquid swirl settle time
 
 // Resting tilt for the floating die — rotated so one specific icosahedron
-// facet faces the camera dead-on (its centroid lands at local (0, 0, ~0.49)
-// once this rotation is applied). Movies/Games/confirm/answer text is
-// anchored to that facet via a small counter-rotated "face group" inside
-// the die (see below), so it always reads right-way-up and front-on.
-const REST_ROTATION = { x: 0, y: 0.36486382754888896 };
+// facet faces the camera dead-on AND that facet's triangle sits apex-up,
+// base-down on screen (its centroid lands at local (0, 0, ~0.49) once this
+// rotation is applied). Movies/Games/confirm/answer text is anchored to
+// that facet via a small counter-rotated "face group" inside the die (see
+// below), so it always reads right-way-up and front-on.
+const REST_ROTATION = { x: 0.36486382754888896, y: 0 };
+const REST_Z = -Math.PI / 2;
 
 // Slow continuous spin while idle, so the die never looks perfectly still
 // — like it's gently turning in the fluid.
@@ -181,7 +183,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         if (phase === 'intro') {
           dieRef.current.rotation.z += delta * IDLE_SPIN;
         } else {
-          dieRef.current.rotation.z += (0 - dieRef.current.rotation.z) * Math.min(delta * 2, 1);
+          dieRef.current.rotation.z += (REST_Z - dieRef.current.rotation.z) * Math.min(delta * 2, 1);
         }
       }
     }
@@ -226,25 +228,25 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           mostly hidden in the dark fluid — only face 6 (painted lighter in
           dieGeo) reads clearly, like that one facet has floated face-up
           against the glass. */}
-      <group ref={dieRef} position={[0, 0, 0.85]} rotation={[REST_ROTATION.x, REST_ROTATION.y, 0]} scale={0.67}>
+      <group ref={dieRef} position={[0, 0, 0.85]} rotation={[REST_ROTATION.x, REST_ROTATION.y, REST_Z]} scale={0.67}>
         <mesh castShadow geometry={dieGeo}>
           <meshStandardMaterial vertexColors roughness={0.5} metalness={0.05} flatShading />
         </mesh>
 
         {/* "Face group" — sits flush on one specific facet (its centroid,
             nudged outward along the face normal) with a counter-rotation
-            that exactly cancels REST_ROTATION, plus an extra -90° spin
-            about the viewing axis so this facet's triangle sits with a
-            horizontal edge at the bottom and its apex at the top (like the
-            reference). Movies/Games/confirm/answer text lives inside this
-            group so it always renders flat, front-on, right-way-up and
-            centred on that one facet, regardless of how the die itself is
-            tilted. Because of the extra -90° spin, a child's local
-            position (px, py) lands on screen at (py, -px) — so to place
-            text at screen position (X, Y) we set position={[-Y, X, Z]}.
-            Each <Text> also gets rotation={[0,0,Math.PI/2]} to cancel that
-            same spin so the glyphs themselves stay upright. */}
-        <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, -Math.PI / 2]}>
+            that, combined with REST_ROTATION (now {x: ~21°, z: -90°}),
+            renders this facet's triangle apex-up, base-down on screen —
+            matching the reference. Movies/Games/confirm/answer text lives
+            inside this group so it always renders flat, front-on,
+            right-way-up and centred on that one facet, regardless of how
+            the die itself is tilted. The net transform still works out to
+            a -90° spin about the viewing axis, so a child's local position
+            (px, py) lands on screen at (py, -px) — to place text at screen
+            position (X, Y) we set position={[-Y, X, Z]}. Each <Text> also
+            gets rotation={[0,0,Math.PI/2]} to cancel that same spin so the
+            glyphs themselves stay upright. */}
+        <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, 0]}>
           {showPicker && (
             <>
               {/* Upper hit zone — Movies & TV (screen pos 0, 0.03) */}
