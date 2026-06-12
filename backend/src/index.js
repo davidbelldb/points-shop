@@ -45,8 +45,7 @@ import shoppingRoutes, { backfillEventSnackSync } from './modules/shopping/shopp
 import bootstrapRoutes from './modules/bootstrap/bootstrap.routes.js';
 import playlistRoutes from './modules/playlist/playlist.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
-import { sendPush } from './modules/notifications/push.js';
-import { query as dbQuery } from './db.js';
+import { registerBackgroundJobs } from './jobs/index.js';
 
 const MEDIA_DIR = config.mediaDir;
 await mkdir(MEDIA_DIR, { recursive: true });
@@ -146,45 +145,10 @@ backfillEventSnackSync()
   .then((n) => fastify.log.info(`event snack backfill: ${n} event(s) checked`))
   .catch((e) => fastify.log.warn({ err: e }, 'event snack backfill failed'));
 
-// ── Scheduled push notification poller (every 60s) ───────────────────────────
-async function fireScheduledPushes() {
-  try {
-    const { rows: due } = await dbQuery(
-      `UPDATE scheduled_push_notifications
-          SET sent_at = NOW()
-        WHERE sent_at IS NULL AND scheduled_for <= NOW()
-        RETURNING id, title, body, url, account_id`,
-    );
-    for (const n of due) {
-      const { rows: subs } = n.account_id
-        ? await dbQuery(`SELECT DISTINCT account_id FROM push_subscriptions WHERE account_id = $1`, [n.account_id])
-        : await dbQuery(`SELECT DISTINCT account_id FROM push_subscriptions`);
-      await Promise.all(subs.map(r => sendPush(r.account_id, { title: n.title, body: n.body, url: n.url })));
-      fastify.log.info({ id: n.id }, 'Scheduled push fired');
-    }
-  } catch (e) {
-    fastify.log.error({ err: e }, 'Scheduled push poller error');
-  }
-}
-setInterval(fireScheduledPushes, 60_000);
-
-// One-shot background backfill for legacy stories without small
-// thumbnails (video posters + 320px image thumbnails). Doesn't block
-// startup; logs progress through fastify.log.
-import('./modules/stories/backfill_thumbnails.js')
-  .then(({ backfillVideoThumbnails, backfillImageThumbnails }) => {
-    backfillVideoThumbnails(fastify.log);
-    backfillImageThumbnails(fastify.log);
-  })
-  .catch((e) => fastify.log.error({ err: e }, 'thumbnail backfill bootstrap failed'));
-
-// One-shot background backfill: re-encode legacy hero-slide/product
-// images (multi-MB PNG/JPEG, predating the optimizeImage pipeline) to
-// capped 1600px WebP. These are re-fetched on every home/games page
-// load, so this is a major win for repeat-visit speed.
-import('./modules/media/backfill_images.js')
-  .then(({ backfillLegacyImages }) => backfillLegacyImages(fastify.log))
-  .catch((e) => fastify.log.error({ err: e }, 'legacy image backfill bootstrap failed'));
+// All recurring/one-shot background work (media backfills, scheduled push
+// poller, expired-session cleanup) lives in ./jobs — see that module for
+// details on what runs and why.
+registerBackgroundJobs(fastify);
 
 const shutdown = async (signal) => {
   fastify.log.info(`Received ${signal}, shutting down`);

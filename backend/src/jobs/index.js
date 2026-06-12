@@ -1,0 +1,85 @@
+/**
+ * Background jobs — anything that runs on a timer or once at boot, kept out
+ * of index.js so the app entrypoint stays focused on wiring up routes.
+ *
+ * Jobs registered here:
+ *  - One-shot media backfills (story thumbnails, legacy hero/product images)
+ *  - Scheduled push notification poller (every 60s)
+ *  - Expired session cleanup (hourly) — `sessions` gets a new row on every
+ *    login and was previously only pruned on explicit logout, so the table
+ *    grew without bound the longer the app was used.
+ *
+ * Anything that "builds up over time" (tables that only grow, caches that
+ * only fill, files that are never cleaned up) belongs here so it's easy to
+ * find in one place rather than scattered through index.js.
+ */
+import { query } from '../db.js';
+import { sendPush } from '../modules/notifications/push.js';
+
+const PUSH_POLL_MS = 60_000;
+const SESSION_CLEANUP_MS = 60 * 60_000; // hourly
+
+export function registerBackgroundJobs(fastify) {
+  registerOneShotBackfills(fastify);
+  registerScheduledPushPoller(fastify);
+  registerSessionCleanup(fastify);
+}
+
+// One-shot backfills for legacy media that predates the optimized
+// upload/thumbnail pipelines. Don't block startup; log progress through
+// fastify.log.
+function registerOneShotBackfills(fastify) {
+  import('../modules/stories/backfill_thumbnails.js')
+    .then(({ backfillVideoThumbnails, backfillImageThumbnails }) => {
+      backfillVideoThumbnails(fastify.log);
+      backfillImageThumbnails(fastify.log);
+    })
+    .catch((e) => fastify.log.error({ err: e }, 'thumbnail backfill bootstrap failed'));
+
+  // Re-encode legacy hero-slide/product images (multi-MB PNG/JPEG,
+  // predating the optimizeImage pipeline) to capped 1600px WebP. These are
+  // re-fetched on every home/games page load, so this is a major win for
+  // repeat-visit speed.
+  import('../modules/media/backfill_images.js')
+    .then(({ backfillLegacyImages }) => backfillLegacyImages(fastify.log))
+    .catch((e) => fastify.log.error({ err: e }, 'legacy image backfill bootstrap failed'));
+}
+
+function registerScheduledPushPoller(fastify) {
+  async function fireScheduledPushes() {
+    try {
+      const { rows: due } = await query(
+        `UPDATE scheduled_push_notifications
+            SET sent_at = NOW()
+          WHERE sent_at IS NULL AND scheduled_for <= NOW()
+          RETURNING id, title, body, url, account_id`,
+      );
+      for (const n of due) {
+        const { rows: subs } = n.account_id
+          ? await query(`SELECT DISTINCT account_id FROM push_subscriptions WHERE account_id = $1`, [n.account_id])
+          : await query(`SELECT DISTINCT account_id FROM push_subscriptions`);
+        await Promise.all(subs.map((r) => sendPush(r.account_id, { title: n.title, body: n.body, url: n.url })));
+        fastify.log.info({ id: n.id }, 'Scheduled push fired');
+      }
+    } catch (e) {
+      fastify.log.error({ err: e }, 'Scheduled push poller error');
+    }
+  }
+  setInterval(fireScheduledPushes, PUSH_POLL_MS);
+}
+
+// Sessions are created on every login (and refreshed via last_used_at on
+// every request) but were only ever deleted by an explicit logout. Prune
+// rows past their expiry hourly, plus once at boot to clear any backlog.
+function registerSessionCleanup(fastify) {
+  async function cleanupExpiredSessions() {
+    try {
+      const { rowCount } = await query(`DELETE FROM sessions WHERE expires_at < NOW()`);
+      if (rowCount > 0) fastify.log.info({ count: rowCount }, 'Pruned expired sessions');
+    } catch (e) {
+      fastify.log.error({ err: e }, 'Session cleanup error');
+    }
+  }
+  cleanupExpiredSessions();
+  setInterval(cleanupExpiredSessions, SESSION_CLEANUP_MS);
+}

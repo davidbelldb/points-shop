@@ -8,10 +8,16 @@ import StoryViewer from './StoryViewer.jsx';
    1. ACTIVE stories (24h live) — at most two circles since the app only has
       two accounts; one per author with a glow ring.
    2. HIGHLIGHT REELS — flat-ring covers; tap to open the reel manager.
-   3. THE VAULT — every archived story as its own circle with a DD/MM date
-      label. Sorted newest first.
+   3. THE VAULT — archived stories from the last VAULT_WINDOW_DAYS as their
+      own circles with a DD/MM date label. Sorted newest first.
    The strip hides entirely if there's nothing to show at all. */
 const POLL_MS = 30_000;
+// The vault used to fetch the ENTIRE all-time archive on every 30s poll —
+// the query and the rendered circle list both grew a little more every
+// week as stories expired into it, which is why the home page kept getting
+// slower over time. The home strip only needs "recent" memories; the full
+// history is still browsable on the Sneaky Feed page's month-grouped view.
+const VAULT_WINDOW_DAYS = 14;
 
 function Divider() {
   return <div className="my-1 h-14 w-px shrink-0 bg-neutral-200" aria-hidden="true" />;
@@ -35,23 +41,42 @@ export default function StoriesStrip() {
   const [archive, setArchive] = useState([]);
   const [viewer, setViewer]   = useState(null); // { stories, index } | null
 
-  async function refresh() {
+  // Active stories + reels change frequently (new posts, views) and are
+  // cheap to fetch — keep polling these every 30s.
+  async function refreshLive() {
     try {
       // Home strip shows EVERYONE'S published reels (David + Katie). The
       // /stories management page is the per-account view.
-      const [a, r, ar] = await Promise.all([
+      const [a, r] = await Promise.all([
         api.listActiveStories(),
         api.listReels({ scope: 'all' }),
-        api.listArchiveStories(),
       ]);
       setActive(a);
       setReels(r);
+    } catch { /* swallow — strip is non-critical */ }
+  }
+
+  // Archived stories are immutable once expired — no need to poll them.
+  // Bound to a recent window so this stays a cheap, indexed query
+  // (created_at) instead of scanning the entire all-time archive.
+  async function refreshArchive() {
+    try {
+      const to = new Date();
+      to.setDate(to.getDate() + 1); // include anything that expired earlier today
+      const from = new Date();
+      from.setDate(from.getDate() - VAULT_WINDOW_DAYS);
+      const ar = await api.listArchiveStories(from.toISOString(), to.toISOString());
       setArchive(ar);
     } catch { /* swallow — strip is non-critical */ }
   }
+
+  async function refresh() {
+    await Promise.all([refreshLive(), refreshArchive()]);
+  }
+
   useEffect(() => {
     refresh();
-    const id = setInterval(refresh, POLL_MS);
+    const id = setInterval(refreshLive, POLL_MS);
     return () => clearInterval(id);
   }, []);
 
