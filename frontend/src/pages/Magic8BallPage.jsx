@@ -448,12 +448,6 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         <circleGeometry args={[1.08 * WINDOW_SCALE, 48]} />
         <meshStandardMaterial color="#0d1733" roughness={0.1} metalness={0.1} transparent opacity={0.12} depthWrite={false} />
       </mesh>
-
-      {/* Window ring */}
-      <mesh position={[0, 0, 1.5]}>
-        <torusGeometry args={[1.08 * WINDOW_SCALE, 0.12 * WINDOW_SCALE, 16, 48]} />
-        <meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.45} />
-      </mesh>
     </group>
   );
 }
