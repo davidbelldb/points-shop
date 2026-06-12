@@ -8,7 +8,13 @@ import { useSettings } from '../lib/SettingsContext.jsx';
 function CmsCard({ slide }) {
   const inner = (
     <div className="relative aspect-[16/7] md:aspect-square lg:aspect-[4/3] overflow-hidden rounded-2xl bg-neutral-100 shadow-sm">
-      <img src={slide.image_url} alt={slide.title ?? ''} className="h-full w-full object-cover" />
+      <img
+        src={slide.image_url}
+        alt={slide.title ?? ''}
+        className="h-full w-full object-cover"
+        loading="lazy"
+        decoding="async"
+      />
       {(slide.title || slide.code || slide.subtitle) && (
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4 text-white">
           {slide.title    && <p className="text-lg font-bold leading-tight">{slide.title}</p>}

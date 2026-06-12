@@ -178,6 +178,14 @@ import('./modules/stories/backfill_thumbnails.js')
   })
   .catch((e) => fastify.log.error({ err: e }, 'thumbnail backfill bootstrap failed'));
 
+// One-shot background backfill: re-encode legacy hero-slide/product
+// images (multi-MB PNG/JPEG, predating the optimizeImage pipeline) to
+// capped 1600px WebP. These are re-fetched on every home/games page
+// load, so this is a major win for repeat-visit speed.
+import('./modules/media/backfill_images.js')
+  .then(({ backfillLegacyImages }) => backfillLegacyImages(fastify.log))
+  .catch((e) => fastify.log.error({ err: e }, 'legacy image backfill bootstrap failed'));
+
 const shutdown = async (signal) => {
   fastify.log.info(`Received ${signal}, shutting down`);
   await fastify.close();
