@@ -4,6 +4,14 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { api } from '../lib/api.js';
+import { useSettings } from '../lib/SettingsContext.jsx';
+
+// Parse a settings value (always a string, or undefined) to a finite number,
+// falling back to a default when missing/invalid.
+function num(v, fallback) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 /* ============================================================================
  * Magic 8-Ball — homepage embed
@@ -40,15 +48,31 @@ const IDLE_SPIN = 0.12;
 // Tunable scene settings — change these to restyle, reposition or
 // recolour the ball without hunting through the JSX below.
 // ---------------------------------------------------------------------
-const SCENE_BACKGROUND = '#2a0e52';                // flat colour behind the whole 8-ball
-const CAMERA_VIEW = { pos: [0, 0.3, 4], fov: 35 }; // camera position/fov once settled on the window
+// Radial gradient behind the whole 8-ball — deep near-black liquid glow at
+// the centre (#05050c, reaching full strength at 50% of the way out) fading
+// to near-black (#02041c) at the edges.
+const SCENE_BACKGROUND = 'radial-gradient(circle, #05050c 50%, #02041c 100%)';
+
+// Default camera position/fov once settled on the window, and default
+// lighting rig — both overridable from Admin > Magic 8-Ball (stored as
+// settings; these are the fallbacks when no override is saved).
+const DEFAULT_CAMERA_VIEW = { pos: [0, 0.3, 4], fov: 35 };
+const DEFAULT_LIGHTING = {
+  ambientIntensity: 0.55,
+  ambientColor: '#ffffff',
+  dir1Intensity: 1.0,
+  dir2Intensity: 0.3,
+  pointIntensity: 0.8,
+  pointColor: '#88aaff',
+};
 const TEXT_COLOR = '#b7b7f7';                      // Movies/Games/confirm/answer text on the die face
-const RESULT_FACE_COLOR = '#08055d';               // the die's "result" facet colour
+const RESULT_FACE_COLOR = '#050c47';               // the die's "result" facet colour
 const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
 const DIE_Z_REST = 0.85;                           // resting depth, deep in the liquid
 const DIE_Z_FLOAT = 1.15;                          // how close to the glass it floats once the result settles
 const FILTER_COLOR = '#10173a';                    // murky liquid filter drawn over the window
 const FILTER_OPACITY = 0.8;
+const WINDOW_SCALE = 0.55;                         // window/portal elements scaled to 55% (45% smaller)
 
 /* ----------------------------------------------------------------------
  * Window "liquid" — deep dark blue (#0e0e29) filling the whole window,
@@ -73,14 +97,16 @@ function makeWindowGlowTexture() {
 
 /* ----------------------------------------------------------------------
  * Lighting — matches Stb15Scene's day-mode rig (SceneLighting w/ isNight=false)
+ * by default, but ambient/directional/point intensities and colours are
+ * tunable from Admin > Magic 8-Ball.
  * -------------------------------------------------------------------- */
-function SceneLighting() {
+function SceneLighting({ lighting }) {
   return (
     <>
-      <ambientLight intensity={0.55} color="#ffffff" />
-      <directionalLight position={[4, 8, 4]} intensity={1.0} />
-      <directionalLight position={[-5, 4, -2]} intensity={0.3} />
-      <pointLight position={[-5, 6, -3]} intensity={0.8} color="#88aaff" distance={16} decay={2} />
+      <ambientLight intensity={lighting.ambientIntensity} color={lighting.ambientColor} />
+      <directionalLight position={[4, 8, 4]} intensity={lighting.dir1Intensity} />
+      <directionalLight position={[-5, 4, -2]} intensity={lighting.dir2Intensity} />
+      <pointLight position={[-5, 6, -3]} intensity={lighting.pointIntensity} color={lighting.pointColor} distance={16} decay={2} />
     </>
   );
 }
@@ -94,20 +120,14 @@ function SceneLighting() {
  *   shaking — settled on the window, like the original close-up
  *   answer  — stays on the window, same as select/confirm/shaking
  * -------------------------------------------------------------------- */
-const CAMERA_TARGETS = {
-  intro: { pos: [0, 1.6, 9.5], fov: 42 },
-  select: CAMERA_VIEW,
-  confirm: CAMERA_VIEW,
-  shaking: CAMERA_VIEW,
-  answer: CAMERA_VIEW,
-};
+const INTRO_CAMERA = { pos: [0, 1.6, 9.5], fov: 42 };
 
-function CameraRig({ phase }) {
+function CameraRig({ phase, cameraView }) {
   const { camera } = useThree();
   const targetVec = useRef(new THREE.Vector3());
 
   useFrame(() => {
-    const target = CAMERA_TARGETS[phase] || CAMERA_TARGETS.select;
+    const target = phase === 'intro' ? INTRO_CAMERA : cameraView;
     targetVec.current.set(...target.pos);
     camera.position.lerp(targetVec.current, 0.045);
     camera.fov += (target.fov - camera.fov) * 0.045;
@@ -227,18 +247,18 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
       {/* Window background — flat mid-grey, the resting colour of the window */}
       <mesh position={[0, 0, 0.7]}>
-        <circleGeometry args={[1.06, 48]} />
+        <circleGeometry args={[1.06 * WINDOW_SCALE, 48]} />
         <meshBasicMaterial map={glowTex} depthWrite={false} />
       </mesh>
 
       {/* Double ring inset around the window, like the real 8-ball's
           recessed window lip. */}
       <mesh position={[0, 0, 0.78]}>
-        <torusGeometry args={[1.02, 0.018, 12, 48]} />
+        <torusGeometry args={[1.02 * WINDOW_SCALE, 0.018 * WINDOW_SCALE, 12, 48]} />
         <meshStandardMaterial color="#0c0c0c" roughness={0.4} metalness={0.2} />
       </mesh>
       <mesh position={[0, 0, 0.76]}>
-        <torusGeometry args={[0.94, 0.012, 12, 48]} />
+        <torusGeometry args={[0.94 * WINDOW_SCALE, 0.012 * WINDOW_SCALE, 12, 48]} />
         <meshStandardMaterial color="#0c0c0c" roughness={0.4} metalness={0.2} />
       </mesh>
 
@@ -269,9 +289,9 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, 0]}>
           {showPicker && (
             <>
-              {/* Upper hit zone — Movies & TV (screen pos 0, 0.03) */}
+              {/* Upper hit zone — Movies & TV (screen pos 0, 0.06) */}
               <mesh
-                position={[-0.03, 0, 0.045]}
+                position={[-0.06, 0, 0.045]}
                 onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
                 onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
                 onPointerOut={() => setCursor(false)}
@@ -279,13 +299,13 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.16, 0.38]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[-0.03, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.38} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[-0.06, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.38} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
                 Movies
               </Text>
 
-              {/* Lower hit zone — Video Games (screen pos 0, -0.15) */}
+              {/* Lower hit zone — Video Games (screen pos 0, -0.12) */}
               <mesh
-                position={[0.15, 0, 0.045]}
+                position={[0.12, 0, 0.045]}
                 onClick={(e) => { e.stopPropagation(); onPick('games'); }}
                 onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
                 onPointerOut={() => setCursor(false)}
@@ -293,7 +313,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.18, 0.55]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.15, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[0.12, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
                 Games
               </Text>
             </>
@@ -329,7 +349,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.35, 0.48]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
                 {answer}
               </Text>
             </>
@@ -351,19 +371,19 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           the filter and reads clearly, like it's risen up against the
           glass through the fluid. */}
       <mesh position={[0, 0, 1.0]}>
-        <circleGeometry args={[1.06, 48]} />
+        <circleGeometry args={[1.06 * WINDOW_SCALE, 48]} />
         <meshBasicMaterial color={FILTER_COLOR} transparent opacity={FILTER_OPACITY} depthWrite={false} />
       </mesh>
 
       {/* Glass tint */}
       <mesh position={[0, 0, 1.46]}>
-        <circleGeometry args={[1.08, 48]} />
+        <circleGeometry args={[1.08 * WINDOW_SCALE, 48]} />
         <meshStandardMaterial color="#0d1733" roughness={0.1} metalness={0.1} transparent opacity={0.12} depthWrite={false} />
       </mesh>
 
       {/* Window ring */}
       <mesh position={[0, 0, 1.5]}>
-        <torusGeometry args={[1.08, 0.12, 16, 48]} />
+        <torusGeometry args={[1.08 * WINDOW_SCALE, 0.12 * WINDOW_SCALE, 16, 48]} />
         <meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.45} />
       </mesh>
     </group>
@@ -373,7 +393,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 /* ----------------------------------------------------------------------
  * Canvas shell + gesture surface
  * -------------------------------------------------------------------- */
-function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture, onFirstInteract }) {
+function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture, onFirstInteract, cameraView, lighting }) {
   const swipeRef = useRef({ active: false, lastX: 0, lastDir: 0, accum: 0, lastT: 0 });
 
   function resetSwipe() {
@@ -422,9 +442,9 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
       onPointerUp={resetSwipe}
       onPointerLeave={resetSwipe}
     >
-      <Canvas shadows dpr={[1, 2]} camera={{ position: CAMERA_TARGETS.intro.pos, fov: CAMERA_TARGETS.intro.fov }} gl={{ antialias: true, alpha: true }}>
-        <SceneLighting />
-        <CameraRig phase={phase} />
+      <Canvas shadows dpr={[1, 2]} camera={{ position: INTRO_CAMERA.pos, fov: INTRO_CAMERA.fov }} gl={{ antialias: true, alpha: true }}>
+        <SceneLighting lighting={lighting} />
+        <CameraRig phase={phase} cameraView={cameraView} />
         <MagicBall phase={phase} answer={answer} shakeSeed={shakeSeed} onPick={onPick} onReroll={onReroll} />
       </Canvas>
     </div>
@@ -435,6 +455,7 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
  * Playable widget
  * -------------------------------------------------------------------- */
 export function Magic8BallGame() {
+  const { settings } = useSettings();
   const [lists, setLists] = useState({ movies: [], games: [] });
   // 'intro' (camera pulls back to reveal the ball) -> 'select' (pick a
   // category) -> 'confirm' (shake to ask) -> 'shaking' -> 'answer' (camera
@@ -448,6 +469,38 @@ export function Magic8BallGame() {
   const busyRef = useRef(false);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+
+  // Camera position/fov and lighting rig — overridable from
+  // Admin > Magic 8-Ball, falling back to the defaults above.
+  const cameraView = useMemo(() => ({
+    pos: [
+      num(settings.magic8ball_camera_x, DEFAULT_CAMERA_VIEW.pos[0]),
+      num(settings.magic8ball_camera_y, DEFAULT_CAMERA_VIEW.pos[1]),
+      num(settings.magic8ball_camera_z, DEFAULT_CAMERA_VIEW.pos[2]),
+    ],
+    fov: num(settings.magic8ball_camera_fov, DEFAULT_CAMERA_VIEW.fov),
+  }), [
+    settings.magic8ball_camera_x,
+    settings.magic8ball_camera_y,
+    settings.magic8ball_camera_z,
+    settings.magic8ball_camera_fov,
+  ]);
+
+  const lighting = useMemo(() => ({
+    ambientIntensity: num(settings.magic8ball_light_ambient_intensity, DEFAULT_LIGHTING.ambientIntensity),
+    ambientColor: settings.magic8ball_light_ambient_color || DEFAULT_LIGHTING.ambientColor,
+    dir1Intensity: num(settings.magic8ball_light_dir1_intensity, DEFAULT_LIGHTING.dir1Intensity),
+    dir2Intensity: num(settings.magic8ball_light_dir2_intensity, DEFAULT_LIGHTING.dir2Intensity),
+    pointIntensity: num(settings.magic8ball_light_point_intensity, DEFAULT_LIGHTING.pointIntensity),
+    pointColor: settings.magic8ball_light_point_color || DEFAULT_LIGHTING.pointColor,
+  }), [
+    settings.magic8ball_light_ambient_intensity,
+    settings.magic8ball_light_ambient_color,
+    settings.magic8ball_light_dir1_intensity,
+    settings.magic8ball_light_dir2_intensity,
+    settings.magic8ball_light_point_intensity,
+    settings.magic8ball_light_point_color,
+  ]);
 
   useEffect(() => {
     api.rewatchList().then((rows) => {
@@ -590,6 +643,8 @@ export function Magic8BallGame() {
         onReroll={handleReroll}
         onShakeGesture={handleShakeGesture}
         onFirstInteract={handleFirstInteract}
+        cameraView={cameraView}
+        lighting={lighting}
       />
 
       <p className="text-center text-xs text-neutral-400">

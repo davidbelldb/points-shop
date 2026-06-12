@@ -7,6 +7,10 @@ const ALLOWED = [
   'audio_section_enabled', 'audio_title', 'audio_subtitle',
   'homepage_featured_enabled',
   'magic8ball_homepage_visible',
+  'magic8ball_camera_x', 'magic8ball_camera_y', 'magic8ball_camera_z', 'magic8ball_camera_fov',
+  'magic8ball_light_ambient_intensity', 'magic8ball_light_ambient_color',
+  'magic8ball_light_dir1_intensity', 'magic8ball_light_dir2_intensity',
+  'magic8ball_light_point_intensity', 'magic8ball_light_point_color',
 ];
 
 export async function getAllSettings() {
