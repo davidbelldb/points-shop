@@ -49,7 +49,11 @@ function StoryTile({ s, onClick }) {
           <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">▶</span>
         </>
       ) : (
-        <img src={s.media_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+        // Prefer the 320px server-generated thumbnail — these grid tiles render
+        // at ~100-150px, so shipping the full 1600px media_url was ~90% wasted
+        // bytes. Fall back to media_url for legacy rows uploaded before the
+        // thumbnail pipeline existed (backfill fills these in over time).
+        <img src={s.thumbnail_url || s.media_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
       )}
     </button>
   );
