@@ -70,10 +70,10 @@ const RESULT_FACE_COLOR = '#100c7f';               // the die's "result" facet c
 const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
 const DIE_Z_REST = 0.85;                           // resting depth, deep in the liquid
 const DIE_Z_FLOAT = 1.15;                          // how close to the glass it floats once the result settles
-const FILTER_COLOR = '#10173a';                    // murky liquid filter drawn over the window
-const FILTER_OPACITY = 0.8;
+const FILTER_COLOR = '#000000';                    // murky liquid filter drawn over the window — black, so only the result face's own colour reads through
+const FILTER_OPACITY = 0.45;
 const WINDOW_SCALE = 1;                            // window/portal elements at full size (shrink reverted — was creating a nested "second ball" look)
-const WINDOW_FILL_COLOR = '#05050c';               // flat "liquid" fill inside the 8-ball window
+const WINDOW_FILL_COLOR = '#000000';               // flat "liquid" fill inside the 8-ball window — solid black
 
 /* ----------------------------------------------------------------------
  * Lighting — matches Stb15Scene's day-mode rig (SceneLighting w/ isNight=false)
