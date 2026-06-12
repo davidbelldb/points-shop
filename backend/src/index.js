@@ -168,10 +168,14 @@ async function fireScheduledPushes() {
 }
 setInterval(fireScheduledPushes, 60_000);
 
-// One-shot background backfill for legacy video stories without poster
-// thumbnails. Doesn't block startup; logs progress through fastify.log.
+// One-shot background backfill for legacy stories without small
+// thumbnails (video posters + 320px image thumbnails). Doesn't block
+// startup; logs progress through fastify.log.
 import('./modules/stories/backfill_thumbnails.js')
-  .then(({ backfillVideoThumbnails }) => backfillVideoThumbnails(fastify.log))
+  .then(({ backfillVideoThumbnails, backfillImageThumbnails }) => {
+    backfillVideoThumbnails(fastify.log);
+    backfillImageThumbnails(fastify.log);
+  })
   .catch((e) => fastify.log.error({ err: e }, 'thumbnail backfill bootstrap failed'));
 
 const shutdown = async (signal) => {

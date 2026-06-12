@@ -66,9 +66,15 @@ export default function StoryRing({
                   <line x1="8" y1="22" x2="16" y2="22" />
                 </svg>
               </span>
-            ) : thumbnailUrl ? (
+            ) : (posterUrl || thumbnailUrl) ? (
+              // Prefer the small generated thumbnail (posterUrl) over the
+              // full-resolution media_url — circles only render at ~74px,
+              // so loading the full image wastes bandwidth and causes the
+              // slow "progressive reveal" effect on mobile connections.
+              // Falls back to the full image for legacy stories that
+              // pre-date the thumbnail backfill.
               <img
-                src={thumbnailUrl}
+                src={posterUrl || thumbnailUrl}
                 alt=""
                 className="h-full w-full object-cover"
                 width={size}
