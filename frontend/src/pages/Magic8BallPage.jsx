@@ -213,38 +213,45 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
         {/* "Face group" — sits flush on one specific facet (its centroid,
             nudged outward along the face normal) with a counter-rotation
-            that exactly cancels REST_ROTATION. Movies/Games/confirm/answer
-            text lives inside this group so it always renders flat,
-            front-on and right-way-up on that one facet, regardless of how
-            the die itself is tilted. */}
-        <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, 0]}>
+            that exactly cancels REST_ROTATION, plus an extra -90° spin
+            about the viewing axis so this facet's triangle sits with a
+            horizontal edge at the bottom and its apex at the top (like the
+            reference). Movies/Games/confirm/answer text lives inside this
+            group so it always renders flat, front-on, right-way-up and
+            centred on that one facet, regardless of how the die itself is
+            tilted. Because of the extra -90° spin, a child's local
+            position (px, py) lands on screen at (py, -px) — so to place
+            text at screen position (X, Y) we set position={[-Y, X, Z]}.
+            Each <Text> also gets rotation={[0,0,Math.PI/2]} to cancel that
+            same spin so the glyphs themselves stay upright. */}
+        <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, -Math.PI / 2]}>
           {showPicker && (
             <>
-              {/* Upper hit zone — Movies & TV */}
+              {/* Upper hit zone — Movies & TV (screen pos 0, 0.05) */}
               <mesh
-                position={[0, 0.12, 0.03]}
+                position={[-0.05, 0, 0.03]}
                 onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
                 onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
                 onPointerOut={() => setCursor(false)}
               >
-                <planeGeometry args={[0.5, 0.28]} />
+                <planeGeometry args={[0.18, 0.4]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0, 0.12, 0.04]} fontSize={0.09} color="#23264a" maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
+              <Text position={[-0.05, 0, 0.04]} rotation={[0, 0, Math.PI / 2]} fontSize={0.085} color="#23264a" maxWidth={0.4} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
                 Movies
               </Text>
 
-              {/* Lower hit zone — Video Games */}
+              {/* Lower hit zone — Video Games (screen pos 0, -0.15) */}
               <mesh
-                position={[0, -0.12, 0.03]}
+                position={[0.15, 0, 0.03]}
                 onClick={(e) => { e.stopPropagation(); onPick('games'); }}
                 onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
                 onPointerOut={() => setCursor(false)}
               >
-                <planeGeometry args={[0.5, 0.28]} />
+                <planeGeometry args={[0.18, 0.55]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0, -0.12, 0.04]} fontSize={0.085} color="#23264a" maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
+              <Text position={[0.15, 0, 0.04]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color="#23264a" maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
                 Games
               </Text>
             </>
@@ -252,16 +259,17 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
           {showConfirm && (
             <>
+              {/* screen pos (0, -0.05) */}
               <mesh
-                position={[0, 0, 0.03]}
+                position={[0.05, 0, 0.03]}
                 onClick={(e) => { e.stopPropagation(); onReroll(); }}
                 onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
                 onPointerOut={() => setCursor(false)}
               >
-                <planeGeometry args={[0.55, 0.6]} />
+                <planeGeometry args={[0.35, 0.46]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0, 0, 0.04]} fontSize={0.062} lineHeight={1.25} color="#23264a" maxWidth={0.5} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.002} outlineColor="#ffffff">
+              <Text position={[0.05, 0, 0.04]} rotation={[0, 0, Math.PI / 2]} fontSize={0.058} lineHeight={1.25} color="#23264a" maxWidth={0.46} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.002} outlineColor="#ffffff">
                 {'Okay, then.\nGive me a shake!'}
               </Text>
             </>
@@ -269,16 +277,17 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
           {showAnswer && (
             <>
+              {/* screen pos (0, -0.05) */}
               <mesh
-                position={[0, 0, 0.03]}
+                position={[0.05, 0, 0.03]}
                 onClick={(e) => { e.stopPropagation(); onReroll(); }}
                 onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
                 onPointerOut={() => setCursor(false)}
               >
-                <planeGeometry args={[0.55, 0.6]} />
+                <planeGeometry args={[0.35, 0.48]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0, 0, 0.04]} fontSize={0.068} lineHeight={1.25} color="#23264a" maxWidth={0.52} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.002} outlineColor="#ffffff">
+              <Text position={[0.05, 0, 0.04]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} lineHeight={1.25} color="#23264a" maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.002} outlineColor="#ffffff">
                 {answer}
               </Text>
             </>
@@ -380,6 +389,7 @@ export function Magic8BallGame() {
   const [phase, setPhase] = useState('intro');
   const [answer, setAnswer] = useState('');
   const [shakeSeed, setShakeSeed] = useState(0);
+  const [motionSupported, setMotionSupported] = useState(false);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const categoryRef = useRef('movies');
   const busyRef = useRef(false);
@@ -406,6 +416,20 @@ export function Magic8BallGame() {
   useEffect(() => {
     const id = setTimeout(() => setPhase((p) => (p === 'intro' ? 'select' : p)), 2200);
     return () => clearTimeout(id);
+  }, []);
+
+  // iOS 13+ gates devicemotion behind an explicit DeviceMotionEvent
+  // .requestPermission() call, which must run inside a user gesture. The
+  // auto-request on first tap (handleFirstInteract) covers most cases, but
+  // some browsers ignore/ silently reject that implicit attempt — so when
+  // permission is still needed, show an explicit "Enable shake" button as
+  // a reliable fallback.
+  useEffect(() => {
+    setMotionSupported(
+      typeof window !== 'undefined' &&
+      typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function'
+    );
   }, []);
 
   function rollFor(category) {
@@ -525,6 +549,19 @@ export function Magic8BallGame() {
               : phase === 'shaking'
                 ? 'Shaking…'
                 : 'Tap the answer to ask again, or shake the ball for another.'}
+        {motionSupported && !motionEnabled && (
+          <>
+            {' '}
+            <button
+              type="button"
+              onClick={enableMotion}
+              className="ml-1 rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+              title="Enable shake-to-ask"
+            >
+              📳 Enable shake
+            </button>
+          </>
+        )}
       </p>
     </div>
   );
