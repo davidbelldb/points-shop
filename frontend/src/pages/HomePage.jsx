@@ -11,6 +11,7 @@ import Confetti from '../components/Confetti.jsx';
 import AudioNotesSection from '../components/AudioNotesSection.jsx';
 import CalendarUpcomingSection from '../components/CalendarUpcomingSection.jsx';
 import StoriesStrip from '../components/stories/StoriesStrip.jsx';
+import FeaturedStory from '../components/stories/FeaturedStory.jsx';
 import { daysUntil, countdownClock } from '../lib/countdown.js';
 
 // Replace the {name} token with the account's name so the admin can write e.g.
@@ -26,6 +27,7 @@ export default function HomePage() {
   const [products, setProducts] = useState(null);
   const [topSlides, setTopSlides] = useState([]);
   const [gameSlides, setGameSlides] = useState([]);
+  const [featuredPool, setFeaturedPool] = useState(null);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState('newest');
 
@@ -36,6 +38,12 @@ export default function HomePage() {
     hydrateThenFetch('home:products', setProducts, api.listProducts, (e) => setError(e.message));
     hydrateThenFetch('home:heroTop', setTopSlides, () => api.listHeroSlides('top'), console.error);
     hydrateThenFetch('home:heroGames', setGameSlides, () => api.listHeroSlides('games'), console.error);
+    // Pool of recent archived stories to pick the "Featured Story" from.
+    hydrateThenFetch('home:featuredPool', setFeaturedPool, () => {
+      const to = new Date(); to.setDate(to.getDate() + 1);
+      const from = new Date(); from.setDate(from.getDate() - 60);
+      return api.listArchiveStories(from.toISOString(), to.toISOString());
+    }, console.error);
   }, []);
 
   const sorted = useMemo(() => {
@@ -67,6 +75,8 @@ export default function HomePage() {
       </div>
 
       <StoriesStrip />
+
+      <FeaturedStory stories={featuredPool} variant="home" />
 
       <HeroCarousel slides={topSlides} />
 

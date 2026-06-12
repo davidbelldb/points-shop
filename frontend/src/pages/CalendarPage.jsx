@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import StoryViewer from '../components/stories/StoryViewer.jsx';
+import FeaturedStory from '../components/stories/FeaturedStory.jsx';
 import { EVENT_ICONS, EventIcon, EVENT_ICON_COLOR } from '../lib/eventIcons.jsx';
 
 /* ============================================================
@@ -331,6 +332,7 @@ export default function CalendarPage() {
             desktop screens as a square matching the calendar's footprint. */}
         <FeaturedStory
           stories={monthStories}
+          variant="calendar"
           className="hidden lg:block lg:col-start-3 lg:row-start-1"
         />
 
@@ -362,58 +364,6 @@ export default function CalendarPage() {
         />
       )}
     </div>
-  );
-}
-
-/* ============================================================
-   Featured story — one random archived story from the focused month,
-   shown in a square frame matching the calendar's footprint. The image is
-   cropped (object-cover) to fill the rounded square. Re-picks when the
-   month's story set changes (i.e. when you switch months).
-   ============================================================ */
-function FeaturedStory({ stories, className = '' }) {
-  const [viewer, setViewer] = useState(null);
-
-  const featured = useMemo(() => {
-    if (!stories || stories.length === 0) return null;
-    return stories[Math.floor(Math.random() * stories.length)];
-  }, [stories]);
-
-  // Nothing to feature this month — drop the column entirely.
-  if (!stories || stories.length === 0 || !featured) return null;
-
-  const dateLabel = new Date(featured.created_at)
-    .toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-
-  return (
-    <section className={className}>
-      <div className="rounded-2xl border border-neutral-200 bg-white p-3">
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Featured story</h2>
-          <span className="text-[11px] text-neutral-400">{dateLabel}</span>
-        </div>
-        <button
-          onClick={() => setViewer({ stories: [featured], index: 0 })}
-          className="relative block aspect-square w-full overflow-hidden rounded-xl bg-neutral-100"
-        >
-          {featured.media_type === 'video' ? (
-            featured.thumbnail_url
-              ? <img src={featured.thumbnail_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
-              : <video src={featured.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
-          ) : (
-            <img src={featured.media_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
-          )}
-          {featured.caption && (
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-left">
-              <p className="line-clamp-2 text-sm font-medium text-white">{featured.caption}</p>
-            </div>
-          )}
-        </button>
-      </div>
-      {viewer && (
-        <StoryViewer stories={viewer.stories} initialIndex={0} onClose={() => setViewer(null)} />
-      )}
-    </section>
   );
 }
 
