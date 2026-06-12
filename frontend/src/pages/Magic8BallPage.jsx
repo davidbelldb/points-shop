@@ -23,9 +23,12 @@ const CATEGORIES = {
 
 const SHAKE_DURATION = 1400; // ms — wobble + liquid swirl settle time
 
-// Resting tilt for the floating triangle die — a gentle tilt so it reads
-// as a flat plane floating face-on in the window, like the classic 8-ball.
-const REST_ROTATION = { x: 0.06, y: -0.1 };
+// Resting tilt for the floating die — rotated so one specific icosahedron
+// facet faces the camera dead-on (its centroid lands at local (0, 0, ~0.49)
+// once this rotation is applied). Movies/Games/confirm/answer text is
+// anchored to that facet via a small counter-rotated "face group" inside
+// the die (see below), so it always reads right-way-up and front-on.
+const REST_ROTATION = { x: 0, y: 0.36486382754888896 };
 
 // Slow continuous spin while idle, so the die never looks perfectly still
 // — like it's gently turning in the fluid.
@@ -147,11 +150,12 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
       } else {
         dieRef.current.rotation.x += (REST_ROTATION.x - dieRef.current.rotation.x) * Math.min(delta * 2, 1);
         dieRef.current.rotation.y += (REST_ROTATION.y - dieRef.current.rotation.y) * Math.min(delta * 2, 1);
-        // Only let it idly spin when there's no interactive text on its
-        // face — keeps the Movies/Games picker and confirm prompt legible
-        // and clickable, while the revealed answer can drift and turn.
-        const interactive = phase === 'select' || phase === 'confirm';
-        if (!interactive) {
+        // Only let it idly spin during the intro, before any text is on
+        // the face — once Movies/Games, the confirm prompt, or the
+        // revealed answer is showing, settle rotation.z back to 0 and
+        // hold it there so that facet stays square-on to the camera and
+        // the text stays right-way-up with no drift.
+        if (phase === 'intro') {
           dieRef.current.rotation.z += delta * IDLE_SPIN;
         } else {
           dieRef.current.rotation.z += (0 - dieRef.current.rotation.z) * Math.min(delta * 2, 1);
@@ -195,8 +199,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
       {/* The "inner core" — a white 20-sided die that tumbles wildly while
           shaking and otherwise drifts with a slow continuous spin, like a
-          d20 floating in the deep blue liquid. Movies/Games/confirm/answer
-          text is printed straight onto its face. */}
+          d20 floating in the deep blue liquid. */}
       <group ref={dieRef} position={[0, 0, 0.85]} rotation={[REST_ROTATION.x, REST_ROTATION.y, 0]} scale={0.67}>
         <mesh castShadow>
           <icosahedronGeometry args={[0.62, 0]} />
@@ -208,71 +211,79 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.25} depthWrite={false} />
         </mesh>
 
-        {showPicker && (
-          <>
-            {/* Upper hit zone — Movies & TV */}
-            <mesh
-              position={[0, 0.08, 0.48]}
-              onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
-              onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-              onPointerOut={() => setCursor(false)}
-            >
-              <planeGeometry args={[0.85, 0.3]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-            <Text position={[0, 0.08, 0.5]} fontSize={0.16} color="#23264a" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
-              Movies
-            </Text>
+        {/* "Face group" — sits flush on one specific facet (its centroid,
+            nudged outward along the face normal) with a counter-rotation
+            that exactly cancels REST_ROTATION. Movies/Games/confirm/answer
+            text lives inside this group so it always renders flat,
+            front-on and right-way-up on that one facet, regardless of how
+            the die itself is tilted. */}
+        <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, 0]}>
+          {showPicker && (
+            <>
+              {/* Upper hit zone — Movies & TV */}
+              <mesh
+                position={[0, 0.12, 0.03]}
+                onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
+                onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+                onPointerOut={() => setCursor(false)}
+              >
+                <planeGeometry args={[0.5, 0.28]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              </mesh>
+              <Text position={[0, 0.12, 0.04]} fontSize={0.09} color="#23264a" maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
+                Movies
+              </Text>
 
-            {/* Lower hit zone — Video Games */}
-            <mesh
-              position={[0, -0.22, 0.48]}
-              onClick={(e) => { e.stopPropagation(); onPick('games'); }}
-              onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-              onPointerOut={() => setCursor(false)}
-            >
-              <planeGeometry args={[0.85, 0.28]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-            <Text position={[0, -0.22, 0.5]} fontSize={0.14} color="#23264a" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
-              Games
-            </Text>
-          </>
-        )}
+              {/* Lower hit zone — Video Games */}
+              <mesh
+                position={[0, -0.12, 0.03]}
+                onClick={(e) => { e.stopPropagation(); onPick('games'); }}
+                onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+                onPointerOut={() => setCursor(false)}
+              >
+                <planeGeometry args={[0.5, 0.28]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              </mesh>
+              <Text position={[0, -0.12, 0.04]} fontSize={0.085} color="#23264a" maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
+                Games
+              </Text>
+            </>
+          )}
 
-        {showConfirm && (
-          <>
-            <mesh
-              position={[0, -0.05, 0.48]}
-              onClick={(e) => { e.stopPropagation(); onReroll(); }}
-              onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-              onPointerOut={() => setCursor(false)}
-            >
-              <planeGeometry args={[0.95, 0.7]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-            <Text position={[0, -0.05, 0.5]} fontSize={0.115} lineHeight={1.25} color="#23264a" maxWidth={0.9} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
-              {'Okay, then.\nGive me a shake!'}
-            </Text>
-          </>
-        )}
+          {showConfirm && (
+            <>
+              <mesh
+                position={[0, 0, 0.03]}
+                onClick={(e) => { e.stopPropagation(); onReroll(); }}
+                onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+                onPointerOut={() => setCursor(false)}
+              >
+                <planeGeometry args={[0.55, 0.6]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              </mesh>
+              <Text position={[0, 0, 0.04]} fontSize={0.062} lineHeight={1.25} color="#23264a" maxWidth={0.5} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.002} outlineColor="#ffffff">
+                {'Okay, then.\nGive me a shake!'}
+              </Text>
+            </>
+          )}
 
-        {showAnswer && (
-          <>
-            <mesh
-              position={[0, -0.05, 0.48]}
-              onClick={(e) => { e.stopPropagation(); onReroll(); }}
-              onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-              onPointerOut={() => setCursor(false)}
-            >
-              <planeGeometry args={[0.95, 0.7]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-            <Text position={[0, -0.05, 0.5]} fontSize={0.13} lineHeight={1.25} color="#23264a" maxWidth={0.92} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0025} outlineColor="#ffffff">
-              {answer}
-            </Text>
-          </>
-        )}
+          {showAnswer && (
+            <>
+              <mesh
+                position={[0, 0, 0.03]}
+                onClick={(e) => { e.stopPropagation(); onReroll(); }}
+                onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+                onPointerOut={() => setCursor(false)}
+              >
+                <planeGeometry args={[0.55, 0.6]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              </mesh>
+              <Text position={[0, 0, 0.04]} fontSize={0.068} lineHeight={1.25} color="#23264a" maxWidth={0.52} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.002} outlineColor="#ffffff">
+                {answer}
+              </Text>
+            </>
+          )}
+        </group>
       </group>
 
       {/* Heading prompt — fixed in the window, not on the die */}
