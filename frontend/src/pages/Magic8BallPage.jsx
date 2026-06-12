@@ -23,36 +23,18 @@ const CATEGORIES = {
 
 const SHAKE_DURATION = 1400; // ms — wobble + liquid swirl settle time
 
-// Resting tilt for the inner die — angled so one facet sits roughly
-// flat-on to the camera (perpendicular to the screen) once it settles.
-const REST_ROTATION = { x: 0.36, y: 0.7 };
+// Resting tilt for the floating triangle die — a gentle tilt so it reads
+// as a flat plane floating face-on in the window, like the classic 8-ball.
+const REST_ROTATION = { x: 0.06, y: -0.1 };
+
+// Slow continuous spin while idle, so the die never looks perfectly still
+// — like it's gently turning in the fluid.
+const IDLE_SPIN = 0.12;
 
 /* ----------------------------------------------------------------------
- * Deep navy liquid texture — sits in front of the die so it reads as
- * being suspended in the classic 8-ball fluid. Opacity falls away from
- * the top corner down towards the bottom, so the die "surfaces" through
- * a clearer patch.
- * -------------------------------------------------------------------- */
-function makeLiquidTexture() {
-  const size = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, size * 0.25, size);
-  grad.addColorStop(0, 'rgba(6, 10, 36, 0.95)');
-  grad.addColorStop(0.45, 'rgba(16, 28, 86, 0.65)');
-  grad.addColorStop(1, 'rgba(46, 78, 160, 0.2)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/* ----------------------------------------------------------------------
- * Window background — flat #1f1f1e with the faintest vignette for depth.
- * The window stays this neutral dark colour at rest; the only blue in the
- * scene is the inner triangle face once an answer is revealed.
+ * Window background — flat mid-grey with a soft vignette, matching the
+ * classic 8-ball's recessed window. The only colour in the scene is the
+ * blue triangle floating inside it.
  * -------------------------------------------------------------------- */
 function makeWindowGlowTexture() {
   const size = 256;
@@ -60,9 +42,9 @@ function makeWindowGlowTexture() {
   c.width = c.height = size;
   const ctx = c.getContext('2d');
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, '#262625');
-  grad.addColorStop(0.6, '#1f1f1e');
-  grad.addColorStop(1, '#141413');
+  grad.addColorStop(0, '#3a3a3b');
+  grad.addColorStop(0.6, '#2c2c2d');
+  grad.addColorStop(1, '#1c1c1d');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(c);
@@ -124,11 +106,28 @@ function CameraRig({ phase }) {
 function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
   const ballRef = useRef();
   const dieRef = useRef();
-  const liquidRef = useRef();
   const shakeStartRef = useRef(0);
 
-  const liquidTex = useMemo(() => makeLiquidTexture(), []);
   const glowTex = useMemo(() => makeWindowGlowTexture(), []);
+
+  // Downward-pointing triangle (one face of the d20), like the classic
+  // 8-ball's floating die.
+  const triangleGeo = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.58, 0.46);
+    shape.lineTo(0.58, 0.46);
+    shape.lineTo(0, -0.56);
+    shape.lineTo(-0.58, 0.46);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.16,
+      bevelEnabled: true,
+      bevelThickness: 0.025,
+      bevelSize: 0.025,
+      bevelSegments: 3,
+    });
+    geo.translate(0, 0, -0.08);
+    return geo;
+  }, []);
 
   useEffect(() => {
     if (shakeSeed) shakeStartRef.current = performance.now();
@@ -156,26 +155,27 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
       ballRef.current.rotation.x = wobbleX;
     }
 
-    // Die face — tumbles while shaking, settles back to the face-on
-    // resting pose (REST_ROTATION) once a phase has something to show.
-    // No idle bob/sway.
+    // Die face — tumbles wildly while shaking, otherwise drifts with a
+    // slow continuous spin so it never looks frozen, like it's turning
+    // gently in the fluid.
     if (dieRef.current) {
       if (shaking) {
-        dieRef.current.rotation.x += delta * 2.2;
-        dieRef.current.rotation.y += delta * 3.0;
+        dieRef.current.rotation.x += delta * 2.6;
+        dieRef.current.rotation.y += delta * 3.4;
+        dieRef.current.rotation.z += delta * 1.8;
       } else {
-        dieRef.current.rotation.x += (REST_ROTATION.x - dieRef.current.rotation.x) * Math.min(delta * 4, 1);
-        dieRef.current.rotation.y += (REST_ROTATION.y - dieRef.current.rotation.y) * Math.min(delta * 4, 1);
+        dieRef.current.rotation.x += (REST_ROTATION.x - dieRef.current.rotation.x) * Math.min(delta * 2, 1);
+        dieRef.current.rotation.y += (REST_ROTATION.y - dieRef.current.rotation.y) * Math.min(delta * 2, 1);
+        // Only let it idly spin when there's no interactive text on its
+        // face — keeps the Movies/Games picker and confirm prompt legible
+        // and clickable, while the revealed answer can drift and turn.
+        const interactive = phase === 'select' || phase === 'confirm';
+        if (!interactive) {
+          dieRef.current.rotation.z += delta * IDLE_SPIN;
+        } else {
+          dieRef.current.rotation.z += (0 - dieRef.current.rotation.z) * Math.min(delta * 2, 1);
+        }
       }
-    }
-
-    // Liquid opacity — idle swirl, plus a cloudy burst that clears after a shake
-    if (liquidRef.current) {
-      let base = 0.5 + Math.sin(t * 0.7) * 0.18;
-      if (shaking) {
-        base = 0.88 - Math.min(since / (SHAKE_DURATION / 1000), 1) * 0.4;
-      }
-      liquidRef.current.material.opacity = Math.max(0.12, Math.min(0.9, base));
     }
   });
 
@@ -195,69 +195,60 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         <meshStandardMaterial color="#0c0c10" roughness={0.18} metalness={0.4} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Window background — flat #1f1f1e, the resting colour of the window */}
+      {/* Window background — flat mid-grey, the resting colour of the window */}
       <mesh position={[0, 0, 0.7]}>
-        <circleGeometry args={[1.05, 48]} />
+        <circleGeometry args={[1.06, 48]} />
         <meshBasicMaterial map={glowTex} depthWrite={false} />
       </mesh>
 
-      {/* The "inner core" — a faceted 20-sided die, tilted so one facet
-          sits roughly flat-on to the camera (perpendicular to the screen),
-          like a d20 resting against the front of its window. */}
-      <group ref={dieRef} position={[0, 0, 0.85]} rotation={[REST_ROTATION.x, REST_ROTATION.y, 0]}>
-        <mesh castShadow>
-          <icosahedronGeometry args={[0.5, 0]} />
-          <meshStandardMaterial color="#1c3fae" emissive="#3a5cff" emissiveIntensity={0.55} roughness={0.25} metalness={0.15} flatShading transparent opacity={0.95} />
-        </mesh>
-        {/* Faint edge highlight so the facets read clearly through the liquid */}
-        <mesh scale={1.01}>
-          <icosahedronGeometry args={[0.5, 0]} />
-          <meshBasicMaterial color="#9db4ff" wireframe transparent opacity={0.18} depthWrite={false} />
-        </mesh>
-      </group>
-
-      {/* Navy liquid pane — sits in front of the die, tinting it so it
-          reads as suspended in the classic 8-ball fluid. Idle swirl, plus
-          a cloudy burst that clears after a shake. */}
-      <mesh ref={liquidRef} position={[0, 0, 1.0]}>
-        <circleGeometry args={[1.0, 48]} />
-        <meshBasicMaterial map={liquidTex} transparent opacity={0.6} depthWrite={false} />
+      {/* Double ring inset around the window, like the real 8-ball's
+          recessed window lip. */}
+      <mesh position={[0, 0, 0.78]}>
+        <torusGeometry args={[1.02, 0.018, 12, 48]} />
+        <meshStandardMaterial color="#0c0c0c" roughness={0.4} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, 0, 0.76]}>
+        <torusGeometry args={[0.94, 0.012, 12, 48]} />
+        <meshStandardMaterial color="#0c0c0c" roughness={0.4} metalness={0.2} />
       </mesh>
 
-      {/* Readable text sits in front of the liquid */}
-      <group position={[0, 0, 0]}>
+      {/* The "inner core" — a faceted blue triangle (one face of the d20)
+          that tumbles wildly while shaking and otherwise drifts with a
+          slow continuous spin, like the classic 8-ball's die floating in
+          its window. Movies/Games/confirm/answer text is printed on its
+          face. */}
+      <group ref={dieRef} position={[0, 0, 0.92]} rotation={[REST_ROTATION.x, REST_ROTATION.y, 0]}>
+        <mesh castShadow geometry={triangleGeo}>
+          <meshStandardMaterial color="#1f3fe6" emissive="#2c4dff" emissiveIntensity={0.6} roughness={0.3} metalness={0.1} />
+        </mesh>
+
         {showPicker && (
           <>
-            {/* Heading prompt */}
-            <Text position={[0, 0.36, 1.42]} fontSize={0.082} lineHeight={1.15} color="#fdf6e3" maxWidth={1.35} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.004} outlineColor="#0a0a14">
-              {'Need Help Choosing\na Movie or Game?'}
-            </Text>
-
             {/* Upper hit zone — Movies & TV */}
             <mesh
-              position={[0, 0.02, 1.4]}
+              position={[0, 0.22, 0.1]}
               onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
               onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
               onPointerOut={() => setCursor(false)}
             >
-              <planeGeometry args={[1.4, 0.4]} />
+              <planeGeometry args={[0.8, 0.3]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
-            <Text position={[0, 0.02, 1.42]} fontSize={0.16} color="#fdf6e3" maxWidth={1.4} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.005} outlineColor="#0a0a14">
+            <Text position={[0, 0.22, 0.105]} fontSize={0.12} color="#eaf6ff" maxWidth={0.8} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
               Movies
             </Text>
 
             {/* Lower hit zone — Video Games */}
             <mesh
-              position={[0, -0.32, 1.4]}
+              position={[0, -0.12, 0.1]}
               onClick={(e) => { e.stopPropagation(); onPick('games'); }}
               onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
               onPointerOut={() => setCursor(false)}
             >
-              <planeGeometry args={[1.4, 0.4]} />
+              <planeGeometry args={[0.55, 0.26]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
-            <Text position={[0, -0.32, 1.42]} fontSize={0.16} color="#fdf6e3" maxWidth={1.4} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.005} outlineColor="#0a0a14">
+            <Text position={[0, -0.12, 0.105]} fontSize={0.105} color="#eaf6ff" maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
               Games
             </Text>
           </>
@@ -266,42 +257,49 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         {showConfirm && (
           <>
             <mesh
-              position={[0, 0, 1.4]}
+              position={[0, 0.03, 0.1]}
               onClick={(e) => { e.stopPropagation(); onReroll(); }}
               onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
               onPointerOut={() => setCursor(false)}
             >
-              <planeGeometry args={[1.5, 1.2]} />
+              <planeGeometry args={[0.9, 0.7]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
-            <Text position={[0, -0.04, 1.42]} fontSize={0.135} lineHeight={1.2} color="#fdf6e3" maxWidth={1.35} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.005} outlineColor="#0a0a14">
+            <Text position={[0, 0.03, 0.105]} fontSize={0.095} lineHeight={1.25} color="#eaf6ff" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
               {'Okay, then.\nGive me a shake!'}
             </Text>
           </>
         )}
 
         {showAnswer && (
-          <mesh
-            position={[0, 0, 1.4]}
-            onClick={(e) => { e.stopPropagation(); onReroll(); }}
-            onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-            onPointerOut={() => setCursor(false)}
-          >
-            <planeGeometry args={[1.5, 1.2]} />
-            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-          </mesh>
-        )}
-        {showAnswer && (
-          <Text position={[0, -0.04, 1.42]} fontSize={0.16} lineHeight={1.2} color="#fdf6e3" maxWidth={1.35} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.006} outlineColor="#0a0a14">
-            {answer}
-          </Text>
+          <>
+            <mesh
+              position={[0, 0.03, 0.1]}
+              onClick={(e) => { e.stopPropagation(); onReroll(); }}
+              onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+              onPointerOut={() => setCursor(false)}
+            >
+              <planeGeometry args={[0.9, 0.7]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+            <Text position={[0, 0.03, 0.105]} fontSize={0.105} lineHeight={1.25} color="#eaf6ff" maxWidth={0.85} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.003} outlineColor="#0a1a66">
+              {answer}
+            </Text>
+          </>
         )}
       </group>
+
+      {/* Heading prompt — fixed in the window, not on the die */}
+      {showPicker && (
+        <Text position={[0, 0.62, 1.0]} fontSize={0.078} lineHeight={1.15} color="#fdf6e3" maxWidth={1.35} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.004} outlineColor="#0a0a14">
+          {'Need Help Choosing\na Movie or Game?'}
+        </Text>
+      )}
 
       {/* Glass tint */}
       <mesh position={[0, 0, 1.46]}>
         <circleGeometry args={[1.08, 48]} />
-        <meshStandardMaterial color="#0d1733" roughness={0.1} metalness={0.1} transparent opacity={0.22} depthWrite={false} />
+        <meshStandardMaterial color="#0d1733" roughness={0.1} metalness={0.1} transparent opacity={0.12} depthWrite={false} />
       </mesh>
 
       {/* Window ring */}
