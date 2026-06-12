@@ -74,14 +74,24 @@ function registerScheduledPushPoller(fastify) {
   setInterval(fireScheduledPushes, PUSH_POLL_MS);
 }
 
-// Sessions are created on every login (and refreshed via last_used_at on
-// every request) but were only ever deleted by an explicit logout. Prune
-// rows past their expiry hourly, plus once at boot to clear any backlog.
+// Sessions are created on every login and were only ever deleted by an
+// explicit logout. Prune rows past their expiry hourly, plus once at boot to
+// clear any backlog.
+//
+// Every request also did (until now, see auth.repo.js findSession) an
+// UPDATE ... SET last_used_at = NOW() on its session row — and /api/bootstrap
+// fans that out to 6 UPDATEs per page load. Constant single-row UPDATEs leave
+// dead tuples behind that autovacuum doesn't always keep up with, bloating
+// the table and its indexes (including idx_sessions_token, on the hot path
+// for every request) so lookups get slower the more the site is used. Run a
+// VACUUM ANALYZE here too, hourly + once at boot, to keep that in check and
+// clear out any bloat already accumulated.
 function registerSessionCleanup(fastify) {
   async function cleanupExpiredSessions() {
     try {
       const { rowCount } = await query(`DELETE FROM sessions WHERE expires_at < NOW()`);
       if (rowCount > 0) fastify.log.info({ count: rowCount }, 'Pruned expired sessions');
+      await query(`VACUUM (ANALYZE) sessions`);
     } catch (e) {
       fastify.log.error({ err: e }, 'Session cleanup error');
     }

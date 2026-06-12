@@ -39,7 +39,18 @@ export async function findSession(token) {
     [token],
   );
   if (rows.length === 0) return null;
-  query(`UPDATE sessions SET last_used_at = NOW() WHERE token = $1`, [token]).catch(() => {});
+  // Throttled — only write last_used_at if it's stale by >5 minutes.
+  // findSession runs on EVERY request via the onRequest hook, and since
+  // /api/bootstrap fans out to 5 fastify.inject() sub-requests (each of
+  // which re-runs onRequest), a single page load was firing 6 UPDATEs
+  // against this table. Constant single-row UPDATEs bloat the table and
+  // its indexes with dead tuples, making this exact lookup progressively
+  // slower the more the site is used — without ever growing row count.
+  query(
+    `UPDATE sessions SET last_used_at = NOW()
+      WHERE token = $1 AND last_used_at < NOW() - INTERVAL '5 minutes'`,
+    [token],
+  ).catch(() => {});
   return rows[0];
 }
 
