@@ -29,8 +29,11 @@ const DEFAULTS = {
   magic8ball_filter_color: '#000000',
   magic8ball_filter_opacity: '0.45',
   magic8ball_filter_depth: '1',
-  magic8ball_die_depth: '0.85',
+  magic8ball_glass_opacity: '0.12',
+  magic8ball_die_depth_start: '0.85',
+  magic8ball_die_depth_end: '1.15',
   magic8ball_result_face_pop: '0',
+  magic8ball_result_face_color: '#100c7f',
   magic8ball_reveal_lead_ms: '500',
 };
 
@@ -69,8 +72,11 @@ export default function AdminMagic8BallSection({ bare = false }) {
     settings.magic8ball_filter_color,
     settings.magic8ball_filter_opacity,
     settings.magic8ball_filter_depth,
-    settings.magic8ball_die_depth,
+    settings.magic8ball_glass_opacity,
+    settings.magic8ball_die_depth_start,
+    settings.magic8ball_die_depth_end,
     settings.magic8ball_result_face_pop,
+    settings.magic8ball_result_face_color,
     settings.magic8ball_reveal_lead_ms,
   ]);
 
@@ -332,6 +338,16 @@ export default function AdminMagic8BallSection({ bare = false }) {
               className={numInputCls}
             />
           </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Glass opacity (0-1)</span>
+            <input
+              value={vals.magic8ball_glass_opacity}
+              type="number" min="0" max="1" step="0.02"
+              onChange={(e) => setVal('magic8ball_glass_opacity', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_glass_opacity', 0.12)}
+              className={numInputCls}
+            />
+          </label>
         </div>
       </div>
 
@@ -340,19 +356,30 @@ export default function AdminMagic8BallSection({ bare = false }) {
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Icosahedron &amp; result face</p>
         <p className="text-xs text-neutral-500">
-          Icosahedron depth moves the die&apos;s resting position toward/away from the glass (colours unchanged for now).
-          Result face pop pushes just that one facet outward (positive) or inward (negative) for a relief effect.
+          Start depth is the die&apos;s resting/tumbling position; end depth is where it settles once revealed (colours
+          unchanged for now). Result face pop pushes just that one facet outward (positive) or inward (negative) for
+          a relief effect. Result face end colour is the colour that facet fades to once revealed.
           Reveal fade duration is how long before the die finishes settling that the result colour and answer text
           fade in to 100% &mdash; the fade always finishes exactly when the die comes to rest.
         </p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <label className="flex items-center justify-between gap-2">
-            <span className="text-neutral-500">Icosahedron depth</span>
+            <span className="text-neutral-500">Start depth</span>
             <input
-              value={vals.magic8ball_die_depth}
+              value={vals.magic8ball_die_depth_start}
               type="number" step="0.05"
-              onChange={(e) => setVal('magic8ball_die_depth', e.target.value)}
-              onBlur={() => commitNumber('magic8ball_die_depth', 0.85)}
+              onChange={(e) => setVal('magic8ball_die_depth_start', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_die_depth_start', 0.85)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">End depth</span>
+            <input
+              value={vals.magic8ball_die_depth_end}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_die_depth_end', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_die_depth_end', 1.15)}
               className={numInputCls}
             />
           </label>
@@ -365,6 +392,22 @@ export default function AdminMagic8BallSection({ bare = false }) {
               onBlur={() => commitNumber('magic8ball_result_face_pop', 0)}
               className={numInputCls}
             />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Result face end colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(vals.magic8ball_result_face_color) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: vals.magic8ball_result_face_color }} />
+              )}
+              <input
+                value={vals.magic8ball_result_face_color}
+                onChange={(e) => setVal('magic8ball_result_face_color', e.target.value)}
+                onBlur={() => commitColour('magic8ball_result_face_color')}
+                className={colourInputCls}
+                placeholder="#100c7f"
+                maxLength={7}
+              />
+            </div>
           </label>
           <label className="flex items-center justify-between gap-2">
             <span className="text-neutral-500">Reveal fade duration (ms)</span>

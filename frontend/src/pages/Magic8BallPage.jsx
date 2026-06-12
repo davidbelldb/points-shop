@@ -78,7 +78,6 @@ const DEFAULT_LIGHTING = {
   pointColor: '#88aaff',
 };
 const TEXT_COLOR = '#b7b7f7';                      // Movies/Games/confirm/answer text on the die face
-const RESULT_FACE_COLOR = '#100c7f';               // the die's "result" facet colour once revealed
 const RESULT_FACE_REST_COLOR = '#05050c';          // result facet colour while tumbling/settling — hidden in the liquid
 const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
 const WINDOW_SCALE = 1;                            // window/portal elements at full size (shrink reverted — was creating a nested "second ball" look)
@@ -88,12 +87,14 @@ const WINDOW_FILL_COLOR = '#000000';               // flat "liquid" fill inside 
 // Appearance defaults — overridable from Admin > Magic 8-Ball (stored as
 // settings; these are the fallbacks when no override is saved).
 // ---------------------------------------------------------------------
-const DEFAULT_DIE_DEPTH = 0.85;                    // icosahedron resting depth, deep in the liquid
-const DIE_FLOAT_OFFSET = 0.3;                      // how much further forward the die floats once the result settles, relative to its resting depth
+const DEFAULT_DIE_DEPTH_START = 0.85;              // icosahedron resting/tumbling depth, deep in the liquid
+const DEFAULT_DIE_DEPTH_END = 1.15;                // icosahedron depth once the result settles, close to the glass
 const DEFAULT_RESULT_FACE_POP = 0;                 // extra outward offset for just the result facet (face 6), along its own normal — a "pop out" relief effect
+const DEFAULT_RESULT_FACE_COLOR = '#100c7f';       // the die's "result" facet colour once revealed (end colour of the reveal fade)
 const DEFAULT_FILTER_COLOR = '#000000';            // murky liquid filter drawn over the window — black, so only the result face's own colour reads through
 const DEFAULT_FILTER_OPACITY = 0.45;
 const DEFAULT_FILTER_DEPTH = 1.0;
+const DEFAULT_GLASS_OPACITY = 0.12;                // the dark semi-transparent "glass" pane in front of everything in the window
 const DEFAULT_QUESTION_TITLE = 'Need Help Choosing\na Movie or Game?';
 const DEFAULT_QUESTION_COLOR = '#fdf6e3';
 const DEFAULT_QUESTION_OPACITY = 1;
@@ -188,7 +189,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
   // the liquid) while tumbling/settling, then transitions smoothly to
   // RESULT_FACE_COLOR only once the die has fully come to rest.
   const restFaceColor = useRef(new THREE.Color(RESULT_FACE_REST_COLOR));
-  const litFaceColor = useRef(new THREE.Color(RESULT_FACE_COLOR));
+  const litFaceColor = useRef(new THREE.Color(appearance?.resultFaceColor ?? DEFAULT_RESULT_FACE_COLOR));
   const faceColorScratch = useRef(new THREE.Color());
   const faceRevealRef = useRef(0); // 0 = rest colour/invisible text, 1 = fully revealed
   const shakeEndRef = useRef(null); // timestamp shaking last stopped, or null while shaking
@@ -241,6 +242,18 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
     if (shakeSeed) shakeStartRef.current = performance.now();
   }, [shakeSeed]);
 
+  // Keep the "revealed" result-face colour in sync with its setting, and
+  // re-apply it immediately if the face is already (partway) revealed.
+  useEffect(() => {
+    litFaceColor.current.set(appearance?.resultFaceColor ?? DEFAULT_RESULT_FACE_COLOR);
+    if (faceRevealRef.current > 0) {
+      const c = faceColorScratch.current
+        .copy(restFaceColor.current)
+        .lerp(litFaceColor.current, faceRevealRef.current);
+      setFaceColor(dieGeo, 6, c);
+    }
+  }, [appearance?.resultFaceColor, dieGeo]);
+
   function setCursor(pointer) {
     document.body.style.cursor = pointer ? 'pointer' : '';
   }
@@ -289,8 +302,9 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
       // Once the result face has settled, the die drifts forward —
       // floating up through the deep liquid to sit close against the
       // glass, so the result reads through the murky filter below.
-      const dieDepth = appearance?.dieDepth ?? DEFAULT_DIE_DEPTH;
-      const targetZ = phase === 'answer' ? dieDepth + DIE_FLOAT_OFFSET : dieDepth;
+      const dieDepthStart = appearance?.dieDepthStart ?? DEFAULT_DIE_DEPTH_START;
+      const dieDepthEnd = appearance?.dieDepthEnd ?? DEFAULT_DIE_DEPTH_END;
+      const targetZ = phase === 'answer' ? dieDepthEnd : dieDepthStart;
       dieRef.current.position.z += (targetZ - dieRef.current.position.z) * Math.min(delta * 1.5, 1);
 
       // Result-face colour reveal — tracks the moment shaking stops
@@ -371,7 +385,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
           mostly hidden in the dark fluid — only face 6 (painted lighter in
           dieGeo) reads clearly, like that one facet has floated face-up
           against the glass. */}
-      <group ref={dieRef} position={[0, 0, appearance?.dieDepth ?? DEFAULT_DIE_DEPTH]} rotation={[REST_ROTATION.x, REST_ROTATION.y, REST_Z]} scale={DIE_SCALE}>
+      <group ref={dieRef} position={[0, 0, appearance?.dieDepthStart ?? DEFAULT_DIE_DEPTH_START]} rotation={[REST_ROTATION.x, REST_ROTATION.y, REST_Z]} scale={DIE_SCALE}>
         <mesh castShadow geometry={dieGeo}>
           <meshStandardMaterial vertexColors roughness={1} metalness={0} flatShading />
         </mesh>
@@ -453,7 +467,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
               <Text ref={answerTextRef} position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20" fillOpacity={0} outlineOpacity={0}>
-                {answer}
+                {answer.replace(/:\s*/, ':\n')}
               </Text>
             </>
           )}
@@ -481,7 +495,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
       {/* Glass tint */}
       <mesh position={[0, 0, 1.46]}>
         <circleGeometry args={[1.08 * WINDOW_SCALE, 48]} />
-        <meshStandardMaterial color="#0d1733" roughness={0.1} metalness={0.1} transparent opacity={0.12} depthWrite={false} />
+        <meshStandardMaterial color="#0d1733" roughness={0.1} metalness={0.1} transparent opacity={appearance?.glassOpacity ?? DEFAULT_GLASS_OPACITY} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -722,8 +736,11 @@ export function Magic8BallGame() {
     filterColor: settings.magic8ball_filter_color || DEFAULT_FILTER_COLOR,
     filterOpacity: num(settings.magic8ball_filter_opacity, DEFAULT_FILTER_OPACITY),
     filterDepth: num(settings.magic8ball_filter_depth, DEFAULT_FILTER_DEPTH),
-    dieDepth: num(settings.magic8ball_die_depth, DEFAULT_DIE_DEPTH),
+    glassOpacity: num(settings.magic8ball_glass_opacity, DEFAULT_GLASS_OPACITY),
+    dieDepthStart: num(settings.magic8ball_die_depth_start, DEFAULT_DIE_DEPTH_START),
+    dieDepthEnd: num(settings.magic8ball_die_depth_end, DEFAULT_DIE_DEPTH_END),
     resultFacePop: num(settings.magic8ball_result_face_pop, DEFAULT_RESULT_FACE_POP),
+    resultFaceColor: settings.magic8ball_result_face_color || DEFAULT_RESULT_FACE_COLOR,
     revealLeadMs: num(settings.magic8ball_reveal_lead_ms, DEFAULT_REVEAL_LEAD_MS),
   }), [
     settings.magic8ball_question_title,
@@ -733,8 +750,11 @@ export function Magic8BallGame() {
     settings.magic8ball_filter_color,
     settings.magic8ball_filter_opacity,
     settings.magic8ball_filter_depth,
-    settings.magic8ball_die_depth,
+    settings.magic8ball_glass_opacity,
+    settings.magic8ball_die_depth_start,
+    settings.magic8ball_die_depth_end,
     settings.magic8ball_result_face_pop,
+    settings.magic8ball_result_face_color,
     settings.magic8ball_reveal_lead_ms,
   ]);
 

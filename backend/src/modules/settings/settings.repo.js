@@ -13,8 +13,8 @@ const ALLOWED = [
   'magic8ball_light_point_intensity', 'magic8ball_light_point_color',
   'magic8ball_question_title', 'magic8ball_question_color', 'magic8ball_question_opacity', 'magic8ball_question_depth',
   'magic8ball_filter_color', 'magic8ball_filter_opacity', 'magic8ball_filter_depth',
-  'magic8ball_die_depth', 'magic8ball_result_face_pop',
-  'magic8ball_reveal_lead_ms',
+  'magic8ball_die_depth_start', 'magic8ball_die_depth_end', 'magic8ball_glass_opacity', 'magic8ball_result_face_pop',
+  'magic8ball_result_face_color', 'magic8ball_reveal_lead_ms',
 ];
 
 export async function getAllSettings() {
