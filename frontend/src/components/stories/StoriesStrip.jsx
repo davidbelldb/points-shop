@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api.js';
+import { getCached, setCached } from '../../lib/swrCache.js';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import StoryRing from './StoryRing.jsx';
 import StoryViewer from './StoryViewer.jsx';
@@ -51,6 +52,7 @@ export default function StoriesStrip() {
         api.listActiveStories(),
         api.listReels({ scope: 'all' }),
       ]);
+      setCached('stories:live', { active: a, reels: r });
       setActive(a);
       setReels(r);
     } catch { /* swallow — strip is non-critical */ }
@@ -66,6 +68,7 @@ export default function StoriesStrip() {
       const from = new Date();
       from.setDate(from.getDate() - VAULT_WINDOW_DAYS);
       const ar = await api.listArchiveStories(from.toISOString(), to.toISOString());
+      setCached('stories:archive', ar);
       setArchive(ar);
     } catch { /* swallow — strip is non-critical */ }
   }
@@ -75,6 +78,17 @@ export default function StoriesStrip() {
   }
 
   useEffect(() => {
+    // Repaint instantly from the last response (see swrCache.js) so
+    // returning to "/" doesn't blank out the strip while it reloads —
+    // then refresh() still runs to pick up anything new.
+    const cachedLive = getCached('stories:live');
+    if (cachedLive) {
+      setActive(cachedLive.active);
+      setReels(cachedLive.reels);
+    }
+    const cachedArchive = getCached('stories:archive');
+    if (cachedArchive) setArchive(cachedArchive);
+
     refresh();
     const id = setInterval(refreshLive, POLL_MS);
     return () => clearInterval(id);

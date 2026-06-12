@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { hydrateThenFetch } from '../lib/swrCache.js';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
@@ -30,9 +31,12 @@ export default function HomePage() {
   const [sort, setSort] = useState('newest');
 
   useEffect(() => {
-    api.listProducts().then(setProducts).catch((e) => setError(e.message));
-    api.listHeroSlides('top').then(setTopSlides).catch(console.error);
-    api.listHeroSlides('games').then(setGameSlides).catch(console.error);
+    // Repaint instantly from the last response (in-memory, or
+    // sessionStorage on a fresh tab/PWA launch) while refetching in the
+    // background — see swrCache.js for why this matters on the home page.
+    hydrateThenFetch('home:products', setProducts, api.listProducts, (e) => setError(e.message));
+    hydrateThenFetch('home:heroTop', setTopSlides, () => api.listHeroSlides('top'), console.error);
+    hydrateThenFetch('home:heroGames', setGameSlides, () => api.listHeroSlides('games'), console.error);
   }, []);
 
   const sorted = useMemo(() => {
