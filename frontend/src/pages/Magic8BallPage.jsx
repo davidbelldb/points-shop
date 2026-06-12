@@ -180,10 +180,14 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 
   return (
     <group ref={ballRef}>
-      {/* Outer 8-ball shell */}
-      <mesh castShadow receiveShadow>
-        <sphereGeometry args={[1.6, 48, 48]} />
-        <meshStandardMaterial color="#0c0c10" roughness={0.18} metalness={0.4} />
+      {/* Outer 8-ball shell — a full sphere would entirely hide the window
+          contents behind its near (camera-facing) surface, since everything
+          in the window sits at a smaller radius than the shell. Cut a
+          circular "porthole" out of the front (a polar cap, rotated to
+          face +Z/the camera) so the glow, liquid, die and ring are visible. */}
+      <mesh castShadow receiveShadow rotation={[Math.PI / 2, 0, 0]}>
+        <sphereGeometry args={[1.6, 48, 48, 0, Math.PI * 2, Math.PI / 3, Math.PI - Math.PI / 3]} />
+        <meshStandardMaterial color="#0c0c10" roughness={0.18} metalness={0.4} side={THREE.DoubleSide} />
       </mesh>
 
       {/* Window glow — radial blue glow behind the liquid */}
@@ -303,7 +307,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
 /* ----------------------------------------------------------------------
  * Canvas shell + gesture surface
  * -------------------------------------------------------------------- */
-function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture }) {
+function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture, onFirstInteract }) {
   const swipeRef = useRef({ active: false, lastX: 0, lastDir: 0, accum: 0, lastT: 0 });
 
   function resetSwipe() {
@@ -312,6 +316,10 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
 
   function handlePointerDown(e) {
     swipeRef.current = { active: true, lastX: e.clientX, lastDir: 0, accum: 0, lastT: performance.now() };
+    // Piggyback the iOS motion-permission prompt onto the very first tap —
+    // requestPermission() must be called from inside a user gesture, so
+    // this is the earliest point we can ask without a dedicated button.
+    onFirstInteract?.();
   }
 
   function handlePointerMove(e) {
@@ -368,7 +376,6 @@ export function Magic8BallGame() {
   const [phase, setPhase] = useState('intro');
   const [answer, setAnswer] = useState('');
   const [shakeSeed, setShakeSeed] = useState(0);
-  const [motionSupported, setMotionSupported] = useState(false);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const categoryRef = useRef('movies');
   const busyRef = useRef(false);
@@ -388,10 +395,6 @@ export function Magic8BallGame() {
       const all = rows.map((r) => r.title).filter(Boolean);
       setLists((l) => ({ ...l, games: unplayed.length ? unplayed : all }));
     }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    setMotionSupported(typeof window !== 'undefined' && 'DeviceMotionEvent' in window);
   }, []);
 
   // Intro: camera pulls back to show the whole ball on load, then settles
@@ -470,6 +473,8 @@ export function Magic8BallGame() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [motionEnabled]);
 
+  const motionRequestedRef = useRef(false);
+
   async function enableMotion() {
     try {
       if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -480,8 +485,18 @@ export function Magic8BallGame() {
         setMotionEnabled(true);
       }
     } catch {
-      // Permission denied or unsupported — gesture/button still work
+      // Permission denied or unsupported — scrub/swipe gesture still works
     }
+  }
+
+  // Auto-request device-motion permission on the very first touch/click on
+  // the ball, so there's no separate "Enable shake" button to tap. On iOS
+  // this still needs to happen inside a user gesture (hence wiring it to
+  // pointerdown); on Android/desktop it just silently enables.
+  function handleFirstInteract() {
+    if (motionRequestedRef.current || motionEnabled) return;
+    motionRequestedRef.current = true;
+    enableMotion();
   }
 
   return (
@@ -493,6 +508,7 @@ export function Magic8BallGame() {
         onPick={handlePick}
         onReroll={handleReroll}
         onShakeGesture={handleShakeGesture}
+        onFirstInteract={handleFirstInteract}
       />
 
       <p className="text-center text-xs text-neutral-400">
@@ -505,19 +521,6 @@ export function Magic8BallGame() {
               : phase === 'shaking'
                 ? 'Shaking…'
                 : 'Tap the answer to ask again, or shake the ball for another.'}
-        {motionSupported && !motionEnabled && (
-          <>
-            {' '}
-            <button
-              type="button"
-              onClick={enableMotion}
-              className="ml-1 rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
-              title="Enable shake-to-ask"
-            >
-              📳 Enable shake
-            </button>
-          </>
-        )}
       </p>
     </div>
   );
