@@ -11,12 +11,25 @@ import StoryViewer from './StoryViewer.jsx';
                     matching the other home titles, frame capped to a tidy size.
      - 'calendar' : a bordered card with a small uppercase header + the story's
                     date, sized to sit beside the calendar month grid. */
+// Stable hash of today's date (local) — gives a "featured story of the day"
+// that's identical wherever it's rendered (home + calendar), as long as the
+// same story pool is passed in, and rotates to a new pick each day.
+function todaySeed() {
+  const d = new Date();
+  const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 export default function FeaturedStory({ stories, variant = 'home', className = '' }) {
   const [viewer, setViewer] = useState(null);
 
+  // Deterministic per-day pick (not random) so the home page and the calendar
+  // surface the exact same featured story for a given month's pool.
   const featured = useMemo(() => {
     if (!stories || stories.length === 0) return null;
-    return stories[Math.floor(Math.random() * stories.length)];
+    return stories[todaySeed() % stories.length];
   }, [stories]);
 
   // Nothing to feature — render nothing at all.

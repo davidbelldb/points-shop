@@ -5,6 +5,7 @@ const ALLOWED = [
   'banner_enabled', 'banner_text', 'banner_link_url', 'banner_bg_colour', 'banner_text_colour',
   'banner_countdown_date', 'banner_countdown_time',
   'audio_section_enabled', 'audio_title', 'audio_subtitle',
+  'homepage_featured_enabled',
 ];
 
 export async function getAllSettings() {

@@ -38,13 +38,28 @@ export default function HomePage() {
     hydrateThenFetch('home:products', setProducts, api.listProducts, (e) => setError(e.message));
     hydrateThenFetch('home:heroTop', setTopSlides, () => api.listHeroSlides('top'), console.error);
     hydrateThenFetch('home:heroGames', setGameSlides, () => api.listHeroSlides('games'), console.error);
-    // Pool of recent archived stories to pick the "Featured Story" from.
-    hydrateThenFetch('home:featuredPool', setFeaturedPool, () => {
-      const to = new Date(); to.setDate(to.getDate() + 1);
-      const from = new Date(); from.setDate(from.getDate() - 60);
-      return api.listArchiveStories(from.toISOString(), to.toISOString());
-    }, console.error);
   }, []);
+
+  // Featured story is admin-toggled (hidden by default) and only shown on the
+  // home page between 18:00 and 19:00 local time. Re-check the window every
+  // minute so it appears/disappears at the boundary without a reload.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const featuredEnabled = settings.homepage_featured_enabled === 'true';
+  const showFeatured = featuredEnabled && now.getHours() === 18; // 18:00–19:00
+
+  // Only fetch the pool (this month's archived stories — same set the calendar
+  // features from) once we're actually going to show it.
+  useEffect(() => {
+    if (!showFeatured || featuredPool !== null) return;
+    const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const to   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    hydrateThenFetch('home:featuredPool', setFeaturedPool, () => api.listArchiveStories(from, to), console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showFeatured, featuredPool]);
 
   const sorted = useMemo(() => {
     if (!products) return null;
@@ -76,7 +91,7 @@ export default function HomePage() {
 
       <StoriesStrip />
 
-      <FeaturedStory stories={featuredPool} variant="home" />
+      {showFeatured && <FeaturedStory stories={featuredPool} variant="home" />}
 
       <HeroCarousel slides={topSlides} />
 

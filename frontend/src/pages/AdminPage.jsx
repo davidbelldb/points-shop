@@ -179,6 +179,7 @@ function BrandingSection({ settings, onChanged }) {
   const [error, setError] = useState(null);
 
   const bannerEnabled = settings.banner_enabled === 'true';
+  const featuredEnabled = settings.homepage_featured_enabled === 'true';
 
   useEffect(() => {
     setShopName(settings.shop_name ?? '');
@@ -196,6 +197,15 @@ function BrandingSection({ settings, onChanged }) {
     setBusy(true); setError(null);
     try {
       await api.admin.updateSettings({ banner_enabled: bannerEnabled ? 'false' : 'true' });
+      await onChanged();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+
+  async function toggleFeatured() {
+    setBusy(true); setError(null);
+    try {
+      await api.admin.updateSettings({ homepage_featured_enabled: featuredEnabled ? 'false' : 'true' });
       await onChanged();
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
@@ -268,6 +278,22 @@ function BrandingSection({ settings, onChanged }) {
       <Field label="Hero title"><input className={inputCls} value={heroTitle} onChange={(e) => setHeroTitle(e.target.value)} /></Field>
       <Field label="Hero subtitle"><input className={inputCls} value={heroSubtitle} onChange={(e) => setHeroSubtitle(e.target.value)} /></Field>
       <p className="text-xs text-neutral-500">Tip: use <code>{'{name}'}</code> in the hero title or subtitle to insert the user&apos;s name (e.g. &quot;Welcome back {'{name}'}&quot;).</p>
+
+      <hr className="border-neutral-200" />
+
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Homepage featured story</p>
+          <p className="mt-0.5 text-[11px] text-neutral-400">When shown, appears on the home page between 6–7pm only.</p>
+        </div>
+        <button
+          onClick={toggleFeatured}
+          disabled={busy}
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${featuredEnabled ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {featuredEnabled ? 'Shown' : 'Hidden'}
+        </button>
+      </div>
 
       <hr className="border-neutral-200" />
 
