@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import StoryViewer from '../components/stories/StoryViewer.jsx';
@@ -142,7 +142,22 @@ export default function CalendarPage() {
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null); // null | 'new' | event obj
 
+  const [monthStories, setMonthStories] = useState(null); // archived stories for the focused month
+
   const grid = useMemo(() => buildMonthGrid(focusDate), [focusDate]);
+
+  // Archived stories for the whole focused month — feeds both the Featured
+  // story panel and the Sneaky Highlights grid below, so we only query once.
+  useEffect(() => {
+    const from = startOfMonth(focusDate).toISOString();
+    const to   = endOfMonthExclusive(focusDate).toISOString();
+    let cancelled = false;
+    setMonthStories(null);
+    api.listArchiveStories(from, to)
+      .then((data) => { if (!cancelled) setMonthStories(data); })
+      .catch(() => { if (!cancelled) setMonthStories([]); });
+    return () => { cancelled = true; };
+  }, [focusDate]);
 
   // Fetch a generous window covering the visible grid (might span the prev/next month).
   useEffect(() => {
@@ -233,8 +248,9 @@ export default function CalendarPage() {
         <Link to="/" className="text-sm text-neutral-500">Back</Link>
       </div>
 
-      {/* ── Responsive 2-column layout: calendar left, events right on md+ ── */}
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,460px)_1fr] lg:grid-cols-[minmax(0,420px)_1fr] md:gap-6 md:items-start">
+      {/* ── Responsive layout: calendar + events on md+, plus a Featured story
+            square as a third column on large desktop screens. ── */}
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,460px)_1fr] lg:grid-cols-[minmax(0,400px)_1fr_minmax(0,400px)] md:gap-6 md:items-start">
 
         {/* LEFT — month grid */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-3 md:col-start-1 md:row-start-1">
@@ -311,10 +327,17 @@ export default function CalendarPage() {
           ))}
         </section>
 
+        {/* FEATURED — a random story from this month, shown only on large
+            desktop screens as a square matching the calendar's footprint. */}
+        <FeaturedStory
+          stories={monthStories}
+          className="hidden lg:block lg:col-start-3 lg:row-start-1"
+        />
+
       </div>
 
-      {/* Story highlights — full width below both columns */}
-      <HighlightsSection focusDate={focusDate} selectedDay={selectedDay} />
+      {/* Story highlights — full width below the columns */}
+      <HighlightsSection stories={monthStories} selectedDay={selectedDay} />
 
       {/* Floating create button */}
       <button
@@ -343,24 +366,66 @@ export default function CalendarPage() {
 }
 
 /* ============================================================
-   Highlights — archived stories grouped by the day they were posted.
-   Pulls /api/stories/archive scoped to the visible month, and if a day
-   is selected, filters down to that day.
+   Featured story — one random archived story from the focused month,
+   shown in a square frame matching the calendar's footprint. The image is
+   cropped (object-cover) to fill the rounded square. Re-picks when the
+   month's story set changes (i.e. when you switch months).
    ============================================================ */
-function HighlightsSection({ focusDate, selectedDay }) {
-  const [stories, setStories] = useState(null);
+function FeaturedStory({ stories, className = '' }) {
   const [viewer, setViewer] = useState(null);
 
-  // Refetch when month changes; one query per month is plenty for the volumes here.
-  useEffect(() => {
-    const from = startOfMonth(focusDate).toISOString();
-    const to   = endOfMonthExclusive(focusDate).toISOString();
-    let cancelled = false;
-    api.listArchiveStories(from, to)
-      .then((data) => { if (!cancelled) setStories(data); })
-      .catch(() => { if (!cancelled) setStories([]); });
-    return () => { cancelled = true; };
-  }, [focusDate]);
+  const featured = useMemo(() => {
+    if (!stories || stories.length === 0) return null;
+    return stories[Math.floor(Math.random() * stories.length)];
+  }, [stories]);
+
+  // Nothing to feature this month — drop the column entirely.
+  if (!stories || stories.length === 0 || !featured) return null;
+
+  const dateLabel = new Date(featured.created_at)
+    .toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+
+  return (
+    <section className={className}>
+      <div className="rounded-2xl border border-neutral-200 bg-white p-3">
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Featured story</h2>
+          <span className="text-[11px] text-neutral-400">{dateLabel}</span>
+        </div>
+        <button
+          onClick={() => setViewer({ stories: [featured], index: 0 })}
+          className="relative block aspect-square w-full overflow-hidden rounded-xl bg-neutral-100"
+        >
+          {featured.media_type === 'video' ? (
+            featured.thumbnail_url
+              ? <img src={featured.thumbnail_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+              : <video src={featured.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+          ) : (
+            <img src={featured.media_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+          )}
+          {featured.caption && (
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-left">
+              <p className="line-clamp-2 text-sm font-medium text-white">{featured.caption}</p>
+            </div>
+          )}
+        </button>
+      </div>
+      {viewer && (
+        <StoryViewer stories={viewer.stories} initialIndex={0} onClose={() => setViewer(null)} />
+      )}
+    </section>
+  );
+}
+
+/* ============================================================
+   Highlights — archived stories for the focused month (passed down from
+   CalendarPage). If a day is selected, filters down to that day. Thumbnails
+   flow edge-to-edge in one continuous wrapping grid: each day's small date
+   chip is followed inline by that day's thumbnails, so e.g. Jun 2's stories
+   sit right after Jun 1's rather than starting a fresh row per day.
+   ============================================================ */
+function HighlightsSection({ stories, selectedDay }) {
+  const [viewer, setViewer] = useState(null);
 
   const filtered = useMemo(() => {
     if (!stories) return [];
@@ -370,7 +435,7 @@ function HighlightsSection({ focusDate, selectedDay }) {
     return stories;
   }, [stories, selectedDay]);
 
-  // Group day-by-day for the visual rhythm.
+  // Group day-by-day; preserves the archive's newest-first order.
   const dayGroups = useMemo(() => {
     const map = new Map();
     for (const s of filtered) {
@@ -390,42 +455,49 @@ function HighlightsSection({ focusDate, selectedDay }) {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800">Sneaky Highlights</h2>
         <Link to="/stories" className="text-xs font-semibold text-amber-700">All highlights</Link>
       </div>
-      {dayGroups.length === 0 && (
+      {dayGroups.length === 0 ? (
         <p className="text-xs text-neutral-500">No stories archived on this day.</p>
-      )}
-      {dayGroups.map((g) => (
-        <div key={g.k} className="space-y-1">
-          <p className="text-[11px] font-semibold text-neutral-500">
-            {g.date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
-            <span className="ml-2 font-normal text-neutral-400">{g.stories.length}</span>
-          </p>
-          <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-2">
-            {g.stories.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => {
-                  const queue = g.stories.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-                  setViewer({ stories: queue, index: queue.findIndex((x) => x.id === s.id) });
-                }}
-                className="relative aspect-square overflow-hidden rounded-lg bg-neutral-100"
-              >
-                {s.media_type === 'video' ? (
-                  <>
-                    {s.thumbnail_url ? (
-                      <img src={s.thumbnail_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <video src={s.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
-                    )}
-                    <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">▶</span>
-                  </>
-                ) : (
-                  <img src={s.media_url} alt="" className="h-full w-full object-cover" />
-                )}
-              </button>
-            ))}
-          </div>
+      ) : (
+        <div className="flex flex-wrap items-stretch gap-1.5">
+          {dayGroups.map((g) => (
+            <Fragment key={g.k}>
+              {/* Inline date chip — sits in the flow so the next day's
+                  thumbnails pack directly after this day's. */}
+              <div className="flex shrink-0 flex-col justify-center pr-0.5 pl-1">
+                <span className="text-[10px] font-semibold uppercase leading-tight text-neutral-400">
+                  {g.date.toLocaleDateString(undefined, { weekday: 'short' })}
+                </span>
+                <span className="text-xs font-bold leading-tight text-neutral-600">
+                  {g.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+              {g.stories.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    const queue = g.stories.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    setViewer({ stories: queue, index: queue.findIndex((x) => x.id === s.id) });
+                  }}
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100 sm:h-24 sm:w-24"
+                >
+                  {s.media_type === 'video' ? (
+                    <>
+                      {s.thumbnail_url ? (
+                        <img src={s.thumbnail_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                      ) : (
+                        <video src={s.media_url} className="h-full w-full object-cover" muted preload="metadata" playsInline />
+                      )}
+                      <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">▶</span>
+                    </>
+                  ) : (
+                    <img src={s.thumbnail_url || s.media_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                  )}
+                </button>
+              ))}
+            </Fragment>
+          ))}
         </div>
-      ))}
+      )}
       {viewer && (
         <StoryViewer
           stories={viewer.stories}
