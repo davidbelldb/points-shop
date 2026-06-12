@@ -22,6 +22,16 @@ const DEFAULTS = {
   magic8ball_light_dir2_intensity: '0.3',
   magic8ball_light_point_intensity: '0.8',
   magic8ball_light_point_color: '#88aaff',
+  magic8ball_question_title: 'Need Help Choosing\na Movie or Game?',
+  magic8ball_question_color: '#fdf6e3',
+  magic8ball_question_opacity: '1',
+  magic8ball_question_depth: '1',
+  magic8ball_filter_color: '#000000',
+  magic8ball_filter_opacity: '0.45',
+  magic8ball_filter_depth: '1',
+  magic8ball_die_depth: '0.85',
+  magic8ball_result_face_pop: '0',
+  magic8ball_reveal_lead_ms: '500',
 };
 
 export default function AdminMagic8BallSection({ bare = false }) {
@@ -52,6 +62,16 @@ export default function AdminMagic8BallSection({ bare = false }) {
     settings.magic8ball_light_dir2_intensity,
     settings.magic8ball_light_point_intensity,
     settings.magic8ball_light_point_color,
+    settings.magic8ball_question_title,
+    settings.magic8ball_question_color,
+    settings.magic8ball_question_opacity,
+    settings.magic8ball_question_depth,
+    settings.magic8ball_filter_color,
+    settings.magic8ball_filter_opacity,
+    settings.magic8ball_filter_depth,
+    settings.magic8ball_die_depth,
+    settings.magic8ball_result_face_pop,
+    settings.magic8ball_reveal_lead_ms,
   ]);
 
   function setVal(key, value) {
@@ -82,6 +102,10 @@ export default function AdminMagic8BallSection({ bare = false }) {
       setError(`${key} must be a hex colour like #88aaff`);
       return;
     }
+    save(key, vals[key]);
+  }
+
+  function commitText(key) {
     save(key, vals[key]);
   }
 
@@ -202,6 +226,155 @@ export default function AdminMagic8BallSection({ bare = false }) {
                 maxLength={7}
               />
             </div>
+          </label>
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Question text</p>
+        <p className="text-xs text-neutral-500">
+          The heading shown while picking Movies or Games. Depth is the distance toward the camera (bigger = closer to the glass).
+        </p>
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-neutral-500">Title text (use a blank line to break onto a new line)</span>
+          <textarea
+            value={vals.magic8ball_question_title}
+            onChange={(e) => setVal('magic8ball_question_title', e.target.value)}
+            onBlur={() => commitText('magic8ball_question_title')}
+            rows={2}
+            className="w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none font-mono"
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Text colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(vals.magic8ball_question_color) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: vals.magic8ball_question_color }} />
+              )}
+              <input
+                value={vals.magic8ball_question_color}
+                onChange={(e) => setVal('magic8ball_question_color', e.target.value)}
+                onBlur={() => commitColour('magic8ball_question_color')}
+                className={colourInputCls}
+                placeholder="#fdf6e3"
+                maxLength={7}
+              />
+            </div>
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Opacity (0-1)</span>
+            <input
+              value={vals.magic8ball_question_opacity}
+              type="number" min="0" max="1" step="0.05"
+              onChange={(e) => setVal('magic8ball_question_opacity', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_question_opacity', 1)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Depth</span>
+            <input
+              value={vals.magic8ball_question_depth}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_question_depth', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_question_depth', 1)}
+              className={numInputCls}
+            />
+          </label>
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Liquid cover</p>
+        <p className="text-xs text-neutral-500">
+          The thin semi-opaque pane that sits in front of the die at rest, giving the window its murky look.
+          Depth is the distance toward the camera.
+        </p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Cover colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(vals.magic8ball_filter_color) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: vals.magic8ball_filter_color }} />
+              )}
+              <input
+                value={vals.magic8ball_filter_color}
+                onChange={(e) => setVal('magic8ball_filter_color', e.target.value)}
+                onBlur={() => commitColour('magic8ball_filter_color')}
+                className={colourInputCls}
+                placeholder="#000000"
+                maxLength={7}
+              />
+            </div>
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Opacity (0-1)</span>
+            <input
+              value={vals.magic8ball_filter_opacity}
+              type="number" min="0" max="1" step="0.05"
+              onChange={(e) => setVal('magic8ball_filter_opacity', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_filter_opacity', 0.45)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Depth</span>
+            <input
+              value={vals.magic8ball_filter_depth}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_filter_depth', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_filter_depth', 1)}
+              className={numInputCls}
+            />
+          </label>
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Icosahedron &amp; result face</p>
+        <p className="text-xs text-neutral-500">
+          Icosahedron depth moves the die&apos;s resting position toward/away from the glass (colours unchanged for now).
+          Result face pop pushes just that one facet outward (positive) or inward (negative) for a relief effect.
+          Reveal fade duration is how long before the die finishes settling that the result colour and answer text
+          fade in to 100% &mdash; the fade always finishes exactly when the die comes to rest.
+        </p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Icosahedron depth</span>
+            <input
+              value={vals.magic8ball_die_depth}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_die_depth', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_die_depth', 0.85)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Result face pop</span>
+            <input
+              value={vals.magic8ball_result_face_pop}
+              type="number" step="0.01"
+              onChange={(e) => setVal('magic8ball_result_face_pop', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_result_face_pop', 0)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Reveal fade duration (ms)</span>
+            <input
+              value={vals.magic8ball_reveal_lead_ms}
+              type="number" min="0" step="50"
+              onChange={(e) => setVal('magic8ball_reveal_lead_ms', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_reveal_lead_ms', 500)}
+              className={numInputCls}
+            />
           </label>
         </div>
       </div>
