@@ -85,14 +85,14 @@ function SceneLighting() {
  *   select/
  *   confirm/
  *   shaking — settled on the window, like the original close-up
- *   answer  — pushes in tight on the die face to reveal the pick
+ *   answer  — stays on the window, same as select/confirm/shaking
  * -------------------------------------------------------------------- */
 const CAMERA_TARGETS = {
   intro: { pos: [0, 1.6, 9.5], fov: 42 },
   select: { pos: [0, 0.3, 4], fov: 35 },
   confirm: { pos: [0, 0.3, 4], fov: 35 },
   shaking: { pos: [0, 0.3, 4], fov: 35 },
-  answer: { pos: [0, 0.05, 2.15], fov: 26 },
+  answer: { pos: [0, 0.3, 4], fov: 35 },
 };
 
 function CameraRig({ phase }) {
