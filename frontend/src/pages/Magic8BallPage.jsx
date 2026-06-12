@@ -80,8 +80,9 @@ const DEFAULT_LIGHTING = {
 const TEXT_COLOR = '#b7b7f7';                      // Movies/Games/confirm/answer text on the die face
 const RESULT_FACE_COLOR = '#100c7f';               // the die's "result" facet colour once revealed
 const RESULT_FACE_REST_COLOR = '#05050c';          // result facet colour while tumbling/settling — hidden in the liquid
-const RESULT_FACE_REVEAL_EPS = 0.015;              // how close to fully-settled before the reveal transition starts
-const RESULT_FACE_TRANSITION_SPEED = 6;            // higher = quicker colour transition once settled
+const RESULT_FACE_REVEAL_EPS = 0.015;              // how close to fully-settled before the reveal countdown starts
+const RESULT_FACE_REVEAL_DELAY_MS = 500;           // wait this long after settling before the colour starts fading
+const RESULT_FACE_TRANSITION_SPEED = 6;            // higher = quicker colour/text-opacity fade once it starts
 const DIE_SCALE = 0.67 * 1.33;                     // 33% bigger than the original 0.67
 const DIE_Z_REST = 0.85;                           // resting depth, deep in the liquid
 const DIE_Z_FLOAT = 1.15;                          // how close to the glass it floats once the result settles
@@ -126,17 +127,34 @@ const INTRO_CAMERA = { pos: [0, 1.6, 9.5], fov: 42 };
 const MIN_PINCH_ZOOM = 0.5;
 const MAX_PINCH_ZOOM = 1.8;
 
-function CameraRig({ phase, cameraView, zoomRef }) {
+// Two-finger drag (without pinching) orbits the camera around the ball.
+// Sensitivity is radians of orbit per pixel of drag; elevation is clamped
+// so the camera can't flip over the top/bottom of the ball.
+const ORBIT_SENSITIVITY = 0.006;
+const MAX_ORBIT_ELEVATION = 1.1;
+
+// Point the camera orbits/looks around — the centre of the 8-ball window.
+const LOOK_AT = new THREE.Vector3(0, 0, 0.6);
+const ORBIT_AXIS_Y = new THREE.Vector3(0, 1, 0);
+const ORBIT_AXIS_X = new THREE.Vector3(1, 0, 0);
+
+function CameraRig({ phase, cameraView, zoomRef, orbitRef }) {
   const { camera } = useThree();
   const targetVec = useRef(new THREE.Vector3());
 
   useFrame(() => {
     const target = phase === 'intro' ? INTRO_CAMERA : cameraView;
     const zoom = zoomRef?.current ?? 1;
-    targetVec.current.set(...target.pos);
+    const orbit = orbitRef?.current ?? { az: 0, el: 0 };
+
+    targetVec.current.set(...target.pos).sub(LOOK_AT);
+    if (orbit.az) targetVec.current.applyAxisAngle(ORBIT_AXIS_Y, orbit.az);
+    if (orbit.el) targetVec.current.applyAxisAngle(ORBIT_AXIS_X, orbit.el);
+    targetVec.current.add(LOOK_AT);
+
     camera.position.lerp(targetVec.current, 0.045);
     camera.fov += (target.fov * zoom - camera.fov) * 0.045;
-    camera.lookAt(0, 0, 0.6);
+    camera.lookAt(LOOK_AT);
     camera.updateProjectionMatrix();
   });
 
@@ -158,7 +176,9 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
   const restFaceColor = useRef(new THREE.Color(RESULT_FACE_REST_COLOR));
   const litFaceColor = useRef(new THREE.Color(RESULT_FACE_COLOR));
   const faceColorScratch = useRef(new THREE.Color());
-  const faceRevealRef = useRef(0); // 0 = rest colour, 1 = fully revealed
+  const faceRevealRef = useRef(0); // 0 = rest colour/invisible text, 1 = fully revealed
+  const settledSinceRef = useRef(null); // timestamp the die first settled, or null
+  const answerTextRef = useRef(null); // troika Text instance for the answer, faded with faceRevealRef
 
   // The die's own geometry — an icosahedron with one facet (face 6, the
   // one that's face-on to the camera once REST_ROTATION is applied)
@@ -238,10 +258,13 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
       const targetZ = phase === 'answer' ? DIE_Z_FLOAT : DIE_Z_REST;
       dieRef.current.position.z += (targetZ - dieRef.current.position.z) * Math.min(delta * 1.5, 1);
 
-      // Result-face colour reveal — only flip to the lit colour once the
-      // die has essentially stopped moving (rotation + float both settled),
-      // then fade smoothly into it. Any other time (tumbling, still
-      // floating into place) the facet stays the dark "hidden" colour.
+      // Result-face colour reveal — once the die has essentially stopped
+      // moving (rotation + float both settled), wait
+      // RESULT_FACE_REVEAL_DELAY_MS, then fade the facet colour from
+      // RESULT_FACE_REST_COLOR to RESULT_FACE_COLOR, fading the answer
+      // text's opacity in at the same time. Any other time (tumbling,
+      // still floating into place, or not yet settled long enough) the
+      // facet stays the dark "hidden" colour and the text stays invisible.
       const settled =
         phase === 'answer' &&
         Math.abs(dieRef.current.rotation.x - REST_ROTATION.x) < RESULT_FACE_REVEAL_EPS &&
@@ -249,7 +272,16 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
         Math.abs(dieRef.current.rotation.z - REST_Z) < RESULT_FACE_REVEAL_EPS &&
         Math.abs(dieRef.current.position.z - targetZ) < RESULT_FACE_REVEAL_EPS;
 
-      const revealTarget = settled ? 1 : 0;
+      if (settled) {
+        if (settledSinceRef.current === null) settledSinceRef.current = performance.now();
+      } else {
+        settledSinceRef.current = null;
+      }
+      const revealTarget =
+        settled && settledSinceRef.current !== null && performance.now() - settledSinceRef.current >= RESULT_FACE_REVEAL_DELAY_MS
+          ? 1
+          : 0;
+
       const prevReveal = faceRevealRef.current;
       if (prevReveal !== revealTarget || (prevReveal > 0 && prevReveal < 1)) {
         faceRevealRef.current += (revealTarget - prevReveal) * Math.min(delta * RESULT_FACE_TRANSITION_SPEED, 1);
@@ -257,6 +289,10 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
           .copy(restFaceColor.current)
           .lerp(litFaceColor.current, faceRevealRef.current);
         setFaceColor(dieGeo, 6, c);
+        if (answerTextRef.current) {
+          answerTextRef.current.fillOpacity = faceRevealRef.current;
+          answerTextRef.current.outlineOpacity = faceRevealRef.current;
+        }
       }
     }
   });
@@ -381,7 +417,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
                 <planeGeometry args={[0.35, 0.48]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text ref={answerTextRef} position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20" fillOpacity={0} outlineOpacity={0}>
                 {answer}
               </Text>
             </>
@@ -427,14 +463,25 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll }) {
  * -------------------------------------------------------------------- */
 function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture, onFirstInteract, cameraView, lighting }) {
   const swipeRef = useRef({ active: false, lastX: 0, lastDir: 0, accum: 0, lastT: 0 });
-  // Tracks active touch points by pointerId, plus pinch state, so a
-  // two-finger pinch can zoom the camera in/out without triggering swipes.
+  // Tracks active touch points by pointerId, plus pinch/orbit state, so a
+  // two-finger gesture can zoom (pinch apart/together) and orbit (drag
+  // together) the camera without triggering swipes.
   const pointersRef = useRef(new Map());
-  const pinchRef = useRef({ active: false, startDist: 0, startZoom: 1 });
+  const pinchRef = useRef({ active: false, startDist: 0, startZoom: 1, startCentroid: { x: 0, y: 0 }, startOrbit: { az: 0, el: 0 } });
+  const multiTouchRef = useRef(false);
   const zoomRef = useRef(1);
+  const orbitRef = useRef({ az: 0, el: 0 });
+  // Single-finger tap tracking, for double-tap-to-reset.
+  const downRef = useRef({ time: 0, x: 0, y: 0 });
+  const tapRef = useRef({ time: 0, x: 0, y: 0 });
 
   function resetSwipe() {
     swipeRef.current = { active: false, lastX: 0, lastDir: 0, accum: 0, lastT: 0 };
+  }
+
+  function resetCamera() {
+    orbitRef.current = { az: 0, el: 0 };
+    zoomRef.current = 1;
   }
 
   function pinchDistance() {
@@ -444,13 +491,29 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
+  function pinchCentroid() {
+    const pts = [...pointersRef.current.values()];
+    if (pts.length < 2) return { x: 0, y: 0 };
+    const [a, b] = pts;
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+
   function handlePointerDown(e) {
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    downRef.current = { time: performance.now(), x: e.clientX, y: e.clientY };
+
     if (pointersRef.current.size >= 2) {
-      // A second finger landed — start (or restart) the pinch and cancel
-      // any in-progress swipe so the two gestures don't fight.
+      // A second finger landed — start (or restart) the pinch/orbit and
+      // cancel any in-progress swipe so the gestures don't fight.
+      multiTouchRef.current = true;
       resetSwipe();
-      pinchRef.current = { active: true, startDist: pinchDistance(), startZoom: zoomRef.current };
+      pinchRef.current = {
+        active: true,
+        startDist: pinchDistance(),
+        startZoom: zoomRef.current,
+        startCentroid: pinchCentroid(),
+        startOrbit: { ...orbitRef.current },
+      };
       return;
     }
     swipeRef.current = { active: true, lastX: e.clientX, lastDir: 0, accum: 0, lastT: performance.now() };
@@ -466,12 +529,24 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
     }
 
     if (pinchRef.current.active && pointersRef.current.size >= 2) {
+      // Pinching apart/together zooms...
       const dist = pinchDistance();
       if (dist > 0 && pinchRef.current.startDist > 0) {
         const scale = pinchRef.current.startDist / dist;
         const next = pinchRef.current.startZoom * scale;
         zoomRef.current = Math.min(MAX_PINCH_ZOOM, Math.max(MIN_PINCH_ZOOM, next));
       }
+      // ...while dragging both fingers together orbits the camera.
+      const centroid = pinchCentroid();
+      const dx = centroid.x - pinchRef.current.startCentroid.x;
+      const dy = centroid.y - pinchRef.current.startCentroid.y;
+      orbitRef.current = {
+        az: pinchRef.current.startOrbit.az - dx * ORBIT_SENSITIVITY,
+        el: Math.min(
+          MAX_ORBIT_ELEVATION,
+          Math.max(-MAX_ORBIT_ELEVATION, pinchRef.current.startOrbit.el - dy * ORBIT_SENSITIVITY)
+        ),
+      };
       return;
     }
 
@@ -497,10 +572,39 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
   }
 
   function handlePointerUp(e) {
+    // A "simple tap" is a single finger that was never part of a
+    // multi-touch gesture this whole press.
+    const wasSimpleTap = pointersRef.current.size === 1 && !multiTouchRef.current;
+
     pointersRef.current.delete(e.pointerId);
     if (pointersRef.current.size < 2) {
       pinchRef.current.active = false;
     }
+    if (pointersRef.current.size === 0) {
+      multiTouchRef.current = false;
+    }
+
+    if (wasSimpleTap) {
+      const now = performance.now();
+      const duration = now - downRef.current.time;
+      const moved = Math.hypot(e.clientX - downRef.current.x, e.clientY - downRef.current.y);
+      if (duration < 300 && moved < 12) {
+        const sinceLastTap = now - tapRef.current.time;
+        const tapDist = Math.hypot(e.clientX - tapRef.current.x, e.clientY - tapRef.current.y);
+        if (sinceLastTap < 350 && tapDist < 40) {
+          // Double-tap — reset orbit + zoom back to the configured view.
+          resetCamera();
+          tapRef.current = { time: 0, x: 0, y: 0 };
+        } else {
+          tapRef.current = { time: now, x: e.clientX, y: e.clientY };
+        }
+      } else {
+        tapRef.current = { time: 0, x: 0, y: 0 };
+      }
+    } else {
+      tapRef.current = { time: 0, x: 0, y: 0 };
+    }
+
     resetSwipe();
   }
 
@@ -519,7 +623,7 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
     >
       <Canvas shadows dpr={[1, 2]} camera={{ position: INTRO_CAMERA.pos, fov: INTRO_CAMERA.fov }} gl={{ antialias: true, alpha: true }}>
         <SceneLighting lighting={lighting} />
-        <CameraRig phase={phase} cameraView={cameraView} zoomRef={zoomRef} />
+        <CameraRig phase={phase} cameraView={cameraView} zoomRef={zoomRef} orbitRef={orbitRef} />
         <MagicBall phase={phase} answer={answer} shakeSeed={shakeSeed} onPick={onPick} onReroll={onReroll} />
       </Canvas>
     </div>
