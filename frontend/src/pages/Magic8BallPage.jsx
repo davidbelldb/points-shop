@@ -61,9 +61,11 @@ const IDLE_SPIN = 0.12;
 // recolour the ball without hunting through the JSX below.
 // ---------------------------------------------------------------------
 // Radial gradient behind the whole 8-ball — deep near-black liquid glow at
-// the centre (#05050c, reaching full strength at 50% of the way out) fading
-// to near-black (#02041c) at the edges.
-const SCENE_BACKGROUND = 'radial-gradient(circle, #05050c 50%, #02041c 100%)';
+// the centre (reaching full strength at 50% of the way out) fading to
+// near-black (#02041c) at the edges. The centre colour is overridable from
+// Admin > Magic 8-Ball.
+const DEFAULT_SCENE_BACKGROUND_COLOR = '#05050c';
+const sceneBackground = (color) => `radial-gradient(circle, ${color} 50%, #02041c 100%)`;
 
 // Default camera position/fov once settled on the window, and default
 // lighting rig — both overridable from Admin > Magic 8-Ball (stored as
@@ -94,11 +96,12 @@ const DEFAULT_RESULT_FACE_COLOR = '#100c7f';       // the die's "result" facet c
 const DEFAULT_FILTER_COLOR = '#000000';            // murky liquid filter drawn over the window — black, so only the result face's own colour reads through
 const DEFAULT_FILTER_OPACITY = 0.45;
 const DEFAULT_FILTER_DEPTH = 1.0;
-const DEFAULT_GLASS_OPACITY = 0.12;                // the dark semi-transparent "glass" pane in front of everything in the window
 const DEFAULT_QUESTION_TITLE = 'Need Help Choosing\na Movie or Game?';
 const DEFAULT_QUESTION_COLOR = '#fdf6e3';
 const DEFAULT_QUESTION_OPACITY = 1;
 const DEFAULT_QUESTION_DEPTH = 1.0;
+const DEFAULT_SELECTION_DEPTH = 0.055;             // depth (toward camera) of the Movies/Games picker text on the die face
+const DEFAULT_RESULT_TEXT_DEPTH = 0.055;           // depth (toward camera) of the revealed answer text on the die face
 
 // Fixed duration (ms) the die's settle animation is assumed to take once
 // shaking stops — used purely to time the result-face/answer-text reveal
@@ -186,8 +189,9 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
   const shakeStartRef = useRef(0);
 
   // Result-facet colour reveal — stays RESULT_FACE_REST_COLOR (blends into
-  // the liquid) while tumbling/settling, then transitions smoothly to
-  // RESULT_FACE_COLOR only once the die has fully come to rest.
+  // the liquid) while tumbling/settling, then transitions smoothly to the
+  // configurable "result face end colour" only once the die has fully come
+  // to rest.
   const restFaceColor = useRef(new THREE.Color(RESULT_FACE_REST_COLOR));
   const litFaceColor = useRef(new THREE.Color(appearance?.resultFaceColor ?? DEFAULT_RESULT_FACE_COLOR));
   const faceColorScratch = useRef(new THREE.Color());
@@ -310,7 +314,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
       // Result-face colour reveal — tracks the moment shaking stops
       // (shakeEndRef), and treats the die's settle animation as taking a
       // fixed SETTLE_DURATION_MS from that point. The reveal fade — facet
-      // colour from RESULT_FACE_REST_COLOR to RESULT_FACE_COLOR, and the
+      // colour from RESULT_FACE_REST_COLOR to the configurable end colour, and the
       // answer text's opacity from 0 to 1 — plays during the last
       // `revealLeadMs` of that window, so it finishes exactly when the die
       // comes to rest. Only applies once an answer is showing; any other
@@ -416,7 +420,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
                 <planeGeometry args={[0.16, 0.38]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[-0.06, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.38} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[-0.06, 0, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} fontWeight="bold" color={TEXT_COLOR} maxWidth={0.38} textAlign="center" anchorX="center" anchorY="middle">
                 Movies
               </Text>
 
@@ -430,7 +434,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
                 <planeGeometry args={[0.18, 0.55]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.12, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} color={TEXT_COLOR} maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[0.12, 0, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} fontWeight="bold" color={TEXT_COLOR} maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle">
                 Games
               </Text>
             </>
@@ -448,7 +452,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
                 <planeGeometry args={[0.35, 0.46]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.058} lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.46} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20">
+              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.058} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.46} textAlign="center" anchorX="center" anchorY="middle">
                 {'Okay, then.\nGive me a shake!'}
               </Text>
             </>
@@ -466,7 +470,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
                 <planeGeometry args={[0.35, 0.48]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <Text ref={answerTextRef} position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20" fillOpacity={0} outlineOpacity={0}>
+              <Text ref={answerTextRef} position={[0.05, 0, appearance?.resultTextDepth ?? DEFAULT_RESULT_TEXT_DEPTH]} rotation={[0, 0, Math.PI / 2]} fontSize={0.064} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.48} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.0015} outlineColor="#0a0a20" fillOpacity={0} outlineOpacity={0}>
                 {answer.replace(/:\s*/, ':\n')}
               </Text>
             </>
@@ -476,7 +480,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
 
       {/* Heading prompt — fixed in the window, not on the die */}
       {showPicker && (
-        <Text position={[0, 0.62 * WINDOW_SCALE, appearance?.questionDepth ?? DEFAULT_QUESTION_DEPTH]} fontSize={0.078 * WINDOW_SCALE} lineHeight={1.15} color={appearance?.questionColor ?? DEFAULT_QUESTION_COLOR} fillOpacity={appearance?.questionOpacity ?? DEFAULT_QUESTION_OPACITY} maxWidth={1.35 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle" outlineWidth={0.004 * WINDOW_SCALE} outlineColor="#0a0a14" outlineOpacity={appearance?.questionOpacity ?? DEFAULT_QUESTION_OPACITY}>
+        <Text position={[0, 0.62 * WINDOW_SCALE, appearance?.questionDepth ?? DEFAULT_QUESTION_DEPTH]} fontSize={0.078 * WINDOW_SCALE} fontWeight="bold" lineHeight={1.15} color={appearance?.questionColor ?? DEFAULT_QUESTION_COLOR} fillOpacity={appearance?.questionOpacity ?? DEFAULT_QUESTION_OPACITY} maxWidth={1.35 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
           {appearance?.questionTitle ?? DEFAULT_QUESTION_TITLE}
         </Text>
       )}
@@ -490,12 +494,6 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
       <mesh position={[0, 0, appearance?.filterDepth ?? DEFAULT_FILTER_DEPTH]}>
         <circleGeometry args={[1.06 * WINDOW_SCALE, 48]} />
         <meshBasicMaterial color={appearance?.filterColor ?? DEFAULT_FILTER_COLOR} transparent opacity={appearance?.filterOpacity ?? DEFAULT_FILTER_OPACITY} depthWrite={false} />
-      </mesh>
-
-      {/* Glass tint */}
-      <mesh position={[0, 0, 1.46]}>
-        <circleGeometry args={[1.08 * WINDOW_SCALE, 48]} />
-        <meshStandardMaterial color="#0d1733" roughness={0.1} metalness={0.1} transparent opacity={appearance?.glassOpacity ?? DEFAULT_GLASS_OPACITY} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -656,7 +654,7 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
       className="touch-none overflow-hidden rounded-2xl shadow-lg"
       style={{
         aspectRatio: '4 / 3',
-        background: SCENE_BACKGROUND,
+        background: sceneBackground(appearance?.sceneBackgroundColor ?? DEFAULT_SCENE_BACKGROUND_COLOR),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -729,6 +727,7 @@ export function Magic8BallGame() {
   // above. Colours/depths/opacity apply on page reload; the die geometry
   // (depth + result-face pop) is rebuilt via dieGeo's own memo.
   const appearance = useMemo(() => ({
+    sceneBackgroundColor: settings.magic8ball_scene_background_color || DEFAULT_SCENE_BACKGROUND_COLOR,
     questionTitle: settings.magic8ball_question_title || DEFAULT_QUESTION_TITLE,
     questionColor: settings.magic8ball_question_color || DEFAULT_QUESTION_COLOR,
     questionOpacity: num(settings.magic8ball_question_opacity, DEFAULT_QUESTION_OPACITY),
@@ -736,13 +735,15 @@ export function Magic8BallGame() {
     filterColor: settings.magic8ball_filter_color || DEFAULT_FILTER_COLOR,
     filterOpacity: num(settings.magic8ball_filter_opacity, DEFAULT_FILTER_OPACITY),
     filterDepth: num(settings.magic8ball_filter_depth, DEFAULT_FILTER_DEPTH),
-    glassOpacity: num(settings.magic8ball_glass_opacity, DEFAULT_GLASS_OPACITY),
+    selectionDepth: num(settings.magic8ball_selection_depth, DEFAULT_SELECTION_DEPTH),
+    resultTextDepth: num(settings.magic8ball_result_text_depth, DEFAULT_RESULT_TEXT_DEPTH),
     dieDepthStart: num(settings.magic8ball_die_depth_start, DEFAULT_DIE_DEPTH_START),
     dieDepthEnd: num(settings.magic8ball_die_depth_end, DEFAULT_DIE_DEPTH_END),
     resultFacePop: num(settings.magic8ball_result_face_pop, DEFAULT_RESULT_FACE_POP),
     resultFaceColor: settings.magic8ball_result_face_color || DEFAULT_RESULT_FACE_COLOR,
     revealLeadMs: num(settings.magic8ball_reveal_lead_ms, DEFAULT_REVEAL_LEAD_MS),
   }), [
+    settings.magic8ball_scene_background_color,
     settings.magic8ball_question_title,
     settings.magic8ball_question_color,
     settings.magic8ball_question_opacity,
@@ -750,7 +751,8 @@ export function Magic8BallGame() {
     settings.magic8ball_filter_color,
     settings.magic8ball_filter_opacity,
     settings.magic8ball_filter_depth,
-    settings.magic8ball_glass_opacity,
+    settings.magic8ball_selection_depth,
+    settings.magic8ball_result_text_depth,
     settings.magic8ball_die_depth_start,
     settings.magic8ball_die_depth_end,
     settings.magic8ball_result_face_pop,
