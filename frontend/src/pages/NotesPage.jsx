@@ -321,7 +321,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               title="Move to trash"
-              className="rounded p-1 opacity-0 group-hover:opacity-100 transition-all text-neutral-400 dark:text-neutral-500 hover:bg-red-50 hover:text-[#fca5a5]"
+              className="rounded p-1 opacity-0 group-hover:opacity-100 transition-all text-neutral-400 dark:text-neutral-500 hover:text-[#fca5a5]"
             ><TrashIcon size={13} /></button>
           )}
           {mode === 'trash' && (
@@ -332,7 +332,7 @@ function NoteRow({ note, active, mode, onClick, onArchive, onDelete, onRestore, 
                 onHardDelete();
               }}
               title="Delete permanently"
-              className="rounded p-1 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-[#fca5a5] text-neutral-400 dark:text-neutral-500"
+              className="rounded p-1 opacity-0 group-hover:opacity-100 transition-all hover:text-[#fca5a5] text-neutral-400 dark:text-neutral-500"
               style={confirmHard ? { opacity: 1, background: '#3a1818', color: '#fca5a5' } : {}}
             >
               {confirmHard
