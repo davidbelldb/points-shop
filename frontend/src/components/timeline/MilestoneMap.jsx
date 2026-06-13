@@ -63,12 +63,16 @@ const DEFAULT_CENTER = { lat: 52.205, lng: 0.119 };
  *  - locations: [{ id, lat, lng, title, date }]  (single pin -> array of 1)
  *  - center / zoom: optional overrides (defaults to fitting all locations)
  *  - height: CSS height (default '14rem')
+ *  - rounded: render with rounded corners (default true)
+ *  - bordered: render with a themed border (default true)
  */
 export default function MilestoneMap({
   locations = [],
   center,
   zoom = 14,
   height = '14rem',
+  rounded = true,
+  bordered = true,
   className = '',
 }) {
   const { theme } = useTimelineTheme();
@@ -138,7 +142,9 @@ export default function MilestoneMap({
 
   return (
     <div
-      className={`relative isolate overflow-hidden rounded-2xl border border-[var(--tl-card-border)] ${className}`}
+      className={`relative isolate overflow-hidden ${rounded ? 'rounded-2xl' : ''} ${
+        bordered ? 'border border-[var(--tl-card-border)]' : ''
+      } ${className}`}
       style={{
         height,
         background: 'var(--tl-page-bg)',
@@ -146,7 +152,8 @@ export default function MilestoneMap({
         // Google Maps canvas (it's drawn in its own compositing layer).
         // A fully-opaque mask forces Safari onto the masking code path,
         // which *does* respect the radius - this has no visual effect on
-        // other browsers, which already clip correctly.
+        // other browsers, which already clip correctly. Harmless no-op
+        // when `rounded` is false.
         WebkitMaskImage: '-webkit-radial-gradient(white, white)',
         maskImage: 'radial-gradient(white, white)',
       }}

@@ -130,10 +130,6 @@ export default function RelationshipTimeline({
           </p>
         </header>
 
-        {showOverviewMap && overviewLocations.length > 0 && (
-          <MilestoneMap locations={overviewLocations} className="mb-12" height="10rem" />
-        )}
-
         <div ref={containerRef} className="relative">
           {/* Central line track (dashed) */}
           <div
@@ -167,6 +163,16 @@ export default function RelationshipTimeline({
           </div>
         </div>
       </div>
+
+      {showOverviewMap && overviewLocations.length > 0 && (
+        <MilestoneMap
+          locations={overviewLocations}
+          className="mt-12 mx-[calc(50%-50vw)] w-screen"
+          height="18rem"
+          rounded={false}
+          bordered={false}
+        />
+      )}
 
       <MediaLightbox item={lightboxItem} onClose={() => setLightboxItem(null)} />
     </div>
