@@ -208,7 +208,7 @@ export default function AccountPage() {
                     <path d="M12 6v6l4 2" />
                   </svg>
                 </div>
-                <p className="text-sm font-medium">Relationship Timeline</p>
+                <p className="text-sm font-medium">Timeline</p>
               </div>
               <span className="text-neutral-400">→</span>
             </Link>
