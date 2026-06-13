@@ -40,6 +40,7 @@ export default function TimelineThemeEditor() {
         <ColorField label="Line gradient start" value={theme.lineFrom} onChange={(v) => updateTheme({ lineFrom: v })} />
         <ColorField label="Line gradient middle" value={theme.lineVia} onChange={(v) => updateTheme({ lineVia: v })} />
         <ColorField label="Line gradient end" value={theme.lineTo} onChange={(v) => updateTheme({ lineTo: v })} />
+        <ColorField label="Dashed line (track)" value={theme.lineTrack} onChange={(v) => updateTheme({ lineTrack: v })} withAlpha />
         <ColorField label="Glow accent" value={theme.glow} onChange={(v) => updateTheme({ glow: v })} />
         <ColorField label="Dot background" value={theme.dotBg} onChange={(v) => updateTheme({ dotBg: v })} />
         <ColorField label="Dot border" value={theme.dotBorder} onChange={(v) => updateTheme({ dotBorder: v })} />

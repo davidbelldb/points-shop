@@ -40,8 +40,10 @@ const TimelineCard = forwardRef(function TimelineCard(
       {/* Spacer that pushes the card to the opposite half on desktop */}
       {side === 'right' && <div className="hidden md:block md:w-1/2" />}
 
-      {/* Glowing dot on the central line - vertically aligned with the title */}
-      <div className="absolute left-3 top-10 md:left-1/2 -translate-x-1/2 z-10">
+      {/* Glowing dot on the central line - vertically aligned with the title.
+          Deliberately kept below the sticky app header's z-10 so it never
+          renders on top of the nav bar while scrolling. */}
+      <div className="absolute left-3 top-10 md:left-1/2 -translate-x-1/2 z-[1]">
         <div className="relative">
           <div className="absolute -inset-1.5 rounded-full bg-[var(--tl-glow)] blur-sm animate-pulse" />
           <div

@@ -143,7 +143,7 @@ export default function RelationshipTimeline({
         <div ref={containerRef} className="relative">
           {/* Central line track (dashed) */}
           <div
-            className="absolute left-3 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-[var(--tl-card-border)]"
+            className="absolute left-3 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-[var(--tl-line-track)]"
             style={lineDashStyle}
           />
           {/* Animated "drawn" line - solid (no dashes), grown from the top

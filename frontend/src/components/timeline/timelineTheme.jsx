@@ -19,6 +19,7 @@ export const defaultTimelineTheme = {
   lineFrom: '#fb7185', // rose-400
   lineVia: '#e879f9', // fuchsia-400
   lineTo: '#fcd34d', // amber-300
+  lineTrack: 'rgba(63, 63, 70, 0.6)', // zinc-700 / 60% - the dashed (unfilled) track
   glow: '#fb7185', // rose-400
 
   // Milestone dots
@@ -66,6 +67,7 @@ export const TIMELINE_CSS_VAR_MAP = {
   lineFrom: '--tl-line-from',
   lineVia: '--tl-line-via',
   lineTo: '--tl-line-to',
+  lineTrack: '--tl-line-track',
   glow: '--tl-glow',
   dotBg: '--tl-dot-bg',
   dotBorder: '--tl-dot-border',
