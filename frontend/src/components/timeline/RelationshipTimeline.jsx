@@ -38,6 +38,8 @@ export default function RelationshipTimeline({
   title = 'Our Story So Far',
   subtitle = 'Every little moment, mapped out one milestone at a time.',
   showOverviewMap = true,
+  mapCenter,
+  mapZoom,
   className = '',
 }) {
   const { theme } = useTimelineTheme();
@@ -181,6 +183,8 @@ export default function RelationshipTimeline({
       {showOverviewMap && overviewLocations.length > 0 && (
         <MilestoneMap
           locations={overviewLocations}
+          center={mapCenter}
+          zoom={mapZoom}
           className="mt-12 mx-[calc(50%-50vw)] w-screen"
           height="18rem"
           rounded={false}

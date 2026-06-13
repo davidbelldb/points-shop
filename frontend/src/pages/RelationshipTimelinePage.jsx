@@ -27,9 +27,14 @@ export default function RelationshipTimelinePage() {
       .getSettings()
       .then((settings) => {
         if (cancelled) return;
+        const lat = parseFloat(settings?.timeline_map_center_lat);
+        const lng = parseFloat(settings?.timeline_map_center_lng);
+        const zoom = parseFloat(settings?.timeline_map_zoom);
         setPageSettings({
           title: settings?.timeline_title || undefined,
           subtitle: settings?.timeline_subtitle || undefined,
+          mapCenter: Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : undefined,
+          mapZoom: Number.isFinite(zoom) ? zoom : undefined,
         });
       })
       .catch(() => { if (!cancelled) setPageSettings({}); });
@@ -49,6 +54,8 @@ export default function RelationshipTimelinePage() {
             milestones={milestones}
             title={pageSettings?.title}
             subtitle={pageSettings?.subtitle}
+            mapCenter={pageSettings?.mapCenter}
+            mapZoom={pageSettings?.mapZoom}
           />
         )}
       </div>

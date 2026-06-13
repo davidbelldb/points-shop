@@ -3,6 +3,7 @@ import { query } from '../../db.js';
 const ALLOWED = [
   'shop_name', 'hero_title', 'hero_subtitle', 'logo_url', 'games_title', 'games_subtitle',
   'timeline_theme', 'timeline_title', 'timeline_subtitle',
+  'timeline_map_center_lat', 'timeline_map_center_lng', 'timeline_map_zoom',
   'banner_enabled', 'banner_text', 'banner_link_url', 'banner_bg_colour', 'banner_text_colour',
   'banner_countdown_date', 'banner_countdown_time',
   'audio_section_enabled', 'audio_title', 'audio_subtitle',

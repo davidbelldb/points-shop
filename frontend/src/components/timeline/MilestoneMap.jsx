@@ -112,7 +112,10 @@ export default function MilestoneMap({
   // map area.
   const pointsKey = points.map((p) => `${p.id}:${p.lat},${p.lng}`).join('|');
   useEffect(() => {
-    if (!map || points.length === 0) return;
+    // An explicit `center` override means the admin has manually positioned
+    // this map (see TimelinePageSettingsEditor) - leave it exactly where
+    // they put it instead of re-fitting to the pins.
+    if (!map || points.length === 0 || center) return;
 
     const applyViewport = () => {
       if (points.length > 1) {
@@ -199,7 +202,7 @@ export default function MilestoneMap({
       observer?.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, zoom]);
+  }, [map, pointsKey, zoom, center]);
 
   if (points.length === 0) return null;
 
