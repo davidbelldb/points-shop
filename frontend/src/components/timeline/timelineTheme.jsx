@@ -100,6 +100,18 @@ export function themeToCssVars(theme) {
 
 const STORAGE_KEY = 'sneakySocial.timelineTheme';
 
+// These fields are code-level configuration, not exposed in the theme
+// editor UI. They must never be persisted to (or restored from)
+// localStorage, otherwise an old saved theme can permanently "pin" the map
+// to a stale tile provider even after the code defaults change.
+const NON_PERSISTED_KEYS = ['mapTileUrlDark', 'mapTileUrlLight', 'mapTileAttribution'];
+
+function stripNonPersistedKeys(obj) {
+  const copy = { ...obj };
+  for (const key of NON_PERSISTED_KEYS) delete copy[key];
+  return copy;
+}
+
 const TimelineThemeContext = createContext({
   theme: defaultTimelineTheme,
   setTheme: () => {},
@@ -113,7 +125,9 @@ export function TimelineThemeProvider({ theme: themeProp, children }) {
     if (typeof window === 'undefined') return defaultTimelineTheme;
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      return saved ? { ...defaultTimelineTheme, ...JSON.parse(saved) } : defaultTimelineTheme;
+      return saved
+        ? { ...defaultTimelineTheme, ...stripNonPersistedKeys(JSON.parse(saved)) }
+        : defaultTimelineTheme;
     } catch {
       return defaultTimelineTheme;
     }
@@ -127,7 +141,7 @@ export function TimelineThemeProvider({ theme: themeProp, children }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(theme));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stripNonPersistedKeys(theme)));
     } catch {
       // localStorage unavailable - ignore, theme just won't persist
     }
