@@ -37,6 +37,12 @@ const DEFAULTS = {
   magic8ball_result_face_pop: '0',
   magic8ball_result_face_color: '#100c7f',
   magic8ball_reveal_lead_ms: '500',
+  magic8ball_confirm_text: 'Okay, then.\nGive me a shake!',
+  magic8ball_confirm_color: '#b7b7f7',
+  magic8ball_confirm_font_size: '0.1',
+  magic8ball_confirm_depth: '1',
+  magic8ball_confirm_x: '0',
+  magic8ball_confirm_y: '-0.05',
 };
 
 export default function AdminMagic8BallSection({ bare = false }) {
@@ -82,6 +88,12 @@ export default function AdminMagic8BallSection({ bare = false }) {
     settings.magic8ball_result_face_pop,
     settings.magic8ball_result_face_color,
     settings.magic8ball_reveal_lead_ms,
+    settings.magic8ball_confirm_text,
+    settings.magic8ball_confirm_color,
+    settings.magic8ball_confirm_font_size,
+    settings.magic8ball_confirm_depth,
+    settings.magic8ball_confirm_x,
+    settings.magic8ball_confirm_y,
   ]);
 
   function setVal(key, value) {
@@ -325,12 +337,90 @@ export default function AdminMagic8BallSection({ bare = false }) {
             />
           </label>
           <label className="flex items-center justify-between gap-2">
-            <span className="text-neutral-500">&quot;Movies&quot;/&quot;Games&quot; &amp; confirm depth</span>
+            <span className="text-neutral-500">&quot;Movies&quot;/&quot;Games&quot; depth</span>
             <input
               value={vals.magic8ball_selection_depth}
               type="number" step="0.05"
               onChange={(e) => setVal('magic8ball_selection_depth', e.target.value)}
               onBlur={() => commitNumber('magic8ball_selection_depth', 1)}
+              className={numInputCls}
+            />
+          </label>
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Confirm prompt</p>
+        <p className="text-xs text-neutral-500">
+          The &quot;Okay, then. Give me a shake!&quot; message shown after picking Movies or Games &mdash; fixed in the
+          window like the question title. X/Y position is relative to the centre of the window (right/up are positive).
+        </p>
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-neutral-500">Prompt text (use a blank line to break onto a new line)</span>
+          <textarea
+            value={vals.magic8ball_confirm_text}
+            onChange={(e) => setVal('magic8ball_confirm_text', e.target.value)}
+            onBlur={() => commitText('magic8ball_confirm_text')}
+            rows={2}
+            className="w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none font-mono"
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Text colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(vals.magic8ball_confirm_color) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: vals.magic8ball_confirm_color }} />
+              )}
+              <input
+                value={vals.magic8ball_confirm_color}
+                onChange={(e) => setVal('magic8ball_confirm_color', e.target.value)}
+                onBlur={() => commitColour('magic8ball_confirm_color')}
+                className={colourInputCls}
+                placeholder="#b7b7f7"
+                maxLength={7}
+              />
+            </div>
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Font size</span>
+            <input
+              value={vals.magic8ball_confirm_font_size}
+              type="number" step="0.005" min="0"
+              onChange={(e) => setVal('magic8ball_confirm_font_size', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_confirm_font_size', 0.1)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Depth</span>
+            <input
+              value={vals.magic8ball_confirm_depth}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_confirm_depth', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_confirm_depth', 1)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">X position</span>
+            <input
+              value={vals.magic8ball_confirm_x}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_confirm_x', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_confirm_x', 0)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Y position</span>
+            <input
+              value={vals.magic8ball_confirm_y}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_confirm_y', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_confirm_y', -0.05)}
               className={numInputCls}
             />
           </label>

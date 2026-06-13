@@ -16,6 +16,8 @@ const ALLOWED = [
   'magic8ball_die_depth_start', 'magic8ball_die_depth_end', 'magic8ball_result_face_pop',
   'magic8ball_result_face_color', 'magic8ball_selection_depth', 'magic8ball_result_text_depth',
   'magic8ball_reveal_lead_ms', 'magic8ball_scene_background_color',
+  'magic8ball_confirm_text', 'magic8ball_confirm_color', 'magic8ball_confirm_font_size',
+  'magic8ball_confirm_depth', 'magic8ball_confirm_x', 'magic8ball_confirm_y',
 ];
 
 export async function getAllSettings() {

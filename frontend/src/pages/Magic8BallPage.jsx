@@ -100,9 +100,19 @@ const DEFAULT_QUESTION_TITLE = 'Need Help Choosing\na Movie or Game?';
 const DEFAULT_QUESTION_COLOR = '#b7b7f7';
 const DEFAULT_QUESTION_OPACITY = 1;
 const DEFAULT_QUESTION_DEPTH = 1.0;
-const DEFAULT_SELECTION_DEPTH = 1.0;               // depth of the detached Movies/Games picker + confirm prompt, fixed in the window (same coordinate space as the question title)
+const DEFAULT_SELECTION_DEPTH = 1.0;               // depth of the detached Movies/Games picker, fixed in the window (same coordinate space as the question title)
 const DEFAULT_RESULT_TEXT_DEPTH = 0.055;           // depth (toward camera) of the revealed answer text on the die face
-const OVERLAY_FONT_SIZE = 0.1;                     // shared font size for the question title, Movies/Games picker and confirm prompt — all detached from the die, fixed in the window
+const OVERLAY_FONT_SIZE = 0.1;                     // shared font size for the question title and Movies/Games picker — both detached from the die, fixed in the window
+
+// "Okay, then. Give me a shake!" confirm prompt — fully configurable from
+// Admin > Magic 8-Ball (text, size, colour, depth and X/Y position), fixed
+// in the window like the question title/picker.
+const DEFAULT_CONFIRM_TEXT = 'Okay, then.\nGive me a shake!';
+const DEFAULT_CONFIRM_COLOR = '#b7b7f7';
+const DEFAULT_CONFIRM_FONT_SIZE = 0.1;
+const DEFAULT_CONFIRM_DEPTH = 1.0;
+const DEFAULT_CONFIRM_X = 0;
+const DEFAULT_CONFIRM_Y = -0.05;
 
 // Fixed duration (ms) the die's settle animation is assumed to take once
 // shaking stops — used purely to time the result-face/answer-text reveal
@@ -472,7 +482,11 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
       {showConfirm && (
         <>
           <mesh
-            position={[0, -0.05 * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
+            position={[
+              appearance?.confirmX ?? DEFAULT_CONFIRM_X,
+              appearance?.confirmY ?? DEFAULT_CONFIRM_Y,
+              (appearance?.confirmDepth ?? DEFAULT_CONFIRM_DEPTH) - 0.01,
+            ]}
             onClick={(e) => { e.stopPropagation(); onReroll(); }}
             onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
             onPointerOut={() => setCursor(false)}
@@ -480,8 +494,22 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
             <planeGeometry args={[1.1 * WINDOW_SCALE, 0.5 * WINDOW_SCALE]} />
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
-          <Text position={[0, -0.05 * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={1.3 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
-            {'Okay, then.\nGive me a shake!'}
+          <Text
+            position={[
+              appearance?.confirmX ?? DEFAULT_CONFIRM_X,
+              appearance?.confirmY ?? DEFAULT_CONFIRM_Y,
+              appearance?.confirmDepth ?? DEFAULT_CONFIRM_DEPTH,
+            ]}
+            fontSize={appearance?.confirmFontSize ?? DEFAULT_CONFIRM_FONT_SIZE}
+            fontWeight="bold"
+            lineHeight={1.25}
+            color={appearance?.confirmColor ?? DEFAULT_CONFIRM_COLOR}
+            maxWidth={1.3 * WINDOW_SCALE}
+            textAlign="center"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {appearance?.confirmText ?? DEFAULT_CONFIRM_TEXT}
           </Text>
         </>
       )}
@@ -738,6 +766,12 @@ export function Magic8BallGame() {
     filterDepth: num(settings.magic8ball_filter_depth, DEFAULT_FILTER_DEPTH),
     selectionDepth: num(settings.magic8ball_selection_depth, DEFAULT_SELECTION_DEPTH),
     resultTextDepth: num(settings.magic8ball_result_text_depth, DEFAULT_RESULT_TEXT_DEPTH),
+    confirmText: settings.magic8ball_confirm_text || DEFAULT_CONFIRM_TEXT,
+    confirmColor: settings.magic8ball_confirm_color || DEFAULT_CONFIRM_COLOR,
+    confirmFontSize: num(settings.magic8ball_confirm_font_size, DEFAULT_CONFIRM_FONT_SIZE),
+    confirmDepth: num(settings.magic8ball_confirm_depth, DEFAULT_CONFIRM_DEPTH),
+    confirmX: num(settings.magic8ball_confirm_x, DEFAULT_CONFIRM_X),
+    confirmY: num(settings.magic8ball_confirm_y, DEFAULT_CONFIRM_Y),
     dieDepthStart: num(settings.magic8ball_die_depth_start, DEFAULT_DIE_DEPTH_START),
     dieDepthEnd: num(settings.magic8ball_die_depth_end, DEFAULT_DIE_DEPTH_END),
     resultFacePop: num(settings.magic8ball_result_face_pop, DEFAULT_RESULT_FACE_POP),
@@ -754,6 +788,12 @@ export function Magic8BallGame() {
     settings.magic8ball_filter_depth,
     settings.magic8ball_selection_depth,
     settings.magic8ball_result_text_depth,
+    settings.magic8ball_confirm_text,
+    settings.magic8ball_confirm_color,
+    settings.magic8ball_confirm_font_size,
+    settings.magic8ball_confirm_depth,
+    settings.magic8ball_confirm_x,
+    settings.magic8ball_confirm_y,
     settings.magic8ball_die_depth_start,
     settings.magic8ball_die_depth_end,
     settings.magic8ball_result_face_pop,
