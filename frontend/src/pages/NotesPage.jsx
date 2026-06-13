@@ -887,7 +887,7 @@ function EmptyState({ message }) {
 
 // ─── New Note Popover ─────────────────────────────────────────────────────────
 
-function NewNotePopover({ onCreate, onClose }) {
+function NewNotePopover({ onCreate, onClose, partnerName }) {
   return (
     <div className="absolute top-full right-0 mt-1.5 z-50 w-48 rounded-2xl bg-white shadow-2xl ring-1 ring-black/8 dark:ring-white/8 overflow-hidden py-1">
       <button
@@ -901,7 +901,7 @@ function NewNotePopover({ onCreate, onClose }) {
         onClick={() => { onCreate('shared'); onClose(); }}
         className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-[#1f8a6b] dark:text-[#61dbbb] hover:bg-[#61dbbb]/5 dark:hover:bg-[#61dbbb]/10 transition-colors"
       >
-        <SharedPeopleIcon size={14} /> Shared with Katie
+        <SharedPeopleIcon size={14} /> Shared with {partnerName}
       </button>
     </div>
   );
@@ -918,6 +918,12 @@ export default function NotesPage() {
   const [creating,     setCreating]     = useState(false);
   const [showPopover,  setShowPopover]  = useState(false);
   const [footerCounts, setFooterCounts] = useState({ archive: 0, trash: 0 });
+  const [partnerName, setPartnerName]   = useState('them');
+
+  // Fetch the other account's name for "Shared with {name}"
+  useEffect(() => {
+    api.notesPartner().then((p) => p?.name && setPartnerName(p.name)).catch(() => {});
+  }, []);
 
   // Load notes whenever view changes
   useEffect(() => {
@@ -1050,7 +1056,7 @@ export default function NotesPage() {
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </button>
-            {showPopover && <NewNotePopover onCreate={createNote} onClose={() => setShowPopover(false)} />}
+            {showPopover && <NewNotePopover onCreate={createNote} onClose={() => setShowPopover(false)} partnerName={partnerName} />}
           </div>
         )}
       </div>

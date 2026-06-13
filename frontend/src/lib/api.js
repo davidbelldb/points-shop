@@ -222,6 +222,7 @@ export const api = {
     return request(`/orders${qs ? `?${qs}` : ''}`);
   },
   // Notes
+  notesPartner: () => request('/notes/partner'),
   listNotes: (status = 'active') => request(`/notes?status=${status}`),
   createNote: (type = 'personal') => request('/notes', { method: 'POST', body: JSON.stringify({ type }) }),
   updateNote: (id, body) => request(`/notes/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),

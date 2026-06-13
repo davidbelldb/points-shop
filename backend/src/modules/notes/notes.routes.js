@@ -39,6 +39,14 @@ async function notifyPartner(actorId, action) {
 }
 
 export default async function notesRoutes(fastify) {
+  // GET /api/notes/partner — the other account's name (for "Shared with {name}")
+  fastify.get('/api/notes/partner', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    if (!accountId) return reply.code(401).send({ error: 'Not authenticated' });
+    const other = await findOtherUser(accountId);
+    return other ? { id: other.id, name: other.name } : { id: null, name: 'them' };
+  });
+
   // GET /api/notes?status=active|archived|deleted
   fastify.get('/api/notes', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
