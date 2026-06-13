@@ -40,8 +40,8 @@ const TimelineCard = forwardRef(function TimelineCard(
       {/* Spacer that pushes the card to the opposite half on desktop */}
       {side === 'right' && <div className="hidden md:block md:w-1/2" />}
 
-      {/* Glowing dot on the central line */}
-      <div className="absolute left-4 top-2 md:left-1/2 -translate-x-1/2 z-10">
+      {/* Glowing dot on the central line - vertically aligned with the title */}
+      <div className="absolute left-3 top-10 md:left-1/2 -translate-x-1/2 z-10">
         <div className="relative">
           <div className="absolute -inset-1.5 rounded-full bg-[var(--tl-glow)] blur-sm animate-pulse" />
           <div
@@ -64,11 +64,7 @@ const TimelineCard = forwardRef(function TimelineCard(
           side === 'right' ? 'md:pl-10' : 'md:pr-10'
         } pb-8`}
       >
-        <div
-          className={`border-l-2 pl-4 transition-colors ${
-            isActive ? 'border-[var(--tl-accent)]' : 'border-transparent'
-          }`}
-        >
+        <div className="pl-4">
           <div className="flex items-center gap-2.5 mb-1.5">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tl-dot-bg)] border border-[var(--tl-card-border)] text-[var(--tl-accent)]">
               <Icon className="h-4 w-4" />
