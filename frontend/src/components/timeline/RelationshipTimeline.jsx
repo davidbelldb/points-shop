@@ -137,7 +137,7 @@ export default function RelationshipTimeline({
         <div ref={containerRef} className="relative">
           {/* Central line track (dashed) */}
           <div
-            className="absolute left-3 md:left-1/2 top-0 bottom-0 w-1 -translate-x-1/2 rounded-full bg-[var(--tl-line-track)]"
+            className="absolute left-3 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-[var(--tl-line-track)]"
             style={lineDashStyle}
           />
           {/* Animated "drawn" line - solid (no dashes), grown from the top
@@ -146,7 +146,7 @@ export default function RelationshipTimeline({
               currently visible and the full color transition always reads
               through. */}
           <motion.div
-            className="absolute left-3 md:left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
+            className="absolute left-3 md:left-1/2 top-0 w-1 -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
             style={{ height: lineHeight }}
           />
 
