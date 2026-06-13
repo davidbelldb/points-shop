@@ -118,12 +118,18 @@ export default function MilestoneMap({
       if (points.length > 1) {
         const bounds = new window.google.maps.LatLngBounds();
         points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
-        // A smaller pixel padding makes `fitBounds` pick a tighter (more
-        // zoomed-in) level while still guaranteeing every pin stays inside
-        // the visible area - unlike a post-hoc `setZoom` + `getBounds()`
-        // check, this is synchronous and doesn't depend on the map having
-        // already settled.
-        map.fitBounds(bounds, 12);
+        // `fitBounds` fits the *lat/lng points* themselves snugly inside the
+        // viewport, but each pin icon is a 40x50 marker anchored near its
+        // tip (anchor (20,44)) - so it extends ~44px ABOVE its point and only
+        // ~6px below, and ~20px either side. A small uniform padding doesn't
+        // leave room for that, so a pin sitting near an edge of the bounds
+        // gets its icon clipped (and the map ends up feeling "off-centre").
+        // Pad asymmetrically to cover the icon's actual footprint, plus a
+        // little breathing room, while still keeping a tight zoom.
+        map.fitBounds(bounds, { top: 56, right: 28, bottom: 24, left: 28 });
+        // Re-center explicitly on the bounds' centre - fitBounds occasionally
+        // settles a pixel or two off-centre once the padding is asymmetric.
+        map.setCenter(bounds.getCenter());
       } else {
         map.setCenter({ lat: points[0].lat, lng: points[0].lng });
         map.setZoom(zoom + 1);
