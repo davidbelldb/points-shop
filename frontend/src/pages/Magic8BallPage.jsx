@@ -100,7 +100,10 @@ const DEFAULT_QUESTION_TITLE = 'Need Help Choosing\na Movie or Game?';
 const DEFAULT_QUESTION_COLOR = '#b7b7f7';
 const DEFAULT_QUESTION_OPACITY = 1;
 const DEFAULT_QUESTION_DEPTH = 1.0;
+const DEFAULT_QUESTION_Y = 0.62;                   // vertical position of the question title, fixed in the window
 const DEFAULT_SELECTION_DEPTH = 1.0;               // depth of the detached Movies/Games picker, fixed in the window (same coordinate space as the question title)
+const DEFAULT_MOVIES_Y = 0.05;                     // vertical position of the "Movies" picker text, fixed in the window
+const DEFAULT_GAMES_Y = -0.22;                     // vertical position of the "Games" picker text, fixed in the window
 const DEFAULT_RESULT_TEXT_DEPTH = 0.055;           // depth (toward camera) of the revealed answer text on the die face
 const OVERLAY_FONT_SIZE = 0.1;                     // shared font size for the question title and Movies/Games picker — both detached from the die, fixed in the window
 
@@ -444,7 +447,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
           regardless of how the die tumbles/rotates. All four share the
           same larger font size and text colour for visual consistency. */}
       {showPicker && (
-        <Text position={[0, 0.62 * WINDOW_SCALE, appearance?.questionDepth ?? DEFAULT_QUESTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" lineHeight={1.15} color={appearance?.questionColor ?? DEFAULT_QUESTION_COLOR} fillOpacity={appearance?.questionOpacity ?? DEFAULT_QUESTION_OPACITY} maxWidth={1.35 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
+        <Text position={[0, (appearance?.questionY ?? DEFAULT_QUESTION_Y) * WINDOW_SCALE, appearance?.questionDepth ?? DEFAULT_QUESTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" lineHeight={1.15} color={appearance?.questionColor ?? DEFAULT_QUESTION_COLOR} fillOpacity={appearance?.questionOpacity ?? DEFAULT_QUESTION_OPACITY} maxWidth={1.35 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
           {appearance?.questionTitle ?? DEFAULT_QUESTION_TITLE}
         </Text>
       )}
@@ -452,7 +455,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
       {showPicker && (
         <>
           <mesh
-            position={[0, 0.05 * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
+            position={[0, (appearance?.moviesY ?? DEFAULT_MOVIES_Y) * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
             onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
             onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
             onPointerOut={() => setCursor(false)}
@@ -460,12 +463,12 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
             <planeGeometry args={[0.7 * WINDOW_SCALE, 0.22 * WINDOW_SCALE]} />
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
-          <Text position={[0, 0.05 * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" color={TEXT_COLOR} maxWidth={1.2 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
+          <Text position={[0, (appearance?.moviesY ?? DEFAULT_MOVIES_Y) * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" color={TEXT_COLOR} maxWidth={1.2 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
             Movies
           </Text>
 
           <mesh
-            position={[0, -0.22 * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
+            position={[0, (appearance?.gamesY ?? DEFAULT_GAMES_Y) * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
             onClick={(e) => { e.stopPropagation(); onPick('games'); }}
             onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
             onPointerOut={() => setCursor(false)}
@@ -473,7 +476,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
             <planeGeometry args={[0.7 * WINDOW_SCALE, 0.22 * WINDOW_SCALE]} />
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
-          <Text position={[0, -0.22 * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" color={TEXT_COLOR} maxWidth={1.2 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
+          <Text position={[0, (appearance?.gamesY ?? DEFAULT_GAMES_Y) * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" color={TEXT_COLOR} maxWidth={1.2 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
             Games
           </Text>
         </>
@@ -761,10 +764,13 @@ export function Magic8BallGame() {
     questionColor: settings.magic8ball_question_color || DEFAULT_QUESTION_COLOR,
     questionOpacity: num(settings.magic8ball_question_opacity, DEFAULT_QUESTION_OPACITY),
     questionDepth: num(settings.magic8ball_question_depth, DEFAULT_QUESTION_DEPTH),
+    questionY: num(settings.magic8ball_question_y, DEFAULT_QUESTION_Y),
     filterColor: settings.magic8ball_filter_color || DEFAULT_FILTER_COLOR,
     filterOpacity: num(settings.magic8ball_filter_opacity, DEFAULT_FILTER_OPACITY),
     filterDepth: num(settings.magic8ball_filter_depth, DEFAULT_FILTER_DEPTH),
     selectionDepth: num(settings.magic8ball_selection_depth, DEFAULT_SELECTION_DEPTH),
+    moviesY: num(settings.magic8ball_movies_y, DEFAULT_MOVIES_Y),
+    gamesY: num(settings.magic8ball_games_y, DEFAULT_GAMES_Y),
     resultTextDepth: num(settings.magic8ball_result_text_depth, DEFAULT_RESULT_TEXT_DEPTH),
     confirmText: settings.magic8ball_confirm_text || DEFAULT_CONFIRM_TEXT,
     confirmColor: settings.magic8ball_confirm_color || DEFAULT_CONFIRM_COLOR,
@@ -783,10 +789,13 @@ export function Magic8BallGame() {
     settings.magic8ball_question_color,
     settings.magic8ball_question_opacity,
     settings.magic8ball_question_depth,
+    settings.magic8ball_question_y,
     settings.magic8ball_filter_color,
     settings.magic8ball_filter_opacity,
     settings.magic8ball_filter_depth,
     settings.magic8ball_selection_depth,
+    settings.magic8ball_movies_y,
+    settings.magic8ball_games_y,
     settings.magic8ball_result_text_depth,
     settings.magic8ball_confirm_text,
     settings.magic8ball_confirm_color,

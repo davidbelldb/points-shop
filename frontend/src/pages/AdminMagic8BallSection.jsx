@@ -27,10 +27,13 @@ const DEFAULTS = {
   magic8ball_question_color: '#b7b7f7',
   magic8ball_question_opacity: '1',
   magic8ball_question_depth: '1',
+  magic8ball_question_y: '0.62',
   magic8ball_filter_color: '#000000',
   magic8ball_filter_opacity: '0.45',
   magic8ball_filter_depth: '1',
   magic8ball_selection_depth: '1',
+  magic8ball_movies_y: '0.05',
+  magic8ball_games_y: '-0.22',
   magic8ball_result_text_depth: '0.055',
   magic8ball_die_depth_start: '0.85',
   magic8ball_die_depth_end: '1.15',
@@ -78,10 +81,13 @@ export default function AdminMagic8BallSection({ bare = false }) {
     settings.magic8ball_question_color,
     settings.magic8ball_question_opacity,
     settings.magic8ball_question_depth,
+    settings.magic8ball_question_y,
     settings.magic8ball_filter_color,
     settings.magic8ball_filter_opacity,
     settings.magic8ball_filter_depth,
     settings.magic8ball_selection_depth,
+    settings.magic8ball_movies_y,
+    settings.magic8ball_games_y,
     settings.magic8ball_result_text_depth,
     settings.magic8ball_die_depth_start,
     settings.magic8ball_die_depth_end,
@@ -337,12 +343,42 @@ export default function AdminMagic8BallSection({ bare = false }) {
             />
           </label>
           <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Title Y position</span>
+            <input
+              value={vals.magic8ball_question_y}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_question_y', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_question_y', 0.62)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
             <span className="text-neutral-500">&quot;Movies&quot;/&quot;Games&quot; depth</span>
             <input
               value={vals.magic8ball_selection_depth}
               type="number" step="0.05"
               onChange={(e) => setVal('magic8ball_selection_depth', e.target.value)}
               onBlur={() => commitNumber('magic8ball_selection_depth', 1)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">&quot;Movies&quot; Y position</span>
+            <input
+              value={vals.magic8ball_movies_y}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_movies_y', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_movies_y', 0.05)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">&quot;Games&quot; Y position</span>
+            <input
+              value={vals.magic8ball_games_y}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_games_y', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_games_y', -0.22)}
               className={numInputCls}
             />
           </label>
