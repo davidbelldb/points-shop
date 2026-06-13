@@ -231,7 +231,7 @@ function buildGridBlob(players, todayRows, viewDate) {
     ctx.fillStyle = '#737373';
     ctx.textAlign = 'center';
     const [, mm, dd] = viewDate.split('-');
-    ctx.fillText(`Dirty Wordle · ${dd}/${mm}`, W / 2, PAD + 4);
+    ctx.fillText(`Dirdle · ${dd}/${mm}`, W / 2, PAD + 4);
 
     const cellColor = (state) => {
       if (state === 'correct') return '#61dbbb';
@@ -379,7 +379,7 @@ function LeaderboardModal({ onClose, today }) {
       <div className="w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: modalBg }}>
         {/* Header */}
         <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-          <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Dirty Wordle Leaderboard</h2>
+          <h2 className="font-bold text-lg tracking-tight" style={{ color: '#ed70bd' }}>Dirdle Leaderboard</h2>
           <button onClick={onClose} aria-label="Close" style={{ color: textSec, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, fontSize: 22, padding: '0 0 0 8px' }}>✕</button>
         </div>
 
@@ -714,7 +714,7 @@ export default function DirtyWordlePage() {
       {/* Header */}
       <div className="w-full max-w-sm flex items-center justify-between px-2">
         <Link to="/games" className="w-20 text-sm text-neutral-500">← Games</Link>
-        <h1 className="font-bold text-lg tracking-wide">Dirty Wordle</h1>
+        <h1 className="font-bold text-lg tracking-wide">Dirdle</h1>
         <button
           onClick={() => setShowLeaderboard(true)}
           className="w-20 text-right text-sm font-medium px-2 py-1 rounded-lg transition text-neutral-500"
