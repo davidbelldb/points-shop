@@ -42,8 +42,10 @@ const TimelineCard = forwardRef(function TimelineCard(
         <div className="relative">
           <div className="absolute -inset-1.5 rounded-full bg-[var(--tl-glow)] blur-sm animate-pulse" />
           <div
-            className={`relative h-4 w-4 rounded-full border-2 bg-[var(--tl-dot-bg)] transition-colors ${
-              isActive ? 'border-[var(--tl-accent)] scale-125' : 'border-[var(--tl-dot-border)]'
+            className={`relative h-4 w-4 rounded-full border-2 transition-colors ${
+              isActive
+                ? 'bg-[var(--tl-dot-active-bg)] border-[var(--tl-dot-active-border)] scale-125'
+                : 'bg-[var(--tl-dot-bg)] border-[var(--tl-dot-border)]'
             }`}
           />
         </div>

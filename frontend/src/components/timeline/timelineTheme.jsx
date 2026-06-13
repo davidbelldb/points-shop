@@ -25,6 +25,10 @@ export const defaultTimelineTheme = {
   dotBg: '#18181b', // zinc-900
   dotBorder: '#fb7185', // rose-400
 
+  // Active / first milestone dot (highlighted pin)
+  dotActiveBg: '#18181b', // zinc-900
+  dotActiveBorder: '#fb7185', // rose-400
+
   // Cards
   cardBg: 'rgba(24, 24, 27, 0.78)', // zinc-900 / 78%
   cardBorder: 'rgba(63, 63, 70, 0.6)', // zinc-700 / 60%
@@ -64,6 +68,8 @@ export const TIMELINE_CSS_VAR_MAP = {
   glow: '--tl-glow',
   dotBg: '--tl-dot-bg',
   dotBorder: '--tl-dot-border',
+  dotActiveBg: '--tl-dot-active-bg',
+  dotActiveBorder: '--tl-dot-active-border',
   cardBg: '--tl-card-bg',
   cardBorder: '--tl-card-border',
   cardShadow: '--tl-card-shadow',

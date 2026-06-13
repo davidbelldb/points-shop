@@ -276,7 +276,7 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
   const hasMedia = !!form.media;
 
   return (
-    <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-4">
+    <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Date (sortable, e.g. 2026-06-13)">
           <input

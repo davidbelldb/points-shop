@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, useScroll, useSpring, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useScroll, useSpring, useTransform } from 'framer-motion';
 import TimelineCard from './TimelineCard';
 import TimelinePlayer from './TimelinePlayer';
 import MediaLightbox from './MediaLightbox';
@@ -51,7 +51,38 @@ export default function RelationshipTimeline({
     target: containerRef,
     offset: ['start 0.85', 'end 0.6'],
   });
-  const lineHeight = useSpring(useTransform(scrollYProgress, [0, 1], ['0%', '100%']), {
+  const scrollProgress = useTransform(scrollYProgress, [0, 1], [0, 100]);
+
+  // Progress driven by the milestone currently highlighted via the
+  // play/jump controls, measured as a percentage of the track's height so
+  // the line draws down to that milestone's dot even if the page hasn't
+  // scrolled there yet.
+  const activeProgress = useMotionValue(0);
+
+  const updateActiveProgress = useCallback(() => {
+    const container = containerRef.current;
+    const target = itemRefs.current[activeIndex];
+    if (!container || !target) return;
+    const containerHeight = container.offsetHeight;
+    if (!containerHeight) return;
+    const dotCenter = target.offsetTop + 16; // matches the dot's `top-2` + half its height
+    activeProgress.set(Math.min(100, (dotCenter / containerHeight) * 100));
+  }, [activeIndex, activeProgress]);
+
+  useEffect(() => {
+    updateActiveProgress();
+    window.addEventListener('resize', updateActiveProgress);
+    return () => window.removeEventListener('resize', updateActiveProgress);
+  }, [updateActiveProgress, milestones.length]);
+
+  // Draw the line to whichever is further along: the natural scroll
+  // position, or the milestone currently highlighted by the play-through
+  // controls.
+  const combinedProgress = useTransform(
+    [scrollProgress, activeProgress],
+    ([scroll, active]) => `${Math.max(scroll, active)}%`
+  );
+  const lineHeight = useSpring(combinedProgress, {
     stiffness: 90,
     damping: 25,
     restDelta: 0.001,
@@ -121,7 +152,7 @@ export default function RelationshipTimeline({
 
         <div ref={containerRef} className="relative">
           {/* Central line track */}
-          <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 bg-[var(--tl-card-border)] rounded-full" />
+          <div className="absolute left-4 md:left-1/2 top-0 bottom-0 -translate-x-1/2 border-l-2 border-dashed border-[var(--tl-card-border)]" />
           {/* Animated "drawn" line */}
           <motion.div
             className="absolute left-4 md:left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"

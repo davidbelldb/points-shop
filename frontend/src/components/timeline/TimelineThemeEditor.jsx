@@ -1,5 +1,5 @@
 import { RotateCcw } from 'lucide-react';
-import { defaultTimelineTheme, useTimelineTheme } from './timelineTheme';
+import { defaultTimelineTheme, themeToCssVars, useTimelineTheme } from './timelineTheme';
 
 /**
  * TimelineThemeEditor
@@ -15,7 +15,10 @@ export default function TimelineThemeEditor() {
   const { theme, updateTheme, resetTheme } = useTimelineTheme();
 
   return (
-    <div className="rounded-2xl border bg-[var(--tl-card-bg)] border-[var(--tl-card-border)] p-5 sm:p-6 text-[var(--tl-body)]">
+    <div
+      className="rounded-2xl border bg-[var(--tl-card-bg)] border-[var(--tl-card-border)] p-5 sm:p-6 text-[var(--tl-body)]"
+      style={themeToCssVars(theme)}
+    >
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-[var(--tl-title)]">Timeline Theme</h2>
         <button
@@ -40,6 +43,8 @@ export default function TimelineThemeEditor() {
         <ColorField label="Glow accent" value={theme.glow} onChange={(v) => updateTheme({ glow: v })} />
         <ColorField label="Dot background" value={theme.dotBg} onChange={(v) => updateTheme({ dotBg: v })} />
         <ColorField label="Dot border" value={theme.dotBorder} onChange={(v) => updateTheme({ dotBorder: v })} />
+        <ColorField label="Active dot background" value={theme.dotActiveBg} onChange={(v) => updateTheme({ dotActiveBg: v })} />
+        <ColorField label="Active dot border" value={theme.dotActiveBorder} onChange={(v) => updateTheme({ dotActiveBorder: v })} />
       </Section>
 
       <Section title="Cards">
