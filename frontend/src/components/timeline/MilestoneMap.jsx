@@ -107,7 +107,9 @@ export default function MilestoneMap({
     setMap(null);
   }, []);
 
-  // Fit/center the viewport whenever the point set changes.
+  // Fit/center the viewport whenever the point set changes, so every pin -
+  // however far apart, up to the whole world - stays inside the visible
+  // map area.
   const pointsKey = points.map((p) => `${p.id}:${p.lat},${p.lng}`).join('|');
   useEffect(() => {
     if (!map || points.length === 0) return;
@@ -116,7 +118,7 @@ export default function MilestoneMap({
       if (points.length > 1) {
         const bounds = new window.google.maps.LatLngBounds();
         points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
-        map.fitBounds(bounds, 32);
+        map.fitBounds(bounds, 40);
       } else {
         map.setCenter({ lat: points[0].lat, lng: points[0].lng });
         map.setZoom(zoom);
@@ -125,16 +127,33 @@ export default function MilestoneMap({
 
     applyViewport();
 
-    // Maps that mount inside animated/transitioning wrappers can initialize
-    // before the container has its final layout size, so nudge it to
-    // re-measure once everything has settled, then re-apply the
-    // center/bounds against the now-correct container size (otherwise the
-    // initial fitBounds can leave the pins off-center).
-    const id = setTimeout(() => {
-      window.google.maps.event.trigger(map, 'resize');
-      applyViewport();
-    }, 150);
-    return () => clearTimeout(id);
+    // Maps that mount inside animated/transitioning wrappers (or a
+    // full-bleed layout whose width depends on the viewport) can initialize
+    // before the container has its final layout size, so nudge the map to
+    // re-measure and re-fit any time its container actually resizes -
+    // covers late image loads, window resizes, and the initial settle.
+    let resizeTimer;
+    const handleResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        window.google.maps.event.trigger(map, 'resize');
+        applyViewport();
+      }, 50);
+    };
+    const settleId = setTimeout(handleResize, 150);
+
+    let observer;
+    const mapDiv = map.getDiv();
+    if (typeof ResizeObserver !== 'undefined' && mapDiv) {
+      observer = new ResizeObserver(handleResize);
+      observer.observe(mapDiv);
+    }
+
+    return () => {
+      clearTimeout(settleId);
+      clearTimeout(resizeTimer);
+      observer?.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, pointsKey, zoom]);
 

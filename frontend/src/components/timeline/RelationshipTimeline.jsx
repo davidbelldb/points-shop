@@ -96,9 +96,23 @@ export default function RelationshipTimeline({
   // changes - so the target is tracked in its own motion value and updated
   // via effect whenever the active dot (or its measured position) changes.
   const lineTarget = useMotionValue(0);
+
+  // The IntersectionObserver's very first callback can land on a later
+  // milestone if the page is short enough that it's already inside the
+  // "active" band on load - which would jump the line straight past pin 1.
+  // For this initial settle period, pin the target to the first dot so the
+  // line always visibly starts its draw from pin 1, then hand off to
+  // whatever `activeIndex` the scroll position actually calls for.
+  const [hasSettled, setHasSettled] = useState(false);
   useEffect(() => {
-    lineTarget.set(dotOffsets[activeIndex] ?? 0);
-  }, [dotOffsets, activeIndex, lineTarget]);
+    const id = setTimeout(() => setHasSettled(true), 400);
+    return () => clearTimeout(id);
+  }, []);
+
+  useEffect(() => {
+    const targetIndex = hasSettled ? activeIndex : 0;
+    lineTarget.set(dotOffsets[targetIndex] ?? 0);
+  }, [dotOffsets, activeIndex, hasSettled, lineTarget]);
   const lineHeight = useSpring(lineTarget, {
     stiffness: 90,
     damping: 25,
