@@ -1,6 +1,7 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import RichText from './RichText';
+import MilestoneDetailModal from './MilestoneDetailModal';
 import { getMilestoneIcon } from './icons';
 
 const MEDIA_SIZE_CLASSES = {
@@ -31,6 +32,8 @@ const TimelineCard = forwardRef(function TimelineCard(
   const fromSide = side === 'right' ? 60 : -60;
   const media = milestone.media;
   const mediaSizeClass = MEDIA_SIZE_CLASSES[media?.size] || MEDIA_SIZE_CLASSES.md;
+  const hasLongDescription = !!milestone.longDescription?.trim();
+  const [showDetail, setShowDetail] = useState(false);
 
   return (
     <div ref={ref} data-milestone-id={milestone.id} className="relative flex w-full items-start">
@@ -75,11 +78,23 @@ const TimelineCard = forwardRef(function TimelineCard(
             </time>
           </div>
 
-          <RichText
-            as="h3"
-            text={milestone.title}
-            className="text-lg sm:text-xl font-bold text-[var(--tl-title)] mb-1"
-          />
+          {hasLongDescription ? (
+            <h3 className="text-lg sm:text-xl font-bold text-[var(--tl-title)] mb-1">
+              <button
+                type="button"
+                onClick={() => setShowDetail(true)}
+                className="text-left underline-offset-4 hover:underline hover:text-[var(--tl-accent)] transition-colors"
+              >
+                <RichText as="span" text={milestone.title} />
+              </button>
+            </h3>
+          ) : (
+            <RichText
+              as="h3"
+              text={milestone.title}
+              className="text-lg sm:text-xl font-bold text-[var(--tl-title)] mb-1"
+            />
+          )}
 
           <RichText
             text={milestone.description}
@@ -105,6 +120,10 @@ const TimelineCard = forwardRef(function TimelineCard(
 
       {/* Spacer that pushes the card to the opposite half on desktop */}
       {side === 'left' && <div className="hidden md:block md:w-1/2" />}
+
+      {hasLongDescription && (
+        <MilestoneDetailModal milestone={showDetail ? milestone : null} onClose={() => setShowDetail(false)} />
+      )}
     </div>
   );
 });

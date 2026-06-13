@@ -8,6 +8,7 @@ function toMilestone(row) {
     displayDate: row.display_date,
     title: row.title,
     description: row.description,
+    longDescription: row.long_description ?? '',
     icon: row.icon,
     media: row.media ?? null,
     location:
@@ -43,6 +44,7 @@ export async function createMilestone({
   displayDate = '',
   title = '',
   description = '',
+  longDescription = '',
   icon = 'Heart',
   media = null,
   location = null,
@@ -55,8 +57,8 @@ export async function createMilestone({
 
   const { rows } = await query(
     `INSERT INTO timeline_milestones
-       (sort_order, date, display_date, title, description, icon, media, location_lat, location_lng, location_label, visible)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       (sort_order, date, display_date, title, description, long_description, icon, media, location_lat, location_lng, location_label, visible)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING *`,
     [
       sortOrder,
@@ -64,6 +66,7 @@ export async function createMilestone({
       displayDate,
       title,
       description,
+      longDescription,
       icon,
       media ? JSON.stringify(media) : null,
       location?.lat ?? null,
@@ -80,6 +83,7 @@ const UPDATABLE_FIELDS = {
   displayDate: 'display_date',
   title: 'title',
   description: 'description',
+  longDescription: 'long_description',
   icon: 'icon',
   visible: 'visible',
 };

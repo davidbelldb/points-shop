@@ -104,19 +104,28 @@ export default function MilestoneMap({
   const pointsKey = points.map((p) => `${p.id}:${p.lat},${p.lng}`).join('|');
   useEffect(() => {
     if (!map || points.length === 0) return;
-    if (points.length > 1) {
-      const bounds = new window.google.maps.LatLngBounds();
-      points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
-      map.fitBounds(bounds, 32);
-    } else {
-      map.setCenter({ lat: points[0].lat, lng: points[0].lng });
-      map.setZoom(zoom);
-    }
+
+    const applyViewport = () => {
+      if (points.length > 1) {
+        const bounds = new window.google.maps.LatLngBounds();
+        points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+        map.fitBounds(bounds, 32);
+      } else {
+        map.setCenter({ lat: points[0].lat, lng: points[0].lng });
+        map.setZoom(zoom);
+      }
+    };
+
+    applyViewport();
+
     // Maps that mount inside animated/transitioning wrappers can initialize
     // before the container has its final layout size, so nudge it to
-    // re-measure once everything has settled.
+    // re-measure once everything has settled, then re-apply the
+    // center/bounds against the now-correct container size (otherwise the
+    // initial fitBounds can leave the pins off-center).
     const id = setTimeout(() => {
       window.google.maps.event.trigger(map, 'resize');
+      applyViewport();
     }, 150);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps

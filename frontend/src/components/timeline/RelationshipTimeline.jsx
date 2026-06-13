@@ -56,7 +56,7 @@ export default function RelationshipTimeline({
     target: containerRef,
     offset: ['start 0.85', 'end 0.6'],
   });
-  const scrollProgress = useTransform(scrollYProgress, [0, 1], [0, 100]);
+  const scrollProgress = useTransform(scrollYProgress, [0, 1], [0, 1]);
 
   // Progress driven by the milestone currently highlighted via the
   // play/jump controls, measured as a percentage of the track's height so
@@ -71,7 +71,7 @@ export default function RelationshipTimeline({
     const containerHeight = container.offsetHeight;
     if (!containerHeight) return;
     const dotCenter = target.offsetTop + 16; // matches the dot's `top-2` + half its height
-    activeProgress.set(Math.min(100, (dotCenter / containerHeight) * 100));
+    activeProgress.set(Math.min(1, dotCenter / containerHeight));
   }, [activeIndex, activeProgress]);
 
   useEffect(() => {
@@ -82,16 +82,20 @@ export default function RelationshipTimeline({
 
   // Draw the line to whichever is further along: the natural scroll
   // position, or the milestone currently highlighted by the play-through
-  // controls.
+  // controls. Expressed as a 0-1 fraction of the track's height.
   const combinedProgress = useTransform(
     [scrollProgress, activeProgress],
-    ([scroll, active]) => `${Math.max(scroll, active)}%`
+    ([scroll, active]) => Math.max(scroll, active)
   );
-  const lineHeight = useSpring(combinedProgress, {
+  const lineProgress = useSpring(combinedProgress, {
     stiffness: 90,
     damping: 25,
     restDelta: 0.001,
   });
+  // Reveal the gradient "fill" line from the top down by clipping its
+  // (full-height) box - this keeps its dash pattern perfectly aligned with
+  // the track's, unlike animating `height` on a percentage basis.
+  const lineClip = useTransform(lineProgress, (p) => `inset(0 0 ${(1 - p) * 100}% 0)`);
 
   const scrollToIndex = useCallback((index) => {
     const el = itemRefs.current[index];
@@ -138,7 +142,7 @@ export default function RelationshipTimeline({
 
   return (
     <div
-      className={`min-h-screen w-full bg-gradient-to-b from-[var(--tl-page-bg)] to-[var(--tl-page-bg-to)] px-4 sm:px-6 py-12 sm:py-16 ${className}`}
+      className={`min-h-screen w-full bg-gradient-to-b from-[var(--tl-page-bg)] to-[var(--tl-page-bg-to)] px-4 sm:px-6 pt-4 sm:pt-6 pb-12 sm:pb-16 ${className}`}
       style={themeToCssVars(theme)}
     >
       <div className="mx-auto max-w-3xl">
@@ -152,7 +156,7 @@ export default function RelationshipTimeline({
         </header>
 
         {showOverviewMap && overviewLocations.length > 0 && (
-          <MilestoneMap locations={overviewLocations} className="mb-12" height="16rem" />
+          <MilestoneMap locations={overviewLocations} className="mb-12" height="10rem" />
         )}
 
         <div ref={containerRef} className="relative">
@@ -164,8 +168,8 @@ export default function RelationshipTimeline({
           {/* Animated "drawn" line - same dash pattern, fills in with the
               gradient as the user scrolls/plays/jumps through milestones. */}
           <motion.div
-            className="absolute left-4 md:left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
-            style={{ height: lineHeight, ...lineDashStyle }}
+            className="absolute left-4 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
+            style={{ clipPath: lineClip, WebkitClipPath: lineClip, ...lineDashStyle }}
           />
 
           <div className="flex flex-col">

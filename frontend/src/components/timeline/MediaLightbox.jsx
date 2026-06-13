@@ -58,18 +58,6 @@ export default function MediaLightbox({ item, onClose }) {
             transition={{ type: 'spring', damping: 22, stiffness: 220 }}
             onClick={(e) => e.stopPropagation()}
           />
-
-          {item.alt && (
-            <motion.p
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 text-sm text-[var(--tl-body)] bg-[var(--tl-control-bg)] border border-[var(--tl-control-border)] rounded-full px-4 py-1.5"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {item.alt}
-            </motion.p>
-          )}
         </motion.div>
       )}
     </AnimatePresence>

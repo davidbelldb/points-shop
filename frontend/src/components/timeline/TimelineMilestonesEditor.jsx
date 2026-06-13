@@ -8,6 +8,7 @@ const EMPTY_FORM = {
   displayDate: '',
   title: '',
   description: '',
+  longDescription: '',
   icon: 'Heart',
   media: null,
   location: null,
@@ -207,6 +208,7 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
     displayDate: initial.displayDate ?? '',
     title: initial.title ?? '',
     description: initial.description ?? '',
+    longDescription: initial.longDescription ?? '',
     icon: initial.icon ?? 'Heart',
     media: initial.media ?? null,
     location: initial.location ?? null,
@@ -256,6 +258,7 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
         displayDate: form.displayDate.trim(),
         title: form.title.trim(),
         description: form.description,
+        longDescription: form.longDescription,
         icon: form.icon,
         media: form.media,
         location: form.location,
@@ -312,6 +315,16 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
           value={form.description}
           onChange={(e) => set({ description: e.target.value })}
           rows={4}
+          className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm"
+        />
+      </Field>
+
+      <Field label="Longer description (optional - shown in a popup when the title is tapped)">
+        <textarea
+          value={form.longDescription}
+          onChange={(e) => set({ longDescription: e.target.value })}
+          rows={5}
+          placeholder="Leave blank to keep the title plain (not tappable)."
           className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm"
         />
       </Field>

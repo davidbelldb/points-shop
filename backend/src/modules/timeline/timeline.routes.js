@@ -43,14 +43,14 @@ export default async function timelineRoutes(fastify) {
 
   fastify.post('/api/admin/timeline/milestones', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    const { date, displayDate, title, description, icon, media, location, visible } = req.body ?? {};
+    const { date, displayDate, title, description, longDescription, icon, media, location, visible } = req.body ?? {};
     if (!date || typeof date !== 'string') {
       return reply.code(400).send({ error: 'date is required' });
     }
     if (!validLocation(location)) {
       return reply.code(400).send({ error: 'location must be { lat, lng, label? } or null' });
     }
-    const created = await createMilestone({ date, displayDate, title, description, icon, media, location, visible });
+    const created = await createMilestone({ date, displayDate, title, description, longDescription, icon, media, location, visible });
     return reply.code(201).send(created);
   });
 

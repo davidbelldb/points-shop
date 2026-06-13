@@ -28,7 +28,7 @@ export default function TimelinePlayer({ milestones, activeIndex, isPlaying, onJ
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="fixed bottom-4 left-1/2 md:left-[calc(50%+7rem)] -translate-x-1/2 z-40 w-[min(92vw,32rem)]"
+      className="fixed bottom-4 left-1/2 md:left-[calc(50%+7rem)] -translate-x-1/2 z-30 w-[min(92vw,32rem)]"
     >
       <div className="rounded-2xl border bg-[var(--tl-control-bg)] border-[var(--tl-control-border)] backdrop-blur-md shadow-xl px-4 py-3">
         <div className="flex items-center gap-3">
