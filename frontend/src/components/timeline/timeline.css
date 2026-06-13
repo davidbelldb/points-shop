@@ -32,3 +32,15 @@
 .gm-ui-hover-effect:hover {
   opacity: 1;
 }
+
+/*
+ * Hide the "Map Data / Terms" and "Report a map error" footer links.
+ *
+ * Heads-up: Google's Maps Platform Terms of Service require this
+ * attribution to remain visible on the map. Hiding it is technically a ToS
+ * violation, even though enforcement risk for a small private/personal app
+ * is low. Keep this in mind if this ever becomes a public-facing product.
+ */
+.gm-style-cc {
+  display: none !important;
+}

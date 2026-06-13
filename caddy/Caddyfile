@@ -1,7 +1,7 @@
 sneakypoints.com {
     encode gzip zstd
 
-    @admin path /admin /admin/* /api/admin/*
+    @admin path /admin /admin/* /api/admin/* /journal /journal/*
     basicauth @admin {
         david $2a$14$vkQtJbp5G0/mcBzV8TYteOtnAMFisDOcttjVAoHRbjXRPmSYBvfee
     }
@@ -33,6 +33,7 @@ sneakypoints.com {
         @static {
             path *.webp *.png *.jpg *.jpeg *.gif *.svg *.ico *.glb *.gltf *.bin *.mp3 *.mp4 *.woff *.woff2 *.ttf
             not path /sw.js
+            file
         }
         header @static Cache-Control "public, max-age=604800"
 

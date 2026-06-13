@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, MapPin, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Plus, Search, Trash2, UploadCloud, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { iconNames } from './icons';
 
@@ -179,8 +179,34 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const result = await api.admin.upload(file);
+      const type = result.mimetype === 'image/gif' ? 'gif' : 'image';
+      set({
+        media: {
+          url: result.url,
+          type,
+          alt: form.media?.alt ?? '',
+          size: form.media?.size ?? 'md',
+        },
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const save = async () => {
     if (!form.date.trim()) {
@@ -215,7 +241,7 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
 
   return (
     <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Date (sortable, e.g. 2026-06-13)">
           <input
             type="text"
@@ -281,56 +307,94 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
             </button>
           )}
         </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.gif"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
         {hasMedia ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="URL">
-              <input
-                type="text"
-                value={form.media.url ?? ''}
-                onChange={(e) => set({ media: { ...form.media, url: e.target.value } })}
-                placeholder="/images/milestones/example.gif"
-                className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
-              />
-            </Field>
-            <Field label="Type">
-              <select
-                value={form.media.type ?? 'image'}
-                onChange={(e) => set({ media: { ...form.media, type: e.target.value } })}
-                className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
-              >
-                <option value="image">image</option>
-                <option value="gif">gif</option>
-              </select>
-            </Field>
-            <Field label="Alt text">
-              <input
-                type="text"
-                value={form.media.alt ?? ''}
-                onChange={(e) => set({ media: { ...form.media, alt: e.target.value } })}
-                className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
-              />
-            </Field>
-            <Field label="Size">
-              <select
-                value={form.media.size ?? 'md'}
-                onChange={(e) => set({ media: { ...form.media, size: e.target.value } })}
-                className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
-              >
-                <option value="sm">sm</option>
-                <option value="md">md</option>
-                <option value="lg">lg</option>
-                <option value="full">full</option>
-              </select>
-            </Field>
+          <div className="space-y-2">
+            {form.media.url && (
+              <div className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
+                <img src={form.media.url} alt="" className="max-h-40 w-full object-contain" />
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2 text-sm font-medium text-zinc-500 hover:text-amber-700 hover:border-amber-300 disabled:opacity-60"
+            >
+              <UploadCloud className="h-4 w-4" />
+              {uploading ? 'Uploading…' : 'Upload from device'}
+            </button>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Field label="URL">
+                <input
+                  type="text"
+                  value={form.media.url ?? ''}
+                  onChange={(e) => set({ media: { ...form.media, url: e.target.value } })}
+                  placeholder="/images/milestones/example.gif"
+                  className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="Type">
+                <select
+                  value={form.media.type ?? 'image'}
+                  onChange={(e) => set({ media: { ...form.media, type: e.target.value } })}
+                  className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
+                >
+                  <option value="image">image</option>
+                  <option value="gif">gif</option>
+                </select>
+              </Field>
+              <Field label="Alt text">
+                <input
+                  type="text"
+                  value={form.media.alt ?? ''}
+                  onChange={(e) => set({ media: { ...form.media, alt: e.target.value } })}
+                  className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
+                />
+              </Field>
+              <Field label="Size">
+                <select
+                  value={form.media.size ?? 'md'}
+                  onChange={(e) => set({ media: { ...form.media, size: e.target.value } })}
+                  className="w-full rounded-lg border border-zinc-300 px-2.5 py-1.5 text-sm"
+                >
+                  <option value="sm">sm</option>
+                  <option value="md">md</option>
+                  <option value="lg">lg</option>
+                  <option value="full">full</option>
+                </select>
+              </Field>
+            </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => set({ media: { url: '', type: 'image', alt: '', size: 'md' } })}
-            className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-amber-700"
-          >
-            <Plus className="h-4 w-4" /> Add image / gif
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2.5 text-sm font-medium text-zinc-500 hover:text-amber-700 hover:border-amber-300 disabled:opacity-60"
+            >
+              <UploadCloud className="h-4 w-4" />
+              {uploading ? 'Uploading…' : 'Upload from device'}
+            </button>
+            <button
+              type="button"
+              onClick={() => set({ media: { url: '', type: 'image', alt: '', size: 'md' } })}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2.5 text-sm font-medium text-zinc-500 hover:text-amber-700 hover:border-amber-300"
+            >
+              <Plus className="h-4 w-4" /> Add media URL
+            </button>
+          </div>
         )}
       </div>
 
@@ -465,7 +529,7 @@ function LocationField({ location, onChange }) {
         </div>
       )}
 
-      <div className="mt-2 grid grid-cols-3 gap-2">
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Field label="Latitude">
           <input
             type="number"

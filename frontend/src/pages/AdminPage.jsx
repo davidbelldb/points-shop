@@ -16,7 +16,6 @@ import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
 import TimelineThemeEditor from '../components/timeline/TimelineThemeEditor.jsx';
-import TimelineMilestonesEditor from '../components/timeline/TimelineMilestonesEditor.jsx';
 import { TimelineThemeProvider } from '../components/timeline/timelineTheme.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
@@ -175,19 +174,23 @@ export default function AdminPage() {
       </AdminCollapsible>
 
       <AdminCollapsible title="Relationship Timeline" storageKey="admin::timeline">
-        <div className="mb-6">
-          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">Milestones</h3>
-          <TimelineMilestonesEditor />
-        </div>
         <TimelineThemeProvider>
           <TimelineThemeEditor />
         </TimelineThemeProvider>
-        <Link
-          to="/timeline"
-          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900"
-        >
-          View timeline →
-        </Link>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <Link
+            to="/journal"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900"
+          >
+            Manage milestones (Journal) →
+          </Link>
+          <Link
+            to="/timeline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900"
+          >
+            View timeline →
+          </Link>
+        </div>
       </AdminCollapsible>
     </div>
   );
