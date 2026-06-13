@@ -198,6 +198,42 @@ export default function AccountPage() {
 
           {user?.username === 'david' && (
             <Link
+              to="/timeline"
+              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium">Relationship Timeline</p>
+              </div>
+              <span className="text-neutral-400">→</span>
+            </Link>
+          )}
+
+          {user?.username === 'david' && (
+            <Link
+              to="/journal"
+              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium">Journal editor</p>
+              </div>
+              <span className="text-neutral-400">→</span>
+            </Link>
+          )}
+
+          {user?.username === 'david' && (
+            <Link
               to="/admin"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
             >
