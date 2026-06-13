@@ -51,10 +51,13 @@ const DEFAULT_CENTER = { lat: 52.205, lng: 0.119 };
  * switches between dark/light based on `theme.mapTheme` ('dark' | 'light').
  * Pin markers + popups pick up the admin's configured accent colors.
  *
- * All maps on /timeline are display-only: zoom, pan/drag, the map/satellite
+ * All maps on /timeline are mostly display-only: pan/drag, the map/satellite
  * toggle, Street View ("pegman"), and keyboard shortcuts are disabled so the
- * map reads as a themed illustration rather than an interactive widget.
- * Marker click -> InfoWindow still works.
+ * map reads as a themed illustration rather than an interactive widget. The
+ * one exception is zoom - `gestureHandling: 'cooperative'` lets a two-finger
+ * pinch zoom the map (one-finger touch still scrolls the page past it), and
+ * desktop scroll-zoom requires ctrl/cmd+scroll. Marker click -> InfoWindow
+ * still works.
  *
  * Props:
  *  - locations: [{ id, lat, lng, title, date }]  (single pin -> array of 1)
@@ -172,10 +175,8 @@ export default function MilestoneMap({
             fullscreenControl: false,
             keyboardShortcuts: false,
             clickableIcons: false,
-            scrollwheel: false,
-            draggable: false,
             disableDoubleClickZoom: true,
-            gestureHandling: 'none',
+            gestureHandling: 'cooperative',
           }}
         >
           {points.map((p) => (

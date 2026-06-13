@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion, useSpring } from 'framer-motion';
+import { motion, useMotionValue, useSpring } from 'framer-motion';
 import TimelineCard from './TimelineCard';
 import MediaLightbox from './MediaLightbox';
 import MilestoneMap from './MilestoneMap';
@@ -90,7 +90,16 @@ export default function RelationshipTimeline({
   // its new target each time `activeIndex` changes on scroll. Starts at 0,
   // so on load it only reaches the first dot - not however far down the
   // page happens to render on first paint.
-  const lineHeight = useSpring(dotOffsets[activeIndex] ?? 0, {
+  //
+  // `useSpring` only animates towards a *MotionValue* target - passing it a
+  // plain number only sets the initial value once and ignores later
+  // changes - so the target is tracked in its own motion value and updated
+  // via effect whenever the active dot (or its measured position) changes.
+  const lineTarget = useMotionValue(0);
+  useEffect(() => {
+    lineTarget.set(dotOffsets[activeIndex] ?? 0);
+  }, [dotOffsets, activeIndex, lineTarget]);
+  const lineHeight = useSpring(lineTarget, {
     stiffness: 90,
     damping: 25,
     restDelta: 0.5,
@@ -128,7 +137,7 @@ export default function RelationshipTimeline({
         <div ref={containerRef} className="relative">
           {/* Central line track (dashed) */}
           <div
-            className="absolute left-3 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-[var(--tl-line-track)]"
+            className="absolute left-3 md:left-1/2 top-0 bottom-0 w-1 -translate-x-1/2 rounded-full bg-[var(--tl-line-track)]"
             style={lineDashStyle}
           />
           {/* Animated "drawn" line - solid (no dashes), grown from the top
@@ -137,7 +146,7 @@ export default function RelationshipTimeline({
               currently visible and the full color transition always reads
               through. */}
           <motion.div
-            className="absolute left-3 md:left-1/2 top-0 w-1 -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
+            className="absolute left-3 md:left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
             style={{ height: lineHeight }}
           />
 
