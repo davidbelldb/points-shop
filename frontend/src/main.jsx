@@ -42,6 +42,7 @@ const ShoppingListPage     = lazy(() => import('./pages/ShoppingListPage.jsx'));
 const SneakySpreadsheetsPage = lazy(() => import('./pages/SneakySpreadsheetsPage.jsx'));
 const AdminPage            = lazy(() => import('./pages/AdminPage.jsx'));
 const AdminSurveyResponsesPage = lazy(() => import('./pages/AdminSurveyResponsesPage.jsx'));
+const RelationshipTimelinePage = lazy(() => import('./pages/RelationshipTimelinePage.jsx'));
 
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
@@ -130,6 +131,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="sneakyspreadsheets" element={<SneakySpreadsheetsPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
+              <Route path="timeline" element={<RelationshipTimelinePage />} />
             </Route>
           </Routes>
           </Suspense>

@@ -103,6 +103,13 @@ function UserIcon() {
     </svg>
   );
 }
+function HeartIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.5 4.04 3 5.5l7 7Z" />
+    </svg>
+  );
+}
 
 function Item({ to, label, icon, onClose }) {
   const location = useLocation();
@@ -181,6 +188,7 @@ export default function MenuDrawer({ open, onClose }) {
             <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
             <Item to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} onClose={onClose} />
             <Item to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} onClose={onClose} />
+            <Item to="/timeline" label="Our Timeline" icon={<HeartIcon />} onClose={onClose} />
           </div>
           <div className="mt-auto pt-2">
             <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />
