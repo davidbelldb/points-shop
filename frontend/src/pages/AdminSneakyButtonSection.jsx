@@ -69,7 +69,7 @@ export default function AdminSneakyButtonSection({ bare = false }) {
     <div className="space-y-3">
       <p className="text-xs text-neutral-500">
         Adds a button below the hero slides (and above Shut the Box 15) that fetches a random,
-        adorable cat, dog, or duck picture — or occasionally a gif — for Katie.
+        adorable gif of a cat or a duck for Katie.
       </p>
 
       <div className="flex items-center justify-between">
@@ -111,9 +111,8 @@ export default function AdminSneakyButtonSection({ bare = false }) {
           disabled={busy}
         >
           <option value="cat">Cats only</option>
-          <option value="dog">Dogs only</option>
           <option value="duck">Ducks only</option>
-          <option value="random">Surprise me (cat, dog, or duck)</option>
+          <option value="random">Surprise me (cat or duck)</option>
         </select>
       </label>
 

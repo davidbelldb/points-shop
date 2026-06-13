@@ -16,8 +16,8 @@ function validatePatch(patch) {
       return 'homepage_days must be an array of integers 0-6';
     }
   }
-  if ('animal_type' in patch && !['cat', 'dog', 'duck', 'random'].includes(patch.animal_type)) {
-    return 'animal_type must be cat, dog, duck, or random';
+  if ('animal_type' in patch && !['cat', 'duck', 'random'].includes(patch.animal_type)) {
+    return 'animal_type must be cat, duck, or random';
   }
   if ('button_label' in patch && (typeof patch.button_label !== 'string' || patch.button_label.length > 60)) {
     return 'button_label must be a string up to 60 characters';
@@ -25,37 +25,36 @@ function validatePatch(patch) {
   return null;
 }
 
-const ANIMAL_KINDS = ['cat', 'dog', 'duck'];
+const ANIMAL_KINDS = ['cat', 'duck'];
 
-// Random cute cat/dog image (sometimes a gif) via TheCatAPI / TheDogAPI, or a
-// random duck pic via random-d.uk. The cat/dog APIs work unauthenticated at
-// modest rate limits; optional CAT_API_KEY / DOG_API_KEY env vars (sent as
-// x-api-key) raise those limits if Katie wants more headroom later.
-// random-d.uk needs no key at all.
+// Random cute gif of a cat (via TheCatAPI) or a duck (via random-d.uk).
+// Both are restricted to gif results only. TheCatAPI works unauthenticated at
+// modest rate limits; an optional CAT_API_KEY env var (sent as x-api-key)
+// raises that limit if Katie wants more headroom later. random-d.uk needs no
+// key at all.
 async function fetchAnimalImage(kind) {
   if (kind === 'duck') {
     try {
-      const res = await fetch('https://random-d.uk/api/v2/random');
+      const res = await fetch('https://random-d.uk/api/v2/random?type=gif');
       if (!res.ok) return null;
       const data = await res.json();
       if (!data?.url) return null;
       return {
         url: data.url,
         kind,
-        is_gif: /\.gif(\?|$)/i.test(data.url),
+        is_gif: true,
       };
     } catch {
       return null;
     }
   }
 
-  const isCat = kind === 'cat';
-  const url = isCat
-    ? 'https://api.thecatapi.com/v1/images/search?mime_types=jpg,png,gif'
-    : 'https://api.thedogapi.com/v1/images/search?mime_types=jpg,png,gif';
-  const key = ((isCat ? process.env.CAT_API_KEY : process.env.DOG_API_KEY) || '').trim();
+  const key = (process.env.CAT_API_KEY || '').trim();
   try {
-    const res = await fetch(url, key ? { headers: { 'x-api-key': key } } : undefined);
+    const res = await fetch(
+      'https://api.thecatapi.com/v1/images/search?mime_types=gif',
+      key ? { headers: { 'x-api-key': key } } : undefined,
+    );
     if (!res.ok) return null;
     const data = await res.json();
     const item = Array.isArray(data) ? data[0] : null;
@@ -63,7 +62,7 @@ async function fetchAnimalImage(kind) {
     return {
       url: item.url,
       kind,
-      is_gif: /\.gif(\?|$)/i.test(item.url),
+      is_gif: true,
     };
   } catch {
     return null;

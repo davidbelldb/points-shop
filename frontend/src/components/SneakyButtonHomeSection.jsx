@@ -40,7 +40,7 @@ export default function SneakyButtonHomeSection() {
         type="button"
         onClick={fetchAnimal}
         disabled={loading}
-        className="w-full rounded-2xl border border-neutral-200 bg-white py-3 text-center text-sm font-semibold text-amber-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60 dark:border-neutral-800 dark:bg-neutral-900 dark:text-amber-400"
+        className="w-full rounded-2xl bg-amber-600 py-3 text-center text-sm font-semibold text-amber-900 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
       >
         {loading ? 'Fetching something cute…' : (config.button_label || '🐾 Sneaky Button')}
       </button>
