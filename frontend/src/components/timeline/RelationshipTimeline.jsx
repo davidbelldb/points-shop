@@ -137,7 +137,7 @@ export default function RelationshipTimeline({
               currently visible and the full color transition always reads
               through. */}
           <motion.div
-            className="absolute left-3 md:left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
+            className="absolute left-3 md:left-1/2 top-0 w-1 -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
             style={{ height: lineHeight }}
           />
 
