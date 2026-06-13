@@ -77,7 +77,7 @@ export default function MilestoneDetailModal({ milestone, onClose }) {
 
             <RichText
               text={milestone.longDescription}
-              className="text-sm sm:text-[0.95rem] text-[var(--tl-body)]"
+              className="text-sm sm:text-[0.95rem] text-[var(--tl-body)] text-justify"
             />
           </motion.div>
         </motion.div>
