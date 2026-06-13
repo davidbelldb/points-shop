@@ -1,7 +1,6 @@
 import { forwardRef } from 'react';
 import { motion } from 'framer-motion';
 import RichText from './RichText';
-import MilestoneMap from './MilestoneMap';
 import { getMilestoneIcon } from './icons';
 
 const MEDIA_SIZE_CLASSES = {
@@ -50,26 +49,24 @@ const TimelineCard = forwardRef(function TimelineCard(
         </div>
       </div>
 
-      {/* Card */}
+      {/* Content */}
       <motion.div
         initial={{ opacity: 0, x: fromSide, y: 20 }}
         whileInView={{ opacity: 1, x: 0, y: 0 }}
         viewport={{ once: true, amount: 0.35 }}
-        whileHover={{ scale: 1.02 }}
         transition={{ type: 'spring', stiffness: 120, damping: 18 }}
         className={`ml-12 w-full md:ml-0 md:w-1/2 ${
           side === 'right' ? 'md:pl-10' : 'md:pr-10'
-        } pb-12`}
+        } pb-8`}
       >
         <div
-          className={`rounded-2xl border bg-[var(--tl-card-bg)] border-[var(--tl-card-border)] p-5 sm:p-6 shadow-lg transition-shadow ${
-            isActive ? 'ring-2 ring-[var(--tl-accent)]' : ''
+          className={`border-l-2 pl-4 transition-colors ${
+            isActive ? 'border-[var(--tl-accent)]' : 'border-transparent'
           }`}
-          style={{ boxShadow: '0 8px 30px var(--tl-card-shadow)' }}
         >
-          <div className="flex items-center gap-3 mb-2">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--tl-dot-bg)] border border-[var(--tl-card-border)] text-[var(--tl-accent)]">
-              <Icon className="h-5 w-5" />
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tl-dot-bg)] border border-[var(--tl-card-border)] text-[var(--tl-accent)]">
+              <Icon className="h-4 w-4" />
             </span>
             <time className="text-xs sm:text-sm font-medium uppercase tracking-wide text-[var(--tl-date)]">
               {milestone.displayDate || milestone.date}
@@ -79,7 +76,7 @@ const TimelineCard = forwardRef(function TimelineCard(
           <RichText
             as="h3"
             text={milestone.title}
-            className="text-lg sm:text-xl font-bold text-[var(--tl-title)] mb-1.5"
+            className="text-lg sm:text-xl font-bold text-[var(--tl-title)] mb-1"
           />
 
           <RichText
@@ -91,7 +88,7 @@ const TimelineCard = forwardRef(function TimelineCard(
             <button
               type="button"
               onClick={() => onOpenLightbox?.(media)}
-              className={`mt-4 block overflow-hidden rounded-xl border border-[var(--tl-card-border)] ${mediaSizeClass} group`}
+              className={`mt-3 block overflow-hidden rounded-xl border border-[var(--tl-card-border)] ${mediaSizeClass} group`}
             >
               <img
                 src={media.url}
@@ -100,23 +97,6 @@ const TimelineCard = forwardRef(function TimelineCard(
                 loading="lazy"
               />
             </button>
-          )}
-
-          {milestone.location && (
-            <MilestoneMap
-              className="mt-4"
-              height="9rem"
-              interactive={false}
-              locations={[
-                {
-                  id: milestone.id,
-                  lat: milestone.location.lat,
-                  lng: milestone.location.lng,
-                  title: milestone.title,
-                  date: milestone.displayDate || milestone.date,
-                },
-              ]}
-            />
           )}
         </div>
       </motion.div>

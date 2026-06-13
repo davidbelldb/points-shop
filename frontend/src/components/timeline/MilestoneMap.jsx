@@ -131,6 +131,13 @@ export default function MilestoneMap({
         height,
         background: 'var(--tl-page-bg)',
         '--tl-map-popup-invert': isLightColor(theme.mapPopupBg) ? 0 : 1,
+        // iOS Safari ignores `overflow: hidden` + `border-radius` for the
+        // Google Maps canvas (it's drawn in its own compositing layer).
+        // A fully-opaque mask forces Safari onto the masking code path,
+        // which *does* respect the radius - this has no visual effect on
+        // other browsers, which already clip correctly.
+        WebkitMaskImage: '-webkit-radial-gradient(white, white)',
+        maskImage: 'radial-gradient(white, white)',
       }}
     >
       {!GOOGLE_MAPS_API_KEY || loadError ? (
