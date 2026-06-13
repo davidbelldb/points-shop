@@ -54,6 +54,12 @@ const DEFAULTS = {
   magic8ball_confirm_depth: '1',
   magic8ball_confirm_x: '0',
   magic8ball_confirm_y: '-0.05',
+  magic8ball_glass_opacity: '0.12',
+  magic8ball_glass_scale: '1',
+  magic8ball_glass_thinness: '0.05',
+  magic8ball_glass_depth: '1.05',
+  magic8ball_glass_glare_opacity: '0.25',
+  magic8ball_glass_glare_color: '#ffd9a6',
 };
 
 export default function AdminMagic8BallSection({ bare = false }) {
@@ -116,6 +122,12 @@ export default function AdminMagic8BallSection({ bare = false }) {
     settings.magic8ball_confirm_depth,
     settings.magic8ball_confirm_x,
     settings.magic8ball_confirm_y,
+    settings.magic8ball_glass_opacity,
+    settings.magic8ball_glass_scale,
+    settings.magic8ball_glass_thinness,
+    settings.magic8ball_glass_depth,
+    settings.magic8ball_glass_glare_opacity,
+    settings.magic8ball_glass_glare_color,
   ]);
 
   function setVal(key, value) {
@@ -584,6 +596,86 @@ export default function AdminMagic8BallSection({ bare = false }) {
               onBlur={() => commitNumber('magic8ball_filter_depth', 1)}
               className={numInputCls}
             />
+          </label>
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Glass cover</p>
+        <p className="text-xs text-neutral-500">
+          One last translucent pane over the whole window, in front of everything else, for a subtle &quot;under
+          glass&quot; finish &mdash; plus a soft warm glare highlight near the top-left. Scale resizes the circular
+          panel; thinness is how clear vs. frosted it looks (lower = thinner/clearer, higher = thicker/frosted);
+          depth is how far toward the camera it sits.
+        </p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Opacity (0-1)</span>
+            <input
+              value={vals.magic8ball_glass_opacity}
+              type="number" min="0" max="1" step="0.01"
+              onChange={(e) => setVal('magic8ball_glass_opacity', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_glass_opacity', 0.12)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Scale (size)</span>
+            <input
+              value={vals.magic8ball_glass_scale}
+              type="number" min="0" step="0.01"
+              onChange={(e) => setVal('magic8ball_glass_scale', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_glass_scale', 1)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Thinness (0-1)</span>
+            <input
+              value={vals.magic8ball_glass_thinness}
+              type="number" min="0" max="1" step="0.01"
+              onChange={(e) => setVal('magic8ball_glass_thinness', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_glass_thinness', 0.05)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Depth</span>
+            <input
+              value={vals.magic8ball_glass_depth}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_glass_depth', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_glass_depth', 1.05)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Glare opacity (0-1)</span>
+            <input
+              value={vals.magic8ball_glass_glare_opacity}
+              type="number" min="0" max="1" step="0.01"
+              onChange={(e) => setVal('magic8ball_glass_glare_opacity', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_glass_glare_opacity', 0.25)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Glare colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(vals.magic8ball_glass_glare_color) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: vals.magic8ball_glass_glare_color }} />
+              )}
+              <input
+                value={vals.magic8ball_glass_glare_color}
+                onChange={(e) => setVal('magic8ball_glass_glare_color', e.target.value)}
+                onBlur={() => commitColour('magic8ball_glass_glare_color')}
+                className={colourInputCls}
+                placeholder="#ffd9a6"
+                maxLength={7}
+              />
+            </div>
           </label>
         </div>
       </div>

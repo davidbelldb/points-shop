@@ -103,6 +103,17 @@ const DEFAULT_RESULT_FACE_COLOR = '#100c7f';       // the die's "result" facet c
 const DEFAULT_FILTER_COLOR = '#000000';            // murky liquid filter drawn over the window — black, so only the result face's own colour reads through
 const DEFAULT_FILTER_OPACITY = 0.45;
 const DEFAULT_FILTER_DEPTH = 1.0;
+
+// Final glass cover — a translucent circular pane over the whole window,
+// sitting in front of everything else, with a soft warm "glare" highlight
+// near the top-left for a bit of under-glass polish. All overridable from
+// Admin > Magic 8-Ball.
+const DEFAULT_GLASS_OPACITY = 0.12;
+const DEFAULT_GLASS_SCALE = 1.0;                   // size of the circular pane, relative to the window radius
+const DEFAULT_GLASS_THINNESS = 0.05;               // material roughness — lower = thinner/clearer glass, higher = thicker/frosted
+const DEFAULT_GLASS_DEPTH = 1.05;                  // closest to the camera, in front of text/filter
+const DEFAULT_GLASS_GLARE_OPACITY = 0.25;
+const DEFAULT_GLASS_GLARE_COLOR = '#ffd9a6';
 const DEFAULT_QUESTION_TITLE = 'Need Help Choosing\na Movie or Game?';
 const DEFAULT_QUESTION_COLOR = '#b7b7f7';
 const DEFAULT_QUESTION_OPACITY = 1;
@@ -261,6 +272,23 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
     }
     return geo;
   }, [appearance?.resultFacePop]);
+
+  // Soft radial-gradient texture for the glass cover's "glare" highlight —
+  // generated once and reused; tinted to the configured glare colour via
+  // the material's color prop.
+  const glareTexture = useMemo(() => {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+  }, []);
 
   useEffect(() => {
     if (shakeSeed) shakeStartRef.current = performance.now();
@@ -532,6 +560,39 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
       <mesh position={[0, 0, appearance?.filterDepth ?? DEFAULT_FILTER_DEPTH]}>
         <circleGeometry args={[1.06 * WINDOW_SCALE, 48]} />
         <meshBasicMaterial color={appearance?.filterColor ?? DEFAULT_FILTER_COLOR} transparent opacity={appearance?.filterOpacity ?? DEFAULT_FILTER_OPACITY} depthWrite={false} />
+      </mesh>
+
+      {/* Glass cover — a final translucent pane over the whole window, in
+          front of everything else, for a subtle "under glass" polish. A
+          soft warm glare highlight sits near the top-left, like light
+          catching the curved surface. */}
+      <mesh position={[0, 0, appearance?.glassDepth ?? DEFAULT_GLASS_DEPTH]}>
+        <circleGeometry args={[1.06 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE), 48]} />
+        <meshPhysicalMaterial
+          color="#ffffff"
+          transparent
+          opacity={appearance?.glassOpacity ?? DEFAULT_GLASS_OPACITY}
+          roughness={appearance?.glassThinness ?? DEFAULT_GLASS_THINNESS}
+          metalness={0}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh
+        position={[
+          -0.32 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE),
+          0.32 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE),
+          (appearance?.glassDepth ?? DEFAULT_GLASS_DEPTH) + 0.005,
+        ]}
+      >
+        <planeGeometry args={[1.1 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE), 1.1 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE)]} />
+        <meshBasicMaterial
+          map={glareTexture}
+          color={appearance?.glassGlareColor ?? DEFAULT_GLASS_GLARE_COLOR}
+          transparent
+          opacity={appearance?.glassGlareOpacity ?? DEFAULT_GLASS_GLARE_OPACITY}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
       </mesh>
     </group>
   );
@@ -823,6 +884,12 @@ export function Magic8BallGame() {
     resultFacePop: num(settings.magic8ball_result_face_pop, DEFAULT_RESULT_FACE_POP),
     resultFaceColor: settings.magic8ball_result_face_color || DEFAULT_RESULT_FACE_COLOR,
     revealLeadMs: num(settings.magic8ball_reveal_lead_ms, DEFAULT_REVEAL_LEAD_MS),
+    glassOpacity: num(settings.magic8ball_glass_opacity, DEFAULT_GLASS_OPACITY),
+    glassScale: num(settings.magic8ball_glass_scale, DEFAULT_GLASS_SCALE),
+    glassThinness: num(settings.magic8ball_glass_thinness, DEFAULT_GLASS_THINNESS),
+    glassDepth: num(settings.magic8ball_glass_depth, DEFAULT_GLASS_DEPTH),
+    glassGlareOpacity: num(settings.magic8ball_glass_glare_opacity, DEFAULT_GLASS_GLARE_OPACITY),
+    glassGlareColor: settings.magic8ball_glass_glare_color || DEFAULT_GLASS_GLARE_COLOR,
   }), [
     settings.magic8ball_scene_background_color,
     settings.magic8ball_question_title,
@@ -848,6 +915,12 @@ export function Magic8BallGame() {
     settings.magic8ball_result_face_pop,
     settings.magic8ball_result_face_color,
     settings.magic8ball_reveal_lead_ms,
+    settings.magic8ball_glass_opacity,
+    settings.magic8ball_glass_scale,
+    settings.magic8ball_glass_thinness,
+    settings.magic8ball_glass_depth,
+    settings.magic8ball_glass_glare_opacity,
+    settings.magic8ball_glass_glare_color,
   ]);
 
   useEffect(() => {
