@@ -22,6 +22,7 @@ import {
   Moon,
   Pizza,
   Gamepad2,
+  Briefcase,
 } from 'lucide-react';
 
 /**
@@ -80,6 +81,7 @@ export const iconMap = {
   Pizza,
   BowlingPin,
   Gamepad2,
+  Briefcase,
 };
 
 export const iconNames = Object.keys(iconMap);
