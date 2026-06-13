@@ -443,7 +443,7 @@ export default function AdminMagic8BallSection({ bare = false }) {
             />
           </label>
           <label className="flex items-center justify-between gap-2">
-            <span className="text-neutral-500">Selection text depth</span>
+            <span className="text-neutral-500">&quot;Movies&quot;/&quot;Games&quot; text depth</span>
             <input
               value={vals.magic8ball_selection_depth}
               type="number" step="0.005"
@@ -453,7 +453,7 @@ export default function AdminMagic8BallSection({ bare = false }) {
             />
           </label>
           <label className="flex items-center justify-between gap-2">
-            <span className="text-neutral-500">Result text depth</span>
+            <span className="text-neutral-500">Answer (result) text depth</span>
             <input
               value={vals.magic8ball_result_text_depth}
               type="number" step="0.005"
