@@ -17,6 +17,14 @@ const DEFAULTS = {
   magic8ball_camera_y: '0.3',
   magic8ball_camera_z: '4',
   magic8ball_camera_fov: '35',
+  magic8ball_intro_camera_x: '0',
+  magic8ball_intro_camera_y: '1.6',
+  magic8ball_intro_camera_z: '9.5',
+  magic8ball_intro_camera_fov: '42',
+  magic8ball_reset_camera_x: '0',
+  magic8ball_reset_camera_y: '0.3',
+  magic8ball_reset_camera_z: '4',
+  magic8ball_reset_camera_fov: '35',
   magic8ball_light_ambient_intensity: '0.55',
   magic8ball_light_ambient_color: '#ffffff',
   magic8ball_light_dir1_intensity: '1',
@@ -71,6 +79,14 @@ export default function AdminMagic8BallSection({ bare = false }) {
     settings.magic8ball_camera_y,
     settings.magic8ball_camera_z,
     settings.magic8ball_camera_fov,
+    settings.magic8ball_intro_camera_x,
+    settings.magic8ball_intro_camera_y,
+    settings.magic8ball_intro_camera_z,
+    settings.magic8ball_intro_camera_fov,
+    settings.magic8ball_reset_camera_x,
+    settings.magic8ball_reset_camera_y,
+    settings.magic8ball_reset_camera_z,
+    settings.magic8ball_reset_camera_fov,
     settings.magic8ball_light_ambient_intensity,
     settings.magic8ball_light_ambient_color,
     settings.magic8ball_light_dir1_intensity,
@@ -171,31 +187,92 @@ export default function AdminMagic8BallSection({ bare = false }) {
 
       <hr className="border-neutral-200" />
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Camera</p>
         <p className="text-xs text-neutral-500">
-          Position of the camera once it settles on the 8-ball window (select / confirm / shaking / answer phases).
           X is left/right, Y is height, Z is distance toward you. FOV widens or narrows the view. Changes apply on page reload.
         </p>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          {[
-            { label: 'Pos X', key: 'magic8ball_camera_x', fallback: 0 },
-            { label: 'Pos Y (height)', key: 'magic8ball_camera_y', fallback: 0.3 },
-            { label: 'Pos Z (distance)', key: 'magic8ball_camera_z', fallback: 4 },
-            { label: 'FOV °', key: 'magic8ball_camera_fov', fallback: 35 },
-          ].map(({ label, key, fallback }) => (
-            <label key={key} className="flex items-center justify-between gap-2">
-              <span className="text-neutral-500">{label}</span>
-              <input
-                value={vals[key]}
-                type="number"
-                step="0.1"
-                onChange={(e) => setVal(key, e.target.value)}
-                onBlur={() => commitNumber(key, fallback)}
-                className={numInputCls}
-              />
-            </label>
-          ))}
+
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-neutral-600">Start (on load)</p>
+          <p className="text-xs text-neutral-500">
+            Where the camera begins on page load, pulled back to reveal the whole ball before it settles on the End position.
+          </p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            {[
+              { label: 'Pos X', key: 'magic8ball_intro_camera_x', fallback: 0 },
+              { label: 'Pos Y (height)', key: 'magic8ball_intro_camera_y', fallback: 1.6 },
+              { label: 'Pos Z (distance)', key: 'magic8ball_intro_camera_z', fallback: 9.5 },
+              { label: 'FOV °', key: 'magic8ball_intro_camera_fov', fallback: 42 },
+            ].map(({ label, key, fallback }) => (
+              <label key={key} className="flex items-center justify-between gap-2">
+                <span className="text-neutral-500">{label}</span>
+                <input
+                  value={vals[key]}
+                  type="number"
+                  step="0.1"
+                  onChange={(e) => setVal(key, e.target.value)}
+                  onBlur={() => commitNumber(key, fallback)}
+                  className={numInputCls}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-neutral-600">End (settled)</p>
+          <p className="text-xs text-neutral-500">
+            Where the camera settles once it arrives on the 8-ball window (select / confirm / shaking / answer phases).
+          </p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            {[
+              { label: 'Pos X', key: 'magic8ball_camera_x', fallback: 0 },
+              { label: 'Pos Y (height)', key: 'magic8ball_camera_y', fallback: 0.3 },
+              { label: 'Pos Z (distance)', key: 'magic8ball_camera_z', fallback: 4 },
+              { label: 'FOV °', key: 'magic8ball_camera_fov', fallback: 35 },
+            ].map(({ label, key, fallback }) => (
+              <label key={key} className="flex items-center justify-between gap-2">
+                <span className="text-neutral-500">{label}</span>
+                <input
+                  value={vals[key]}
+                  type="number"
+                  step="0.1"
+                  onChange={(e) => setVal(key, e.target.value)}
+                  onBlur={() => commitNumber(key, fallback)}
+                  className={numInputCls}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-neutral-600">Reset (double-tap)</p>
+          <p className="text-xs text-neutral-500">
+            Where double-tapping the window returns the camera to, after any pinch-zoom or two-finger orbit. Independent
+            of the End position above, so you can set a different &quot;home&quot; view.
+          </p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            {[
+              { label: 'Pos X', key: 'magic8ball_reset_camera_x', fallback: 0 },
+              { label: 'Pos Y (height)', key: 'magic8ball_reset_camera_y', fallback: 0.3 },
+              { label: 'Pos Z (distance)', key: 'magic8ball_reset_camera_z', fallback: 4 },
+              { label: 'FOV °', key: 'magic8ball_reset_camera_fov', fallback: 35 },
+            ].map(({ label, key, fallback }) => (
+              <label key={key} className="flex items-center justify-between gap-2">
+                <span className="text-neutral-500">{label}</span>
+                <input
+                  value={vals[key]}
+                  type="number"
+                  step="0.1"
+                  onChange={(e) => setVal(key, e.target.value)}
+                  onBlur={() => commitNumber(key, fallback)}
+                  className={numInputCls}
+                />
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 

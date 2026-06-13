@@ -71,6 +71,13 @@ const sceneBackground = (color) => `radial-gradient(circle, ${color} 50%, #02041
 // lighting rig — both overridable from Admin > Magic 8-Ball (stored as
 // settings; these are the fallbacks when no override is saved).
 const DEFAULT_CAMERA_VIEW = { pos: [0, 0.3, 4], fov: 35 };
+// Starting ("intro") camera position on page load — pulled right back so
+// the whole ball is visible before it settles on DEFAULT_CAMERA_VIEW.
+// Overridable from Admin > Magic 8-Ball.
+const DEFAULT_INTRO_CAMERA_VIEW = { pos: [0, 1.6, 9.5], fov: 42 };
+// Camera position double-tap restores — independent of the settled/end
+// position above, so a custom "home" view can be set in Admin.
+const DEFAULT_RESET_CAMERA_VIEW = { pos: [0, 0.3, 4], fov: 35 };
 const DEFAULT_LIGHTING = {
   ambientIntensity: 0.55,
   ambientColor: '#ffffff',
@@ -152,7 +159,6 @@ function SceneLighting({ lighting }) {
  *   shaking — settled on the window, like the original close-up
  *   answer  — stays on the window, same as select/confirm/shaking
  * -------------------------------------------------------------------- */
-const INTRO_CAMERA = { pos: [0, 1.6, 9.5], fov: 42 };
 
 // Two-finger pinch zoom multiplies the target FOV by this factor — values
 // below 1 zoom in (narrower FOV), above 1 zoom out (wider FOV).
@@ -170,12 +176,12 @@ const LOOK_AT = new THREE.Vector3(0, 0, 0.6);
 const ORBIT_AXIS_Y = new THREE.Vector3(0, 1, 0);
 const ORBIT_AXIS_X = new THREE.Vector3(1, 0, 0);
 
-function CameraRig({ phase, cameraView, zoomRef, orbitRef }) {
+function CameraRig({ phase, introView, cameraView, homeOverrideRef, zoomRef, orbitRef }) {
   const { camera } = useThree();
   const targetVec = useRef(new THREE.Vector3());
 
   useFrame(() => {
-    const target = phase === 'intro' ? INTRO_CAMERA : cameraView;
+    const target = phase === 'intro' ? introView : (homeOverrideRef?.current ?? cameraView);
     const zoom = zoomRef?.current ?? 1;
     const orbit = orbitRef?.current ?? { az: 0, el: 0 };
 
@@ -534,7 +540,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
 /* ----------------------------------------------------------------------
  * Canvas shell + gesture surface
  * -------------------------------------------------------------------- */
-function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture, onFirstInteract, cameraView, lighting, appearance }) {
+function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeGesture, onFirstInteract, introView, cameraView, resetView, lighting, appearance }) {
   const swipeRef = useRef({ active: false, lastX: 0, lastDir: 0, accum: 0, lastT: 0 });
   // Tracks active touch points by pointerId, plus pinch/orbit state, so a
   // two-finger gesture can zoom (pinch apart/together) and orbit (drag
@@ -544,6 +550,9 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
   const multiTouchRef = useRef(false);
   const zoomRef = useRef(1);
   const orbitRef = useRef({ az: 0, el: 0 });
+  // Once double-tapped, overrides cameraView as the camera's "home" target
+  // (set to resetView) — null until then, meaning cameraView is home.
+  const homeOverrideRef = useRef(null);
   // Single-finger tap tracking, for double-tap-to-reset.
   const downRef = useRef({ time: 0, x: 0, y: 0 });
   const tapRef = useRef({ time: 0, x: 0, y: 0 });
@@ -555,6 +564,7 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
   function resetCamera() {
     orbitRef.current = { az: 0, el: 0 };
     zoomRef.current = 1;
+    homeOverrideRef.current = resetView;
   }
 
   function pinchDistance() {
@@ -694,9 +704,9 @@ function Magic8BallCanvas({ phase, answer, shakeSeed, onPick, onReroll, onShakeG
       onPointerLeave={handlePointerUp}
       onPointerCancel={handlePointerUp}
     >
-      <Canvas shadows dpr={[1, 2]} camera={{ position: INTRO_CAMERA.pos, fov: INTRO_CAMERA.fov }} gl={{ antialias: true, alpha: true }}>
+      <Canvas shadows dpr={[1, 2]} camera={{ position: introView.pos, fov: introView.fov }} gl={{ antialias: true, alpha: true }}>
         <SceneLighting lighting={lighting} />
-        <CameraRig phase={phase} cameraView={cameraView} zoomRef={zoomRef} orbitRef={orbitRef} />
+        <CameraRig phase={phase} introView={introView} cameraView={cameraView} homeOverrideRef={homeOverrideRef} zoomRef={zoomRef} orbitRef={orbitRef} />
         <MagicBall phase={phase} answer={answer} shakeSeed={shakeSeed} onPick={onPick} onReroll={onReroll} appearance={appearance} />
       </Canvas>
     </div>
@@ -735,6 +745,37 @@ export function Magic8BallGame() {
     settings.magic8ball_camera_y,
     settings.magic8ball_camera_z,
     settings.magic8ball_camera_fov,
+  ]);
+
+  // Starting ("intro") camera position on load — overridable from Admin.
+  const introView = useMemo(() => ({
+    pos: [
+      num(settings.magic8ball_intro_camera_x, DEFAULT_INTRO_CAMERA_VIEW.pos[0]),
+      num(settings.magic8ball_intro_camera_y, DEFAULT_INTRO_CAMERA_VIEW.pos[1]),
+      num(settings.magic8ball_intro_camera_z, DEFAULT_INTRO_CAMERA_VIEW.pos[2]),
+    ],
+    fov: num(settings.magic8ball_intro_camera_fov, DEFAULT_INTRO_CAMERA_VIEW.fov),
+  }), [
+    settings.magic8ball_intro_camera_x,
+    settings.magic8ball_intro_camera_y,
+    settings.magic8ball_intro_camera_z,
+    settings.magic8ball_intro_camera_fov,
+  ]);
+
+  // Fixed position the camera returns to on double-tap — independent of
+  // cameraView, overridable from Admin.
+  const resetView = useMemo(() => ({
+    pos: [
+      num(settings.magic8ball_reset_camera_x, DEFAULT_RESET_CAMERA_VIEW.pos[0]),
+      num(settings.magic8ball_reset_camera_y, DEFAULT_RESET_CAMERA_VIEW.pos[1]),
+      num(settings.magic8ball_reset_camera_z, DEFAULT_RESET_CAMERA_VIEW.pos[2]),
+    ],
+    fov: num(settings.magic8ball_reset_camera_fov, DEFAULT_RESET_CAMERA_VIEW.fov),
+  }), [
+    settings.magic8ball_reset_camera_x,
+    settings.magic8ball_reset_camera_y,
+    settings.magic8ball_reset_camera_z,
+    settings.magic8ball_reset_camera_fov,
   ]);
 
   const lighting = useMemo(() => ({
@@ -936,7 +977,9 @@ export function Magic8BallGame() {
         onReroll={handleReroll}
         onShakeGesture={handleShakeGesture}
         onFirstInteract={handleFirstInteract}
+        introView={introView}
         cameraView={cameraView}
+        resetView={resetView}
         lighting={lighting}
         appearance={appearance}
       />
