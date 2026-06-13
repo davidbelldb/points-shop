@@ -42,13 +42,15 @@ export const defaultTimelineTheme = {
   controlAccent: '#fb7185',
 
   // Leaflet map theming
+  // Standard OpenStreetMap tiles - widely cached, rarely blocked by
+  // ad-blockers/extensions (unlike some third-party basemap CDNs). For the
+  // dark theme, MilestoneMap applies a CSS filter to invert/tint these tiles
+  // rather than relying on a separate dark tile source.
   mapTheme: 'dark', // 'dark' | 'light'
-  mapTileUrlDark:
-    'https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png',
-  mapTileUrlLight:
-    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  mapTileUrlDark: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  mapTileUrlLight: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   mapTileAttribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   mapPinColor: '#fb7185', // rose-400
   mapPinGlow: 'rgba(251, 113, 133, 0.55)',
   mapPopupBg: '#18181b',

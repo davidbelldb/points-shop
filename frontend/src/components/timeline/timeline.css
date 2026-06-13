@@ -44,6 +44,11 @@
   }
 }
 
+/* Recolour standard OpenStreetMap tiles for the dark theme. */
+.tl-map-dark-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+
 /* Themed Leaflet popups */
 .leaflet-popup-content-wrapper {
   background: var(--tl-map-popup-bg, #18181b);

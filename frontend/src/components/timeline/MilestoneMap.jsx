@@ -56,7 +56,12 @@ export default function MilestoneMap({
         className="h-full w-full"
         style={{ background: 'var(--tl-page-bg)' }}
       >
-        <TileLayer url={tileUrl} attribution={theme.mapTileAttribution} />
+        <TileLayer
+          url={tileUrl}
+          attribution={theme.mapTileAttribution}
+          className={theme.mapTheme === 'light' ? '' : 'tl-map-dark-tiles'}
+        />
+        <MapResizer />
         {points.map((p) => (
           <Marker key={p.id} position={[p.lat, p.lng]} icon={pinIcon}>
             {(p.title || p.date) && (
@@ -103,6 +108,24 @@ function createPinIcon() {
     iconAnchor: [14, 38],
     popupAnchor: [0, -34],
   });
+}
+
+/**
+ * Forces Leaflet to re-measure its container after mount. Maps that mount
+ * inside animated/transitioning wrappers (e.g. framer-motion cards that fade
+ * or scale in) can initialize before the container has its final layout
+ * size, leaving tiles stuck at a stale 0x0 grid - pins/popups (which are
+ * positioned independently) still show, but tile imagery never appears.
+ */
+function MapResizer() {
+  const map = useMap();
+
+  useEffect(() => {
+    const id = setTimeout(() => map.invalidateSize(), 150);
+    return () => clearTimeout(id);
+  }, [map]);
+
+  return null;
 }
 
 /** Fits the map viewport to all provided points (used for overview maps). */
