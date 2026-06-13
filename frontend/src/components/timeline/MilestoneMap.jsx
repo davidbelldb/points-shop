@@ -119,9 +119,25 @@ export default function MilestoneMap({
         const bounds = new window.google.maps.LatLngBounds();
         points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
         map.fitBounds(bounds, 40);
+
+        // `fitBounds` often leaves a little extra breathing room (it snaps
+        // to the nearest whole zoom level that fits). Try one level closer
+        // for a tighter view, but only keep it if every pin is still
+        // inside the visible area at that zoom.
+        const baseZoom = map.getZoom();
+        if (typeof baseZoom === 'number') {
+          map.setZoom(baseZoom + 1);
+          const tighterBounds = map.getBounds();
+          const allVisible =
+            tighterBounds &&
+            points.every((p) => tighterBounds.contains(new window.google.maps.LatLng(p.lat, p.lng)));
+          if (!allVisible) {
+            map.setZoom(baseZoom);
+          }
+        }
       } else {
         map.setCenter({ lat: points[0].lat, lng: points[0].lng });
-        map.setZoom(zoom);
+        map.setZoom(zoom + 1);
       }
     };
 

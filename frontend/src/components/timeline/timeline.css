@@ -8,12 +8,29 @@
 .gm-style-iw-c {
   background: var(--tl-map-popup-bg, #18181b) !important;
   border-radius: 0.75rem !important;
-  padding: 0.65rem 0.9rem !important;
+  padding: 0.5rem 0.75rem !important;
+  /* Google sizes this box inline (including space for its hidden close
+     button row below) - override so it shrinks to fit our content. */
+  height: auto !important;
+  min-height: 0 !important;
 }
 
 .gm-style-iw-d {
   overflow: hidden !important;
+  max-height: none !important;
   color: var(--tl-map-popup-text, #fafafa);
+}
+
+/*
+ * Google reserves a row of space above the content for its close-button
+ * "chrome" bar even once the button itself is hidden. Collapse it so the
+ * popup hugs our content instead of leaving a tall empty band.
+ */
+.gm-style-iw-chr {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
 }
 
 .gm-style-iw-t::after {
