@@ -62,7 +62,7 @@ export default function RelationshipTimeline({
     if (!container || !target) return;
     const containerHeight = container.offsetHeight;
     if (!containerHeight) return;
-    const dotCenter = target.offsetTop + 16; // matches the dot's `top-2` + half its height
+    const dotCenter = target.offsetTop + 48; // matches the dot's `top-10` + half its height
     activeProgress.set(Math.min(1, dotCenter / containerHeight));
   }, [activeIndex, activeProgress]);
 
