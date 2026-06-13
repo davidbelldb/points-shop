@@ -24,13 +24,13 @@ const DEFAULTS = {
   magic8ball_light_point_intensity: '0.8',
   magic8ball_light_point_color: '#88aaff',
   magic8ball_question_title: 'Need Help Choosing\na Movie or Game?',
-  magic8ball_question_color: '#fdf6e3',
+  magic8ball_question_color: '#b7b7f7',
   magic8ball_question_opacity: '1',
   magic8ball_question_depth: '1',
   magic8ball_filter_color: '#000000',
   magic8ball_filter_opacity: '0.45',
   magic8ball_filter_depth: '1',
-  magic8ball_selection_depth: '0.055',
+  magic8ball_selection_depth: '1',
   magic8ball_result_text_depth: '0.055',
   magic8ball_die_depth_start: '0.85',
   magic8ball_die_depth_end: '1.15',
@@ -273,6 +273,9 @@ export default function AdminMagic8BallSection({ bare = false }) {
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Question text</p>
         <p className="text-xs text-neutral-500">
           The heading shown while picking Movies or Games. Depth is the distance toward the camera (bigger = closer to the glass).
+          The &quot;Movies&quot;/&quot;Games&quot; picker text and the &quot;Okay, then. Give me a shake!&quot; prompt are
+          detached from the die and sit fixed in the window alongside this heading &mdash; they share its font size and
+          colour, with their own depth below.
         </p>
         <label className="flex flex-col gap-1 text-xs">
           <span className="text-neutral-500">Title text (use a blank line to break onto a new line)</span>
@@ -296,7 +299,7 @@ export default function AdminMagic8BallSection({ bare = false }) {
                 onChange={(e) => setVal('magic8ball_question_color', e.target.value)}
                 onBlur={() => commitColour('magic8ball_question_color')}
                 className={colourInputCls}
-                placeholder="#fdf6e3"
+                placeholder="#b7b7f7"
                 maxLength={7}
               />
             </div>
@@ -312,12 +315,22 @@ export default function AdminMagic8BallSection({ bare = false }) {
             />
           </label>
           <label className="flex items-center justify-between gap-2">
-            <span className="text-neutral-500">Depth</span>
+            <span className="text-neutral-500">Title depth</span>
             <input
               value={vals.magic8ball_question_depth}
               type="number" step="0.05"
               onChange={(e) => setVal('magic8ball_question_depth', e.target.value)}
               onBlur={() => commitNumber('magic8ball_question_depth', 1)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">&quot;Movies&quot;/&quot;Games&quot; &amp; confirm depth</span>
+            <input
+              value={vals.magic8ball_selection_depth}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_selection_depth', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_selection_depth', 1)}
               className={numInputCls}
             />
           </label>
@@ -380,8 +393,7 @@ export default function AdminMagic8BallSection({ bare = false }) {
           Start depth is the die&apos;s resting/tumbling position; end depth is where it settles once revealed (colours
           unchanged for now). Result face pop pushes just that one facet outward (positive) or inward (negative) for
           a relief effect. Result face end colour is the colour that facet fades to once revealed.
-          Selection/result text depth control how far toward the camera the Movies/Games picker text and the revealed
-          answer text sit on the die face.
+          Answer (result) text depth controls how far toward the camera the revealed answer text sits on the die face.
           Reveal fade duration is how long before the die finishes settling that the result colour and answer text
           fade in to 100% &mdash; the fade always finishes exactly when the die comes to rest.
         </p>
@@ -439,16 +451,6 @@ export default function AdminMagic8BallSection({ bare = false }) {
               type="number" min="0" step="50"
               onChange={(e) => setVal('magic8ball_reveal_lead_ms', e.target.value)}
               onBlur={() => commitNumber('magic8ball_reveal_lead_ms', 500)}
-              className={numInputCls}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-2">
-            <span className="text-neutral-500">&quot;Movies&quot;/&quot;Games&quot; text depth</span>
-            <input
-              value={vals.magic8ball_selection_depth}
-              type="number" step="0.005"
-              onChange={(e) => setVal('magic8ball_selection_depth', e.target.value)}
-              onBlur={() => commitNumber('magic8ball_selection_depth', 0.055)}
               className={numInputCls}
             />
           </label>

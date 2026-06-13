@@ -97,11 +97,12 @@ const DEFAULT_FILTER_COLOR = '#000000';            // murky liquid filter drawn 
 const DEFAULT_FILTER_OPACITY = 0.45;
 const DEFAULT_FILTER_DEPTH = 1.0;
 const DEFAULT_QUESTION_TITLE = 'Need Help Choosing\na Movie or Game?';
-const DEFAULT_QUESTION_COLOR = '#fdf6e3';
+const DEFAULT_QUESTION_COLOR = '#b7b7f7';
 const DEFAULT_QUESTION_OPACITY = 1;
 const DEFAULT_QUESTION_DEPTH = 1.0;
-const DEFAULT_SELECTION_DEPTH = 0.055;             // depth (toward camera) of the Movies/Games picker text on the die face
+const DEFAULT_SELECTION_DEPTH = 1.0;               // depth of the detached Movies/Games picker + confirm prompt, fixed in the window (same coordinate space as the question title)
 const DEFAULT_RESULT_TEXT_DEPTH = 0.055;           // depth (toward camera) of the revealed answer text on the die face
+const OVERLAY_FONT_SIZE = 0.1;                     // shared font size for the question title, Movies/Games picker and confirm prompt — all detached from the die, fixed in the window
 
 // Fixed duration (ms) the die's settle animation is assumed to take once
 // shaking stops — used purely to time the result-face/answer-text reveal
@@ -408,56 +409,6 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
             gets rotation={[0,0,Math.PI/2]} to cancel that same spin so the
             glyphs themselves stay upright. */}
         <group position={[-0.1901, 0, 0.4977]} rotation={[0, -0.36486382754888896, 0]}>
-          {showPicker && (
-            <>
-              {/* Upper hit zone — Movies & TV (screen pos 0, 0.06) */}
-              <mesh
-                position={[-0.06, 0, 0.045]}
-                onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
-                onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-                onPointerOut={() => setCursor(false)}
-              >
-                <planeGeometry args={[0.16, 0.38]} />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-              </mesh>
-              <Text position={[-0.06, 0, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} fontWeight="bold" color={TEXT_COLOR} maxWidth={0.38} textAlign="center" anchorX="center" anchorY="middle">
-                Movies
-              </Text>
-
-              {/* Lower hit zone — Video Games (screen pos 0, -0.12) */}
-              <mesh
-                position={[0.12, 0, 0.045]}
-                onClick={(e) => { e.stopPropagation(); onPick('games'); }}
-                onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-                onPointerOut={() => setCursor(false)}
-              >
-                <planeGeometry args={[0.18, 0.55]} />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-              </mesh>
-              <Text position={[0.12, 0, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} rotation={[0, 0, Math.PI / 2]} fontSize={0.08} fontWeight="bold" color={TEXT_COLOR} maxWidth={0.55} textAlign="center" anchorX="center" anchorY="middle">
-                Games
-              </Text>
-            </>
-          )}
-
-          {showConfirm && (
-            <>
-              {/* screen pos (0, -0.05) */}
-              <mesh
-                position={[0.05, 0, 0.045]}
-                onClick={(e) => { e.stopPropagation(); onReroll(); }}
-                onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
-                onPointerOut={() => setCursor(false)}
-              >
-                <planeGeometry args={[0.35, 0.46]} />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-              </mesh>
-              <Text position={[0.05, 0, 0.055]} rotation={[0, 0, Math.PI / 2]} fontSize={0.058} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={0.46} textAlign="center" anchorX="center" anchorY="middle">
-                {'Okay, then.\nGive me a shake!'}
-              </Text>
-            </>
-          )}
-
           {showAnswer && (
             <>
               {/* screen pos (0, -0.05) */}
@@ -478,11 +429,61 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
         </group>
       </group>
 
-      {/* Heading prompt — fixed in the window, not on the die */}
+      {/* Heading prompt + Movies/Games picker + confirm prompt — all fixed
+          in the window, not on the die, so they stay upright and steady
+          regardless of how the die tumbles/rotates. All four share the
+          same larger font size and text colour for visual consistency. */}
       {showPicker && (
-        <Text position={[0, 0.62 * WINDOW_SCALE, appearance?.questionDepth ?? DEFAULT_QUESTION_DEPTH]} fontSize={0.078 * WINDOW_SCALE} fontWeight="bold" lineHeight={1.15} color={appearance?.questionColor ?? DEFAULT_QUESTION_COLOR} fillOpacity={appearance?.questionOpacity ?? DEFAULT_QUESTION_OPACITY} maxWidth={1.35 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
+        <Text position={[0, 0.62 * WINDOW_SCALE, appearance?.questionDepth ?? DEFAULT_QUESTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" lineHeight={1.15} color={appearance?.questionColor ?? DEFAULT_QUESTION_COLOR} fillOpacity={appearance?.questionOpacity ?? DEFAULT_QUESTION_OPACITY} maxWidth={1.35 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
           {appearance?.questionTitle ?? DEFAULT_QUESTION_TITLE}
         </Text>
+      )}
+
+      {showPicker && (
+        <>
+          <mesh
+            position={[0, 0.05 * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
+            onClick={(e) => { e.stopPropagation(); onPick('movies'); }}
+            onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+            onPointerOut={() => setCursor(false)}
+          >
+            <planeGeometry args={[0.7 * WINDOW_SCALE, 0.22 * WINDOW_SCALE]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+          <Text position={[0, 0.05 * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" color={TEXT_COLOR} maxWidth={1.2 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
+            Movies
+          </Text>
+
+          <mesh
+            position={[0, -0.22 * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
+            onClick={(e) => { e.stopPropagation(); onPick('games'); }}
+            onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+            onPointerOut={() => setCursor(false)}
+          >
+            <planeGeometry args={[0.7 * WINDOW_SCALE, 0.22 * WINDOW_SCALE]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+          <Text position={[0, -0.22 * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" color={TEXT_COLOR} maxWidth={1.2 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
+            Games
+          </Text>
+        </>
+      )}
+
+      {showConfirm && (
+        <>
+          <mesh
+            position={[0, -0.05 * WINDOW_SCALE, (appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH) - 0.01]}
+            onClick={(e) => { e.stopPropagation(); onReroll(); }}
+            onPointerOver={(e) => { e.stopPropagation(); setCursor(true); }}
+            onPointerOut={() => setCursor(false)}
+          >
+            <planeGeometry args={[1.1 * WINDOW_SCALE, 0.5 * WINDOW_SCALE]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+          <Text position={[0, -0.05 * WINDOW_SCALE, appearance?.selectionDepth ?? DEFAULT_SELECTION_DEPTH]} fontSize={OVERLAY_FONT_SIZE} fontWeight="bold" lineHeight={1.25} color={TEXT_COLOR} maxWidth={1.3 * WINDOW_SCALE} textAlign="center" anchorX="center" anchorY="middle">
+            {'Okay, then.\nGive me a shake!'}
+          </Text>
+        </>
       )}
 
       {/* Murky liquid filter — a near-opaque tinted pane sitting in front
