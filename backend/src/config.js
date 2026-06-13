@@ -28,4 +28,7 @@ export const config = {
     clientId: process.env.TWITCH_CLIENT_ID ?? '',
     clientSecret: process.env.TWITCH_CLIENT_SECRET ?? '',
   },
+  googlePlaces: {
+    apiKey: process.env.GOOGLE_PLACES_API_KEY ?? '',
+  },
 };

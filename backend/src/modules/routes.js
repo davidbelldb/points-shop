@@ -49,6 +49,7 @@ import shoppingRoutes from './shopping/shopping.routes.js';
 import bootstrapRoutes from './bootstrap/bootstrap.routes.js';
 import playlistRoutes from './playlist/playlist.routes.js';
 import sneakyButtonRoutes from './sneaky-button/sneaky-button.routes.js';
+import timelineRoutes from './timeline/timeline.routes.js';
 
 export async function registerAppRoutes(fastify) {
   await fastify.register(productsRoutes);
@@ -89,4 +90,5 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(bootstrapRoutes);
   await fastify.register(playlistRoutes);
   await fastify.register(sneakyButtonRoutes);
+  await fastify.register(timelineRoutes);
 }

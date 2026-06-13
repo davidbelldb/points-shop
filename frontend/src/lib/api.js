@@ -283,6 +283,9 @@ export const api = {
   shopUpdateGrocery: (id, patch) => request(`/shopping/groceries/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   shopDeleteGrocery: (id) => request(`/shopping/groceries/${id}`, { method: 'DELETE' }),
 
+  // Relationship Timeline
+  listTimelineMilestones: () => request('/timeline/milestones'),
+
   // Sneaky Spreadsheets
   sheetTabs:      () => request('/spreadsheets/tabs'),
   sheetCreateTab: (name) => request('/spreadsheets/tabs', { method: 'POST', body: JSON.stringify({ name }) }),
@@ -368,5 +371,17 @@ export const api = {
     pushDismiss:     ()        => request('/admin/push-dismiss',       { method: 'POST' }),
     changeOtherUserPassword: (password) =>
       request('/admin/other-account/password', { method: 'PATCH', body: JSON.stringify({ password }) }),
+
+    // Relationship Timeline
+    listTimelineMilestones: () => request('/admin/timeline/milestones'),
+    createTimelineMilestone: (data) =>
+      request('/admin/timeline/milestones', { method: 'POST', body: JSON.stringify(data) }),
+    updateTimelineMilestone: (id, patch) =>
+      request(`/admin/timeline/milestones/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    deleteTimelineMilestone: (id) =>
+      request(`/admin/timeline/milestones/${id}`, { method: 'DELETE' }),
+    reorderTimelineMilestones: (ids) =>
+      request('/admin/timeline/milestones/reorder', { method: 'PATCH', body: JSON.stringify({ ids }) }),
+    searchPlaces: (q) => request(`/admin/places/search?q=${encodeURIComponent(q)}`),
   },
 };

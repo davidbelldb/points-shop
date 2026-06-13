@@ -46,6 +46,7 @@ services:
       FATSECRET_CLIENT_SECRET: ${FATSECRET_CLIENT_SECRET:-}
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
     volumes:
       - media:/app/media
     networks:

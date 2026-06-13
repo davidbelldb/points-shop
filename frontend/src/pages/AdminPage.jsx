@@ -16,6 +16,7 @@ import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
 import TimelineThemeEditor from '../components/timeline/TimelineThemeEditor.jsx';
+import TimelineMilestonesEditor from '../components/timeline/TimelineMilestonesEditor.jsx';
 import { TimelineThemeProvider } from '../components/timeline/timelineTheme.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
@@ -174,6 +175,10 @@ export default function AdminPage() {
       </AdminCollapsible>
 
       <AdminCollapsible title="Relationship Timeline" storageKey="admin::timeline">
+        <div className="mb-6">
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">Milestones</h3>
+          <TimelineMilestonesEditor />
+        </div>
         <TimelineThemeProvider>
           <TimelineThemeEditor />
         </TimelineThemeProvider>

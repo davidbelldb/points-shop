@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Settings, X } from 'lucide-react';
 import RelationshipTimeline from '../components/timeline/RelationshipTimeline';
 import TimelineThemeEditor from '../components/timeline/TimelineThemeEditor';
 import { TimelineThemeProvider } from '../components/timeline/timelineTheme';
-import milestones from '../data/milestones';
+import { api } from '../lib/api';
 
 /**
  * RelationshipTimelinePage
@@ -17,11 +17,27 @@ import milestones from '../data/milestones';
  */
 export default function RelationshipTimelinePage() {
   const [editorOpen, setEditorOpen] = useState(false);
+  const [milestones, setMilestones] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listTimelineMilestones()
+      .then((data) => { if (!cancelled) setMilestones(data); })
+      .catch((err) => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <TimelineThemeProvider>
       <div className="relative">
-        <RelationshipTimeline milestones={milestones} />
+        {error && (
+          <div className="mx-auto max-w-3xl px-4 pt-6 text-sm text-rose-400">
+            Couldn't load the timeline: {error}
+          </div>
+        )}
+        {milestones && <RelationshipTimeline milestones={milestones} />}
 
         <button
           type="button"
