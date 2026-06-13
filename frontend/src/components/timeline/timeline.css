@@ -24,13 +24,14 @@
   background: var(--tl-map-popup-bg, #18181b) !important;
 }
 
+/*
+ * Google's built-in InfoWindow close button is a separate black icon that
+ * sits above the content and can't be reliably re-themed/positioned. We hide
+ * it and render our own close "x" inline with the title/date instead (see
+ * MilestoneMap.jsx), which picks up the themed popup text color.
+ */
 .gm-ui-hover-effect {
-  filter: invert(var(--tl-map-popup-invert, 0));
-  opacity: 0.7;
-}
-
-.gm-ui-hover-effect:hover {
-  opacity: 1;
+  display: none !important;
 }
 
 /*

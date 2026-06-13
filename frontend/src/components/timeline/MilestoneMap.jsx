@@ -130,7 +130,6 @@ export default function MilestoneMap({
       style={{
         height,
         background: 'var(--tl-page-bg)',
-        '--tl-map-popup-invert': isLightColor(theme.mapPopupBg) ? 0 : 1,
         // iOS Safari ignores `overflow: hidden` + `border-radius` for the
         // Google Maps canvas (it's drawn in its own compositing layer).
         // A fully-opaque mask forces Safari onto the masking code path,
@@ -179,9 +178,19 @@ export default function MilestoneMap({
             >
               {(p.title || p.date) && activeMarkerId === p.id && (
                 <InfoWindowF onCloseClick={() => setActiveMarkerId(null)}>
-                  <div className="text-sm">
-                    {p.title && <div className="font-semibold">{p.title}</div>}
-                    {p.date && <div className="text-xs opacity-70">{p.date}</div>}
+                  <div className="flex items-start gap-3 text-sm">
+                    <div className="min-w-0">
+                      {p.title && <div className="font-semibold">{p.title}</div>}
+                      {p.date && <div className="text-xs opacity-70">{p.date}</div>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveMarkerId(null)}
+                      aria-label="Close"
+                      className="ml-auto shrink-0 cursor-pointer border-0 bg-transparent p-0 text-lg leading-none text-current opacity-60 hover:opacity-100"
+                    >
+                      ×
+                    </button>
                   </div>
                 </InfoWindowF>
               )}
@@ -229,25 +238,4 @@ function createPinIcon(theme) {
     scaledSize: new window.google.maps.Size(40, 50),
     anchor: new window.google.maps.Point(20, 44),
   };
-}
-
-/** Rough light/dark check for a CSS color, used to invert the InfoWindow close icon. */
-function isLightColor(color) {
-  if (!color) return false;
-  let r, g, b;
-  const hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (hexMatch) {
-    let hex = hexMatch[1];
-    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-    r = parseInt(hex.slice(0, 2), 16);
-    g = parseInt(hex.slice(2, 4), 16);
-    b = parseInt(hex.slice(4, 6), 16);
-  } else {
-    const rgbMatch = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-    if (!rgbMatch) return false;
-    [, r, g, b] = rgbMatch.map(Number);
-  }
-  // Perceived brightness (0-255)
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 150;
 }
