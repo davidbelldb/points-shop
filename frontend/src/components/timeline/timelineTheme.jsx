@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '../../lib/api.js';
 
 /**
  * Default "cozy fairytale" theme for the Relationship Timeline.
@@ -93,6 +94,7 @@ export function themeToCssVars(theme) {
 }
 
 const STORAGE_KEY = 'sneakySocial.timelineTheme';
+const SETTINGS_KEY = 'timeline_theme';
 
 const TimelineThemeContext = createContext({
   theme: defaultTimelineTheme,
@@ -118,6 +120,28 @@ export function TimelineThemeProvider({ theme: themeProp, children }) {
     if (themeProp) setTheme((prev) => ({ ...prev, ...themeProp }));
   }, [themeProp]);
 
+  // Pull the server-saved theme (set via the admin's Timeline Theme editor)
+  // so every device/browser picks up the latest theme on load, not just the
+  // one that saved it. Falls back silently to the localStorage/default theme
+  // if the request fails or no server theme has been saved yet.
+  useEffect(() => {
+    if (themeProp) return;
+    let cancelled = false;
+    api.getSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        const raw = settings?.[SETTINGS_KEY];
+        if (!raw) return;
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        setTheme((prev) => ({ ...defaultTimelineTheme, ...prev, ...parsed }));
+      })
+      .catch(() => {
+        // Offline / no settings yet - keep whatever localStorage/default gave us.
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -127,8 +151,29 @@ export function TimelineThemeProvider({ theme: themeProp, children }) {
     }
   }, [theme]);
 
-  const updateTheme = (patch) => setTheme((prev) => ({ ...prev, ...patch }));
-  const resetTheme = () => setTheme(defaultTimelineTheme);
+  // Debounced save to the server so theme edits sync across devices.
+  const saveTimeoutRef = useRef(null);
+  const persistTheme = (nextTheme) => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      api.admin.updateSettings({ [SETTINGS_KEY]: JSON.stringify(nextTheme) }).catch(() => {
+        // Not logged in as admin / offline - the change still applies locally.
+      });
+    }, 600);
+  };
+  useEffect(() => () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+  }, []);
+
+  const updateTheme = (patch) => setTheme((prev) => {
+    const next = { ...prev, ...patch };
+    persistTheme(next);
+    return next;
+  });
+  const resetTheme = () => {
+    setTheme(defaultTimelineTheme);
+    persistTheme(defaultTimelineTheme);
+  };
 
   const value = useMemo(
     () => ({ theme, setTheme, updateTheme, resetTheme }),

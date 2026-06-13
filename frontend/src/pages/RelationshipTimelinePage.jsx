@@ -6,15 +6,16 @@ import { api } from '../lib/api';
 /**
  * RelationshipTimelinePage
  * -------------------------
- * Demo/host page for the Relationship Milestone Tracker. Theme is read from
- * TimelineThemeProvider (persisted to localStorage from the admin's
- * TimelineThemeEditor on /admin) - this page is read-only.
+ * Host page for the Relationship Milestone Tracker. Theme, page title, and
+ * subtitle are all managed from /journal and persisted server-side via the
+ * generic `settings` table, so they apply on every device.
  *
  * Mount this at whatever route you like, e.g. /timeline.
  */
 export default function RelationshipTimelinePage() {
   const [milestones, setMilestones] = useState(null);
   const [error, setError] = useState(null);
+  const [pageSettings, setPageSettings] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,6 +23,16 @@ export default function RelationshipTimelinePage() {
       .listTimelineMilestones()
       .then((data) => { if (!cancelled) setMilestones(data); })
       .catch((err) => { if (!cancelled) setError(err.message); });
+    api
+      .getSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        setPageSettings({
+          title: settings?.timeline_title || undefined,
+          subtitle: settings?.timeline_subtitle || undefined,
+        });
+      })
+      .catch(() => { if (!cancelled) setPageSettings({}); });
     return () => { cancelled = true; };
   }, []);
 
@@ -33,7 +44,13 @@ export default function RelationshipTimelinePage() {
             Couldn't load the timeline: {error}
           </div>
         )}
-        {milestones && <RelationshipTimeline milestones={milestones} />}
+        {milestones && (
+          <RelationshipTimeline
+            milestones={milestones}
+            title={pageSettings?.title}
+            subtitle={pageSettings?.subtitle}
+          />
+        )}
       </div>
     </TimelineThemeProvider>
   );

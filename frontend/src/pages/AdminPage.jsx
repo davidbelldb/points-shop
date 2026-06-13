@@ -15,8 +15,6 @@ import AdminDuckySection from './AdminDuckySection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
-import TimelineThemeEditor from '../components/timeline/TimelineThemeEditor.jsx';
-import { TimelineThemeProvider } from '../components/timeline/timelineTheme.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
 const inputCls =
@@ -174,15 +172,15 @@ export default function AdminPage() {
       </AdminCollapsible>
 
       <AdminCollapsible title="Relationship Timeline" storageKey="admin::timeline">
-        <TimelineThemeProvider>
-          <TimelineThemeEditor />
-        </TimelineThemeProvider>
+        <p className="text-sm text-zinc-500">
+          Milestones, page title/subtitle, and theme are now all managed from the Journal page.
+        </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
           <Link
             to="/journal"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900"
           >
-            Manage milestones (Journal) →
+            Manage timeline (Journal) →
           </Link>
           <Link
             to="/timeline"

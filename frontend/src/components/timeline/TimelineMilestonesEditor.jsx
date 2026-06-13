@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, MapPin, Plus, Search, Trash2, UploadCloud, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, MapPin, Plus, Search, Trash2, UploadCloud, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { iconNames } from './icons';
 
@@ -11,6 +11,7 @@ const EMPTY_FORM = {
   icon: 'Heart',
   media: null,
   location: null,
+  visible: true,
 };
 
 /**
@@ -67,6 +68,18 @@ export default function TimelineMilestonesEditor() {
     }
   };
 
+  const toggleVisible = async (m) => {
+    setBusyId(m.id);
+    try {
+      const updated = await api.admin.updateTimelineMilestone(m.id, { visible: !m.visible });
+      setMilestones((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   if (error) {
     return <p className="text-sm text-rose-600">Couldn't load milestones: {error}</p>;
   }
@@ -88,7 +101,11 @@ export default function TimelineMilestonesEditor() {
               }}
             />
           ) : (
-            <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white p-3">
+            <div
+              className={`flex items-center gap-2 rounded-xl border border-zinc-200 bg-white p-3 ${
+                m.visible === false ? 'opacity-50' : ''
+              }`}
+            >
               <div className="flex flex-col">
                 <button
                   type="button"
@@ -111,7 +128,14 @@ export default function TimelineMilestonesEditor() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-zinc-800">{m.title || '(untitled)'}</p>
+                <p className="truncate text-sm font-semibold text-zinc-800">
+                  {m.title || '(untitled)'}
+                  {m.visible === false && (
+                    <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                      Hidden
+                    </span>
+                  )}
+                </p>
                 <p className="truncate text-xs text-zinc-500">
                   {m.displayDate || m.date}
                   {m.location && (
@@ -123,6 +147,16 @@ export default function TimelineMilestonesEditor() {
                 </p>
               </div>
 
+              <button
+                type="button"
+                onClick={() => toggleVisible(m)}
+                disabled={busyId === m.id}
+                className="rounded-full border border-zinc-200 p-1.5 text-zinc-400 hover:text-amber-700 hover:border-amber-300 disabled:opacity-50"
+                aria-label={m.visible === false ? 'Show on timeline' : 'Hide from timeline'}
+                title={m.visible === false ? 'Hidden — click to show on /timeline' : 'Visible — click to hide from /timeline'}
+              >
+                {m.visible === false ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
               <button
                 type="button"
                 onClick={() => setEditingId(m.id)}
@@ -176,6 +210,7 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
     icon: initial.icon ?? 'Heart',
     media: initial.media ?? null,
     location: initial.location ?? null,
+    visible: initial.visible ?? true,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -224,6 +259,7 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
         icon: form.icon,
         media: form.media,
         location: form.location,
+        visible: form.visible,
       };
       const saved =
         initial.id != null
@@ -293,6 +329,16 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
           ))}
         </select>
       </Field>
+
+      <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+        <input
+          type="checkbox"
+          checked={form.visible}
+          onChange={(e) => set({ visible: e.target.checked })}
+          className="h-4 w-4 rounded border-zinc-300"
+        />
+        Visible on /timeline
+      </label>
 
       <div className="rounded-lg border border-zinc-200 bg-white p-3">
         <div className="mb-2 flex items-center justify-between">

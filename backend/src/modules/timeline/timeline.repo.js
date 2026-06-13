@@ -15,12 +15,20 @@ function toMilestone(row) {
         ? { lat: row.location_lat, lng: row.location_lng, label: row.location_label ?? null }
         : null,
     sortOrder: row.sort_order,
+    visible: row.visible,
   };
 }
 
-export async function listMilestones() {
+/**
+ * @param {boolean} includeHidden - admin views pass `true` to see every
+ *   milestone (so they can toggle visibility); the public /timeline route
+ *   passes `false` (default) so hidden milestones never reach the page.
+ */
+export async function listMilestones(includeHidden = false) {
   const { rows } = await query(
-    `SELECT * FROM timeline_milestones ORDER BY sort_order ASC, date ASC, created_at ASC`
+    includeHidden
+      ? `SELECT * FROM timeline_milestones ORDER BY sort_order ASC, date ASC, created_at ASC`
+      : `SELECT * FROM timeline_milestones WHERE visible = true ORDER BY sort_order ASC, date ASC, created_at ASC`
   );
   return rows.map(toMilestone);
 }
@@ -38,6 +46,7 @@ export async function createMilestone({
   icon = 'Heart',
   media = null,
   location = null,
+  visible = true,
 }) {
   const { rows: maxRows } = await query(
     `SELECT COALESCE(MAX(sort_order), 0) + 10 AS next FROM timeline_milestones`
@@ -46,8 +55,8 @@ export async function createMilestone({
 
   const { rows } = await query(
     `INSERT INTO timeline_milestones
-       (sort_order, date, display_date, title, description, icon, media, location_lat, location_lng, location_label)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       (sort_order, date, display_date, title, description, icon, media, location_lat, location_lng, location_label, visible)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       sortOrder,
@@ -60,6 +69,7 @@ export async function createMilestone({
       location?.lat ?? null,
       location?.lng ?? null,
       location?.label ?? null,
+      visible !== false,
     ]
   );
   return toMilestone(rows[0]);
@@ -71,6 +81,7 @@ const UPDATABLE_FIELDS = {
   title: 'title',
   description: 'description',
   icon: 'icon',
+  visible: 'visible',
 };
 
 export async function updateMilestone(id, patch) {

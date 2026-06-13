@@ -21,6 +21,8 @@ const AUTOPLAY_INTERVAL_MS = 4000;
  *      location?: { lat, lng },
  *    }>
  *  - theme: optional partial theme override (see timelineTheme.js)
+ *  - title: heading text shown at the top (defaults to "Our Story So Far")
+ *  - subtitle: subheading text shown below the title
  *  - showOverviewMap: render a combined map of every located milestone at the top
  *  - className: extra classes for the outer wrapper
  *
@@ -29,7 +31,13 @@ const AUTOPLAY_INTERVAL_MS = 4000;
  * optional <TimelineThemeEditor /> share live, persisted theme state. If no
  * provider is present, the built-in default theme is used.
  */
-export default function RelationshipTimeline({ milestones = [], showOverviewMap = true, className = '' }) {
+export default function RelationshipTimeline({
+  milestones = [],
+  title = 'Our Story So Far',
+  subtitle = 'Every little moment, mapped out one milestone at a time.',
+  showOverviewMap = true,
+  className = '',
+}) {
   const { theme } = useTimelineTheme();
   const containerRef = useRef(null);
   const itemRefs = useRef([]);
@@ -100,10 +108,10 @@ export default function RelationshipTimeline({ milestones = [], showOverviewMap 
       <div className="mx-auto max-w-3xl">
         <header className="mb-10 text-center">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--tl-title)]">
-            Our Story So Far
+            {title}
           </h1>
           <p className="mt-2 text-sm sm:text-base text-[var(--tl-muted)]">
-            Every little moment, mapped out one milestone at a time.
+            {subtitle}
           </p>
         </header>
 

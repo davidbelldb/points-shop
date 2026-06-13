@@ -27,27 +27,30 @@ function validLocation(location) {
 
 export default async function timelineRoutes(fastify) {
   // GET /api/timeline/milestones — public, used by the /timeline page.
+  // Hidden milestones (visible = false) are excluded.
   fastify.get('/api/timeline/milestones', async () => {
-    return listMilestones();
+    return listMilestones(false);
   });
 
   /* ---- Admin: milestone CRUD ---- */
 
+  // Admins see every milestone, including hidden ones, so they can toggle
+  // visibility back on.
   fastify.get('/api/admin/timeline/milestones', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return listMilestones();
+    return listMilestones(true);
   });
 
   fastify.post('/api/admin/timeline/milestones', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    const { date, displayDate, title, description, icon, media, location } = req.body ?? {};
+    const { date, displayDate, title, description, icon, media, location, visible } = req.body ?? {};
     if (!date || typeof date !== 'string') {
       return reply.code(400).send({ error: 'date is required' });
     }
     if (!validLocation(location)) {
       return reply.code(400).send({ error: 'location must be { lat, lng, label? } or null' });
     }
-    const created = await createMilestone({ date, displayDate, title, description, icon, media, location });
+    const created = await createMilestone({ date, displayDate, title, description, icon, media, location, visible });
     return reply.code(201).send(created);
   });
 
