@@ -27,13 +27,13 @@ export default function RelationshipTimelinePage() {
           type="button"
           onClick={() => setEditorOpen((v) => !v)}
           aria-label={editorOpen ? 'Close theme editor' : 'Open theme editor'}
-          className="fixed top-4 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--tl-control-bg)] border border-[var(--tl-control-border)] text-[var(--tl-body)] hover:text-[var(--tl-accent)] shadow-lg transition-colors"
+          className="fixed top-20 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--tl-control-bg)] border border-[var(--tl-control-border)] text-[var(--tl-body)] hover:text-[var(--tl-accent)] shadow-lg transition-colors"
         >
           {editorOpen ? <X className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
         </button>
 
         {editorOpen && (
-          <div className="fixed top-16 right-4 z-50 w-[min(92vw,22rem)] max-h-[80vh] overflow-y-auto shadow-2xl">
+          <div className="fixed top-32 right-4 z-50 w-[min(92vw,22rem)] max-h-[80vh] overflow-y-auto shadow-2xl">
             <TimelineThemeEditor />
           </div>
         )}

@@ -41,7 +41,7 @@ export default function MilestoneMap({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-[var(--tl-card-border)] ${className}`}
+      className={`relative isolate overflow-hidden rounded-2xl border border-[var(--tl-card-border)] ${className}`}
       style={{ height }}
     >
       <MapContainer
