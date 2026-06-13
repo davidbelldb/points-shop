@@ -372,6 +372,11 @@ export const api = {
     changeOtherUserPassword: (password) =>
       request('/admin/other-account/password', { method: 'PATCH', body: JSON.stringify({ password }) }),
 
+    // Disk storage hygiene
+    listStorageReels: () => request('/admin/storage/reels'),
+    cleanupStorageReels: (ids) =>
+      request('/admin/storage/reels/cleanup', { method: 'POST', body: JSON.stringify({ ids }) }),
+
     // Relationship Timeline
     listTimelineMilestones: () => request('/admin/timeline/milestones'),
     createTimelineMilestone: (data) =>

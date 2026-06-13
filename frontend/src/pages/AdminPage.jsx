@@ -190,6 +190,20 @@ export default function AdminPage() {
           </Link>
         </div>
       </AdminCollapsible>
+
+      <AdminCollapsible title="Storage hygiene" storageKey="admin::storage">
+        <p className="text-sm text-zinc-500 dark:text-neutral-400">
+          Review uploaded Reel/Story video files and clear out anything 14+ days old to free up disk space.
+        </p>
+        <div className="mt-3">
+          <Link
+            to="/admin/storage"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300"
+          >
+            Manage storage →
+          </Link>
+        </div>
+      </AdminCollapsible>
     </div>
   );
 }
