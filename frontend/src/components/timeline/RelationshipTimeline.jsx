@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, useMotionValue, useSpring } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useScroll, useSpring } from 'framer-motion';
 import TimelineCard from './TimelineCard';
-import TimelinePlayer from './TimelinePlayer';
 import MediaLightbox from './MediaLightbox';
 import MilestoneMap from './MilestoneMap';
 import { themeToCssVars, useTimelineTheme } from './timelineTheme';
 import './timeline.css';
-
-const AUTOPLAY_INTERVAL_MS = 4000;
 
 // Shared dash pattern for the central track + its "drawn" gradient fill, so
 // the fill lines up with the dashes exactly as it grows.
@@ -49,67 +46,39 @@ export default function RelationshipTimeline({
 
   const [lightboxItem, setLightboxItem] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
 
-  // Progress driven by the milestone currently highlighted via the
-  // play/jump controls, measured as a 0-1 fraction of the track's height so
-  // the line draws down to exactly that milestone's dot.
-  const activeProgress = useMotionValue(0);
-
-  const updateActiveProgress = useCallback(() => {
-    const container = containerRef.current;
-    const target = itemRefs.current[activeIndex];
-    if (!container || !target) return;
-    const containerHeight = container.offsetHeight;
-    if (!containerHeight) return;
-    const dotCenter = target.offsetTop + 48; // matches the dot's `top-10` + half its height
-    activeProgress.set(Math.min(1, dotCenter / containerHeight));
-  }, [activeIndex, activeProgress]);
-
-  useEffect(() => {
-    updateActiveProgress();
-    window.addEventListener('resize', updateActiveProgress);
-    return () => window.removeEventListener('resize', updateActiveProgress);
-  }, [updateActiveProgress, milestones.length]);
-
-  const lineProgress = useSpring(activeProgress, {
+  // Line + dots fill in as the user scrolls down through the milestones -
+  // no playback controls needed. `scrollYProgress` runs from 0 (container
+  // just entering view) to 1 (container scrolled past), smoothed with a
+  // spring for a nice "drawing" feel.
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ['start 0.8', 'end 0.6'],
+  });
+  const lineProgress = useSpring(scrollYProgress, {
     stiffness: 90,
     damping: 25,
     restDelta: 0.001,
   });
 
-  const scrollToIndex = useCallback((index) => {
-    const el = itemRefs.current[index];
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, []);
-
-  const handleJump = useCallback(
-    (index) => {
-      setActiveIndex(index);
-      scrollToIndex(index);
-    },
-    [scrollToIndex]
-  );
-
-  const togglePlay = useCallback(() => setIsPlaying((p) => !p), []);
-
+  // Highlight whichever milestone is currently nearest the centre of the
+  // viewport as "active", so its dot fills in and its card is emphasised.
   useEffect(() => {
-    if (!isPlaying) return;
-    const timer = setInterval(() => {
-      setActiveIndex((prev) => {
-        const next = prev + 1;
-        if (next >= milestones.length) {
-          setIsPlaying(false);
-          return prev;
-        }
-        scrollToIndex(next);
-        return next;
-      });
-    }, AUTOPLAY_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [isPlaying, milestones.length, scrollToIndex]);
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const idx = itemRefs.current.indexOf(entry.target);
+            if (idx !== -1) setActiveIndex(idx);
+          }
+        });
+      },
+      { rootMargin: '-45% 0px -45% 0px', threshold: 0 }
+    );
+    itemRefs.current.forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [milestones.length]);
 
   const overviewLocations = milestones
     .filter((m) => m.location?.lat != null && m.location?.lng != null)
@@ -171,14 +140,6 @@ export default function RelationshipTimeline({
           </div>
         </div>
       </div>
-
-      <TimelinePlayer
-        milestones={milestones}
-        activeIndex={activeIndex}
-        isPlaying={isPlaying}
-        onJump={handleJump}
-        onTogglePlay={togglePlay}
-      />
 
       <MediaLightbox item={lightboxItem} onClose={() => setLightboxItem(null)} />
     </div>
