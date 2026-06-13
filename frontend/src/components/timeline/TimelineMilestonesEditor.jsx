@@ -342,7 +342,7 @@ function MilestoneForm({ initial, onCancel, onSaved }) {
 
       <div className="rounded-lg border border-neutral-200 bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Media (optional)</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Media (optional)</span>
           {hasMedia && (
             <button
               type="button"
@@ -510,7 +510,7 @@ function LocationField({ location, onChange }) {
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Map location (optional)</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Map location (optional)</span>
         <div className="flex items-center gap-2">
           {location && (
             <button
@@ -614,7 +614,7 @@ function LocationField({ location, onChange }) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-neutral-500">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-neutral-600">{label}</span>
       {children}
     </label>
   );

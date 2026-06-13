@@ -107,8 +107,8 @@ export default function TimelineThemeEditor() {
 function Section({ title, children }) {
   return (
     <div className="mb-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--tl-muted)] mb-1">{title}</h3>
-      <div className="divide-y divide-[var(--tl-card-border)]">{children}</div>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--tl-muted)] mb-2">{title}</h3>
+      <div className="space-y-0.5">{children}</div>
     </div>
   );
 }
@@ -119,13 +119,18 @@ function ColorField({ label, value, onChange, withAlpha = false }) {
 
   return (
     <div className="flex items-center gap-3 py-2">
-      <input
-        type="color"
-        value={hex}
-        onChange={(e) => onChange(composeColor(e.target.value, alpha))}
-        className="h-8 w-10 shrink-0 cursor-pointer rounded border border-[var(--tl-card-border)] bg-transparent p-0"
-        aria-label={label}
-      />
+      <span
+        className="relative block h-8 w-8 shrink-0 overflow-hidden rounded-full shadow-inner shadow-black/30"
+        style={{ backgroundColor: hex }}
+      >
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => onChange(composeColor(e.target.value, alpha))}
+          className="absolute inset-0 h-full w-full cursor-pointer appearance-none border-0 bg-transparent p-0 opacity-0"
+          aria-label={label}
+        />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--tl-title)]">{label}</p>
         {withAlpha && (

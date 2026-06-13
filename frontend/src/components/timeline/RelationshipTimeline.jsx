@@ -9,6 +9,11 @@ import './timeline.css';
 
 const AUTOPLAY_INTERVAL_MS = 4000;
 
+// Shared dash pattern for the central track + its "drawn" gradient fill, so
+// the fill lines up with the dashes exactly as it grows.
+const LINE_DASH_MASK = 'repeating-linear-gradient(to bottom, #000 0, #000 8px, transparent 8px, transparent 16px)';
+const lineDashStyle = { maskImage: LINE_DASH_MASK, WebkitMaskImage: LINE_DASH_MASK };
+
 /**
  * RelationshipTimeline
  * ---------------------
@@ -151,12 +156,16 @@ export default function RelationshipTimeline({
         )}
 
         <div ref={containerRef} className="relative">
-          {/* Central line track */}
-          <div className="absolute left-4 md:left-1/2 top-0 bottom-0 -translate-x-1/2 border-l-2 border-dashed border-[var(--tl-card-border)]" />
-          {/* Animated "drawn" line */}
+          {/* Central line track (dashed) */}
+          <div
+            className="absolute left-4 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-[var(--tl-card-border)]"
+            style={lineDashStyle}
+          />
+          {/* Animated "drawn" line - same dash pattern, fills in with the
+              gradient as the user scrolls/plays/jumps through milestones. */}
           <motion.div
             className="absolute left-4 md:left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
-            style={{ height: lineHeight }}
+            style={{ height: lineHeight, ...lineDashStyle }}
           />
 
           <div className="flex flex-col">
