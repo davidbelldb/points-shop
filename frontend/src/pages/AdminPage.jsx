@@ -15,6 +15,8 @@ import AdminDuckySection from './AdminDuckySection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
+import TimelineThemeEditor from '../components/timeline/TimelineThemeEditor.jsx';
+import { TimelineThemeProvider } from '../components/timeline/timelineTheme.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
 const inputCls =
@@ -169,6 +171,18 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Ducky Derby" storageKey="admin::ducky">
         <AdminDuckySection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Relationship Timeline" storageKey="admin::timeline">
+        <TimelineThemeProvider>
+          <TimelineThemeEditor />
+        </TimelineThemeProvider>
+        <Link
+          to="/timeline"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900"
+        >
+          View timeline →
+        </Link>
       </AdminCollapsible>
     </div>
   );
