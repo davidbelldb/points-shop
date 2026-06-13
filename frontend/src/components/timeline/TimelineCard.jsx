@@ -21,11 +21,13 @@ const MEDIA_SIZE_CLASSES = {
  * Props:
  *  - milestone: { id, date, displayDate, title, description, icon, media, location }
  *  - side: 'left' | 'right' (desktop alignment)
- *  - isActive: highlights the card (used by the play-through controls)
+ *  - isActive: highlights the card as the current scroll-position milestone
+ *  - isPassed: milestone the user has scrolled past - keeps the dot filled
+ *    with the active colour, but at its normal (non-scaled) size
  *  - onOpenLightbox(media)
  */
 const TimelineCard = forwardRef(function TimelineCard(
-  { milestone, side = 'left', isActive = false, onOpenLightbox },
+  { milestone, side = 'left', isActive = false, isPassed = false, onOpenLightbox },
   ref
 ) {
   const Icon = getMilestoneIcon(milestone.icon);
@@ -47,9 +49,11 @@ const TimelineCard = forwardRef(function TimelineCard(
         <div className="relative">
           <div className="absolute -inset-1.5 rounded-full bg-[var(--tl-glow)] blur-sm animate-pulse" />
           <div
-            className={`relative h-4 w-4 rounded-full border-2 transition-colors ${
+            className={`relative h-4 w-4 rounded-full border-2 transition-all ${
               isActive
                 ? 'bg-[var(--tl-dot-active-bg)] border-[var(--tl-dot-active-border)] scale-125'
+                : isPassed
+                ? 'bg-[var(--tl-dot-active-bg)] border-[var(--tl-dot-active-border)]'
                 : 'bg-[var(--tl-dot-bg)] border-[var(--tl-dot-border)]'
             }`}
           />

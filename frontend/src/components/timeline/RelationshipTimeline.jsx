@@ -132,6 +132,7 @@ export default function RelationshipTimeline({
                 milestone={milestone}
                 side={index % 2 === 0 ? 'left' : 'right'}
                 isActive={index === activeIndex}
+                isPassed={index < activeIndex}
                 onOpenLightbox={(media) =>
                   setLightboxItem({ url: media.url, alt: media.alt || milestone.title })
                 }
