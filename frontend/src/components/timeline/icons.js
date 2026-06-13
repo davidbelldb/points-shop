@@ -19,7 +19,32 @@ import {
   Star,
   Sun,
   Moon,
+  Pizza,
 } from 'lucide-react';
+
+/**
+ * Lucide doesn't ship a bowling pin icon, so this is a small hand-drawn one
+ * matching lucide's conventions (24x24 viewBox, stroke-based, `currentColor`,
+ * accepts the same props such as `className`).
+ */
+function BowlingPin(props) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M12 2c-1.1 0-2 1.3-2 3 0 1.2.5 2.1 1 2.8-1.8 1.7-3 4.6-3 7.7 0 3 1.5 5.5 4 5.5s4-2.5 4-5.5c0-3.1-1.2-6-3-7.7.5-.7 1-1.6 1-2.8 0-1.7-.9-3-2-3Z" />
+      <path d="M9.3 9.5h5.4" />
+      <path d="M8.7 12h6.6" />
+    </svg>
+  );
+}
 
 /**
  * Map of icon name (string, as stored on a milestone) -> lucide-react component.
@@ -47,6 +72,8 @@ export const iconMap = {
   Star,
   Sun,
   Moon,
+  Pizza,
+  BowlingPin,
 };
 
 export const iconNames = Object.keys(iconMap);
