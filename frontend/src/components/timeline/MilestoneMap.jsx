@@ -118,18 +118,51 @@ export default function MilestoneMap({
       if (points.length > 1) {
         const bounds = new window.google.maps.LatLngBounds();
         points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
-        // `fitBounds` fits the *lat/lng points* themselves snugly inside the
-        // viewport, but each pin icon is a 40x50 marker anchored near its
-        // tip (anchor (20,44)) - so it extends ~44px ABOVE its point and only
-        // ~6px below, and ~20px either side. A small uniform padding doesn't
-        // leave room for that, so a pin sitting near an edge of the bounds
-        // gets its icon clipped (and the map ends up feeling "off-centre").
-        // Pad asymmetrically to cover the icon's actual footprint, plus a
-        // little breathing room, while still keeping a tight zoom.
-        map.fitBounds(bounds, { top: 56, right: 28, bottom: 24, left: 28 });
-        // Re-center explicitly on the bounds' centre - fitBounds occasionally
-        // settles a pixel or two off-centre once the padding is asymmetric.
-        map.setCenter(bounds.getCenter());
+        // Small padding -> the tighter/more zoomed-in fit. fitBounds itself
+        // only considers the lat/lng *points*, not each marker's visual
+        // icon (40x50, anchored near its tip at (20,44), so it extends
+        // ~44px above and ~6px below its point). At this zoom that can push
+        // a pin's icon outside the container on one side. Rather than
+        // zooming back out to make room, pan by the exact pixel amount
+        // needed (below) so every icon stays fully visible at this zoom.
+        map.fitBounds(bounds, 12);
+
+        window.google.maps.event.addListenerOnce(map, 'idle', () => {
+          const projection = map.getProjection();
+          const div = map.getDiv();
+          if (!projection || !div) return;
+
+          const scale = 2 ** map.getZoom();
+          const centerWorld = projection.fromLatLngToPoint(map.getCenter());
+          const toContainerPx = (lat, lng) => {
+            const world = projection.fromLatLngToPoint({ lat, lng });
+            return {
+              x: (world.x - centerWorld.x) * scale + div.offsetWidth / 2,
+              y: (world.y - centerWorld.y) * scale + div.offsetHeight / 2,
+            };
+          };
+
+          // Marker icon footprint relative to its anchor point.
+          const ICON = { top: 44, bottom: 6, left: 20, right: 20 };
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          points.forEach((p) => {
+            const px = toContainerPx(p.lat, p.lng);
+            minX = Math.min(minX, px.x - ICON.left);
+            maxX = Math.max(maxX, px.x + ICON.right);
+            minY = Math.min(minY, px.y - ICON.top);
+            maxY = Math.max(maxY, px.y + ICON.bottom);
+          });
+
+          const EDGE_PAD = 8;
+          let dx = 0;
+          let dy = 0;
+          if (minX < EDGE_PAD) dx = minX - EDGE_PAD;
+          else if (maxX > div.offsetWidth - EDGE_PAD) dx = maxX - (div.offsetWidth - EDGE_PAD);
+          if (minY < EDGE_PAD) dy = minY - EDGE_PAD;
+          else if (maxY > div.offsetHeight - EDGE_PAD) dy = maxY - (div.offsetHeight - EDGE_PAD);
+
+          if (dx !== 0 || dy !== 0) map.panBy(dx, dy);
+        });
       } else {
         map.setCenter({ lat: points[0].lat, lng: points[0].lng });
         map.setZoom(zoom + 1);
