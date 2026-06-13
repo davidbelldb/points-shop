@@ -1,17 +1,55 @@
-import { useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { GoogleMap, InfoWindowF, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 import './timeline.css';
 import { useTimelineTheme } from './timelineTheme';
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+
+/**
+ * "Shades of Grey" by Adam Krogh, via Snazzy Maps
+ * https://snazzymaps.com/style/38/shades-of-grey
+ */
+const DARK_MAP_STYLE = [
+  { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ saturation: 36 }, { color: '#000000' }, { lightness: 40 }] },
+  { featureType: 'all', elementType: 'labels.text.stroke', stylers: [{ visibility: 'on' }, { color: '#000000' }, { lightness: 16 }] },
+  { featureType: 'all', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', elementType: 'geometry.fill', stylers: [{ color: '#000000' }, { lightness: 20 }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#000000' }, { lightness: 17 }, { weight: 1.2 }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#000000' }, { lightness: 20 }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#000000' }, { lightness: 21 }] },
+  { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#000000' }, { lightness: 17 }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#000000' }, { lightness: 29 }, { weight: 0.2 }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#000000' }, { lightness: 18 }] },
+  { featureType: 'road.local', elementType: 'geometry', stylers: [{ color: '#000000' }, { lightness: 16 }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#000000' }, { lightness: 19 }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }, { lightness: 17 }] },
+];
+
+/** Light grey counterpart to DARK_MAP_STYLE, for `mapTheme: 'light'`. */
+const LIGHT_MAP_STYLE = [
+  { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
+  { featureType: 'all', elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
+  { featureType: 'all', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#e0e0e0' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#eeeeee' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#e8e8e8' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#dadada' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#e5e5e5' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9c9c9' }] },
+];
+
+const containerStyle = { width: '100%', height: '100%' };
+const DEFAULT_CENTER = { lat: 52.205, lng: 0.119 };
 
 /**
  * MilestoneMap
  * ------------
- * Themeable Leaflet map for showing one or more milestone locations.
- * Tile set switches between dark/light based on `theme.mapTheme`
- * ('dark' | 'light'), and pin markers + popups pick up the admin's
- * configured accent colors via CSS variables.
+ * Themeable Google Map (Maps JavaScript API) for showing one or more
+ * milestone locations, styled with a SnazzyMaps-style `styles` array that
+ * switches between dark/light based on `theme.mapTheme` ('dark' | 'light').
+ * Pin markers + popups pick up the admin's configured accent colors.
  *
  * Props:
  *  - locations: [{ id, lat, lng, title, date }]  (single pin -> array of 1)
@@ -28,54 +66,115 @@ export default function MilestoneMap({
   className = '',
 }) {
   const { theme } = useTimelineTheme();
+  const [map, setMap] = useState(null);
+  const [activeMarkerId, setActiveMarkerId] = useState(null);
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+  });
 
   const points = locations.filter((l) => l?.lat != null && l?.lng != null);
+  const fallbackCenter = center
+    ? { lat: center[0], lng: center[1] }
+    : points[0]
+      ? { lat: points[0].lat, lng: points[0].lng }
+      : DEFAULT_CENTER;
 
-  const pinIcon = useMemo(() => createPinIcon(theme), [theme.mapPinColor, theme.mapPinGlow]);
+  const mapStyles = theme.mapTheme === 'light' ? LIGHT_MAP_STYLE : DARK_MAP_STYLE;
 
-  const tileUrl = theme.mapTheme === 'light' ? theme.mapTileUrlLight : theme.mapTileUrlDark;
+  const pinIcon = useMemo(() => {
+    if (!isLoaded) return null;
+    return createPinIcon(theme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, theme.mapPinColor, theme.mapPinGlow, theme.mapPopupBg]);
 
-  const fallbackCenter = center || (points[0] ? [points[0].lat, points[0].lng] : [52.205, 0.119]);
+  const onLoad = useCallback((mapInstance) => {
+    setMap(mapInstance);
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    setMap(null);
+  }, []);
+
+  // Fit/center the viewport whenever the point set changes.
+  const pointsKey = points.map((p) => `${p.id}:${p.lat},${p.lng}`).join('|');
+  useEffect(() => {
+    if (!map || points.length === 0) return;
+    if (points.length > 1) {
+      const bounds = new window.google.maps.LatLngBounds();
+      points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+      map.fitBounds(bounds, 32);
+    } else {
+      map.setCenter({ lat: points[0].lat, lng: points[0].lng });
+      map.setZoom(zoom);
+    }
+    // Maps that mount inside animated/transitioning wrappers can initialize
+    // before the container has its final layout size, so nudge it to
+    // re-measure once everything has settled.
+    const id = setTimeout(() => {
+      window.google.maps.event.trigger(map, 'resize');
+    }, 150);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, pointsKey, zoom]);
 
   if (points.length === 0) return null;
 
   return (
     <div
       className={`relative isolate overflow-hidden rounded-2xl border border-[var(--tl-card-border)] ${className}`}
-      style={{ height }}
+      style={{
+        height,
+        background: 'var(--tl-page-bg)',
+        '--tl-map-popup-invert': isLightColor(theme.mapPopupBg) ? 0 : 1,
+      }}
     >
-      <MapContainer
-        center={fallbackCenter}
-        zoom={zoom}
-        scrollWheelZoom={interactive}
-        dragging={interactive}
-        doubleClickZoom={interactive}
-        zoomControl={interactive}
-        touchZoom={interactive}
-        attributionControl={interactive}
-        className="h-full w-full"
-        style={{ background: 'var(--tl-page-bg)' }}
-      >
-        <TileLayer
-          url={tileUrl}
-          attribution={theme.mapTileAttribution}
-          className={theme.mapTheme === 'light' ? '' : 'tl-map-dark-tiles'}
-        />
-        <MapResizer />
-        {points.map((p) => (
-          <Marker key={p.id} position={[p.lat, p.lng]} icon={pinIcon}>
-            {(p.title || p.date) && (
-              <Popup>
-                <div className="text-sm">
-                  {p.title && <div className="font-semibold">{p.title}</div>}
-                  {p.date && <div className="text-xs opacity-70">{p.date}</div>}
-                </div>
-              </Popup>
-            )}
-          </Marker>
-        ))}
-        {points.length > 1 && <FitBounds points={points} />}
-      </MapContainer>
+      {!GOOGLE_MAPS_API_KEY || loadError ? (
+        <div className="flex h-full w-full items-center justify-center text-center text-xs text-[var(--tl-muted)]">
+          Map unavailable
+        </div>
+      ) : !isLoaded ? (
+        <div className="flex h-full w-full items-center justify-center text-center text-xs text-[var(--tl-muted)]">
+          Loading map…
+        </div>
+      ) : (
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={fallbackCenter}
+          zoom={zoom}
+          onLoad={onLoad}
+          onUnmount={onUnmount}
+          options={{
+            styles: mapStyles,
+            disableDefaultUI: !interactive,
+            zoomControl: interactive,
+            scrollwheel: interactive,
+            draggable: interactive,
+            disableDoubleClickZoom: !interactive,
+            gestureHandling: interactive ? 'auto' : 'none',
+            keyboardShortcuts: interactive,
+          }}
+        >
+          {points.map((p) => (
+            <MarkerF
+              key={p.id}
+              position={{ lat: p.lat, lng: p.lng }}
+              icon={pinIcon ?? undefined}
+              onClick={() => setActiveMarkerId(p.id)}
+            >
+              {(p.title || p.date) && activeMarkerId === p.id && (
+                <InfoWindowF onCloseClick={() => setActiveMarkerId(null)}>
+                  <div className="text-sm">
+                    {p.title && <div className="font-semibold">{p.title}</div>}
+                    {p.date && <div className="text-xs opacity-70">{p.date}</div>}
+                  </div>
+                </InfoWindowF>
+              )}
+            </MarkerF>
+          ))}
+        </GoogleMap>
+      )}
 
       {/* Mood tint overlay so the map blends with the timeline's theme */}
       <div
@@ -90,56 +189,51 @@ export default function MilestoneMap({
   );
 }
 
-/** Builds a glowing teardrop pin div-icon themed via CSS variables. */
-function createPinIcon() {
-  const html = `
-    <div class="tl-map-pin-wrap">
-      <div class="tl-map-pin-glow"></div>
-      <svg width="28" height="38" viewBox="0 0 28 38" xmlns="http://www.w3.org/2000/svg" class="tl-map-pin">
-        <path d="M14 0C6.27 0 0 6.27 0 14c0 9.94 14 24 14 24s14-14.06 14-24C28 6.27 21.73 0 14 0z" fill="var(--tl-map-pin)"/>
-        <circle cx="14" cy="14" r="5.5" fill="var(--tl-map-popup-bg)"/>
-      </svg>
-    </div>
-  `;
-  return L.divIcon({
-    html,
-    className: 'tl-map-pin-icon',
-    iconSize: [28, 38],
-    iconAnchor: [14, 38],
-    popupAnchor: [0, -34],
-  });
+/** Builds a glowing teardrop pin icon (SVG data URI) themed via the admin's colors. */
+function createPinIcon(theme) {
+  const pin = theme.mapPinColor || '#fb7185';
+  const glow = theme.mapPinGlow || 'rgba(251, 113, 133, 0.55)';
+  const center = theme.mapPopupBg || '#18181b';
+
+  const svg = `
+    <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
+      </defs>
+      <circle cx="20" cy="14" r="11" fill="${glow}" filter="url(#glow)" />
+      <path d="M20 6C12.27 6 6 12.27 6 20c0 9.94 14 24 14 24s14-14.06 14-24C34 12.27 27.73 6 20 6z" fill="${pin}"/>
+      <circle cx="20" cy="20" r="5.5" fill="${center}"/>
+    </svg>
+  `.trim();
+
+  const url = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+
+  return {
+    url,
+    scaledSize: new window.google.maps.Size(40, 50),
+    anchor: new window.google.maps.Point(20, 44),
+  };
 }
 
-/**
- * Forces Leaflet to re-measure its container after mount. Maps that mount
- * inside animated/transitioning wrappers (e.g. framer-motion cards that fade
- * or scale in) can initialize before the container has its final layout
- * size, leaving tiles stuck at a stale 0x0 grid - pins/popups (which are
- * positioned independently) still show, but tile imagery never appears.
- */
-function MapResizer() {
-  const map = useMap();
-
-  useEffect(() => {
-    const id = setTimeout(() => map.invalidateSize(), 150);
-    return () => clearTimeout(id);
-  }, [map]);
-
-  return null;
-}
-
-/** Fits the map viewport to all provided points (used for overview maps). */
-function FitBounds({ points }) {
-  const map = useMap();
-  const key = points.map((p) => `${p.lat},${p.lng}`).join('|');
-
-  useEffect(() => {
-    if (points.length > 1) {
-      const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
-      map.fitBounds(bounds, { padding: [32, 32] });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-
-  return null;
+/** Rough light/dark check for a CSS color, used to invert the InfoWindow close icon. */
+function isLightColor(color) {
+  if (!color) return false;
+  let r, g, b;
+  const hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    r = parseInt(hex.slice(0, 2), 16);
+    g = parseInt(hex.slice(2, 4), 16);
+    b = parseInt(hex.slice(4, 6), 16);
+  } else {
+    const rgbMatch = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (!rgbMatch) return false;
+    [, r, g, b] = rgbMatch.map(Number);
+  }
+  // Perceived brightness (0-255)
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 150;
 }

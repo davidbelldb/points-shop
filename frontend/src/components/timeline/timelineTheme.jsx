@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 /**
  * Default "cozy fairytale" theme for the Relationship Timeline.
- * Every color lives here so the whole timeline (incl. the Leaflet map)
+ * Every color lives here so the whole timeline (incl. the Google map)
  * can be re-themed from the admin page without touching component code.
  *
  * These are applied to the DOM as CSS custom properties (see
@@ -41,16 +41,10 @@ export const defaultTimelineTheme = {
   controlBorder: 'rgba(63, 63, 70, 0.7)',
   controlAccent: '#fb7185',
 
-  // Leaflet map theming
-  // Standard OpenStreetMap tiles - widely cached, rarely blocked by
-  // ad-blockers/extensions (unlike some third-party basemap CDNs). For the
-  // dark theme, MilestoneMap applies a CSS filter to invert/tint these tiles
-  // rather than relying on a separate dark tile source.
+  // Google Maps theming (rendered via @react-google-maps/api). `mapTheme`
+  // picks between the DARK_MAP_STYLE/LIGHT_MAP_STYLE SnazzyMaps-style arrays
+  // defined in MilestoneMap.jsx.
   mapTheme: 'dark', // 'dark' | 'light'
-  mapTileUrlDark: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  mapTileUrlLight: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  mapTileAttribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   mapPinColor: '#fb7185', // rose-400
   mapPinGlow: 'rgba(251, 113, 133, 0.55)',
   mapPopupBg: '#18181b',
@@ -100,18 +94,6 @@ export function themeToCssVars(theme) {
 
 const STORAGE_KEY = 'sneakySocial.timelineTheme';
 
-// These fields are code-level configuration, not exposed in the theme
-// editor UI. They must never be persisted to (or restored from)
-// localStorage, otherwise an old saved theme can permanently "pin" the map
-// to a stale tile provider even after the code defaults change.
-const NON_PERSISTED_KEYS = ['mapTileUrlDark', 'mapTileUrlLight', 'mapTileAttribution'];
-
-function stripNonPersistedKeys(obj) {
-  const copy = { ...obj };
-  for (const key of NON_PERSISTED_KEYS) delete copy[key];
-  return copy;
-}
-
 const TimelineThemeContext = createContext({
   theme: defaultTimelineTheme,
   setTheme: () => {},
@@ -125,9 +107,7 @@ export function TimelineThemeProvider({ theme: themeProp, children }) {
     if (typeof window === 'undefined') return defaultTimelineTheme;
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      return saved
-        ? { ...defaultTimelineTheme, ...stripNonPersistedKeys(JSON.parse(saved)) }
-        : defaultTimelineTheme;
+      return saved ? { ...defaultTimelineTheme, ...JSON.parse(saved) } : defaultTimelineTheme;
     } catch {
       return defaultTimelineTheme;
     }
@@ -141,7 +121,7 @@ export function TimelineThemeProvider({ theme: themeProp, children }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stripNonPersistedKeys(theme)));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(theme));
     } catch {
       // localStorage unavailable - ignore, theme just won't persist
     }

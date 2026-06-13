@@ -29,12 +29,11 @@
     "@tiptap/extension-underline": "^2.0.0",
     "@tiptap/react": "^2.0.0",
     "@tiptap/starter-kit": "^2.0.0",
+    "@react-google-maps/api": "^2.20.6",
     "framer-motion": "^11.18.2",
-    "leaflet": "^1.9.4",
     "lucide-react": "^0.470.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.14.2",
     "three": "^0.184.0"
   },

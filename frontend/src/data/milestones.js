@@ -10,7 +10,7 @@
  *  - icon: name from `components/timeline/icons.js` (`iconMap`)
  *  - media?: { url, type: 'image' | 'gif', alt?, size?: 'sm' | 'md' | 'lg' | 'full' }
  *      -> put files in /public/images/... and reference as /images/...
- *  - location?: { lat, lng } -> renders a small themed Leaflet map on the card
+ *  - location?: { lat, lng } -> renders a small themed Google map on the card
  *      and adds a pin to the overview map. Coordinates below are
  *      approximate Cambridge UK placeholders - adjust to taste in the admin.
  */
