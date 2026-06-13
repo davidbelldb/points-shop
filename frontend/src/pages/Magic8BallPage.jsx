@@ -715,7 +715,6 @@ export function Magic8BallGame() {
   const [phase, setPhase] = useState('intro');
   const [answer, setAnswer] = useState('');
   const [shakeSeed, setShakeSeed] = useState(0);
-  const [motionSupported, setMotionSupported] = useState(false);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const categoryRef = useRef('movies');
   const busyRef = useRef(false);
@@ -830,20 +829,6 @@ export function Magic8BallGame() {
   useEffect(() => {
     const id = setTimeout(() => setPhase((p) => (p === 'intro' ? 'select' : p)), 2200);
     return () => clearTimeout(id);
-  }, []);
-
-  // iOS 13+ gates devicemotion behind an explicit DeviceMotionEvent
-  // .requestPermission() call, which must run inside a user gesture. The
-  // auto-request on first tap (handleFirstInteract) covers most cases, but
-  // some browsers ignore/ silently reject that implicit attempt — so when
-  // permission is still needed, show an explicit "Enable shake" button as
-  // a reliable fallback.
-  useEffect(() => {
-    setMotionSupported(
-      typeof window !== 'undefined' &&
-      typeof DeviceMotionEvent !== 'undefined' &&
-      typeof DeviceMotionEvent.requestPermission === 'function'
-    );
   }, []);
 
   function rollFor(category) {
@@ -966,19 +951,6 @@ export function Magic8BallGame() {
               : phase === 'shaking'
                 ? 'Shaking…'
                 : 'Tap the answer to ask again, or shake the ball for another.'}
-        {motionSupported && !motionEnabled && (
-          <>
-            {' '}
-            <button
-              type="button"
-              onClick={enableMotion}
-              className="ml-1 rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
-              title="Enable shake-to-ask"
-            >
-              📳 Enable shake
-            </button>
-          </>
-        )}
       </p>
     </div>
   );
