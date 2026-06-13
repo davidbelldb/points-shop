@@ -24,6 +24,8 @@ const ALLOWED = [
   'magic8ball_confirm_depth', 'magic8ball_confirm_x', 'magic8ball_confirm_y',
   'magic8ball_glass_opacity', 'magic8ball_glass_scale', 'magic8ball_glass_thinness',
   'magic8ball_glass_depth', 'magic8ball_glass_glare_opacity', 'magic8ball_glass_glare_color',
+  'magic8ball_rear_title_text', 'magic8ball_rear_title_color', 'magic8ball_rear_title_font_size',
+  'magic8ball_rear_title_y', 'magic8ball_rear_title_depth',
 ];
 
 export async function getAllSettings() {

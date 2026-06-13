@@ -19,7 +19,7 @@ const DEFAULTS = {
   magic8ball_camera_fov: '35',
   magic8ball_intro_camera_x: '0',
   magic8ball_intro_camera_y: '1.6',
-  magic8ball_intro_camera_z: '9.5',
+  magic8ball_intro_camera_z: '-9.5',
   magic8ball_intro_camera_fov: '42',
   magic8ball_reset_camera_x: '0',
   magic8ball_reset_camera_y: '0.3',
@@ -60,6 +60,11 @@ const DEFAULTS = {
   magic8ball_glass_depth: '1.05',
   magic8ball_glass_glare_opacity: '0.25',
   magic8ball_glass_glare_color: '#ffd9a6',
+  magic8ball_rear_title_text: 'Sneaky 8 Ball',
+  magic8ball_rear_title_color: '#b7b7f7',
+  magic8ball_rear_title_font_size: '0.34',
+  magic8ball_rear_title_y: '0',
+  magic8ball_rear_title_depth: '-1.55',
 };
 
 export default function AdminMagic8BallSection({ bare = false }) {
@@ -128,6 +133,11 @@ export default function AdminMagic8BallSection({ bare = false }) {
     settings.magic8ball_glass_depth,
     settings.magic8ball_glass_glare_opacity,
     settings.magic8ball_glass_glare_color,
+    settings.magic8ball_rear_title_text,
+    settings.magic8ball_rear_title_color,
+    settings.magic8ball_rear_title_font_size,
+    settings.magic8ball_rear_title_y,
+    settings.magic8ball_rear_title_depth,
   ]);
 
   function setVal(key, value) {
@@ -208,13 +218,14 @@ export default function AdminMagic8BallSection({ bare = false }) {
         <div className="space-y-1">
           <p className="text-xs font-medium text-neutral-600">Start (on load)</p>
           <p className="text-xs text-neutral-500">
-            Where the camera begins on page load, pulled back to reveal the whole ball before it settles on the End position.
+            Where the camera begins on page load. A negative Pos Z starts the camera behind the ball (showing the rear title),
+            then it arcs round to the End position, passing the rear title on the way.
           </p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
             {[
               { label: 'Pos X', key: 'magic8ball_intro_camera_x', fallback: 0 },
               { label: 'Pos Y (height)', key: 'magic8ball_intro_camera_y', fallback: 1.6 },
-              { label: 'Pos Z (distance)', key: 'magic8ball_intro_camera_z', fallback: 9.5 },
+              { label: 'Pos Z (distance)', key: 'magic8ball_intro_camera_z', fallback: -9.5 },
               { label: 'FOV °', key: 'magic8ball_intro_camera_fov', fallback: 42 },
             ].map(({ label, key, fallback }) => (
               <label key={key} className="flex items-center justify-between gap-2">
@@ -673,6 +684,75 @@ export default function AdminMagic8BallSection({ bare = false }) {
                 onBlur={() => commitColour('magic8ball_glass_glare_color')}
                 className={colourInputCls}
                 placeholder="#ffd9a6"
+                maxLength={7}
+              />
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <hr className="border-neutral-200" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Rear title</p>
+        <p className="text-xs text-neutral-500">
+          A title on the back of the shell, opposite the window &mdash; revealed when the camera starts behind the
+          ball on load and arcs round to the front, passing this title on the way. Size scales the text; Y moves it
+          up/down; Depth moves it toward/away from the centre (more negative sits further round the back).
+        </p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <label className="col-span-2 flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Title text</span>
+            <input
+              value={vals.magic8ball_rear_title_text}
+              onChange={(e) => setVal('magic8ball_rear_title_text', e.target.value)}
+              onBlur={() => commitText('magic8ball_rear_title_text')}
+              className="w-48 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:outline-none"
+              placeholder="Sneaky 8 Ball"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Size (font size)</span>
+            <input
+              value={vals.magic8ball_rear_title_font_size}
+              type="number" min="0" step="0.01"
+              onChange={(e) => setVal('magic8ball_rear_title_font_size', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_rear_title_font_size', 0.34)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Pos Y (height)</span>
+            <input
+              value={vals.magic8ball_rear_title_y}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_rear_title_y', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_rear_title_y', 0)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Depth</span>
+            <input
+              value={vals.magic8ball_rear_title_depth}
+              type="number" step="0.05"
+              onChange={(e) => setVal('magic8ball_rear_title_depth', e.target.value)}
+              onBlur={() => commitNumber('magic8ball_rear_title_depth', -1.55)}
+              className={numInputCls}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-neutral-500">Colour</span>
+            <div className="flex items-center gap-1">
+              {HEX_RE.test(vals.magic8ball_rear_title_color) && (
+                <span className="inline-block h-5 w-5 rounded border border-neutral-300 shrink-0" style={{ background: vals.magic8ball_rear_title_color }} />
+              )}
+              <input
+                value={vals.magic8ball_rear_title_color}
+                onChange={(e) => setVal('magic8ball_rear_title_color', e.target.value)}
+                onBlur={() => commitColour('magic8ball_rear_title_color')}
+                className={colourInputCls}
+                placeholder="#b7b7f7"
                 maxLength={7}
               />
             </div>

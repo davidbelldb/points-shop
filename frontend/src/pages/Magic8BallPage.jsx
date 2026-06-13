@@ -71,10 +71,10 @@ const sceneBackground = (color) => `radial-gradient(circle, ${color} 50%, #02041
 // lighting rig — both overridable from Admin > Magic 8-Ball (stored as
 // settings; these are the fallbacks when no override is saved).
 const DEFAULT_CAMERA_VIEW = { pos: [0, 0.3, 4], fov: 35 };
-// Starting ("intro") camera position on page load — pulled right back so
-// the whole ball is visible before it settles on DEFAULT_CAMERA_VIEW.
-// Overridable from Admin > Magic 8-Ball.
-const DEFAULT_INTRO_CAMERA_VIEW = { pos: [0, 1.6, 9.5], fov: 42 };
+// Starting ("intro") camera position on page load — pulled back behind the
+// ball, so the rear title is visible first and the camera then arcs round
+// to the front window. Overridable from Admin > Magic 8-Ball.
+const DEFAULT_INTRO_CAMERA_VIEW = { pos: [0, 1.6, -9.5], fov: 42 };
 // Camera position double-tap restores — independent of the settled/end
 // position above, so a custom "home" view can be set in Admin.
 const DEFAULT_RESET_CAMERA_VIEW = { pos: [0, 0.3, 4], fov: 35 };
@@ -114,6 +114,15 @@ const DEFAULT_GLASS_THINNESS = 0.05;               // material roughness — low
 const DEFAULT_GLASS_DEPTH = 1.05;                  // closest to the camera, in front of text/filter
 const DEFAULT_GLASS_GLARE_OPACITY = 0.25;
 const DEFAULT_GLASS_GLARE_COLOR = '#ffd9a6';
+
+// Configurable title on the rear of the 8-ball's shell — revealed as the
+// intro camera starts behind the ball and arcs round to the front window.
+// All overridable from Admin > Magic 8-Ball.
+const DEFAULT_REAR_TITLE_TEXT = 'Sneaky 8 Ball';
+const DEFAULT_REAR_TITLE_COLOR = '#b7b7f7';
+const DEFAULT_REAR_TITLE_FONT_SIZE = 0.34;
+const DEFAULT_REAR_TITLE_Y = 0;
+const DEFAULT_REAR_TITLE_DEPTH = -1.55;          // negative = on the back of the shell, facing away from the window
 const DEFAULT_QUESTION_TITLE = 'Need Help Choosing\na Movie or Game?';
 const DEFAULT_QUESTION_COLOR = '#b7b7f7';
 const DEFAULT_QUESTION_OPACITY = 1;
@@ -187,15 +196,71 @@ const LOOK_AT = new THREE.Vector3(0, 0, 0.6);
 const ORBIT_AXIS_Y = new THREE.Vector3(0, 1, 0);
 const ORBIT_AXIS_X = new THREE.Vector3(1, 0, 0);
 
+// How long (ms) the orbital "pan" from introView round to cameraView takes,
+// once the intro reveal ends.
+const INTRO_PAN_DURATION_MS = 2600;
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2;
+}
+
 function CameraRig({ phase, introView, cameraView, homeOverrideRef, zoomRef, orbitRef }) {
   const { camera } = useThree();
   const targetVec = useRef(new THREE.Vector3());
+  const wasIntroRef = useRef(true);
+  const panStartRef = useRef(null);
+  const panDoneRef = useRef(false);
 
   useFrame(() => {
-    const target = phase === 'intro' ? introView : (homeOverrideRef?.current ?? cameraView);
     const zoom = zoomRef?.current ?? 1;
     const orbit = orbitRef?.current ?? { az: 0, el: 0 };
 
+    // The moment the intro phase ends, kick off an orbital pan that sweeps
+    // the camera round the outside of the ball — past the rear title —
+    // from introView to cameraView, instead of cutting through the middle.
+    if (wasIntroRef.current && phase !== 'intro' && panStartRef.current === null) {
+      panStartRef.current = performance.now();
+    }
+    wasIntroRef.current = phase === 'intro';
+
+    if (phase === 'intro') {
+      camera.position.set(...introView.pos);
+      camera.fov = introView.fov;
+      camera.lookAt(LOOK_AT);
+      camera.updateProjectionMatrix();
+      return;
+    }
+
+    if (panStartRef.current !== null && !panDoneRef.current) {
+      const t = Math.min(1, (performance.now() - panStartRef.current) / INTRO_PAN_DURATION_MS);
+      const eased = easeInOutCubic(t);
+
+      // Cylindrical interpolation around the Y axis — radius, height and
+      // azimuth each lerp independently from the intro position to the
+      // settled one, so the camera arcs round the ball's exterior rather
+      // than passing through its centre.
+      const r0 = Math.hypot(introView.pos[0], introView.pos[2]);
+      const r1 = Math.hypot(cameraView.pos[0], cameraView.pos[2]);
+      const a0 = Math.atan2(introView.pos[0], introView.pos[2]);
+      let a1 = Math.atan2(cameraView.pos[0], cameraView.pos[2]);
+      if (a1 - a0 > Math.PI) a1 -= Math.PI * 2;
+      if (a1 - a0 < -Math.PI) a1 += Math.PI * 2;
+
+      const r = r0 + (r1 - r0) * eased;
+      const a = a0 + (a1 - a0) * eased;
+      const y = introView.pos[1] + (cameraView.pos[1] - introView.pos[1]) * eased;
+      const fov = introView.fov + (cameraView.fov - introView.fov) * eased;
+
+      camera.position.set(r * Math.sin(a), y, r * Math.cos(a));
+      camera.fov = fov;
+      camera.lookAt(LOOK_AT);
+      camera.updateProjectionMatrix();
+
+      if (t >= 1) panDoneRef.current = true;
+      return;
+    }
+
+    const target = homeOverrideRef?.current ?? cameraView;
     targetVec.current.set(...target.pos).sub(LOOK_AT);
     if (orbit.az) targetVec.current.applyAxisAngle(ORBIT_AXIS_Y, orbit.az);
     if (orbit.el) targetVec.current.applyAxisAngle(ORBIT_AXIS_X, orbit.el);
@@ -403,6 +468,7 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
   const showAnswer = phase === 'answer';
 
   return (
+    <>
     <group ref={ballRef}>
       {/* Outer 8-ball shell — a full sphere would entirely hide the window
           contents behind its near (camera-facing) surface, since everything
@@ -413,6 +479,25 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
         <sphereGeometry args={[1.6, 48, 48, 0, Math.PI * 2, Math.PI / 3, Math.PI - Math.PI / 3]} />
         <meshStandardMaterial color="#0c0c10" roughness={0.18} metalness={0.4} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* Rear title — sits on the back of the shell, facing away from the
+          window (-Z), revealed when the intro camera starts behind the
+          ball and arcs round to the front. Configurable from Admin >
+          Magic 8-Ball. */}
+      <Text
+        position={[0, (appearance?.rearTitleY ?? DEFAULT_REAR_TITLE_Y) * WINDOW_SCALE, appearance?.rearTitleDepth ?? DEFAULT_REAR_TITLE_DEPTH]}
+        rotation={[0, Math.PI, 0]}
+        fontSize={appearance?.rearTitleFontSize ?? DEFAULT_REAR_TITLE_FONT_SIZE}
+        fontWeight="bold"
+        lineHeight={1.15}
+        color={appearance?.rearTitleColor ?? DEFAULT_REAR_TITLE_COLOR}
+        maxWidth={2.6}
+        textAlign="center"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {appearance?.rearTitleText ?? DEFAULT_REAR_TITLE_TEXT}
+      </Text>
 
       {/* Window background — flat deep-liquid fill, the resting colour of the window */}
       <mesh position={[0, 0, 0.7]}>
@@ -577,24 +662,29 @@ function MagicBall({ phase, answer, shakeSeed, onPick, onReroll, appearance }) {
           depthWrite={false}
         />
       </mesh>
-      <mesh
-        position={[
-          -0.32 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE),
-          0.32 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE),
-          (appearance?.glassDepth ?? DEFAULT_GLASS_DEPTH) + 0.005,
-        ]}
-      >
-        <planeGeometry args={[1.1 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE), 1.1 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE)]} />
-        <meshBasicMaterial
-          map={glareTexture}
-          color={appearance?.glassGlareColor ?? DEFAULT_GLASS_GLARE_COLOR}
-          transparent
-          opacity={appearance?.glassGlareOpacity ?? DEFAULT_GLASS_GLARE_OPACITY}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
     </group>
+
+    {/* Glass glare highlight — deliberately kept OUTSIDE the wobbling ball
+        group so it reads as a fixed reflection of the light source on the
+        glass surface, rather than shaking along with the ball itself. */}
+    <mesh
+      position={[
+        -0.32 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE),
+        0.32 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE),
+        (appearance?.glassDepth ?? DEFAULT_GLASS_DEPTH) + 0.005,
+      ]}
+    >
+      <planeGeometry args={[1.1 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE), 1.1 * WINDOW_SCALE * (appearance?.glassScale ?? DEFAULT_GLASS_SCALE)]} />
+      <meshBasicMaterial
+        map={glareTexture}
+        color={appearance?.glassGlareColor ?? DEFAULT_GLASS_GLARE_COLOR}
+        transparent
+        opacity={appearance?.glassGlareOpacity ?? DEFAULT_GLASS_GLARE_OPACITY}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </mesh>
+    </>
   );
 }
 
@@ -890,6 +980,11 @@ export function Magic8BallGame() {
     glassDepth: num(settings.magic8ball_glass_depth, DEFAULT_GLASS_DEPTH),
     glassGlareOpacity: num(settings.magic8ball_glass_glare_opacity, DEFAULT_GLASS_GLARE_OPACITY),
     glassGlareColor: settings.magic8ball_glass_glare_color || DEFAULT_GLASS_GLARE_COLOR,
+    rearTitleText: settings.magic8ball_rear_title_text || DEFAULT_REAR_TITLE_TEXT,
+    rearTitleColor: settings.magic8ball_rear_title_color || DEFAULT_REAR_TITLE_COLOR,
+    rearTitleFontSize: num(settings.magic8ball_rear_title_font_size, DEFAULT_REAR_TITLE_FONT_SIZE),
+    rearTitleY: num(settings.magic8ball_rear_title_y, DEFAULT_REAR_TITLE_Y),
+    rearTitleDepth: num(settings.magic8ball_rear_title_depth, DEFAULT_REAR_TITLE_DEPTH),
   }), [
     settings.magic8ball_scene_background_color,
     settings.magic8ball_question_title,
@@ -921,6 +1016,11 @@ export function Magic8BallGame() {
     settings.magic8ball_glass_depth,
     settings.magic8ball_glass_glare_opacity,
     settings.magic8ball_glass_glare_color,
+    settings.magic8ball_rear_title_text,
+    settings.magic8ball_rear_title_color,
+    settings.magic8ball_rear_title_font_size,
+    settings.magic8ball_rear_title_y,
+    settings.magic8ball_rear_title_depth,
   ]);
 
   useEffect(() => {
