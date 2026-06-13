@@ -150,6 +150,10 @@ export const api = {
   stb15End:     (payload) => request('/games/shut-the-box-15/end', { method: 'POST', body: JSON.stringify(payload) }),
   getStb15Config: () => request('/games/shut-the-box-15/config'),
   getStb15Props:  () => request('/games/shut-the-box-15/props'),
+
+  // Sneaky Button
+  getSneakyButtonConfig: () => request('/sneaky-button/config'),
+  getSneakyRandomAnimal: () => request('/sneaky-button/random'),
   duckyConfig: () => request('/games/ducky/config'),
   duckyLineup: () => request('/games/ducky/lineup', { method: 'POST' }),
   duckyRace: (lineup_id, picked_ord, stake) =>
@@ -344,6 +348,8 @@ export const api = {
     updateStb15TileMessage:  (ord, patch) => request(`/admin/shut-the-box-15/tile-messages/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     getStb15Props:           () => request('/admin/shut-the-box-15/props'),
     updateStb15Prop:         (key, patch) => request(`/admin/shut-the-box-15/props/${key}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    getSneakyButtonConfig:    () => request('/admin/sneaky-button'),
+    updateSneakyButtonConfig: (patch) => request('/admin/sneaky-button', { method: 'PATCH', body: JSON.stringify(patch) }),
     getDucky: () => request('/admin/games/ducky'),
     updateDucky: (patch) => request('/admin/games/ducky', { method: 'PATCH', body: JSON.stringify(patch) }),
     updateDuckyDuck: (ord, patch) => request(`/admin/games/ducky/ducks/${ord}`, { method: 'PATCH', body: JSON.stringify(patch) }),

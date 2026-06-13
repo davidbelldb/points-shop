@@ -10,6 +10,7 @@ import AdminGamesSection from './AdminGamesSection.jsx';
 import AdminMagic8BallSection from './AdminMagic8BallSection.jsx';
 import AdminWheelSection from './AdminWheelSection.jsx';
 import AdminShutTheBox15Section from './AdminShutTheBox15Section.jsx';
+import AdminSneakyButtonSection from './AdminSneakyButtonSection.jsx';
 import AdminDuckySection from './AdminDuckySection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
@@ -160,6 +161,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Shut the Box 15" storageKey="admin::stb15">
         <AdminShutTheBox15Section bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Sneaky Button" storageKey="admin::sneaky-button">
+        <AdminSneakyButtonSection bare />
       </AdminCollapsible>
 
       <AdminCollapsible title="Ducky Derby" storageKey="admin::ducky">

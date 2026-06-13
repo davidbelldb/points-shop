@@ -7,6 +7,7 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
 import WheelHomeSection from '../components/WheelHomeSection.jsx';
 import ShutTheBox15HomeSection from '../components/ShutTheBox15HomeSection.jsx';
+import SneakyButtonHomeSection from '../components/SneakyButtonHomeSection.jsx';
 import Magic8BallHomeSection from '../components/Magic8BallHomeSection.jsx';
 import Confetti from '../components/Confetti.jsx';
 import AudioNotesSection from '../components/AudioNotesSection.jsx';
@@ -95,6 +96,8 @@ export default function HomePage() {
       {showFeatured && <FeaturedStory stories={featuredPool} variant="home" />}
 
       <HeroCarousel slides={topSlides} />
+
+      <SneakyButtonHomeSection />
 
       {/*
         \u2500\u2500 Responsive two-column section \u2500\u2500
