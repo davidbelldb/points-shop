@@ -25,9 +25,10 @@ export const defaultTimelineTheme = {
   dotBg: '#18181b', // zinc-900
   dotBorder: '#fb7185', // rose-400
 
-  // Active / first milestone dot (highlighted pin)
-  dotActiveBg: '#18181b', // zinc-900
-  dotActiveBorder: '#fb7185', // rose-400
+  // Active / first milestone dot (highlighted pin) - filled solid, not a
+  // hollow ring, so the active milestone stands out clearly.
+  dotActiveBg: '#fb7185', // rose-400
+  dotActiveBorder: '#fda4af', // rose-300
 
   // Cards
   cardBg: 'rgba(24, 24, 27, 0.78)', // zinc-900 / 78%

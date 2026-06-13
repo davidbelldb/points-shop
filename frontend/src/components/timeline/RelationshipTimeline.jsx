@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, useMotionValue, useScroll, useSpring, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useSpring } from 'framer-motion';
 import TimelineCard from './TimelineCard';
 import TimelinePlayer from './TimelinePlayer';
 import MediaLightbox from './MediaLightbox';
@@ -51,17 +51,9 @@ export default function RelationshipTimeline({
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Scroll-linked "draw the line" animation.
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start 0.85', 'end 0.6'],
-  });
-  const scrollProgress = useTransform(scrollYProgress, [0, 1], [0, 1]);
-
   // Progress driven by the milestone currently highlighted via the
-  // play/jump controls, measured as a percentage of the track's height so
-  // the line draws down to that milestone's dot even if the page hasn't
-  // scrolled there yet.
+  // play/jump controls, measured as a 0-1 fraction of the track's height so
+  // the line draws down to exactly that milestone's dot.
   const activeProgress = useMotionValue(0);
 
   const updateActiveProgress = useCallback(() => {
@@ -80,22 +72,11 @@ export default function RelationshipTimeline({
     return () => window.removeEventListener('resize', updateActiveProgress);
   }, [updateActiveProgress, milestones.length]);
 
-  // Draw the line to whichever is further along: the natural scroll
-  // position, or the milestone currently highlighted by the play-through
-  // controls. Expressed as a 0-1 fraction of the track's height.
-  const combinedProgress = useTransform(
-    [scrollProgress, activeProgress],
-    ([scroll, active]) => Math.max(scroll, active)
-  );
-  const lineProgress = useSpring(combinedProgress, {
+  const lineProgress = useSpring(activeProgress, {
     stiffness: 90,
     damping: 25,
     restDelta: 0.001,
   });
-  // Reveal the gradient "fill" line from the top down by clipping its
-  // (full-height) box - this keeps its dash pattern perfectly aligned with
-  // the track's, unlike animating `height` on a percentage basis.
-  const lineClip = useTransform(lineProgress, (p) => `inset(0 0 ${(1 - p) * 100}% 0)`);
 
   const scrollToIndex = useCallback((index) => {
     const el = itemRefs.current[index];
@@ -165,11 +146,13 @@ export default function RelationshipTimeline({
             className="absolute left-4 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-[var(--tl-card-border)]"
             style={lineDashStyle}
           />
-          {/* Animated "drawn" line - same dash pattern, fills in with the
-              gradient as the user scrolls/plays/jumps through milestones. */}
+          {/* Animated "drawn" line - solid (no dashes), grown from the top
+              via scaleY so the from/via/to gradient stops compress into
+              whatever height is currently visible and the full color
+              transition always reads through. */}
           <motion.div
-            className="absolute left-4 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
-            style={{ clipPath: lineClip, WebkitClipPath: lineClip, ...lineDashStyle }}
+            className="absolute left-4 md:left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 origin-top rounded-full bg-gradient-to-b from-[var(--tl-line-from)] via-[var(--tl-line-via)] to-[var(--tl-line-to)]"
+            style={{ scaleY: lineProgress }}
           />
 
           <div className="flex flex-col">
