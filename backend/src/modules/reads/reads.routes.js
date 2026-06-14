@@ -108,13 +108,20 @@ async function fetchReadDetail(sourceId) {
       return {
         source: 'google',
         description: info.description || null,
+        subtitle: info.subtitle || null,
         page_count: Number.isInteger(info.pageCount) ? info.pageCount : null,
         published_date: info.publishedDate || null,
         publisher: info.publisher || null,
         subjects: (info.categories || []).slice(0, 10),
+        subject_places: [],
+        subject_times: [],
+        subject_people: [],
+        language: info.language || null,
         rating: typeof info.averageRating === 'number' ? info.averageRating : null,
         ratings_count: Number.isInteger(info.ratingsCount) ? info.ratingsCount : null,
         isbn: ids.find((i) => i.type === 'ISBN_13')?.identifier || ids[0]?.identifier || null,
+        external_url: (info.infoLink || info.canonicalVolumeLink || '').replace(/^http:/, 'https:')
+          || `https://books.google.com/books?id=${encodeURIComponent(volumeId)}`,
         editions: [],
       };
     } catch {
@@ -127,7 +134,7 @@ async function fetchReadDetail(sourceId) {
     try {
       const [workRes, editionsRes] = await Promise.all([
         fetch(`https://openlibrary.org${sourceId}.json`, { headers }),
-        fetch(`https://openlibrary.org${sourceId}/editions.json?limit=20`, { headers }),
+        fetch(`https://openlibrary.org${sourceId}/editions.json?limit=50`, { headers }),
       ]);
       const work = workRes.ok ? await workRes.json() : null;
       const editionsData = editionsRes.ok ? await editionsRes.json() : null;
@@ -136,29 +143,58 @@ async function fetchReadDetail(sourceId) {
         ? work.description
         : work?.description?.value || null;
 
-      const editions = (editionsData?.entries || [])
-        .map((e) => ({
-          title: e.title || null,
-          publish_date: e.publish_date || null,
-          publishers: e.publishers || [],
-          number_of_pages: Number.isInteger(e.number_of_pages) ? e.number_of_pages : null,
-          isbn_13: (e.isbn_13 || [])[0] || null,
-        }))
-        .filter((e) => e.publish_date || e.number_of_pages || e.publishers.length)
-        .slice(0, 12);
+      const rawEditions = (editionsData?.entries || []).map((e) => ({
+        edition_name: e.edition_name || null, // e.g. "1st edition", "Anniversary edition"
+        physical_format: e.physical_format || null, // e.g. "Hardcover", "Paperback", "Ebook"
+        subtitle: e.subtitle || null,
+        publish_date: e.publish_date || null,
+        publishers: e.publishers || [],
+        number_of_pages: Number.isInteger(e.number_of_pages) ? e.number_of_pages : null,
+        isbn_13: (e.isbn_13 || [])[0] || null,
+        language: (e.languages || [])[0]?.key?.replace('/languages/', '') || null,
+      }));
 
-      if (!work && editions.length === 0) return null;
+      // The full editions list is mostly regional/publisher reprints with the
+      // same content — not useful as a "1st / 2nd edition" list. Instead,
+      // surface only entries that actually describe an edition number or a
+      // physical format, deduped on that combination, sorted earliest first.
+      const seenEd = new Set();
+      const editions = rawEditions
+        .filter((e) => e.edition_name || e.physical_format)
+        .filter((e) => {
+          const k = `${(e.edition_name || '').toLowerCase()}|${(e.physical_format || '').toLowerCase()}`;
+          if (seenEd.has(k)) return false;
+          seenEd.add(k);
+          return true;
+        })
+        .sort((a, b) => (a.publish_date || '').localeCompare(b.publish_date || ''))
+        .slice(0, 10)
+        .map((e) => ({
+          edition_name: e.edition_name,
+          physical_format: e.physical_format,
+          publish_date: e.publish_date,
+          number_of_pages: e.number_of_pages,
+          language: e.language,
+        }));
+
+      if (!work && rawEditions.length === 0) return null;
 
       return {
         source: 'openlibrary',
         description,
-        page_count: editions.find((e) => e.number_of_pages)?.number_of_pages || null,
+        subtitle: work?.subtitle || rawEditions.find((e) => e.subtitle)?.subtitle || null,
+        page_count: rawEditions.find((e) => e.number_of_pages)?.number_of_pages || null,
         published_date: work?.first_publish_date || null,
-        publisher: editions.find((e) => e.publishers.length)?.publishers?.[0] || null,
+        publisher: rawEditions.find((e) => e.publishers.length)?.publishers?.[0] || null,
         subjects: (work?.subjects || []).slice(0, 10),
+        subject_places: (work?.subject_places || []).slice(0, 6),
+        subject_times: (work?.subject_times || []).slice(0, 6),
+        subject_people: (work?.subject_people || []).slice(0, 6),
+        language: rawEditions.find((e) => e.language)?.language || null,
         rating: null,
         ratings_count: null,
-        isbn: editions.find((e) => e.isbn_13)?.isbn_13 || null,
+        isbn: rawEditions.find((e) => e.isbn_13)?.isbn_13 || null,
+        external_url: `https://openlibrary.org${sourceId}`,
         editions,
       };
     } catch {

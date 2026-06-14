@@ -14,6 +14,23 @@ function CoverFallback() {
   );
 }
 
+const LANG_NAMES = {
+  eng: 'English', en: 'English',
+  spa: 'Spanish', es: 'Spanish',
+  fre: 'French', fra: 'French', fr: 'French',
+  ger: 'German', deu: 'German', de: 'German',
+  ita: 'Italian', it: 'Italian',
+  por: 'Portuguese', pt: 'Portuguese',
+  dut: 'Dutch', nld: 'Dutch', nl: 'Dutch',
+  jpn: 'Japanese', ja: 'Japanese',
+  chi: 'Chinese', zho: 'Chinese', zh: 'Chinese',
+  rus: 'Russian', ru: 'Russian',
+};
+function langName(code) {
+  if (!code) return null;
+  return LANG_NAMES[code.toLowerCase()] || code;
+}
+
 function PriorityPicker({ value, onChange }) {
   return (
     <div className="flex gap-1">
@@ -88,6 +105,11 @@ export default function SneakyReadDetailPage() {
   const pageCount = item.page_count ?? detail?.page_count ?? null;
   const genres = item.genres?.length ? item.genres : (detail?.subjects || []);
   const rating = item.rating ?? detail?.rating ?? null;
+  const tagGroups = [
+    { label: 'Places', values: detail?.subject_places },
+    { label: 'Eras', values: detail?.subject_times },
+    { label: 'People', values: detail?.subject_people },
+  ].filter((g) => g.values?.length > 0);
 
   return (
     <div className="space-y-5 py-2">
@@ -108,16 +130,39 @@ export default function SneakyReadDetailPage() {
         </div>
         <div className="min-w-0 flex-1 space-y-1 text-sm">
           <p className="font-semibold">{item.title}</p>
+          {detail?.subtitle && <p className="text-neutral-500">{detail.subtitle}</p>}
           {item.author && <p className="text-neutral-500">{item.author}</p>}
           <p className="text-neutral-500">
-            {rating ? `★ ${Number(rating).toFixed(1)}` : ''}
+            {rating ? `★ ${Number(rating).toFixed(1)}${detail?.ratings_count ? ` (${detail.ratings_count.toLocaleString()})` : ''}` : ''}
             {pageCount ? `${rating ? ' · ' : ''}${pageCount} pages` : ''}
             {detail?.published_date ? `${rating || pageCount ? ' · ' : ''}${detail.published_date}` : ''}
           </p>
           {detail?.publisher && <p className="text-neutral-400">{detail.publisher}</p>}
           {genres?.length > 0 && <p className="text-neutral-400">{genres.join(', ')}</p>}
+          <p className="text-neutral-400">
+            {langName(detail?.language) || ''}
+            {detail?.isbn ? `${langName(detail?.language) ? ' · ' : ''}ISBN ${detail.isbn}` : ''}
+          </p>
+          {detail?.external_url && (
+            <a
+              href={detail.external_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-xs font-medium text-amber-700 hover:underline"
+            >
+              View on {detail.source === 'google' ? 'Google Books' : 'Open Library'} ↗
+            </a>
+          )}
         </div>
       </div>
+
+      {tagGroups.length > 0 && (
+        <div className="space-y-1 text-xs text-neutral-500">
+          {tagGroups.map((g) => (
+            <p key={g.label}><span className="font-medium text-neutral-400">{g.label}:</span> {g.values.join(', ')}</p>
+          ))}
+        </div>
+      )}
 
       {/* Reading plan */}
       <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
@@ -170,11 +215,12 @@ export default function SneakyReadDetailPage() {
                 className="flex items-center justify-between gap-3 border-b border-neutral-100 px-3 py-2 text-sm last:border-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{e.publishers?.join(', ') || 'Unknown publisher'}</p>
+                  <p className="truncate font-medium">{e.edition_name || 'Edition'}</p>
                   <p className="text-xs text-neutral-500">
-                    {e.publish_date || 'Date unknown'}
+                    {e.physical_format || 'Format unknown'}
+                    {e.publish_date ? ` · ${e.publish_date}` : ''}
                     {e.number_of_pages ? ` · ${e.number_of_pages}pp` : ''}
-                    {e.isbn_13 ? ` · ISBN ${e.isbn_13}` : ''}
+                    {langName(e.language) ? ` · ${langName(e.language)}` : ''}
                   </p>
                 </div>
               </div>
