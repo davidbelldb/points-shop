@@ -13,13 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
-
-const ICE_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ],
-};
+import { getIceConfig } from './iceConfig.js';
 
 const POLL_MS = 500; // signal poll interval during setup
 
@@ -97,7 +91,7 @@ export function useWebRTC(gameId) {
     setLocalStream(stream);
 
     // ── 2. Create peer connection ─────────────────────────────────────────
-    const pc = new RTCPeerConnection(ICE_CONFIG);
+    const pc = new RTCPeerConnection(await getIceConfig());
     pcRef.current = pc;
 
     // Add local tracks to connection

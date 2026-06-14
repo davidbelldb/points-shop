@@ -259,6 +259,7 @@ export const api = {
   // WebRTC signaling
   rtcSignal: (type, payload) => request('/rtc/signal', { method: 'POST', body: JSON.stringify({ type, payload }) }),
   rtcPoll:   () => request('/rtc/signal'),
+  rtcTurnCredentials: () => request('/rtc/turn-credentials'),
 
   // Sneaky Calls
   callsPlayers: () => request('/calls/players'),

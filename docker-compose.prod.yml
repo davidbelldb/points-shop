@@ -47,10 +47,30 @@ services:
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      TURN_SECRET: ${TURN_SECRET:-}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
+      TURN_REALM: ${TURN_REALM:-sneakypoints.com}
     volumes:
       - media:/app/media
     networks:
       - app
+
+  coturn:
+    image: coturn/coturn:4.6.2-alpine
+    container_name: points-shop-coturn
+    restart: unless-stopped
+    # Host networking — coturn needs to bind its relay port range directly
+    # on the VPS's public IP, which is awkward to express through Docker's
+    # bridge/NAT port mapping for a whole port range.
+    network_mode: host
+    volumes:
+      - ./turn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+      - --static-auth-secret=${TURN_SECRET}
+      - --external-ip=${TURN_EXTERNAL_IP}
+      - --realm=${TURN_REALM:-sneakypoints.com}
 
   caddy:
     build:
