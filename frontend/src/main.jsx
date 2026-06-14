@@ -46,6 +46,7 @@ const RelationshipTimelinePage = lazy(() => import('./pages/RelationshipTimeline
 const JournalPage          = lazy(() => import('./pages/JournalPage.jsx'));
 const AdminStoragePage     = lazy(() => import('./pages/AdminStoragePage.jsx'));
 const SneakyReadsPage      = lazy(() => import('./pages/SneakyReadsPage.jsx'));
+const SneakyReadDetailPage = lazy(() => import('./pages/SneakyReadDetailPage.jsx'));
 
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
@@ -124,6 +125,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="rewatch" element={<RewatchListPage />} />
               <Route path="rewatch/:id" element={<RewatchDetailPage />} />
               <Route path="sneaky-reads" element={<SneakyReadsPage />} />
+              <Route path="sneaky-reads/:id" element={<SneakyReadDetailPage />} />
               <Route path="playlist" element={<PlaylistPage />} />
               <Route path="playlist/:id" element={<PlaylistDetailPage />} />
               <Route path="calendar" element={<CalendarPage />} />

@@ -91,6 +91,84 @@ function dedupeKey(title, author) {
   return `${(title || '').toLowerCase().trim()}|${(author || '').toLowerCase().trim().split(',')[0]}`;
 }
 
+// Extra detail for a single item's source page — description, page count,
+// publisher/edition info — fetched live from whichever catalogue the item
+// came from (Open Library work key or a "gbooks:<volumeId>" id).
+async function fetchReadDetail(sourceId) {
+  if (!sourceId) return null;
+
+  if (sourceId.startsWith('gbooks:')) {
+    const volumeId = sourceId.slice('gbooks:'.length);
+    try {
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volumeId)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const info = data.volumeInfo || {};
+      const ids = info.industryIdentifiers || [];
+      return {
+        source: 'google',
+        description: info.description || null,
+        page_count: Number.isInteger(info.pageCount) ? info.pageCount : null,
+        published_date: info.publishedDate || null,
+        publisher: info.publisher || null,
+        subjects: (info.categories || []).slice(0, 10),
+        rating: typeof info.averageRating === 'number' ? info.averageRating : null,
+        ratings_count: Number.isInteger(info.ratingsCount) ? info.ratingsCount : null,
+        isbn: ids.find((i) => i.type === 'ISBN_13')?.identifier || ids[0]?.identifier || null,
+        editions: [],
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  if (sourceId.startsWith('/works/')) {
+    const headers = { 'User-Agent': 'sneaky-reads/1.0 (points-shop; davidbell.db@googlemail.com)' };
+    try {
+      const [workRes, editionsRes] = await Promise.all([
+        fetch(`https://openlibrary.org${sourceId}.json`, { headers }),
+        fetch(`https://openlibrary.org${sourceId}/editions.json?limit=20`, { headers }),
+      ]);
+      const work = workRes.ok ? await workRes.json() : null;
+      const editionsData = editionsRes.ok ? await editionsRes.json() : null;
+
+      const description = typeof work?.description === 'string'
+        ? work.description
+        : work?.description?.value || null;
+
+      const editions = (editionsData?.entries || [])
+        .map((e) => ({
+          title: e.title || null,
+          publish_date: e.publish_date || null,
+          publishers: e.publishers || [],
+          number_of_pages: Number.isInteger(e.number_of_pages) ? e.number_of_pages : null,
+          isbn_13: (e.isbn_13 || [])[0] || null,
+        }))
+        .filter((e) => e.publish_date || e.number_of_pages || e.publishers.length)
+        .slice(0, 12);
+
+      if (!work && editions.length === 0) return null;
+
+      return {
+        source: 'openlibrary',
+        description,
+        page_count: editions.find((e) => e.number_of_pages)?.number_of_pages || null,
+        published_date: work?.first_publish_date || null,
+        publisher: editions.find((e) => e.publishers.length)?.publishers?.[0] || null,
+        subjects: (work?.subjects || []).slice(0, 10),
+        rating: null,
+        ratings_count: null,
+        isbn: editions.find((e) => e.isbn_13)?.isbn_13 || null,
+        editions,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 export default async function readsRoutes(fastify) {
   // The calling account's reading list, including books suggested to them.
   fastify.get('/api/reads', async (req) => {
@@ -161,6 +239,23 @@ export default async function readsRoutes(fastify) {
 
     if (!olData && !gbData) return { configured: true, results: [], error: 'request failed' };
     return { configured: true, results: results.slice(0, 14) };
+  });
+
+  // A single item plus extra catalogue detail (description, page count,
+  // editions) fetched live from its source (Open Library or Google Books).
+  fastify.get('/api/reads/:id', async (req, reply) => {
+    const meId = getEffectiveAccountId(req);
+    const { rows } = await query(
+      `SELECT r.*, a.name AS suggested_by_name
+         FROM reads_items r
+         LEFT JOIN accounts a ON a.id = r.suggested_by
+        WHERE r.id = $1 AND r.account_id = $2`,
+      [req.params.id, meId],
+    );
+    const item = rows[0];
+    if (!item) return reply.code(404).send({ error: 'not found' });
+    const detail = await fetchReadDetail(item.source_id);
+    return { item, detail };
   });
 
   // Add a book.

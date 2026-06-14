@@ -197,6 +197,7 @@ export const api = {
 
   // Sneaky Reads (shared reading list, Open Library + Google Books search, replica of rewatch)
   readsList: () => request('/reads'),
+  readsGet: (id) => request(`/reads/${id}`),
   readsPartner: () => request('/reads/partner'),
   readsSearch: (q) => request(`/reads/search?q=${encodeURIComponent(q)}`),
   addRead: (data) => request('/reads', { method: 'POST', body: JSON.stringify(data) }),

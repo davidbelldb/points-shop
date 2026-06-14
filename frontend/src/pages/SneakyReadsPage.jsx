@@ -62,7 +62,9 @@ function ItemCard({ it, busy, onToggleRead, onRemove }) {
         )}
       </div>
       <div className="space-y-1 p-2">
-        <p className="truncate text-sm font-medium" title={it.title}>{it.title}</p>
+        <Link to={`/sneaky-reads/${it.id}`} className="block truncate text-sm font-medium hover:underline" title={it.title}>
+          {it.title}
+        </Link>
         <p className="truncate text-[11px] text-neutral-500" title={it.author || ''}>
           {it.author || 'Unknown author'}
         </p>
