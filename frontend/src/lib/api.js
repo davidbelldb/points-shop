@@ -194,6 +194,15 @@ export const api = {
   addRewatch: (data) => request('/rewatch', { method: 'POST', body: JSON.stringify(data) }),
   updateRewatch: (id, patch) => request(`/rewatch/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteRewatch: (id) => request(`/rewatch/${id}`, { method: 'DELETE' }),
+
+  // Sneaky Reads (shared reading list, Google Books-backed replica of rewatch)
+  readsList: () => request('/reads'),
+  readsPartner: () => request('/reads/partner'),
+  readsSearch: (q) => request(`/reads/search?q=${encodeURIComponent(q)}`),
+  addRead: (data) => request('/reads', { method: 'POST', body: JSON.stringify(data) }),
+  updateRead: (id, patch) => request(`/reads/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteRead: (id) => request(`/reads/${id}`, { method: 'DELETE' }),
+
   listReviews: (productId) => request(`/products/${productId}/reviews`),
   createReview: (productId, body) => request(`/products/${productId}/reviews`, { method: 'POST', body: JSON.stringify({ body }) }),
   updateReview: (reviewId, body) => request(`/reviews/${reviewId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
