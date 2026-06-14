@@ -47,6 +47,7 @@ const JournalPage          = lazy(() => import('./pages/JournalPage.jsx'));
 const AdminStoragePage     = lazy(() => import('./pages/AdminStoragePage.jsx'));
 const SneakyReadsPage      = lazy(() => import('./pages/SneakyReadsPage.jsx'));
 const SneakyReadDetailPage = lazy(() => import('./pages/SneakyReadDetailPage.jsx'));
+const SneakyscapesPage     = lazy(() => import('./pages/SneakyscapesPage.jsx'));
 
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
@@ -140,6 +141,8 @@ createRoot(document.getElementById('root')).render(
               <Route path="admin/surveys/:id/responses" element={<AdminSurveyResponsesPage />} />
               <Route path="timeline" element={<RelationshipTimelinePage />} />
               <Route path="journal" element={<JournalPage />} />
+              {/* Sneakyscapes garden planner — URL-only, intentionally NOT linked in any menu */}
+              <Route path="sneakyscapes" element={<SneakyscapesPage />} />
             </Route>
           </Routes>
           </Suspense>
