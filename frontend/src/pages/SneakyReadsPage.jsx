@@ -210,7 +210,7 @@ export default function SneakyReadsPage() {
     setBusy(true); setError(null);
     try {
       await api.addRead({
-        google_books_id: picked.google_books_id ?? null,
+        source_id: picked.source_id ?? null,
         title: picked.title,
         author: picked.author ?? null,
         cover_url: picked.cover_url ?? null,
@@ -342,7 +342,7 @@ export default function SneakyReadsPage() {
               <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-600 dark:bg-neutral-800">
                 {searchResults.map((r) => (
                   <button
-                    key={r.google_books_id}
+                    key={r.source_id || r.title}
                     onClick={() => pickResult(r)}
                     className="flex w-full items-center gap-3 border-b border-neutral-100 p-2 text-left last:border-0 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-700"
                   >

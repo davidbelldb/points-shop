@@ -16,14 +16,15 @@ async function getAccountName(accountId) {
   return rows[0]?.name || 'Someone';
 }
 
-// Google Books volumes search — no API key required for normal usage.
-// GOOGLE_BOOKS_API_KEY (optional) raises the daily quota if set.
-async function googleBooksFetch(path, params = {}) {
-  const key = (process.env.GOOGLE_BOOKS_API_KEY || '').trim();
+// Open Library search — free, no API key, and one of the broadest book
+// catalogues around (backed by the Internet Archive). Open Library asks
+// API consumers to send a descriptive User-Agent.
+async function openLibraryFetch(path, params = {}) {
   const qs = new URLSearchParams(params);
-  if (key) qs.set('key', key);
   try {
-    const res = await fetch(`https://www.googleapis.com/books/v1${path}?${qs.toString()}`);
+    const res = await fetch(`https://openlibrary.org${path}?${qs.toString()}`, {
+      headers: { 'User-Agent': 'sneaky-reads/1.0 (points-shop; davidbell.db@googlemail.com)' },
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -31,21 +32,18 @@ async function googleBooksFetch(path, params = {}) {
   }
 }
 
-function mapVolume(v) {
-  const info = v.volumeInfo || {};
-  const isbn = (info.industryIdentifiers || []).find((i) => i.type === 'ISBN_13')
-    || (info.industryIdentifiers || []).find((i) => i.type === 'ISBN_10');
-  const thumb = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || null;
+function mapDoc(d) {
+  const coverId = Number.isInteger(d.cover_i) ? d.cover_i : null;
   return {
-    google_books_id: v.id,
-    title: info.title || 'Untitled',
-    author: (info.authors || []).join(', ') || null,
-    cover_url: thumb ? thumb.replace(/^http:/, 'https:') : null,
-    genres: (info.categories || []).slice(0, 4),
-    rating: typeof info.averageRating === 'number' ? info.averageRating : null,
-    page_count: Number.isInteger(info.pageCount) ? info.pageCount : null,
-    year: (info.publishedDate || '').slice(0, 4),
-    isbn: isbn?.identifier || null,
+    source_id: d.key || null, // e.g. "/works/OL12345W"
+    title: d.title || 'Untitled',
+    author: (d.author_name || []).join(', ') || null,
+    cover_url: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null,
+    genres: (d.subject || []).slice(0, 4),
+    rating: typeof d.ratings_average === 'number' ? Math.round(d.ratings_average * 10) / 10 : null,
+    page_count: Number.isInteger(d.number_of_pages_median) ? d.number_of_pages_median : null,
+    year: d.first_publish_year ? String(d.first_publish_year) : '',
+    isbn: (d.isbn || [])[0] || null,
   };
 }
 
@@ -71,14 +69,18 @@ export default async function readsRoutes(fastify) {
     return partner || { id: null, name: 'them' };
   });
 
-  // Google Books type-ahead proxy.
+  // Open Library type-ahead proxy.
   fastify.get('/api/reads/search', async (req) => {
     const q = (req.query?.q || '').trim();
     if (q.length < 2) return { configured: true, results: [] };
-    const data = await googleBooksFetch('/volumes', { q, maxResults: 12 });
+    const data = await openLibraryFetch('/search.json', {
+      q,
+      limit: 12,
+      fields: 'key,title,author_name,cover_i,first_publish_year,subject,isbn,ratings_average,number_of_pages_median',
+    });
     if (!data) return { configured: true, results: [], error: 'request failed' };
-    const results = (data.items || [])
-      .map(mapVolume)
+    const results = (data.docs || [])
+      .map(mapDoc)
       .filter((r) => r.title && r.title !== 'Untitled');
     return { configured: true, results };
   });
@@ -98,12 +100,12 @@ export default async function readsRoutes(fastify) {
 
     const { rows } = await query(
       `INSERT INTO reads_items
-         (account_id, google_books_id, title, author, cover_url, genres, rating, page_count, priority)
+         (account_id, source_id, title, author, cover_url, genres, rating, page_count, priority)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
       [
         meId,
-        typeof b.google_books_id === 'string' ? b.google_books_id : null,
+        typeof b.source_id === 'string' ? b.source_id : null,
         title,
         typeof b.author === 'string' ? b.author : null,
         typeof b.cover_url === 'string' ? b.cover_url : null,
@@ -124,9 +126,9 @@ export default async function readsRoutes(fastify) {
           const myName = await getAccountName(meId);
           await query(
             `INSERT INTO reads_items
-               (account_id, suggested_by, google_books_id, title, author, cover_url, genres, rating, page_count, priority, suggested)
+               (account_id, suggested_by, source_id, title, author, cover_url, genres, rating, page_count, priority, suggested)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, TRUE)`,
-            [partner.id, meId, item.google_books_id, item.title, item.author, item.cover_url, item.genres, item.rating, item.page_count, item.priority],
+            [partner.id, meId, item.source_id, item.title, item.author, item.cover_url, item.genres, item.rating, item.page_count, item.priority],
           );
           await query(
             `INSERT INTO notifications (account_id, type, title, body, link_url)
