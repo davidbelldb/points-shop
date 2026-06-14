@@ -46,7 +46,7 @@ function PriorityPicker({ value, onChange }) {
 function ItemCard({ it, busy, onToggleRead, onRemove }) {
   return (
     <div className={`overflow-hidden rounded-xl border border-neutral-200 bg-white ${it.read ? 'opacity-60' : ''}`}>
-      <div className="relative aspect-[2/3] bg-neutral-900">
+      <Link to={`/sneaky-reads/${it.id}`} className="relative block aspect-[2/3] bg-neutral-900">
         {it.cover_url ? (
           <img src={it.cover_url} alt={it.title} className="h-full w-full object-cover" />
         ) : (
@@ -60,7 +60,7 @@ function ItemCard({ it, busy, onToggleRead, onRemove }) {
             Read
           </span>
         )}
-      </div>
+      </Link>
       <div className="space-y-1 p-2">
         <Link to={`/sneaky-reads/${it.id}`} className="block truncate text-sm font-medium hover:underline" title={it.title}>
           {it.title}
