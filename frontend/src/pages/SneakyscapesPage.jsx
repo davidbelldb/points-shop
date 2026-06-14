@@ -180,6 +180,35 @@ function resolveFootprint(stack, zone, rowIndex, col, item) {
 
 let INSTANCE_SEQ = 1;
 
+// --- Local persistence -------------------------------------------------------
+// Placements survive a browser refresh by round-tripping through localStorage.
+// The stored shape (array of { id, itemKey, zone, rowIndex, col, anchorKey }) is
+// already JSONB-friendly, so this same payload can be POSTed to the backend and
+// stored per-user in Postgres later with no restructuring.
+const STORAGE_KEY = 'sneakyscapes:placed:v1';
+
+function loadPlaced() {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return [];
+    // Keep only well-formed rows that reference a known item.
+    const clean = data.filter(
+      (p) =>
+        p && CATALOG_BY_KEY[p.itemKey] &&
+        Number.isInteger(p.rowIndex) && Number.isInteger(p.col) && [0, 1, 2, 3].includes(p.zone)
+    );
+    // Advance the id sequence past anything we just restored to avoid collisions.
+    const maxId = clean.reduce((m, p) => Math.max(m, p.id || 0), 0);
+    if (maxId >= INSTANCE_SEQ) INSTANCE_SEQ = maxId + 1;
+    return clean;
+  } catch {
+    return [];
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -187,7 +216,7 @@ let INSTANCE_SEQ = 1;
 export default function SneakyscapesPage() {
   const gridMap = useMemo(() => buildGridMap(), []);
 
-  const [placed, setPlaced] = useState([]); // {id, itemKey, zone, rowIndex, col, anchorKey}
+  const [placed, setPlaced] = useState(loadPlaced); // {id, itemKey, zone, rowIndex, col, anchorKey}
   const [dragItem, setDragItem] = useState(null);
   const [ghost, setGhost] = useState(null); // {x,y}
   const [preview, setPreview] = useState(null); // {zone, rowIndex, col, valid}
@@ -219,6 +248,15 @@ export default function SneakyscapesPage() {
   }, [placed, movingId]);
   const occupiedRef = useRef(occupied);
   occupiedRef.current = occupied;
+
+  // Persist placements so they survive a browser refresh.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(placed));
+    } catch {
+      /* storage unavailable (private mode / quota) — keep going in-memory */
+    }
+  }, [placed]);
 
   // live clock for the Status tab (time of day)
   useEffect(() => {
