@@ -44,8 +44,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 const ROWS = 'ABCDEFGHIJKLMNOPQRSTUVW'.split(''); // 23 rows, index 0..22
 const COLS = Array.from({ length: 13 }, (_, i) => i + 1); // 1..13
 const ZONES = [0, 1, 2, 3];
-const GUTTER = '1.25rem';
-const GRID_COLS_TEMPLATE = `${GUTTER} repeat(13, minmax(0, 1fr))`;
+// Coordinate labels, gutter and zone dividers are intentionally NOT rendered for
+// now (the coordinates still exist in the data model). Cells fill the grid edge
+// to edge: column = col (1..13), row = global row + 1.
+const GRID_COLS_TEMPLATE = 'repeat(13, minmax(0, 1fr))';
 
 // View stacks (top -> bottom). Back-of-property (Zone 3) sits at the top.
 const FRONT_STACK = [0];
@@ -444,30 +446,15 @@ export default function SneakyscapesPage() {
   const boards = useMemo(() => {
     const make = (stack) => {
       const els = [];
-      // column-number header (row 1)
-      COLS.forEach((c) => {
-        els.push(
-          <div key={`num-${c}`} style={{ gridColumn: c + 1, gridRow: 1 }}
-            className="flex items-end justify-center pb-0.5 text-[8px] text-neutral-500">
-            {c}
-          </div>
-        );
-      });
       stack.forEach((zone, si) => {
         ROWS.forEach((rowLetter, ri) => {
           const g = si * 23 + ri;
-          els.push(
-            <div key={`let-${zone}-${ri}`} style={{ gridColumn: 1, gridRow: g + 2 }}
-              className="flex items-center justify-center text-[8px] text-neutral-500">
-              {rowLetter}
-            </div>
-          );
           COLS.forEach((col) => {
             const cell = gridMap[keyOf(zone, ri, col)];
             const checker = (ri + col) % 2 === 0;
             const style = {
-              gridColumn: col + 1,
-              gridRow: g + 2,
+              gridColumn: col,
+              gridRow: g + 1,
               border: CELL_LINE,
               backgroundColor: cell.blocked ? HOUSE : checker ? CELL_A : CELL_B,
             };
@@ -479,20 +466,6 @@ export default function SneakyscapesPage() {
             );
           });
         });
-        // zone badge at the first row of each zone block
-        els.push(
-          <div key={`badge-${zone}`} style={{ gridColumn: 14, gridRow: si * 23 + 2 }}
-            className="pointer-events-none z-40 m-0.5 self-start justify-self-end rounded bg-black/55 px-1 py-0.5 text-[7px] font-bold leading-none text-white">
-            Z{zone}
-          </div>
-        );
-        // seam divider between contiguous zones
-        if (si > 0) {
-          els.push(
-            <div key={`div-${zone}`} style={{ gridColumn: '1 / span 14', gridRow: si * 23 + 2, height: 0 }}
-              className="pointer-events-none z-30 self-start border-t-2 border-dashed border-amber-400/80" />
-          );
-        }
       });
       return els;
     };
@@ -509,13 +482,13 @@ export default function SneakyscapesPage() {
         const gTop = stack.indexOf(p.zone) * 23 + p.rowIndex;
         const nodes = [];
         if (item.clearance > 0) {
-          const rawTop = gTop - item.clearance + 2;
-          const top = Math.max(2, rawTop);
-          const span = gTop + 2 - top;
+          const rawTop = gTop - item.clearance + 1;
+          const top = Math.max(1, rawTop);
+          const span = gTop + 1 - top;
           if (span > 0) {
             nodes.push(
               <div key={`${p.id}-buf`}
-                style={{ gridColumn: `${p.col + 1} / span ${item.w}`, gridRow: `${top} / span ${span}`, backgroundColor: SHADOW_FILL, backgroundImage: SHADOW_HATCH }}
+                style={{ gridColumn: `${p.col} / span ${item.w}`, gridRow: `${top} / span ${span}`, backgroundColor: SHADOW_FILL, backgroundImage: SHADOW_HATCH }}
                 className="pointer-events-none z-10 border border-dashed border-black/40" />
             );
           }
@@ -523,8 +496,8 @@ export default function SneakyscapesPage() {
         nodes.push(
           <div key={p.id} onPointerDown={onItemPointerDown(p)}
             style={{
-              gridColumn: `${p.col + 1} / span ${item.w}`,
-              gridRow: `${gTop + 2} / span ${item.h}`,
+              gridColumn: `${p.col} / span ${item.w}`,
+              gridRow: `${gTop + 1} / span ${item.h}`,
               backgroundColor: item.color,
               pointerEvents: dragItem ? 'none' : 'auto',
               touchAction: 'none',
@@ -539,14 +512,14 @@ export default function SneakyscapesPage() {
   const renderPreviewOverlay = (stack) => {
     if (!preview || !dragItem || !stack.includes(preview.zone)) return null;
     const gTop = stack.indexOf(preview.zone) * 23 + preview.rowIndex;
-    const rawTop = gTop - dragItem.clearance + 2;
-    const top = Math.max(2, rawTop);
-    const span = gTop + dragItem.h + 2 - top;
+    const rawTop = gTop - dragItem.clearance + 1;
+    const top = Math.max(1, rawTop);
+    const span = gTop + dragItem.h + 1 - top;
     if (span <= 0) return null;
     return (
       <div className="pointer-events-none z-30"
         style={{
-          gridColumn: `${preview.col + 1} / span ${dragItem.w}`,
+          gridColumn: `${preview.col} / span ${dragItem.w}`,
           gridRow: `${top} / span ${span}`,
           backgroundColor: preview.valid ? 'rgba(34,197,94,0.40)' : 'rgba(239,68,68,0.42)',
           boxShadow: preview.valid ? 'inset 0 0 0 2px #16a34a' : 'inset 0 0 0 2px #dc2626',
