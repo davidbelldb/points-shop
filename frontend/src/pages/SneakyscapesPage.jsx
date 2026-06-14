@@ -19,6 +19,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  *    footprint to fake Stardew-style vertical occlusion; those buffer tiles are
  *    marked occupied so nothing can clip into the back wall/roof.
  *
+ * RENDERING MODEL (important):
+ *  - Each zone is ONE css grid: column 1 is the row-letter gutter, row 1 is the
+ *    column-number header, and the 13x23 playable matrix lives in
+ *    columns 2..14 / rows 2..24. EVERY element (gutter labels, cells, placed
+ *    items, drag preview) is positioned by EXPLICIT grid line. Nothing is
+ *    auto-flowed, so dropping an item never reflows / grows the grid — overlays
+ *    simply stack on top of the fixed cells.
+ *
  * Built for portrait mobile (iOS Safari) — no HTML5 DnD, unified pointer events.
  */
 
@@ -29,7 +37,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 const ROWS = 'ABCDEFGHIJKLMNOPQRSTUVW'.split(''); // 23 rows, index 0..22
 const COLS = Array.from({ length: 13 }, (_, i) => i + 1); // 1..13
 const ZONES = [0, 1, 2, 3];
-const COLS_TEMPLATE = 'repeat(13, minmax(0, 1fr))';
+const GUTTER = '1.25rem';
+const GRID_COLS_TEMPLATE = `${GUTTER} repeat(13, minmax(0, 1fr))`;
 
 const ZONE_TITLES = {
   0: 'Zone 0 — Front Garden',
@@ -71,9 +80,8 @@ function buildBlockedSet() {
   addRange(1, 'O', 4, 10);
   addRange(1, 'P', 4, 5);
   addRange(1, 'P', 7, 10); // P06 stays playable
-  addRange(1, 'Q', 4, 4);
-  addRange(1, 'Q', 7, 10); // Q05, Q06 stay playable
-  addRange(1, 'R', 1, 6);
+  addRange(1, 'Q', 4, 10); // Q05, Q06 now house
+  addRange(1, 'R', 1, 10); // R07–R10 now house
   // S..W full-width block (cols 1..10) — pattern repeats identically.
   ['S', 'T', 'U', 'V', 'W'].forEach((r) => addRange(1, r, 1, 10));
 
@@ -162,22 +170,26 @@ export default function SneakyscapesPage() {
   const [ghost, setGhost] = useState(null); // {x,y} pointer position for the floating chip
   const [preview, setPreview] = useState(null); // {zone, rowIndex, col, valid}
   const [side, setSide] = useState('back'); // 'front' (Zone 0) | 'back' (Zones 1-3)
+  const [movingId, setMovingId] = useState(null); // id of a placed item currently being re-dragged
 
   const lastPt = useRef(null);
   const rafId = useRef(null);
   const dragRef = useRef(null); // mirror of dragItem for window listeners
+  const movingRef = useRef(null); // mirror of movingId for window listeners
   const scrollRef = useRef(null);
 
-  // Occupied tiles (base + buffer) for every placed item.
+  // Occupied tiles (base + buffer). The item being moved is excluded so it
+  // doesn't collide with itself while it's lifted off the board.
   const occupied = useMemo(() => {
     const set = new Set();
     placed.forEach((p) => {
+      if (p.id === movingId) return;
       const item = CATALOG_BY_KEY[p.itemKey];
       const { base, buffer } = footprint(p.zone, p.rowIndex, p.col, item);
       [...base, ...buffer].forEach(([z, r, c]) => set.add(keyOf(z, r, c)));
     });
     return set;
-  }, [placed]);
+  }, [placed, movingId]);
   const occupiedRef = useRef(occupied);
   occupiedRef.current = occupied;
 
@@ -218,20 +230,27 @@ export default function SneakyscapesPage() {
 
     const finish = (e) => {
       const result = computePreviewAt(e.clientX, e.clientY);
+      const mId = movingRef.current;
       if (result && result.valid) {
         const item = dragRef.current;
-        setPlaced((prev) => [
-          ...prev,
-          {
-            id: INSTANCE_SEQ++,
-            itemKey: item.key,
-            zone: result.zone,
-            rowIndex: result.rowIndex,
-            col: result.col,
-            anchorKey: keyOf(result.zone, result.rowIndex, result.col),
-          },
-        ]);
+        const anchorKey = keyOf(result.zone, result.rowIndex, result.col);
+        if (mId != null) {
+          // re-position the existing instance
+          setPlaced((prev) =>
+            prev.map((p) =>
+              p.id === mId
+                ? { ...p, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey }
+                : p
+            )
+          );
+        } else {
+          setPlaced((prev) => [
+            ...prev,
+            { id: INSTANCE_SEQ++, itemKey: item.key, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey },
+          ]);
+        }
       }
+      // Invalid drop while moving → the item simply stays where it was.
       cleanup();
     };
 
@@ -240,6 +259,8 @@ export default function SneakyscapesPage() {
       rafId.current = null;
       lastPt.current = null;
       dragRef.current = null;
+      movingRef.current = null;
+      setMovingId(null);
       setDragItem(null);
       setGhost(null);
       setPreview(null);
@@ -256,8 +277,24 @@ export default function SneakyscapesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragItem]);
 
+  // Begin dragging a NEW item out of the bottom tray.
   const startDrag = (item) => (e) => {
     e.preventDefault();
+    movingRef.current = null;
+    setMovingId(null);
+    dragRef.current = item;
+    setDragItem(item);
+    setGhost({ x: e.clientX, y: e.clientY });
+    lastPt.current = { x: e.clientX, y: e.clientY };
+  };
+
+  // Pick an already-placed item back up and re-drag it with the finger.
+  const startMove = (p) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const item = CATALOG_BY_KEY[p.itemKey];
+    movingRef.current = p.id;
+    setMovingId(p.id);
     dragRef.current = item;
     setDragItem(item);
     setGhost({ x: e.clientX, y: e.clientY });
@@ -268,8 +305,9 @@ export default function SneakyscapesPage() {
 
   /* ---------------- render helpers ---------------- */
 
-  // Static cells per zone — depends only on the immutable gridMap, so React
-  // reuses these elements across drag frames (keeps elementFromPoint at 60fps).
+  // Static cells per zone — positioned by EXPLICIT grid line (col+1 / row+2),
+  // depends only on the immutable gridMap, so React reuses these elements across
+  // drag frames (keeps elementFromPoint smooth and the grid shape rock-stable).
   const cellsByZone = useMemo(() => {
     const out = {};
     ZONES.forEach((zone) => {
@@ -283,6 +321,11 @@ export default function SneakyscapesPage() {
             : checker
             ? 'bg-emerald-100 dark:bg-emerald-900/40'
             : 'bg-emerald-200 dark:bg-emerald-800/40';
+          const style = { gridColumn: col + 1, gridRow: rowIndex + 2 };
+          if (cell.blocked) {
+            style.backgroundImage =
+              'repeating-linear-gradient(45deg, rgba(100,116,139,0.45) 0 3px, transparent 3px 6px)';
+          }
           cells.push(
             <div
               key={cell.key}
@@ -292,15 +335,8 @@ export default function SneakyscapesPage() {
               data-col={col}
               data-blocked={cell.blocked ? 'true' : 'false'}
               title={cell.label}
+              style={style}
               className={`aspect-square border border-emerald-300/40 dark:border-emerald-950/60 ${baseCls}`}
-              style={
-                cell.blocked
-                  ? {
-                      backgroundImage:
-                        'repeating-linear-gradient(45deg, rgba(100,116,139,0.45) 0 3px, transparent 3px 6px)',
-                    }
-                  : undefined
-              }
             />
           );
         });
@@ -312,28 +348,37 @@ export default function SneakyscapesPage() {
 
   const renderPlacedOverlays = (zone) =>
     placed
-      .filter((p) => p.zone === zone)
+      .filter((p) => p.zone === zone && p.id !== movingId)
       .flatMap((p) => {
         const item = CATALOG_BY_KEY[p.itemKey];
         const nodes = [];
+        // occlusion buffer (rows above the base)
         if (item.clearance > 0) {
-          const top = Math.max(1, p.rowIndex - item.clearance + 1);
-          const span = p.rowIndex + 1 - top;
+          const rawTop = p.rowIndex - item.clearance + 2;
+          const top = Math.max(2, rawTop);
+          const span = p.rowIndex + 2 - top;
           if (span > 0) {
             nodes.push(
               <div
                 key={`${p.id}-buf`}
                 className="pointer-events-none z-10 rounded-sm border border-dashed border-slate-400/70 bg-slate-400/20"
-                style={{ gridColumn: `${p.col} / span ${item.w}`, gridRow: `${top} / span ${span}` }}
+                style={{ gridColumn: `${p.col + 1} / span ${item.w}`, gridRow: `${top} / span ${span}` }}
               />
             );
           }
         }
+        // the item body — grabbable when idle, transparent to hit-testing mid-drag
         nodes.push(
           <div
             key={p.id}
-            className={`pointer-events-none z-20 flex items-center justify-center rounded-sm text-[7px] font-semibold leading-tight text-white shadow ring-1 ring-black/30 ${item.cls}`}
-            style={{ gridColumn: `${p.col} / span ${item.w}`, gridRow: `${p.rowIndex + 1} / span ${item.h}` }}
+            onPointerDown={startMove(p)}
+            style={{
+              gridColumn: `${p.col + 1} / span ${item.w}`,
+              gridRow: `${p.rowIndex + 2} / span ${item.h}`,
+              pointerEvents: dragItem ? 'none' : 'auto',
+              touchAction: 'none',
+            }}
+            className={`z-20 flex cursor-grab touch-none items-center justify-center rounded-sm text-[7px] font-semibold leading-tight text-white shadow ring-1 ring-black/30 active:cursor-grabbing ${item.cls}`}
           >
             <span className="px-0.5 text-center">{item.name}</span>
           </div>
@@ -343,9 +388,9 @@ export default function SneakyscapesPage() {
 
   const renderPreviewOverlay = (zone) => {
     if (!preview || preview.zone !== zone || !dragItem) return null;
-    const rawTop = preview.rowIndex - dragItem.clearance + 1;
-    const top = Math.max(1, rawTop);
-    const span = dragItem.h + dragItem.clearance - (top - rawTop);
+    const rawTop = preview.rowIndex - dragItem.clearance + 2;
+    const top = Math.max(2, rawTop);
+    const span = preview.rowIndex + dragItem.h + 2 - top;
     if (span <= 0) return null;
     const cls = preview.valid
       ? 'bg-green-500/40 ring-2 ring-green-500'
@@ -353,7 +398,7 @@ export default function SneakyscapesPage() {
     return (
       <div
         className={`pointer-events-none z-30 rounded-sm ${cls}`}
-        style={{ gridColumn: `${preview.col} / span ${dragItem.w}`, gridRow: `${top} / span ${span}` }}
+        style={{ gridColumn: `${preview.col + 1} / span ${dragItem.w}`, gridRow: `${top} / span ${span}` }}
       />
     );
   };
@@ -363,41 +408,33 @@ export default function SneakyscapesPage() {
       <h3 className="mb-1 text-xs font-bold text-emerald-900 dark:text-emerald-200">
         {ZONE_TITLES[zone]}
       </h3>
-      {/* column numbers */}
-      <div className="flex">
-        <div style={{ width: '1.25rem' }} />
-        <div className="grid flex-1" style={{ gridTemplateColumns: COLS_TEMPLATE }}>
-          {COLS.map((c) => (
-            <div key={c} className="text-center text-[8px] text-neutral-500 dark:text-neutral-400">
-              {c}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="flex">
-        {/* row letters */}
-        <div
-          className="grid"
-          style={{ width: '1.25rem', gridTemplateRows: 'repeat(23, 1fr)' }}
-        >
-          {ROWS.map((l) => (
-            <div
-              key={l}
-              className="flex items-center justify-center text-[8px] text-neutral-500 dark:text-neutral-400"
-            >
-              {l}
-            </div>
-          ))}
-        </div>
-        {/* the playable matrix */}
-        <div
-          className="relative grid flex-1 overflow-hidden rounded-md ring-1 ring-emerald-300 dark:ring-emerald-800"
-          style={{ gridTemplateColumns: COLS_TEMPLATE }}
-        >
-          {cellsByZone[zone]}
-          {renderPlacedOverlays(zone)}
-          {renderPreviewOverlay(zone)}
-        </div>
+      <div
+        className="relative grid overflow-hidden rounded-md ring-1 ring-emerald-300 dark:ring-emerald-800"
+        style={{ gridTemplateColumns: GRID_COLS_TEMPLATE }}
+      >
+        {/* column numbers (grid row 1) */}
+        {COLS.map((c) => (
+          <div
+            key={`num-${c}`}
+            style={{ gridColumn: c + 1, gridRow: 1 }}
+            className="flex items-end justify-center pb-0.5 text-[8px] text-neutral-500 dark:text-neutral-400"
+          >
+            {c}
+          </div>
+        ))}
+        {/* row letters (grid column 1) */}
+        {ROWS.map((l, ri) => (
+          <div
+            key={`let-${l}`}
+            style={{ gridColumn: 1, gridRow: ri + 2 }}
+            className="flex items-center justify-center text-[8px] text-neutral-500 dark:text-neutral-400"
+          >
+            {l}
+          </div>
+        ))}
+        {cellsByZone[zone]}
+        {renderPlacedOverlays(zone)}
+        {renderPreviewOverlay(zone)}
       </div>
     </section>
   );
@@ -458,7 +495,8 @@ export default function SneakyscapesPage() {
             </h3>
             {placed.length === 0 ? (
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                Drag an item from the tray onto the grid to place it.
+                Drag an item from the tray onto the grid to place it. Drag a placed
+                item to move it.
               </p>
             ) : (
               <ul className="space-y-1">
