@@ -61,7 +61,6 @@ const SNEAKYSCAPE_NAME = "Katie's Sneakyscape";
 const PANEL_TABS = [
   { key: 'items', label: 'Items' },
   { key: 'info', label: 'Info' },
-  { key: 'map', label: 'Map' },
 ];
 const SLOT_MIN = 12; // pad the inventory grid out with empty slots
 
@@ -522,7 +521,7 @@ export default function SneakyscapesPage() {
       teardown();
       if (longFired) return;
       const t = Date.now();
-      if (lastTapRef.current.id === p.id && t - lastTapRef.current.t < 300) {
+      if (lastTapRef.current.id === p.id && t - lastTapRef.current.t < 400) {
         lastTapRef.current = { id: null, t: 0 };
         rotatePlaced(p.id); // second quick tap → rotate
       } else {
@@ -545,6 +544,23 @@ export default function SneakyscapesPage() {
   };
 
   const removePlaced = (id) => setPlaced((prev) => prev.filter((p) => p.id !== id));
+
+  const clearAll = () => {
+    if (placed.length === 0) return;
+    if (typeof window !== 'undefined' && !window.confirm('Remove every item from the whole garden?')) return;
+    setPlaced([]); // persists the empty layout to the server + cache
+  };
+
+  // Small "front-edge" marker so rotation is visible even on square items.
+  const frontEdgeStyle = (rot) => {
+    const base = { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 1 };
+    switch (((rot % 4) + 4) % 4) {
+      case 0: return { ...base, left: 2, right: 2, bottom: 1, height: 3 };
+      case 1: return { ...base, top: 2, bottom: 2, left: 1, width: 3 };
+      case 2: return { ...base, left: 2, right: 2, top: 1, height: 3 };
+      default: return { ...base, top: 2, bottom: 2, right: 1, width: 3 };
+    }
+  };
 
   // Duplicate: scan the item's view stack for N free, valid anchor positions.
   const duplicateItem = (srcId, n) => {
@@ -633,8 +649,9 @@ export default function SneakyscapesPage() {
               pointerEvents: dragItem ? 'none' : 'auto',
               touchAction: 'none',
             }}
-            className="z-20 flex cursor-grab touch-none items-center justify-center text-[7px] font-semibold leading-tight text-white shadow ring-1 ring-black/40 active:cursor-grabbing">
+            className="relative z-20 flex cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white shadow ring-1 ring-black/40 active:cursor-grabbing">
             <span className="px-0.5 text-center drop-shadow">{item.name}</span>
+            <span style={frontEdgeStyle(p.rot)} />
           </div>
         );
         return nodes;
@@ -843,6 +860,23 @@ export default function SneakyscapesPage() {
                       <span><span style={{ color: UI.muted }}>Spent:</span> <b style={{ color: UI.accent }}>{spent} pts</b></span>
                     </div>
                   </div>
+
+                  {/* viewing area selector (was the Map tab) */}
+                  <div>
+                    <p className="mb-1 text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Viewing area</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['front', 'back'].map((s) => (
+                        <button key={s} onClick={() => setSide(s)}
+                          className="rounded-xl p-3 text-sm font-bold capitalize"
+                          style={side === s
+                            ? { backgroundColor: UI.accent, color: UI.accentInk }
+                            : { backgroundColor: UI.raised, color: UI.muted, border: `1px solid ${UI.border}` }}>
+                          {s} garden
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised }}>
                     <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Time of day</p>
                     <p className="text-2xl font-bold">{timeStr}</p>
@@ -862,26 +896,13 @@ export default function SneakyscapesPage() {
                       </ul>
                     )}
                   </div>
-                </div>
-              )}
 
-              {panelTab === 'map' && (
-                <div className="space-y-3">
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Viewing area</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['front', 'back'].map((s) => (
-                      <button key={s} onClick={() => setSide(s)}
-                        className="rounded-xl p-4 text-sm font-bold capitalize"
-                        style={side === s
-                          ? { backgroundColor: UI.accent, color: UI.accentInk }
-                          : { backgroundColor: UI.raised, color: UI.muted, border: `1px solid ${UI.border}` }}>
-                        {s} garden
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px]" style={{ color: UI.muted }}>
-                    Pick which part of the plot to view. Close the menu to design it.
-                  </p>
+                  {/* wipe the whole garden */}
+                  <button onClick={clearAll} disabled={placed.length === 0}
+                    style={{ backgroundColor: '#b3402f', opacity: placed.length === 0 ? 0.4 : 1 }}
+                    className="w-full rounded-xl py-2 text-sm font-semibold text-white">
+                    Clear all items
+                  </button>
                 </div>
               )}
             </div>
