@@ -72,9 +72,6 @@ function ItemCard({ it, busy, onToggleRead, onRemove }) {
           {it.rating ? `★ ${Number(it.rating).toFixed(1)}` : ''}
           {it.page_count ? `${it.rating ? ' · ' : ''}${it.page_count}pp` : ''}
         </p>
-        {it.genres?.length > 0 && (
-          <p className="truncate text-[11px] text-neutral-400">{it.genres.join(', ')}</p>
-        )}
         <div className="flex gap-1 pt-1">
           <button
             onClick={() => onToggleRead(it)}
