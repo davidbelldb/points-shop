@@ -54,13 +54,6 @@ const FRONT_STACK = [0];
 const BACK_STACK = [3, 2, 1];
 const stackForZone = (zone) => (zone === 0 ? FRONT_STACK : BACK_STACK);
 
-const ZONE_TITLES = {
-  0: 'Zone 0 — Front Garden',
-  1: 'Zone 1 — Back Garden (nearest house)',
-  2: 'Zone 2 — Back Garden (middle)',
-  3: 'Zone 3 — Back Garden (far end)',
-};
-
 // Placeholder — the player will name their plot during game setup later.
 const SNEAKYSCAPE_NAME = "Katie's Sneakyscape";
 // Tabbed journal pages — Stardew-style. Add more pages here as the game grows.
@@ -79,6 +72,20 @@ const SHADOW_FILL = 'rgba(15,23,42,0.42)';
 const SHADOW_HATCH =
   'repeating-linear-gradient(45deg, rgba(0,0,0,0.30) 0 4px, transparent 4px 8px)';
 const CELL_LINE = '1px solid rgba(0,0,0,0.22)';
+
+// Fixed game-UI palette (theme-independent HUD / modal — reads as a game overlay
+// in both light and dark app themes; to be reskinned with textures later).
+const UI = {
+  frame: '#1b241c', // canvas backdrop around/behind the grid
+  panel: '#28332b', // modal panel
+  raised: '#33403a', // sub-panels inside the modal
+  text: '#f1ede1', // parchment text
+  muted: '#a6b0a3', // muted text
+  accent: '#e0b35a', // gold accent
+  accentInk: '#26200f', // text on accent
+  border: 'rgba(0,0,0,0.45)',
+  hud: 'rgba(20,28,20,0.74)', // floating HUD button bg
+};
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const keyOf = (zone, rowIndex, col) => `Z${pad2(zone)}-${ROWS[rowIndex]}${pad2(col)}`;
@@ -528,7 +535,7 @@ export default function SneakyscapesPage() {
   };
 
   const renderBoard = (stack, cells) => (
-    <div className="relative grid w-full select-none border border-neutral-300"
+    <div className="relative grid w-full select-none"
       style={{ gridTemplateColumns: GRID_COLS_TEMPLATE }}>
       {cells}
       {renderPlacedOverlays(stack)}
@@ -540,6 +547,7 @@ export default function SneakyscapesPage() {
 
   const menuItem = menu ? placed.find((p) => p.id === menu.id) : null;
   const menuCat = menuItem ? CATALOG_BY_KEY[menuItem.itemKey] : null;
+  const areaName = side === 'front' ? 'Front Garden' : 'Back Garden';
 
   // Status-tab clock
   const hour = now.getHours();
@@ -549,50 +557,28 @@ export default function SneakyscapesPage() {
   const actions = []; // future: [{ id, text, due }] e.g. "Water Hydrangea today between …"
 
   return (
-    <div className="flex h-[100dvh] w-full flex-col overflow-x-hidden bg-neutral-50 text-neutral-900">
-      {/* header */}
-      <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-3 py-2">
-        <button onClick={() => { setPanelTab('status'); setPanelOpen(true); }} aria-label="Open menu"
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-neutral-900 active:scale-95">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="4" y1="7" x2="20" y2="7" />
-            <line x1="4" y1="12" x2="20" y2="12" />
-            <line x1="4" y1="17" x2="20" y2="17" />
-          </svg>
-        </button>
-        <div className="flex rounded-full bg-neutral-100 p-0.5 text-xs">
-          {['front', 'back'].map((s) => (
-            <button key={s} onClick={() => setSide(s)}
-              className={`rounded-full px-3 py-1 font-medium capitalize transition ${
-                side === s ? 'bg-amber-500 text-white' : 'text-amber-700'
-              }`}>
-              {s}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* scrollable map */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3"
+    <div className="relative h-[100dvh] w-full overflow-hidden" style={{ backgroundColor: UI.frame }}>
+      {/* full-screen game canvas */}
+      <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ touchAction: dragItem ? 'none' : 'pan-y' }}>
-        <div className="mx-auto max-w-md">
-          <h3 className="mb-1 text-xs font-bold text-amber-700">
-            {side === 'front' ? ZONE_TITLES[0] : 'Back Garden — Zones 3 · 2 · 1'}
-          </h3>
-          {side === 'front' ? renderBoard(FRONT_STACK, boards.front) : renderBoard(BACK_STACK, boards.back)}
+        {side === 'front' ? renderBoard(FRONT_STACK, boards.front) : renderBoard(BACK_STACK, boards.back)}
+      </div>
 
-          {/* lightweight hint — full placement lives in the journal's Items tab */}
-          <p className="mt-3 text-center text-[11px] text-neutral-500">
-            Tap the menu (top-left) → <span className="font-semibold text-amber-700">Items</span> to place plants &amp; structures.
-            Drag a placed item to move it; long-press to remove or duplicate.
-          </p>
-        </div>
-      </main>
+      {/* floating HUD menu button (over the grid) */}
+      <button onClick={() => { setPanelTab('status'); setPanelOpen(true); }} aria-label="Open menu"
+        className="absolute left-3 top-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl active:scale-95"
+        style={{ backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: UI.text, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="4" y1="7" x2="20" y2="7" />
+          <line x1="4" y1="12" x2="20" y2="12" />
+          <line x1="4" y1="17" x2="20" y2="17" />
+        </svg>
+      </button>
 
       {/* floating drag chip */}
       {ghost && dragItem && (
-        <div className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-[10px] font-semibold text-white shadow-lg ring-1 ring-black/40"
-          style={{ left: ghost.x, top: ghost.y, backgroundColor: '#0f766e' }}>
+        <div className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-[10px] font-semibold shadow-lg"
+          style={{ left: ghost.x, top: ghost.y, backgroundColor: UI.accent, color: UI.accentInk }}>
           {dragItem.name}
         </div>
       )}
@@ -601,111 +587,133 @@ export default function SneakyscapesPage() {
       {menu && menuItem && menuCat && (
         <>
           <div className="fixed inset-0 z-50" onPointerDown={() => setMenu(null)} />
-          <div className="fixed z-50 -translate-x-1/2 -translate-y-full rounded-xl border border-neutral-200 bg-white p-3 shadow-2xl"
-            style={{ left: Math.min(Math.max(menu.x, 110), window.innerWidth - 110), top: Math.max(menu.y - 12, 130), width: 200 }}
+          <div className="fixed z-50 -translate-x-1/2 -translate-y-full rounded-xl p-3 shadow-2xl"
+            style={{ left: Math.min(Math.max(menu.x, 110), window.innerWidth - 110), top: Math.max(menu.y - 12, 140), width: 200, backgroundColor: UI.panel, border: `1px solid ${UI.border}`, color: UI.text }}
             onPointerDown={(e) => e.stopPropagation()}>
             <div className="mb-2">
-              <p className="text-[12px] font-bold text-neutral-900">{menuCat.name}</p>
-              <p className="text-[10px] text-neutral-500">{menuItem.anchorKey} · {menuCat.price} pts each</p>
+              <p className="text-[12px] font-bold">{menuCat.name}</p>
+              <p className="text-[10px]" style={{ color: UI.muted }}>{menuItem.anchorKey} · {menuCat.price} pts each</p>
             </div>
 
-            <div className="mb-2 flex items-center justify-between rounded-lg bg-neutral-100 p-1">
+            <div className="mb-2 flex items-center justify-between rounded-lg p-1" style={{ backgroundColor: UI.raised }}>
               <button onClick={() => setDupCount((n) => Math.max(1, n - 1))}
-                className="h-7 w-7 rounded-md bg-white text-base font-bold text-neutral-900 shadow-sm">−</button>
-              <span className="text-sm font-semibold text-neutral-900">{dupCount}×</span>
+                className="h-7 w-7 rounded-md text-base font-bold" style={{ backgroundColor: UI.panel, color: UI.text }}>−</button>
+              <span className="text-sm font-semibold">{dupCount}×</span>
               <button onClick={() => setDupCount((n) => Math.min(20, n + 1))}
-                className="h-7 w-7 rounded-md bg-white text-base font-bold text-neutral-900 shadow-sm">+</button>
+                className="h-7 w-7 rounded-md text-base font-bold" style={{ backgroundColor: UI.panel, color: UI.text }}>+</button>
             </div>
 
             <button onClick={() => { duplicateItem(menu.id, dupCount); setMenu(null); }}
-              className="mb-2 w-full rounded-lg bg-amber-500 py-2 text-[12px] font-semibold text-white">
+              className="mb-2 w-full rounded-lg py-2 text-[12px] font-semibold" style={{ backgroundColor: UI.accent, color: UI.accentInk }}>
               Duplicate ×{dupCount} (−{dupCount * menuCat.price} pts)
             </button>
             <button onClick={() => { removePlaced(menu.id); setMenu(null); }}
-              style={{ backgroundColor: '#dc2626' }}
-              className="w-full rounded-lg py-2 text-[12px] font-semibold text-white">
+              className="w-full rounded-lg py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: '#b3402f' }}>
               Remove (refund {menuCat.price} pts)
             </button>
           </div>
         </>
       )}
 
-      {/* Stardew-style journal — swipeable tabbed bottom sheet */}
+      {/* central game menu modal */}
       {panelOpen && (
-        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/50" onPointerDown={() => setPanelOpen(false)} />
-          <div className="relative z-10 max-h-[82vh] rounded-t-2xl border-t border-neutral-200 bg-neutral-50 shadow-2xl">
-            {/* grab handle + tab bar */}
-            <div className="flex flex-col items-center pt-2">
-              <div className="mb-2 h-1 w-10 rounded-full bg-neutral-300" />
-              <div className="flex w-full border-b border-neutral-200">
-                {PANEL_TABS.map((t) => (
-                  <button key={t.key} onClick={() => setPanelTab(t.key)}
-                    className={`flex-1 py-2 text-sm font-semibold ${
-                      panelTab === t.key ? 'border-b-2 border-amber-500 text-amber-700' : 'text-neutral-500'
-                    }`}>
-                    {t.label}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }} onPointerDown={() => setPanelOpen(false)} />
+          <div className="relative z-10 flex max-h-[86vh] w-full max-w-sm flex-col overflow-hidden rounded-2xl shadow-2xl"
+            style={{ backgroundColor: UI.panel, border: `1px solid ${UI.border}`, color: UI.text }}>
+            {/* header: area name + close */}
+            <div className="flex items-start justify-between px-4 pt-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Now tending</p>
+                <p className="text-xl font-extrabold">{areaName}</p>
+              </div>
+              <button onClick={() => setPanelOpen(false)} aria-label="Close"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg" style={{ backgroundColor: UI.raised, color: UI.text }}>✕</button>
+            </div>
+
+            {/* front / back switcher */}
+            <div className="px-4 pt-3">
+              <div className="flex rounded-full p-0.5 text-sm" style={{ backgroundColor: UI.raised }}>
+                {['front', 'back'].map((s) => (
+                  <button key={s} onClick={() => setSide(s)}
+                    className="flex-1 rounded-full px-3 py-1.5 font-semibold capitalize"
+                    style={side === s
+                      ? { backgroundColor: UI.accent, color: UI.accentInk }
+                      : { color: UI.muted }}>
+                    {s} garden
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* tab bar */}
+            <div className="mt-3 flex px-2" style={{ borderBottom: `1px solid ${UI.border}` }}>
+              {PANEL_TABS.map((t) => (
+                <button key={t.key} onClick={() => setPanelTab(t.key)}
+                  className="flex-1 py-2 text-sm font-semibold"
+                  style={panelTab === t.key
+                    ? { color: UI.accent, borderBottom: `2px solid ${UI.accent}` }
+                    : { color: UI.muted }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
             {/* swipeable content */}
-            <div className="overflow-y-auto p-4" style={{ maxHeight: '62vh', touchAction: 'pan-y' }}
+            <div className="flex-1 overflow-y-auto p-4" style={{ touchAction: 'pan-y' }}
               onPointerDown={onPanelDown} onPointerUp={onPanelUp}>
               {panelTab === 'status' ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-neutral-500">Sneakyscape</p>
-                    <p className="text-lg font-extrabold text-neutral-900">{SNEAKYSCAPE_NAME}</p>
+                    <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Sneakyscape</p>
+                    <p className="text-lg font-extrabold">{SNEAKYSCAPE_NAME}</p>
                   </div>
-                  <div className="rounded-xl bg-neutral-100 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-neutral-500">Time of day</p>
-                    <p className="text-2xl font-bold text-neutral-900">{timeStr}</p>
-                    <p className="text-sm text-amber-700">{phase} · {dateStr}</p>
+                  <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised }}>
+                    <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Time of day</p>
+                    <p className="text-2xl font-bold">{timeStr}</p>
+                    <p className="text-sm" style={{ color: UI.accent }}>{phase} · {dateStr}</p>
                   </div>
                   <div>
-                    <p className="mb-1 text-[10px] uppercase tracking-wide text-neutral-500">Outstanding actions</p>
+                    <p className="mb-1 text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Outstanding actions</p>
                     {actions.length === 0 ? (
-                      <p className="rounded-xl border border-dashed border-neutral-300 p-3 text-sm text-neutral-500">
-                        Nothing needs attention right now. Plants you place will list watering &amp; frost-cover
-                        reminders here, with their zone location.
+                      <p className="rounded-xl p-3 text-sm" style={{ border: `1px dashed ${UI.border}`, color: UI.muted }}>
+                        Nothing needs attention right now. Plants you place will list watering &amp; frost-cover reminders here, with their location.
                       </p>
                     ) : (
                       <ul className="space-y-2">
                         {actions.map((a) => (
-                          <li key={a.id} className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-900">{a.text}</li>
+                          <li key={a.id} className="rounded-xl p-3 text-sm" style={{ backgroundColor: UI.raised }}>{a.text}</li>
                         ))}
                       </ul>
                     )}
                   </div>
                 </div>
               ) : (
-                <ul className="space-y-2">
-                  {CATALOG.map((item) => (
-                    <li key={item.key}>
-                      <button onPointerDown={startDragFromPanel(item)} style={{ touchAction: 'none' }}
-                        className="flex w-full select-none items-center justify-between rounded-xl border border-neutral-200 bg-white p-2 text-left active:scale-[0.98]">
-                        <span className="flex items-center gap-3">
-                          <span className="h-9 w-9 shrink-0 rounded" style={{ backgroundColor: item.color }} />
-                          <span>
-                            <span className="block text-sm font-semibold text-neutral-900">{item.name}</span>
-                            <span className="block text-[10px] text-neutral-500">
-                              {item.w}×{item.h}{item.clearance ? ` (+${item.clearance} shadow)` : ''} ·{' '}
-                              {item.available > 99 ? '∞' : item.available} available
+                <>
+                  <ul className="space-y-2">
+                    {CATALOG.map((item) => (
+                      <li key={item.key}>
+                        <button onPointerDown={startDragFromPanel(item)} style={{ touchAction: 'none', backgroundColor: UI.raised, border: `1px solid ${UI.border}` }}
+                          className="flex w-full select-none items-center justify-between rounded-xl p-2 text-left active:scale-[0.98]">
+                          <span className="flex items-center gap-3">
+                            <span className="h-9 w-9 shrink-0 rounded" style={{ backgroundColor: item.color }} />
+                            <span>
+                              <span className="block text-sm font-semibold">{item.name}</span>
+                              <span className="block text-[10px]" style={{ color: UI.muted }}>
+                                {item.w}×{item.h}{item.clearance ? ` (+${item.clearance} shadow)` : ''} ·{' '}
+                                {item.available > 99 ? '∞' : item.available} available
+                              </span>
                             </span>
                           </span>
-                        </span>
-                        <span className="shrink-0 text-sm font-bold text-amber-700">
-                          {item.price} pt{item.price === 1 ? '' : 's'}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {panelTab === 'items' && (
-                <p className="mt-3 text-center text-[10px] text-neutral-500">Drag an item up onto the grid to place it.</p>
+                          <span className="shrink-0 text-sm font-bold" style={{ color: UI.accent }}>
+                            {item.price} pt{item.price === 1 ? '' : 's'}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-center text-[10px]" style={{ color: UI.muted }}>Drag an item onto the grid to place it.</p>
+                </>
               )}
             </div>
           </div>
