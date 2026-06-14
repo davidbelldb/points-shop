@@ -56,11 +56,13 @@ const stackForZone = (zone) => (zone === 0 ? FRONT_STACK : BACK_STACK);
 
 // Placeholder — the player will name their plot during game setup later.
 const SNEAKYSCAPE_NAME = "Katie's Sneakyscape";
-// Tabbed journal pages — Stardew-style. Add more pages here as the game grows.
+// Tabbed menu pages — Stardew-style. Add more pages here as the game grows.
 const PANEL_TABS = [
-  { key: 'status', label: 'Status' },
   { key: 'items', label: 'Items' },
+  { key: 'info', label: 'Info' },
+  { key: 'map', label: 'Map' },
 ];
+const SLOT_MIN = 12; // pad the inventory grid out with empty slots
 
 // Fixed board palette (theme-independent game canvas).
 const CELL_A = '#356b3b';
@@ -153,13 +155,13 @@ function buildGridMap() {
 /* ------------------------------------------------------------------ */
 
 const CATALOG = [
-  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047' },
-  { key: 'soil', name: 'Soil', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#7c4a1e' },
-  { key: 'gravel', name: 'Gravel', type: 'terrain', w: 1, h: 1, clearance: 0, price: 8, available: 999, color: '#9aa0a6' },
-  { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, price: 40, available: 12, color: '#3d9be0' },
-  { key: 'bench', name: 'Garden Bench', type: 'entity', w: 2, h: 1, clearance: 0, price: 120, available: 4, color: '#9c6b27' },
-  { key: 'shed', name: 'Garden Office / Shed', type: 'entity', w: 5, h: 4, clearance: 2, price: 1500, available: 1, color: '#6b7280' },
-  { key: 'trampoline', name: 'Trampoline', type: 'entity', w: 5, h: 5, clearance: 0, price: 600, available: 1, color: '#5b54d6' },
+  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.' },
+  { key: 'soil', name: 'Soil', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#7c4a1e', desc: 'Bare planting soil.' },
+  { key: 'gravel', name: 'Gravel', type: 'terrain', w: 1, h: 1, clearance: 0, price: 8, available: 999, color: '#9aa0a6', desc: 'Decorative gravel path.' },
+  { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, price: 40, available: 12, color: '#3d9be0', desc: 'Flowering shrub. Needs regular watering.' },
+  { key: 'bench', name: 'Garden Bench', type: 'entity', w: 2, h: 1, clearance: 0, price: 120, available: 4, color: '#9c6b27', desc: 'A two-seat garden bench.' },
+  { key: 'shed', name: 'Garden Office / Shed', type: 'entity', w: 5, h: 4, clearance: 2, price: 1500, available: 1, color: '#6b7280', desc: 'Tall structure — casts a 2-tile shadow footprint behind it.' },
+  { key: 'trampoline', name: 'Trampoline', type: 'entity', w: 5, h: 5, clearance: 0, price: 600, available: 1, color: '#5b54d6', desc: "A kids' trampoline." },
 ];
 const CATALOG_BY_KEY = Object.fromEntries(CATALOG.map((i) => [i.key, i]));
 
@@ -233,8 +235,10 @@ export default function SneakyscapesPage() {
   const [movingId, setMovingId] = useState(null);
   const [menu, setMenu] = useState(null); // {id, x, y} long-press popout
   const [dupCount, setDupCount] = useState(1);
-  const [panelOpen, setPanelOpen] = useState(false); // Stardew journal panel
-  const [panelTab, setPanelTab] = useState('status');
+  const [panelOpen, setPanelOpen] = useState(false); // Stardew menu panel
+  const [panelTab, setPanelTab] = useState('items');
+  const [panelSearch, setPanelSearch] = useState('');
+  const [selectedKey, setSelectedKey] = useState('grass'); // inspected item in the shop grid
   const [now, setNow] = useState(() => new Date());
   const swipeX = useRef(null);
 
@@ -288,16 +292,36 @@ export default function SneakyscapesPage() {
   // Pick an item out of the journal's Items tab and immediately start dragging
   // it onto the grid. Closing the panel reveals the cells under the finger so
   // elementFromPoint can hit-test them mid-drag.
-  const startDragFromPanel = (item) => (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const startDragFromPanel = (item, x, y) => {
     setPanelOpen(false);
     movingRef.current = null;
     setMovingId(null);
     dragRef.current = item;
     setDragItem(item);
-    setGhost({ x: e.clientX, y: e.clientY });
-    lastPt.current = { x: e.clientX, y: e.clientY };
+    setGhost({ x, y });
+    lastPt.current = { x, y };
+  };
+
+  // Inventory-slot gesture: tap = inspect (show detail), drag = place on the grid.
+  const onSlotPointerDown = (item) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedKey(item.key);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const move = (ev) => {
+      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
+        teardown();
+        startDragFromPanel(item, ev.clientX, ev.clientY);
+      }
+    };
+    const up = () => teardown();
+    const teardown = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   };
 
   /* ---------------- pointer drag engine ---------------- */
@@ -547,7 +571,6 @@ export default function SneakyscapesPage() {
 
   const menuItem = menu ? placed.find((p) => p.id === menu.id) : null;
   const menuCat = menuItem ? CATALOG_BY_KEY[menuItem.itemKey] : null;
-  const areaName = side === 'front' ? 'Front Garden' : 'Back Garden';
 
   // Status-tab clock
   const hour = now.getHours();
@@ -555,6 +578,15 @@ export default function SneakyscapesPage() {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
   const actions = []; // future: [{ id, text, due }] e.g. "Water Hydrangea today between …"
+
+  // Shop / inventory derived data
+  const spent = placed.reduce((s, p) => s + (CATALOG_BY_KEY[p.itemKey]?.price || 0), 0);
+  const filteredItems = CATALOG.filter((i) =>
+    i.name.toLowerCase().includes(panelSearch.trim().toLowerCase())
+  );
+  const selectedItem = CATALOG_BY_KEY[selectedKey] || null;
+  const slots = [...filteredItems];
+  while (slots.length < SLOT_MIN || slots.length % 4 !== 0) slots.push(null);
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden" style={{ backgroundColor: UI.frame }}>
@@ -565,7 +597,7 @@ export default function SneakyscapesPage() {
       </div>
 
       {/* floating HUD menu button (over the grid) */}
-      <button onClick={() => { setPanelTab('status'); setPanelOpen(true); }} aria-label="Open menu"
+      <button onClick={() => { setPanelTab('items'); setPanelOpen(true); }} aria-label="Open menu"
         className="absolute left-3 top-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl active:scale-95"
         style={{ backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: UI.text, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -615,58 +647,104 @@ export default function SneakyscapesPage() {
         </>
       )}
 
-      {/* central game menu modal */}
+      {/* central Stardew-style menu modal */}
       {panelOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3">
           <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }} onPointerDown={() => setPanelOpen(false)} />
-          <div className="relative z-10 flex max-h-[86vh] w-full max-w-sm flex-col overflow-hidden rounded-2xl shadow-2xl"
+          <div className="relative z-10 flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-2xl shadow-2xl"
             style={{ backgroundColor: UI.panel, border: `1px solid ${UI.border}`, color: UI.text }}>
-            {/* header: area name + close */}
-            <div className="flex items-start justify-between px-4 pt-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Now tending</p>
-                <p className="text-xl font-extrabold">{areaName}</p>
+
+            {/* tab strip + points + close */}
+            <div className="flex items-center gap-2 px-3 pt-3">
+              <div className="flex flex-1 gap-1">
+                {PANEL_TABS.map((t) => (
+                  <button key={t.key} onClick={() => setPanelTab(t.key)}
+                    className="rounded-lg px-3 py-1.5 text-xs font-bold"
+                    style={panelTab === t.key
+                      ? { backgroundColor: UI.accent, color: UI.accentInk }
+                      : { backgroundColor: UI.raised, color: UI.muted }}>
+                    {t.label}
+                  </button>
+                ))}
               </div>
+              <span className="rounded-lg px-2 py-1 text-xs font-bold" style={{ backgroundColor: UI.raised, color: UI.accent }}>
+                {spent} pts spent
+              </span>
               <button onClick={() => setPanelOpen(false)} aria-label="Close"
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-lg" style={{ backgroundColor: UI.raised, color: UI.text }}>✕</button>
             </div>
 
-            {/* front / back switcher */}
-            <div className="px-4 pt-3">
-              <div className="flex rounded-full p-0.5 text-sm" style={{ backgroundColor: UI.raised }}>
-                {['front', 'back'].map((s) => (
-                  <button key={s} onClick={() => setSide(s)}
-                    className="flex-1 rounded-full px-3 py-1.5 font-semibold capitalize"
-                    style={side === s
-                      ? { backgroundColor: UI.accent, color: UI.accentInk }
-                      : { color: UI.muted }}>
-                    {s} garden
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* tab bar */}
-            <div className="mt-3 flex px-2" style={{ borderBottom: `1px solid ${UI.border}` }}>
-              {PANEL_TABS.map((t) => (
-                <button key={t.key} onClick={() => setPanelTab(t.key)}
-                  className="flex-1 py-2 text-sm font-semibold"
-                  style={panelTab === t.key
-                    ? { color: UI.accent, borderBottom: `2px solid ${UI.accent}` }
-                    : { color: UI.muted }}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* swipeable content */}
-            <div className="flex-1 overflow-y-auto p-4" style={{ touchAction: 'pan-y' }}
+            {/* content */}
+            <div className="flex-1 overflow-y-auto p-3" style={{ touchAction: 'pan-y' }}
               onPointerDown={onPanelDown} onPointerUp={onPanelUp}>
-              {panelTab === 'status' ? (
-                <div className="space-y-4">
-                  <div>
+
+              {panelTab === 'items' && (
+                <div className="space-y-3">
+                  {/* search */}
+                  <input value={panelSearch} onChange={(e) => setPanelSearch(e.target.value)}
+                    placeholder="Search items…"
+                    className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                    style={{ backgroundColor: UI.raised, color: UI.text, border: `1px solid ${UI.border}` }} />
+
+                  {/* inventory slot grid */}
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {slots.map((item, i) => (
+                      <div key={item ? item.key : `empty-${i}`}
+                        onPointerDown={item ? onSlotPointerDown(item) : undefined}
+                        style={{
+                          touchAction: 'none',
+                          backgroundColor: UI.raised,
+                          border: `2px solid ${item && selectedKey === item.key ? UI.accent : UI.border}`,
+                        }}
+                        className={`relative flex aspect-square select-none flex-col items-center justify-center rounded-lg p-1 ${item ? 'cursor-grab active:scale-95' : ''}`}>
+                        {item && (
+                          <>
+                            <span className="h-6 w-6 rounded" style={{ backgroundColor: item.color }} />
+                            <span className="mt-0.5 w-full truncate text-center text-[8px] font-semibold leading-tight">{item.name}</span>
+                            <span className="absolute bottom-0.5 right-1 text-[8px] font-bold" style={{ color: UI.accent }}>{item.price}</span>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* selected item detail panel */}
+                  <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised, border: `1px solid ${UI.border}` }}>
+                    {selectedItem ? (
+                      <div className="flex gap-3">
+                        <span className="h-12 w-12 shrink-0 rounded" style={{ backgroundColor: selectedItem.color }} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="truncate text-sm font-bold">{selectedItem.name}</p>
+                            <p className="shrink-0 text-sm font-bold" style={{ color: UI.accent }}>
+                              {selectedItem.price} pt{selectedItem.price === 1 ? '' : 's'}
+                            </p>
+                          </div>
+                          <p className="text-[11px]" style={{ color: UI.muted }}>{selectedItem.desc}</p>
+                          <p className="mt-1 text-[10px]" style={{ color: UI.muted }}>
+                            Size {selectedItem.w}×{selectedItem.h}
+                            {selectedItem.clearance ? ` (+${selectedItem.clearance}-tile shadow)` : ''} ·{' '}
+                            {selectedItem.available > 99 ? '∞' : selectedItem.available} available
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px]" style={{ color: UI.muted }}>Tap a slot to inspect an item.</p>
+                    )}
+                    <p className="mt-2 text-center text-[10px]" style={{ color: UI.muted }}>Tap a slot to inspect · drag it onto the grid to place.</p>
+                  </div>
+                </div>
+              )}
+
+              {panelTab === 'info' && (
+                <div className="space-y-3">
+                  <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised }}>
                     <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Sneakyscape</p>
                     <p className="text-lg font-extrabold">{SNEAKYSCAPE_NAME}</p>
+                    <div className="mt-2 flex gap-4 text-sm">
+                      <span><span style={{ color: UI.muted }}>Items placed:</span> <b>{placed.length}</b></span>
+                      <span><span style={{ color: UI.muted }}>Spent:</span> <b style={{ color: UI.accent }}>{spent} pts</b></span>
+                    </div>
                   </div>
                   <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised }}>
                     <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Time of day</p>
@@ -688,32 +766,26 @@ export default function SneakyscapesPage() {
                     )}
                   </div>
                 </div>
-              ) : (
-                <>
-                  <ul className="space-y-2">
-                    {CATALOG.map((item) => (
-                      <li key={item.key}>
-                        <button onPointerDown={startDragFromPanel(item)} style={{ touchAction: 'none', backgroundColor: UI.raised, border: `1px solid ${UI.border}` }}
-                          className="flex w-full select-none items-center justify-between rounded-xl p-2 text-left active:scale-[0.98]">
-                          <span className="flex items-center gap-3">
-                            <span className="h-9 w-9 shrink-0 rounded" style={{ backgroundColor: item.color }} />
-                            <span>
-                              <span className="block text-sm font-semibold">{item.name}</span>
-                              <span className="block text-[10px]" style={{ color: UI.muted }}>
-                                {item.w}×{item.h}{item.clearance ? ` (+${item.clearance} shadow)` : ''} ·{' '}
-                                {item.available > 99 ? '∞' : item.available} available
-                              </span>
-                            </span>
-                          </span>
-                          <span className="shrink-0 text-sm font-bold" style={{ color: UI.accent }}>
-                            {item.price} pt{item.price === 1 ? '' : 's'}
-                          </span>
-                        </button>
-                      </li>
+              )}
+
+              {panelTab === 'map' && (
+                <div className="space-y-3">
+                  <p className="text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Viewing area</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['front', 'back'].map((s) => (
+                      <button key={s} onClick={() => setSide(s)}
+                        className="rounded-xl p-4 text-sm font-bold capitalize"
+                        style={side === s
+                          ? { backgroundColor: UI.accent, color: UI.accentInk }
+                          : { backgroundColor: UI.raised, color: UI.muted, border: `1px solid ${UI.border}` }}>
+                        {s} garden
+                      </button>
                     ))}
-                  </ul>
-                  <p className="mt-3 text-center text-[10px]" style={{ color: UI.muted }}>Drag an item onto the grid to place it.</p>
-                </>
+                  </div>
+                  <p className="text-[11px]" style={{ color: UI.muted }}>
+                    Pick which part of the plot to view. Close the menu to design it.
+                  </p>
+                </div>
               )}
             </div>
           </div>
