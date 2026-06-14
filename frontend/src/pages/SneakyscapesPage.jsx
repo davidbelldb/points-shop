@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '../lib/api.js';
 
 /**
  * SneakyscapesPage
@@ -166,26 +167,49 @@ const CATALOG = [
 const CATALOG_BY_KEY = Object.fromEntries(CATALOG.map((i) => [i.key, i]));
 
 /**
- * Resolve an item's footprint within a given view stack.
- * Returns one entry per occupied tile: { inBounds, key }.
- * Base extends DOWN (global rows +), the shadow buffer extends UP (global -).
+ * Local cell offsets for an item at a given rotation, anchored so the BASE
+ * top-left stays at (0,0). Base cells in rot 0 occupy rows 0..h-1, cols 0..w-1;
+ * the shadow buffer sits at negative rows (behind). Rotating turns the whole
+ * shape (base + shadow together) 90° clockwise per step, so the shadow stays on
+ * the correct side. Each entry: { r, c, buf }.
  */
-function resolveFootprint(stack, zone, rowIndex, col, item) {
+function rotatedCells(item, rot = 0) {
+  const pts = [];
+  for (let r = 0; r < item.h; r++) for (let c = 0; c < item.w; c++) pts.push({ r, c, buf: false });
+  for (let r = 1; r <= item.clearance; r++) for (let c = 0; c < item.w; c++) pts.push({ r: -r, c, buf: true });
+  const k = ((rot % 4) + 4) % 4;
+  return pts.map((p) => {
+    let r = p.r;
+    let c = p.c;
+    for (let i = 0; i < k; i++) { const nr = c; const nc = -r; r = nr; c = nc; } // 90° CW
+    return { r, c, buf: p.buf };
+  });
+}
+
+/** Bounding box { r0, c0, w, h } of a set of {r,c} cells. */
+function bbox(cells) {
+  const rs = cells.map((p) => p.r);
+  const cs = cells.map((p) => p.c);
+  const r0 = Math.min(...rs);
+  const c0 = Math.min(...cs);
+  return { r0, c0, h: Math.max(...rs) - r0 + 1, w: Math.max(...cs) - c0 + 1 };
+}
+
+/**
+ * Resolve an item's footprint (rotation-aware) within a given view stack.
+ * Returns one entry per occupied tile: { inBounds, key }.
+ */
+function resolveFootprint(stack, zone, rowIndex, col, item, rot = 0) {
   const totalRows = stack.length * 23;
   const gAnchor = stack.indexOf(zone) * 23 + rowIndex;
-  const cells = [];
-  for (let dr = 0; dr < item.h; dr++) {
-    for (let dc = 0; dc < item.w; dc++) cells.push([gAnchor + dr, col + dc]);
-  }
-  for (let dr = 1; dr <= item.clearance; dr++) {
-    for (let dc = 0; dc < item.w; dc++) cells.push([gAnchor - dr, col + dc]);
-  }
-  return cells.map(([g, c]) => {
-    const inBounds = g >= 0 && g < totalRows && c >= 1 && c <= 13;
+  return rotatedCells(item, rot).map(({ r, c }) => {
+    const g = gAnchor + r;
+    const cc = col + c;
+    const inBounds = g >= 0 && g < totalRows && cc >= 1 && cc <= 13;
     if (!inBounds) return { inBounds: false, key: null };
     const z = stack[Math.floor(g / 23)];
     const ri = g % 23;
-    return { inBounds: true, key: keyOf(z, ri, c) };
+    return { inBounds: true, key: keyOf(z, ri, cc) };
   });
 }
 
@@ -198,23 +222,27 @@ let INSTANCE_SEQ = 1;
 // stored per-user in Postgres later with no restructuring.
 const STORAGE_KEY = 'sneakyscapes:placed:v1';
 
+// Keep only well-formed rows that reference a known item; normalise rotation;
+// advance the id sequence past anything restored to avoid id collisions.
+function sanitizePlaced(data) {
+  if (!Array.isArray(data)) return [];
+  const clean = data
+    .filter(
+      (p) =>
+        p && CATALOG_BY_KEY[p.itemKey] &&
+        Number.isInteger(p.rowIndex) && Number.isInteger(p.col) && [0, 1, 2, 3].includes(p.zone)
+    )
+    .map((p) => ({ ...p, rot: ((Number(p.rot) || 0) % 4 + 4) % 4 }));
+  const maxId = clean.reduce((m, p) => Math.max(m, p.id || 0), 0);
+  if (maxId >= INSTANCE_SEQ) INSTANCE_SEQ = maxId + 1;
+  return clean;
+}
+
 function loadPlaced() {
   try {
     if (typeof window === 'undefined') return [];
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    if (!Array.isArray(data)) return [];
-    // Keep only well-formed rows that reference a known item.
-    const clean = data.filter(
-      (p) =>
-        p && CATALOG_BY_KEY[p.itemKey] &&
-        Number.isInteger(p.rowIndex) && Number.isInteger(p.col) && [0, 1, 2, 3].includes(p.zone)
-    );
-    // Advance the id sequence past anything we just restored to avoid collisions.
-    const maxId = clean.reduce((m, p) => Math.max(m, p.id || 0), 0);
-    if (maxId >= INSTANCE_SEQ) INSTANCE_SEQ = maxId + 1;
-    return clean;
+    return raw ? sanitizePlaced(JSON.parse(raw)) : [];
   } catch {
     return [];
   }
@@ -246,6 +274,10 @@ export default function SneakyscapesPage() {
   const rafId = useRef(null);
   const dragRef = useRef(null);
   const movingRef = useRef(null);
+  const dragRotRef = useRef(0); // rotation (0..3) of the item currently being dragged
+  const lastTapRef = useRef({ id: null, t: 0 }); // double-tap-to-rotate tracking
+  const hydratedRef = useRef(false); // true once the server layout has loaded
+  const saveTimer = useRef(null);
 
   // Occupied tiles (base + shadow). The item being moved is excluded.
   const occupied = useMemo(() => {
@@ -253,7 +285,7 @@ export default function SneakyscapesPage() {
     placed.forEach((p) => {
       if (p.id === movingId) return;
       const item = CATALOG_BY_KEY[p.itemKey];
-      resolveFootprint(stackForZone(p.zone), p.zone, p.rowIndex, p.col, item).forEach((x) => {
+      resolveFootprint(stackForZone(p.zone), p.zone, p.rowIndex, p.col, item, p.rot).forEach((x) => {
         if (x.inBounds) set.add(x.key);
       });
     });
@@ -261,14 +293,44 @@ export default function SneakyscapesPage() {
   }, [placed, movingId]);
   const occupiedRef = useRef(occupied);
   occupiedRef.current = occupied;
+  const placedRef = useRef(placed);
+  placedRef.current = placed;
 
-  // Persist placements so they survive a browser refresh.
+  // Load the shared layout from the server (syncs across devices & both users).
+  // localStorage seeded the initial state for an instant paint; if the server
+  // is empty but we have local placements (first run after this feature shipped)
+  // we migrate the local layout up instead of wiping it.
+  useEffect(() => {
+    let cancelled = false;
+    api.getSneakyscapes()
+      .then((res) => {
+        if (cancelled) return;
+        const serverPlaced = sanitizePlaced(res?.placements);
+        if (serverPlaced.length === 0 && placedRef.current.length > 0) {
+          api.saveSneakyscapes(placedRef.current).catch(() => {});
+        } else {
+          setPlaced(serverPlaced);
+        }
+      })
+      .catch(() => { /* offline / unauthenticated — keep the local copy */ })
+      .finally(() => { if (!cancelled) hydratedRef.current = true; });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist placements: instant localStorage cache + debounced server save.
+  // Gated on hydration so we never overwrite the server with the local cache
+  // before we've loaded it.
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(placed));
     } catch {
       /* storage unavailable (private mode / quota) — keep going in-memory */
     }
+    if (!hydratedRef.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      api.saveSneakyscapes(placed).catch(() => {});
+    }, 600);
   }, [placed]);
 
   // live clock for the Status tab (time of day)
@@ -297,6 +359,7 @@ export default function SneakyscapesPage() {
     movingRef.current = null;
     setMovingId(null);
     dragRef.current = item;
+    dragRotRef.current = 0; // fresh item — no rotation yet
     setDragItem(item);
     setGhost({ x, y });
     lastPt.current = { x, y };
@@ -335,11 +398,12 @@ export default function SneakyscapesPage() {
     const zone = Number(cellEl.dataset.zone);
     const rowIndex = Number(cellEl.dataset.row);
     const col = Number(cellEl.dataset.col);
-    const cells = resolveFootprint(stackForZone(zone), zone, rowIndex, col, item);
+    const rot = dragRotRef.current;
+    const cells = resolveFootprint(stackForZone(zone), zone, rowIndex, col, item, rot);
     const valid = cells.every(
       (x) => x.inBounds && !gridMap[x.key].blocked && !occupiedRef.current.has(x.key)
     );
-    return { zone, rowIndex, col, valid };
+    return { zone, rowIndex, col, valid, rot };
   };
 
   useEffect(() => {
@@ -376,7 +440,7 @@ export default function SneakyscapesPage() {
         } else {
           setPlaced((prev) => [
             ...prev,
-            { id: INSTANCE_SEQ++, itemKey: item.key, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey },
+            { id: INSTANCE_SEQ++, itemKey: item.key, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey, rot: result.rot || 0 },
           ]);
         }
       }
@@ -411,26 +475,62 @@ export default function SneakyscapesPage() {
     movingRef.current = p.id;
     setMovingId(p.id);
     dragRef.current = item;
+    dragRotRef.current = p.rot || 0; // re-dragging keeps the item's set rotation
     setDragItem(item);
     setGhost({ x, y });
     lastPt.current = { x, y };
   };
 
-  // Press-and-hold gesture on a placed item: move (on drag) OR open menu (on hold).
+  // Rotate a placed item 90° clockwise — only if the rotated footprint still
+  // fits at the same anchor (otherwise the rotation is ignored).
+  const rotatePlaced = (id) => {
+    setPlaced((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const item = CATALOG_BY_KEY[p.itemKey];
+        const nextRot = ((p.rot || 0) + 1) % 4;
+        const occ = new Set();
+        prev.forEach((o) => {
+          if (o.id === id) return;
+          const it = CATALOG_BY_KEY[o.itemKey];
+          resolveFootprint(stackForZone(o.zone), o.zone, o.rowIndex, o.col, it, o.rot).forEach((x) => {
+            if (x.inBounds) occ.add(x.key);
+          });
+        });
+        const cells = resolveFootprint(stackForZone(p.zone), p.zone, p.rowIndex, p.col, item, nextRot);
+        const fits = cells.every((x) => x.inBounds && !gridMap[x.key].blocked && !occ.has(x.key));
+        return fits ? { ...p, rot: nextRot } : p;
+      })
+    );
+  };
+
+  // Gesture on a placed item: drag = move · long-press = menu · double-tap = rotate.
   const onItemPointerDown = (p) => (e) => {
     if (dragRef.current || menu) return;
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
     const startY = e.clientY;
+    let longFired = false;
     const move = (ev) => {
       if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
         teardown();
         beginMove(p, ev.clientX, ev.clientY);
       }
     };
-    const up = () => teardown();
+    const up = () => {
+      teardown();
+      if (longFired) return;
+      const t = Date.now();
+      if (lastTapRef.current.id === p.id && t - lastTapRef.current.t < 300) {
+        lastTapRef.current = { id: null, t: 0 };
+        rotatePlaced(p.id); // second quick tap → rotate
+      } else {
+        lastTapRef.current = { id: p.id, t };
+      }
+    };
     const timer = setTimeout(() => {
+      longFired = true;
       teardown();
       setDupCount(1);
       setMenu({ id: p.id, x: startX, y: startY });
@@ -461,11 +561,11 @@ export default function SneakyscapesPage() {
         if (g === startG && c <= src.col) continue; // skip original + left of it on its row
         const z = stack[Math.floor(g / 23)];
         const ri = g % 23;
-        const cells = resolveFootprint(stack, z, ri, c, item);
+        const cells = resolveFootprint(stack, z, ri, c, item, src.rot);
         const ok = cells.every((x) => x.inBounds && !gridMap[x.key].blocked && !occ.has(x.key));
         if (ok) {
           cells.forEach((x) => occ.add(x.key));
-          copies.push({ id: INSTANCE_SEQ++, itemKey: item.key, zone: z, rowIndex: ri, col: c, anchorKey: keyOf(z, ri, c) });
+          copies.push({ id: INSTANCE_SEQ++, itemKey: item.key, zone: z, rowIndex: ri, col: c, anchorKey: keyOf(z, ri, c), rot: src.rot || 0 });
         }
       }
     }
@@ -511,24 +611,24 @@ export default function SneakyscapesPage() {
       .flatMap((p) => {
         const item = CATALOG_BY_KEY[p.itemKey];
         const gTop = stack.indexOf(p.zone) * 23 + p.rowIndex;
+        const cells = rotatedCells(item, p.rot);
+        const baseCells = cells.filter((c) => !c.buf);
+        const bufCells = cells.filter((c) => c.buf);
+        const b = bbox(baseCells);
         const nodes = [];
-        if (item.clearance > 0) {
-          const rawTop = gTop - item.clearance + 1;
-          const top = Math.max(1, rawTop);
-          const span = gTop + 1 - top;
-          if (span > 0) {
-            nodes.push(
-              <div key={`${p.id}-buf`}
-                style={{ gridColumn: `${p.col} / span ${item.w}`, gridRow: `${top} / span ${span}`, backgroundColor: SHADOW_FILL, backgroundImage: SHADOW_HATCH }}
-                className="pointer-events-none z-10 border border-dashed border-black/40" />
-            );
-          }
+        if (bufCells.length) {
+          const f = bbox(bufCells);
+          nodes.push(
+            <div key={`${p.id}-buf`}
+              style={{ gridColumn: `${p.col + f.c0} / span ${f.w}`, gridRow: `${gTop + f.r0 + 1} / span ${f.h}`, backgroundColor: SHADOW_FILL, backgroundImage: SHADOW_HATCH }}
+              className="pointer-events-none z-10 border border-dashed border-black/40" />
+          );
         }
         nodes.push(
           <div key={p.id} onPointerDown={onItemPointerDown(p)}
             style={{
-              gridColumn: `${p.col} / span ${item.w}`,
-              gridRow: `${gTop + 1} / span ${item.h}`,
+              gridColumn: `${p.col + b.c0} / span ${b.w}`,
+              gridRow: `${gTop + b.r0 + 1} / span ${b.h}`,
               backgroundColor: item.color,
               pointerEvents: dragItem ? 'none' : 'auto',
               touchAction: 'none',
@@ -543,15 +643,12 @@ export default function SneakyscapesPage() {
   const renderPreviewOverlay = (stack) => {
     if (!preview || !dragItem || !stack.includes(preview.zone)) return null;
     const gTop = stack.indexOf(preview.zone) * 23 + preview.rowIndex;
-    const rawTop = gTop - dragItem.clearance + 1;
-    const top = Math.max(1, rawTop);
-    const span = gTop + dragItem.h + 1 - top;
-    if (span <= 0) return null;
+    const box = bbox(rotatedCells(dragItem, preview.rot)); // base + shadow combined
     return (
       <div className="pointer-events-none z-30"
         style={{
-          gridColumn: `${preview.col} / span ${dragItem.w}`,
-          gridRow: `${top} / span ${span}`,
+          gridColumn: `${preview.col + box.c0} / span ${box.w}`,
+          gridRow: `${gTop + box.r0 + 1} / span ${box.h}`,
           backgroundColor: preview.valid ? 'rgba(34,197,94,0.40)' : 'rgba(239,68,68,0.42)',
           boxShadow: preview.valid ? 'inset 0 0 0 2px #16a34a' : 'inset 0 0 0 2px #dc2626',
         }} />

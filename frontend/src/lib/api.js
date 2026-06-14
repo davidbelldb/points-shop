@@ -276,6 +276,10 @@ export const api = {
   crChallengeCancel: () => request('/games/cambs-rage/challenge/cancel', { method: 'POST', body: JSON.stringify({}) }),
   crOnlineWin:       (matchId) => request('/games/cambs-rage/online-win', { method: 'POST', body: JSON.stringify({ matchId }) }),
 
+  // Sneakyscapes (garden planner — shared layout)
+  getSneakyscapes:  () => request('/sneakyscapes'),
+  saveSneakyscapes: (placements) => request('/sneakyscapes', { method: 'PUT', body: JSON.stringify({ placements }) }),
+
   // Shopping list
   shopItems:       () => request('/shopping/items'),
   shopAddItem:     (item) => request('/shopping/items', { method: 'POST', body: JSON.stringify(item) }),

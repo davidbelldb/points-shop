@@ -52,6 +52,7 @@ import sneakyButtonRoutes from './sneaky-button/sneaky-button.routes.js';
 import timelineRoutes from './timeline/timeline.routes.js';
 import storageRoutes from './storage/storage.routes.js';
 import readsRoutes from './reads/reads.routes.js';
+import sneakyscapesRoutes from './sneakyscapes/sneakyscapes.routes.js';
 
 export async function registerAppRoutes(fastify) {
   await fastify.register(productsRoutes);
@@ -95,4 +96,5 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(timelineRoutes);
   await fastify.register(storageRoutes);
   await fastify.register(readsRoutes);
+  await fastify.register(sneakyscapesRoutes);
 }
