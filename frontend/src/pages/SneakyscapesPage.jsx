@@ -48,7 +48,6 @@ const ZONES = [0, 1, 2, 3];
 // Coordinate labels, gutter and zone dividers are intentionally NOT rendered for
 // now (the coordinates still exist in the data model). Cells fill the grid edge
 // to edge: column = col (1..13), row = global row + 1.
-const GRID_COLS_TEMPLATE = 'repeat(13, minmax(0, 1fr))';
 
 // View stacks (top -> bottom). Back-of-property (Zone 3) sits at the top.
 const FRONT_STACK = [0];
@@ -609,7 +608,7 @@ export default function SneakyscapesPage() {
             els.push(
               <div key={cell.key} data-cell data-zone={zone} data-row={ri} data-col={col}
                 data-blocked={cell.blocked ? 'true' : 'false'} title={cell.label}
-                style={style} className="aspect-square" />
+                style={style} className="min-h-0 min-w-0" />
             );
           });
         });
@@ -646,10 +645,11 @@ export default function SneakyscapesPage() {
               gridColumn: `${p.col + b.c0} / span ${b.w}`,
               gridRow: `${gTop + b.r0 + 1} / span ${b.h}`,
               backgroundColor: item.color,
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.35)',
               pointerEvents: dragItem ? 'none' : 'auto',
               touchAction: 'none',
             }}
-            className="relative z-20 flex cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white shadow ring-1 ring-black/40 active:cursor-grabbing">
+            className="relative z-20 flex min-h-0 min-w-0 cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white active:cursor-grabbing">
             <span className="px-0.5 text-center drop-shadow">{item.name}</span>
             <span style={frontEdgeStyle(p.rot)} />
           </div>
@@ -672,14 +672,23 @@ export default function SneakyscapesPage() {
     );
   };
 
-  const renderBoard = (stack, cells) => (
-    <div className="relative grid w-full select-none"
-      style={{ gridTemplateColumns: GRID_COLS_TEMPLATE }}>
-      {cells}
-      {renderPlacedOverlays(stack)}
-      {renderPreviewOverlay(stack)}
-    </div>
-  );
+  const renderBoard = (stack, cells) => {
+    const totalRows = stack.length * 23;
+    return (
+      // Fixed aspect-ratio + equal 1fr rows/cols → every cell is a TRUE square and
+      // overlays land exactly on the same grid lines (no sub-pixel drift).
+      <div className="relative grid w-full select-none"
+        style={{
+          gridTemplateColumns: 'repeat(13, 1fr)',
+          gridTemplateRows: `repeat(${totalRows}, 1fr)`,
+          aspectRatio: `13 / ${totalRows}`,
+        }}>
+        {cells}
+        {renderPlacedOverlays(stack)}
+        {renderPreviewOverlay(stack)}
+      </div>
+    );
+  };
 
   /* ---------------- layout ---------------- */
 
