@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
 /**
@@ -251,6 +252,7 @@ function loadPlaced() {
 /* ------------------------------------------------------------------ */
 
 export default function SneakyscapesPage() {
+  const navigate = useNavigate();
   const gridMap = useMemo(() => buildGridMap(), []);
 
   const [placed, setPlaced] = useState(loadPlaced); // {id, itemKey, zone, rowIndex, col, anchorKey}
@@ -276,6 +278,9 @@ export default function SneakyscapesPage() {
   const lastTapRef = useRef({ id: null, t: 0 }); // double-tap-to-rotate tracking
   const hydratedRef = useRef(false); // true once the server layout has loaded
   const saveTimer = useRef(null);
+  const dirtyRef = useRef(false); // local edits awaiting a save (don't let polling clobber them)
+  const lastSyncedAt = useRef(null); // server updated_at we last loaded/saved
+  const applyingRemoteRef = useRef(false); // a setPlaced caused by remote data — don't echo it back
 
   // Occupied tiles (base + shadow). The item being moved is excluded.
   const occupied = useMemo(() => {
@@ -305,8 +310,12 @@ export default function SneakyscapesPage() {
         if (cancelled) return;
         const serverPlaced = sanitizePlaced(res?.placements);
         if (serverPlaced.length === 0 && placedRef.current.length > 0) {
-          api.saveSneakyscapes(placedRef.current).catch(() => {});
+          api.saveSneakyscapes(placedRef.current)
+            .then((resp) => { if (resp?.updated_at) lastSyncedAt.current = resp.updated_at; })
+            .catch(() => {});
         } else {
+          lastSyncedAt.current = res?.updated_at ?? null;
+          applyingRemoteRef.current = true; // don't echo this back to the server
           setPlaced(serverPlaced);
         }
       })
@@ -325,11 +334,34 @@ export default function SneakyscapesPage() {
       /* storage unavailable (private mode / quota) — keep going in-memory */
     }
     if (!hydratedRef.current) return;
+    if (applyingRemoteRef.current) { applyingRemoteRef.current = false; return; } // came from server — don't re-save
+    dirtyRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      api.saveSneakyscapes(placed).catch(() => {});
+      api.saveSneakyscapes(placed)
+        .then((resp) => { if (resp?.updated_at) lastSyncedAt.current = resp.updated_at; dirtyRef.current = false; })
+        .catch(() => {});
     }, 600);
   }, [placed]);
+
+  // Poll the shared layout every 4s so the other device's changes appear live.
+  // Cheap: one tiny singleton SELECT against your own server, no external cost.
+  // Skipped while you're dragging or have unsaved local edits, so it never
+  // clobbers in-progress work.
+  useEffect(() => {
+    const id = setInterval(async () => {
+      if (!hydratedRef.current || dirtyRef.current || dragRef.current) return;
+      try {
+        const res = await api.getSneakyscapes();
+        if (res && res.updated_at && res.updated_at !== lastSyncedAt.current) {
+          lastSyncedAt.current = res.updated_at;
+          applyingRemoteRef.current = true;
+          setPlaced(sanitizePlaced(res.placements));
+        }
+      } catch { /* ignore transient errors */ }
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
 
   // live clock for the Status tab (time of day)
   useEffect(() => {
@@ -711,22 +743,37 @@ export default function SneakyscapesPage() {
   const slots = [...filteredItems];
   while (slots.length < SLOT_MIN || slots.length % 4 !== 0) slots.push(null);
 
+  // Floating HUD buttons sit clear of the iPhone status bar / notch.
+  const hudTop = 'calc(env(safe-area-inset-top, 0px) + 10px)';
+
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden" style={{ backgroundColor: UI.frame }}>
+    // Fixed full-viewport overlay ABOVE the app header (z-50) → true full-screen,
+    // and nothing inside can paint over the app nav. The X exits back to home.
+    <div className="fixed inset-0 z-50 overflow-hidden" style={{ height: '100dvh', backgroundColor: UI.frame }}>
       {/* full-screen game canvas */}
       <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ touchAction: dragItem ? 'none' : 'pan-y' }}>
         {side === 'front' ? renderBoard(FRONT_STACK, boards.front) : renderBoard(BACK_STACK, boards.back)}
       </div>
 
-      {/* floating HUD menu button (over the grid) */}
+      {/* floating HUD menu button (top-left, over the grid) */}
       <button onClick={() => { setPanelTab('items'); setPanelOpen(true); }} aria-label="Open menu"
-        className="absolute left-3 top-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl active:scale-95"
-        style={{ backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: UI.text, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+        className="absolute left-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl active:scale-95"
+        style={{ top: hudTop, backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: UI.text, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <line x1="4" y1="7" x2="20" y2="7" />
           <line x1="4" y1="12" x2="20" y2="12" />
           <line x1="4" y1="17" x2="20" y2="17" />
+        </svg>
+      </button>
+
+      {/* exit full-screen (top-right) */}
+      <button onClick={() => navigate('/')} aria-label="Exit"
+        className="absolute right-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl active:scale-95"
+        style={{ top: hudTop, backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: UI.text, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="6" y1="6" x2="18" y2="18" />
+          <line x1="18" y1="6" x2="6" y2="18" />
         </svg>
       </button>
 
