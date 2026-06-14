@@ -47,6 +47,50 @@ function mapDoc(d) {
   };
 }
 
+// Google Books search — used as a secondary source alongside Open Library.
+// Open Library's catalogue lags for upcoming/not-yet-published titles (it's
+// sourced from library MARC records + Internet Archive ingestion, both of
+// which happen at/after publication); Google Books gets pre-release metadata
+// and cover art from publishers, so it fills that gap and often has better
+// cover-image coverage too. Works without a key (lower, shared quota) — set
+// GOOGLE_BOOKS_API_KEY to use your own quota.
+async function googleBooksFetch(q) {
+  const key = (process.env.GOOGLE_BOOKS_API_KEY || '').trim();
+  const qs = new URLSearchParams({ q, maxResults: '12' });
+  if (key) qs.set('key', key);
+  try {
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${qs.toString()}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function mapGoogleItem(v) {
+  const info = v.volumeInfo || {};
+  const ids = info.industryIdentifiers || [];
+  const isbn = ids.find((i) => i.type === 'ISBN_13')?.identifier || ids[0]?.identifier || null;
+  let cover = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || null;
+  if (cover) cover = cover.replace(/^http:/, 'https:');
+  return {
+    source_id: v.id ? `gbooks:${v.id}` : null,
+    title: info.title || 'Untitled',
+    author: (info.authors || []).join(', ') || null,
+    cover_url: cover,
+    genres: (info.categories || []).slice(0, 4),
+    rating: typeof info.averageRating === 'number' ? info.averageRating : null,
+    page_count: Number.isInteger(info.pageCount) ? info.pageCount : null,
+    year: info.publishedDate ? String(info.publishedDate).slice(0, 4) : '',
+    isbn,
+  };
+}
+
+// Loose dedupe key — same title + first author, case/whitespace-insensitive.
+function dedupeKey(title, author) {
+  return `${(title || '').toLowerCase().trim()}|${(author || '').toLowerCase().trim().split(',')[0]}`;
+}
+
 export default async function readsRoutes(fastify) {
   // The calling account's reading list, including books suggested to them.
   fastify.get('/api/reads', async (req) => {
@@ -69,20 +113,54 @@ export default async function readsRoutes(fastify) {
     return partner || { id: null, name: 'them' };
   });
 
-  // Open Library type-ahead proxy.
+  // Open Library + Google Books type-ahead proxy. Open Library gives broad
+  // catalogue coverage; Google Books fills gaps on upcoming/new titles and
+  // often has better cover art. Results are merged and deduped by title+author.
   fastify.get('/api/reads/search', async (req) => {
     const q = (req.query?.q || '').trim();
     if (q.length < 2) return { configured: true, results: [] };
-    const data = await openLibraryFetch('/search.json', {
-      q,
-      limit: 12,
-      fields: 'key,title,author_name,cover_i,first_publish_year,subject,isbn,ratings_average,number_of_pages_median',
-    });
-    if (!data) return { configured: true, results: [], error: 'request failed' };
-    const results = (data.docs || [])
+
+    const [olData, gbData] = await Promise.all([
+      openLibraryFetch('/search.json', {
+        q,
+        limit: 12,
+        fields: 'key,title,author_name,cover_i,first_publish_year,subject,isbn,ratings_average,number_of_pages_median',
+      }),
+      googleBooksFetch(q),
+    ]);
+
+    const olResults = (olData?.docs || [])
       .map(mapDoc)
       .filter((r) => r.title && r.title !== 'Untitled');
-    return { configured: true, results };
+    const gbResults = (gbData?.items || [])
+      .map(mapGoogleItem)
+      .filter((r) => r.title && r.title !== 'Untitled');
+
+    // Open Library first (broader), then merge in Google Books: fill gaps
+    // (e.g. missing cover/rating/page count) on existing matches, and append
+    // any titles Google Books has that Open Library doesn't (new/upcoming).
+    const seen = new Map();
+    const results = [];
+    for (const r of olResults) {
+      seen.set(dedupeKey(r.title, r.author), r);
+      results.push(r);
+    }
+    for (const r of gbResults) {
+      const k = dedupeKey(r.title, r.author);
+      const existing = seen.get(k);
+      if (existing) {
+        existing.cover_url ||= r.cover_url;
+        existing.rating ??= r.rating;
+        existing.page_count ??= r.page_count;
+        if (!existing.genres?.length && r.genres?.length) existing.genres = r.genres;
+        continue;
+      }
+      seen.set(k, r);
+      results.push(r);
+    }
+
+    if (!olData && !gbData) return { configured: true, results: [], error: 'request failed' };
+    return { configured: true, results: results.slice(0, 14) };
   });
 
   // Add a book.

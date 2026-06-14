@@ -195,7 +195,7 @@ export const api = {
   updateRewatch: (id, patch) => request(`/rewatch/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteRewatch: (id) => request(`/rewatch/${id}`, { method: 'DELETE' }),
 
-  // Sneaky Reads (shared reading list, Google Books-backed replica of rewatch)
+  // Sneaky Reads (shared reading list, Open Library + Google Books search, replica of rewatch)
   readsList: () => request('/reads'),
   readsPartner: () => request('/reads/partner'),
   readsSearch: (q) => request(`/reads/search?q=${encodeURIComponent(q)}`),
