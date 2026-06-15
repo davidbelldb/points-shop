@@ -181,6 +181,8 @@ function buildGridMap() {
 /*    upward (behind), but blocks NOTHING — you can place/walk behind  */
 /*    a tall shrub. Only affects rendering when a sprite is present;   */
 /*    the flat colour fallback always uses the footprint size.         */
+/*  - spriteHByState: { <growth>: rows } overrides spriteH per state,  */
+/*    e.g. grass { long: 2 } → long grass is 2 tiles tall, short is 1. */
 /* Items are depth-sorted front→back: lower on screen draws in front.  */
 /*                                                                    */
 /* STATE / VARIANT MODEL (drives which sprite shows):                 */
@@ -197,7 +199,7 @@ function buildGridMap() {
 /* ------------------------------------------------------------------ */
 
 const CATALOG = [
-  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.', growthStages: ['short', 'medium', 'long'], growthHours: 2 },
+  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.', growthStages: ['short', 'medium', 'long'], growthHours: 2, spriteHByState: { long: 2 } },
   { key: 'soil', name: 'Soil', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#7c4a1e', desc: 'Bare planting soil.' },
   { key: 'gravel', name: 'Gravel', type: 'terrain', w: 1, h: 1, clearance: 0, price: 8, available: 999, color: '#9aa0a6', desc: 'Decorative gravel path.' },
   { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, spriteH: 2, price: 40, available: 12, color: '#3d9be0', desc: 'Flowering shrub. Needs regular watering.' },
@@ -766,7 +768,9 @@ export default function SneakyscapesPage() {
 
         // Tall sprites overdraw UPWARD beyond the footprint (no blocking). Only
         // when there's a sprite, and only for upright rotations (refined in Pixi).
-        const extra = sprite && !p.rot ? Math.max(0, (item.spriteH || item.h) - item.h) : 0;
+        // Height can vary by state (e.g. long grass is 2 tiles tall, short is 1).
+        const effSpriteH = (grown && item.spriteHByState?.[grown]) || item.spriteH || item.h;
+        const extra = sprite && !p.rot ? Math.max(0, effSpriteH - item.h) : 0;
         let rowStart = gTop + b.r0 + 1 - extra;
         let rowSpan = b.h + extra;
         if (rowStart < 1) { rowSpan += rowStart - 1; rowStart = 1; } // clamp at grid top
@@ -1024,7 +1028,9 @@ export default function SneakyscapesPage() {
                               border: `1px solid ${UI.border}`,
                               backgroundColor: url ? UI.raised : selectedItem.color,
                               backgroundImage: url ? `url(${url})` : undefined,
-                              backgroundSize: '100% 100%',
+                              backgroundSize: 'contain',
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'bottom',
                               imageRendering: 'pixelated',
                             }}
                             className="h-12 w-12 shrink-0 cursor-grab rounded-lg active:scale-95" />
