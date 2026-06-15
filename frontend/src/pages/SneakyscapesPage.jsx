@@ -684,7 +684,7 @@ export default function SneakyscapesPage() {
         const ok = cells.every((x) => x.inBounds && !gridMap[x.key].blocked && !occ.has(x.key));
         if (ok) {
           cells.forEach((x) => occ.add(x.key));
-          copies.push({ id: INSTANCE_SEQ++, itemKey: item.key, zone: z, rowIndex: ri, col: c, anchorKey: keyOf(z, ri, c), rot: src.rot || 0, placedAt: Date.now() });
+          copies.push({ id: INSTANCE_SEQ++, itemKey: item.key, zone: z, rowIndex: ri, col: c, anchorKey: keyOf(z, ri, c), rot: src.rot || 0, placedAt: src.placedAt ?? Date.now(), ...(src.growth ? { growth: src.growth } : {}) });
         }
       }
     }
