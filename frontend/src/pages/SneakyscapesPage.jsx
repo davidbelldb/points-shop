@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { resolveItemSprite, resolveBaseTile, resolveHouseSprite } from '../game/sprites.js';
 
 /**
  * SneakyscapesPage
@@ -152,6 +153,18 @@ function buildGridMap() {
 /* Item catalog                                                       */
 /* w = width (cols), h = base depth (rows), clearance = shadow rows.   */
 /* size in real-world ft is for reference as art is added.            */
+/*                                                                    */
+/* STATE / VARIANT MODEL (drives which sprite shows):                 */
+/*  - Global scene (env): { season, weather, timeOfDay } — shared by  */
+/*    the whole garden, weather/season to be fed by a weather API.    */
+/*  - Per-placed-item state (stored on the instance, JSONB-friendly): */
+/*      growth?  : 'bare' | 'sprout' | 'bloom' | ...  (plant lifecycle)*/
+/*      watered? : boolean                            (false → 'dry') */
+/*      device?  : { provider, id, state } | null     (IoT link, later)*/
+/*    These live ON the placement object, so adding/using them needs  */
+/*    NO DB migration. The sprite resolver (game/sprites.js) turns     */
+/*    scene + state into the best available sprite, falling back to    */
+/*    'default' then the flat colour block.                            */
 /* ------------------------------------------------------------------ */
 
 const CATALOG = [
@@ -268,6 +281,9 @@ export default function SneakyscapesPage() {
   const [panelSearch, setPanelSearch] = useState('');
   const [selectedKey, setSelectedKey] = useState('grass'); // inspected item in the shop grid
   const [now, setNow] = useState(() => new Date());
+  // Scene drives sprite variants. season/weather will come from a weather API
+  // later; time 'auto' follows the clock. Overridable here for testing art.
+  const [scene, setScene] = useState({ season: 'summer', weather: 'clear', time: 'auto' });
   const swipeX = useRef(null);
 
   const lastPt = useRef(null);
@@ -619,6 +635,16 @@ export default function SneakyscapesPage() {
     if (copies.length) setPlaced((prev) => [...prev, ...copies]);
   };
 
+  /* ---------------- scene / environment (drives sprite variants) ---------------- */
+
+  const hour = now.getHours();
+  const phase = hour < 6 ? 'Night' : hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : hour < 21 ? 'Evening' : 'Night';
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+  const timeOfDay = scene.time !== 'auto' ? scene.time : (hour < 6 || hour >= 20 ? 'night' : 'day');
+  const env = { season: scene.season, weather: scene.weather, timeOfDay };
+  const baseTile = resolveBaseTile(env);
+
   /* ---------------- static board (cells/gutter/dividers) ---------------- */
 
   const boards = useMemo(() => {
@@ -636,7 +662,14 @@ export default function SneakyscapesPage() {
               border: CELL_LINE,
               backgroundColor: cell.blocked ? HOUSE : checker ? CELL_A : CELL_B,
             };
-            if (cell.blocked) style.backgroundImage = HOUSE_HATCH;
+            if (cell.blocked) {
+              style.backgroundImage = HOUSE_HATCH;
+            } else if (baseTile) {
+              // ground sprite (pixel-art crisp), checker colour stays as fallback
+              style.backgroundImage = `url(${baseTile})`;
+              style.backgroundSize = '100% 100%';
+              style.imageRendering = 'pixelated';
+            }
             els.push(
               <div key={cell.key} data-cell data-zone={zone} data-row={ri} data-col={col}
                 data-blocked={cell.blocked ? 'true' : 'false'} title={cell.label}
@@ -648,7 +681,7 @@ export default function SneakyscapesPage() {
       return els;
     };
     return { front: make(FRONT_STACK), back: make(BACK_STACK) };
-  }, [gridMap]);
+  }, [gridMap, baseTile]);
 
   /* ---------------- dynamic overlays ---------------- */
 
@@ -671,19 +704,26 @@ export default function SneakyscapesPage() {
               className="pointer-events-none z-10 border border-dashed border-black/40" />
           );
         }
+        const sprite = resolveItemSprite(item.key, env, p); // scene + per-item state
+        const bodyStyle = {
+          gridColumn: `${p.col + b.c0} / span ${b.w}`,
+          gridRow: `${gTop + b.r0 + 1} / span ${b.h}`,
+          pointerEvents: dragItem ? 'none' : 'auto',
+          touchAction: 'none',
+        };
+        if (sprite) {
+          bodyStyle.backgroundImage = `url(${sprite})`;
+          bodyStyle.backgroundSize = '100% 100%';
+          bodyStyle.imageRendering = 'pixelated';
+        } else {
+          bodyStyle.backgroundColor = item.color;
+          bodyStyle.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.35)';
+        }
         nodes.push(
-          <div key={p.id} onPointerDown={onItemPointerDown(p)}
-            style={{
-              gridColumn: `${p.col + b.c0} / span ${b.w}`,
-              gridRow: `${gTop + b.r0 + 1} / span ${b.h}`,
-              backgroundColor: item.color,
-              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.35)',
-              pointerEvents: dragItem ? 'none' : 'auto',
-              touchAction: 'none',
-            }}
+          <div key={p.id} onPointerDown={onItemPointerDown(p)} style={bodyStyle}
             className="relative z-20 flex min-h-0 min-w-0 cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white active:cursor-grabbing">
-            <span className="px-0.5 text-center drop-shadow">{item.name}</span>
-            <span style={frontEdgeStyle(p.rot)} />
+            {!sprite && <span className="px-0.5 text-center drop-shadow">{item.name}</span>}
+            {!sprite && <span style={frontEdgeStyle(p.rot)} />}
           </div>
         );
         return nodes;
@@ -706,6 +746,8 @@ export default function SneakyscapesPage() {
 
   const renderBoard = (stack, cells) => {
     const totalRows = stack.length * 23;
+    const isFront = stack.length === 1 && stack[0] === 0;
+    const house = isFront ? resolveHouseSprite('front') : null;
     return (
       // Fixed aspect-ratio + equal 1fr rows/cols → every cell is a TRUE square and
       // overlays land exactly on the same grid lines (no sub-pixel drift).
@@ -716,6 +758,12 @@ export default function SneakyscapesPage() {
           aspectRatio: `13 / ${totalRows}`,
         }}>
         {cells}
+        {house && (
+          // House image spans the whole front grid; the art is transparent over
+          // the playable bottom-right. Sits under placed items, ignores touches.
+          <div className="pointer-events-none"
+            style={{ gridColumn: '1 / span 13', gridRow: '1 / span 23', backgroundImage: `url(${house})`, backgroundSize: '100% 100%', imageRendering: 'pixelated', zIndex: 5 }} />
+        )}
         {renderPlacedOverlays(stack)}
         {renderPreviewOverlay(stack)}
       </div>
@@ -726,12 +774,6 @@ export default function SneakyscapesPage() {
 
   const menuItem = menu ? placed.find((p) => p.id === menu.id) : null;
   const menuCat = menuItem ? CATALOG_BY_KEY[menuItem.itemKey] : null;
-
-  // Status-tab clock
-  const hour = now.getHours();
-  const phase = hour < 6 ? 'Night' : hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : hour < 21 ? 'Evening' : 'Night';
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dateStr = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
   const actions = []; // future: [{ id, text, due }] e.g. "Water Hydrangea today between …"
 
   // Shop / inventory derived data
@@ -931,6 +973,31 @@ export default function SneakyscapesPage() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* scene tester — preview sprite variants (season/weather/time will be API-driven later) */}
+                  <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised }}>
+                    <p className="mb-2 text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Scene (testing)</p>
+                    {[
+                      { key: 'season', label: 'Season', opts: ['spring', 'summer', 'autumn', 'winter'] },
+                      { key: 'weather', label: 'Weather', opts: ['clear', 'rain', 'snow'] },
+                      { key: 'time', label: 'Time', opts: ['auto', 'day', 'night'] },
+                    ].map((row) => (
+                      <div key={row.key} className="mb-2 last:mb-0">
+                        <p className="mb-1 text-[10px]" style={{ color: UI.muted }}>{row.label}</p>
+                        <div className="flex flex-wrap gap-1">
+                          {row.opts.map((o) => (
+                            <button key={o} onClick={() => setScene((s) => ({ ...s, [row.key]: o }))}
+                              className="rounded-md px-2 py-1 text-[11px] font-semibold capitalize"
+                              style={scene[row.key] === o
+                                ? { backgroundColor: UI.accent, color: UI.accentInk }
+                                : { backgroundColor: UI.panel, color: UI.muted, border: `1px solid ${UI.border}` }}>
+                              {o}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised }}>
