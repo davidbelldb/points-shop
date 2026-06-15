@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle.jsx';
-import { useAuth } from '../lib/AuthContext.jsx';
 
 const ICON_COLOUR = '#ed70bd';
 
@@ -104,16 +103,6 @@ function UserIcon() {
     </svg>
   );
 }
-function SproutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 20h10" />
-      <path d="M12 20c0-6 0-8 0-10" />
-      <path d="M12 10C12 7 9 4 5 4c0 4 3 6 7 6z" />
-      <path d="M12 12c0-2.5 2.5-5 6-5 0 3.5-2.5 5-6 5z" />
-    </svg>
-  );
-}
 function Item({ to, label, icon, onClose }) {
   const location = useLocation();
   const active = to === '/'
@@ -138,9 +127,6 @@ function Item({ to, label, icon, onClose }) {
 const SWIPE_LEFT_THRESHOLD = 60;
 
 export default function MenuDrawer({ open, onClose }) {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin'; // David only — keeps Sneakyscapes hidden from Katie for now
-
   useEffect(() => {
     if (!open) return undefined;
     function onKey(e) { if (e.key === 'Escape') onClose(); }
@@ -194,9 +180,6 @@ export default function MenuDrawer({ open, onClose }) {
             <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
             <Item to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} onClose={onClose} />
             <Item to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} onClose={onClose} />
-            {isAdmin && (
-              <Item to="/sneakyscapes" label="Sneakyscapes" icon={<SproutIcon />} onClose={onClose} />
-            )}
           </div>
           <div className="mt-auto pt-2">
             <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />
