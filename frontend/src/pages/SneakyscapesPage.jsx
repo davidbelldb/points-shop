@@ -161,8 +161,15 @@ function buildGridMap() {
 
 /* ------------------------------------------------------------------ */
 /* Item catalog                                                       */
-/* w = width (cols), h = base depth (rows), clearance = shadow rows.   */
-/* size in real-world ft is for reference as art is added.            */
+/* w = width (cols), h = base depth (rows).                           */
+/* TWO kinds of "tall":                                               */
+/*  - clearance: N → solid structure (shed). Reserves/BLOCKS N tiles  */
+/*    behind it; nothing can be placed there.                         */
+/*  - spriteH: total rows the SPRITE spans (>= h). The art overdraws   */
+/*    upward (behind), but blocks NOTHING — you can place/walk behind  */
+/*    a tall shrub. Only affects rendering when a sprite is present;   */
+/*    the flat colour fallback always uses the footprint size.         */
+/* Items are depth-sorted front→back: lower on screen draws in front.  */
 /*                                                                    */
 /* STATE / VARIANT MODEL (drives which sprite shows):                 */
 /*  - Global scene (env): { season, weather, timeOfDay } — shared by  */
@@ -181,7 +188,7 @@ const CATALOG = [
   { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.' },
   { key: 'soil', name: 'Soil', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#7c4a1e', desc: 'Bare planting soil.' },
   { key: 'gravel', name: 'Gravel', type: 'terrain', w: 1, h: 1, clearance: 0, price: 8, available: 999, color: '#9aa0a6', desc: 'Decorative gravel path.' },
-  { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, price: 40, available: 12, color: '#3d9be0', desc: 'Flowering shrub. Needs regular watering.' },
+  { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, spriteH: 2, price: 40, available: 12, color: '#3d9be0', desc: 'Flowering shrub. Needs regular watering.' },
   { key: 'bench', name: 'Garden Bench', type: 'entity', w: 2, h: 1, clearance: 0, price: 120, available: 4, color: '#9c6b27', desc: 'A two-seat garden bench.' },
   { key: 'shed', name: 'Garden Office / Shed', type: 'entity', w: 5, h: 4, clearance: 2, price: 1500, available: 1, color: '#6b7280', desc: 'Tall structure — casts a 2-tile shadow footprint behind it.' },
   { key: 'trampoline', name: 'Trampoline', type: 'entity', w: 5, h: 5, clearance: 0, price: 600, available: 1, color: '#5b54d6', desc: "A kids' trampoline." },
@@ -716,15 +723,27 @@ export default function SneakyscapesPage() {
           );
         }
         const sprite = resolveItemSprite(item.key, env, p); // scene + per-item state
+
+        // Tall sprites overdraw UPWARD beyond the footprint (no blocking). Only
+        // when there's a sprite, and only for upright rotations (refined in Pixi).
+        const extra = sprite && !p.rot ? Math.max(0, (item.spriteH || item.h) - item.h) : 0;
+        let rowStart = gTop + b.r0 + 1 - extra;
+        let rowSpan = b.h + extra;
+        if (rowStart < 1) { rowSpan += rowStart - 1; rowStart = 1; } // clamp at grid top
+
+        // Depth sort: items lower on screen (larger bottom row) render in front.
+        const bottomRow = gTop + b.r0 + b.h;
         const bodyStyle = {
           gridColumn: `${p.col + b.c0} / span ${b.w}`,
-          gridRow: `${gTop + b.r0 + 1} / span ${b.h}`,
+          gridRow: `${rowStart} / span ${rowSpan}`,
+          zIndex: 20 + bottomRow,
           pointerEvents: dragItem ? 'none' : 'auto',
           touchAction: 'none',
         };
         if (sprite) {
           bodyStyle.backgroundImage = `url(${sprite})`;
           bodyStyle.backgroundSize = '100% 100%';
+          bodyStyle.backgroundPosition = 'bottom';
           bodyStyle.imageRendering = 'pixelated';
         } else {
           bodyStyle.backgroundColor = item.color;
@@ -732,7 +751,7 @@ export default function SneakyscapesPage() {
         }
         nodes.push(
           <div key={p.id} onPointerDown={onItemPointerDown(p)} style={bodyStyle}
-            className="relative z-20 flex min-h-0 min-w-0 cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white active:cursor-grabbing">
+            className="relative flex min-h-0 min-w-0 cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white active:cursor-grabbing">
             {!sprite && <span className="px-0.5 text-center drop-shadow">{item.name}</span>}
             {!sprite && <span style={frontEdgeStyle(p.rot)} />}
           </div>
@@ -745,10 +764,11 @@ export default function SneakyscapesPage() {
     const gTop = stack.indexOf(preview.zone) * 23 + preview.rowIndex;
     const box = bbox(rotatedCells(dragItem, preview.rot)); // base + shadow combined
     return (
-      <div className="pointer-events-none z-30"
+      <div className="pointer-events-none"
         style={{
           gridColumn: `${preview.col + box.c0} / span ${box.w}`,
           gridRow: `${gTop + box.r0 + 1} / span ${box.h}`,
+          zIndex: 9999, // always above the depth-sorted items
           backgroundColor: preview.valid ? 'rgba(34,197,94,0.40)' : 'rgba(239,68,68,0.42)',
           boxShadow: preview.valid ? 'inset 0 0 0 2px #16a34a' : 'inset 0 0 0 2px #dc2626',
         }} />
@@ -809,9 +829,10 @@ export default function SneakyscapesPage() {
     // Fixed full-viewport overlay ABOVE the app header (z-50) → true full-screen,
     // and nothing inside can paint over the app nav. The X exits back to home.
     <div className="fixed inset-0 z-50 overflow-hidden" style={{ height: '100dvh', backgroundColor: UI.frame }}>
-      {/* full-screen game canvas */}
+      {/* full-screen game canvas. isolate: contains the per-item depth z-indexes
+          so they can't paint over the HUD clock / menu / drag chip. */}
       <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain"
-        style={{ touchAction: dragItem ? 'none' : 'pan-y' }}>
+        style={{ touchAction: dragItem ? 'none' : 'pan-y', isolation: 'isolate' }}>
         {side === 'front' ? renderBoard(FRONT_STACK, boards.front) : renderBoard(BACK_STACK, boards.back)}
       </div>
 
