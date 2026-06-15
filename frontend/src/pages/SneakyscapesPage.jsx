@@ -785,8 +785,12 @@ export default function SneakyscapesPage() {
   const slots = [...filteredItems];
   while (slots.length < SLOT_MIN || slots.length % 4 !== 0) slots.push(null);
 
-  // Floating HUD buttons sit clear of the iPhone status bar / notch.
+  // Floating HUD sits clear of the iPhone status bar / notch.
   const hudTop = 'calc(env(safe-area-inset-top, 0px) + 10px)';
+  // Pixel-style clock label, e.g. "08:27 15/06".
+  const clockLabel =
+    `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ` +
+    `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   return (
     // Fixed full-viewport overlay ABOVE the app header (z-50) → true full-screen,
@@ -798,25 +802,20 @@ export default function SneakyscapesPage() {
         {side === 'front' ? renderBoard(FRONT_STACK, boards.front) : renderBoard(BACK_STACK, boards.back)}
       </div>
 
-      {/* floating HUD menu button (top-left, over the grid) */}
+      {/* centered pixel clock/date — tap to open the menu */}
       <button onClick={() => { setPanelTab('items'); setPanelOpen(true); }} aria-label="Open menu"
-        className="absolute left-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl active:scale-95"
-        style={{ top: hudTop, backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: UI.text, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <line x1="4" y1="7" x2="20" y2="7" />
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <line x1="4" y1="17" x2="20" y2="17" />
-        </svg>
-      </button>
-
-      {/* exit full-screen (top-right) */}
-      <button onClick={() => navigate('/')} aria-label="Exit"
-        className="absolute right-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl active:scale-95"
-        style={{ top: hudTop, backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: UI.text, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <line x1="6" y1="6" x2="18" y2="18" />
-          <line x1="18" y1="6" x2="6" y2="18" />
-        </svg>
+        className="absolute left-1/2 z-40 -translate-x-1/2 px-2 py-0.5 active:scale-95"
+        style={{
+          top: hudTop,
+          color: UI.text,
+          fontFamily: 'ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace',
+          fontWeight: 800,
+          fontSize: '17px',
+          letterSpacing: '0.5px',
+          fontVariantNumeric: 'tabular-nums',
+          textShadow: '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 2px 6px rgba(0,0,0,0.7)',
+        }}>
+        {clockLabel}
       </button>
 
       {/* floating drag chip */}
@@ -1025,6 +1024,13 @@ export default function SneakyscapesPage() {
                     style={{ backgroundColor: '#b3402f', opacity: placed.length === 0 ? 0.4 : 1 }}
                     className="w-full rounded-xl py-2 text-sm font-semibold text-white">
                     Clear all items
+                  </button>
+
+                  {/* quit the game (back to the app) */}
+                  <button onClick={() => navigate('/')}
+                    className="w-full rounded-xl py-2 text-sm font-semibold"
+                    style={{ backgroundColor: UI.raised, color: UI.text, border: `1px solid ${UI.border}` }}>
+                    Quit to app
                   </button>
                 </div>
               )}
