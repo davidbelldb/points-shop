@@ -200,7 +200,7 @@ function buildGridMap() {
 /* ------------------------------------------------------------------ */
 
 const CATALOG = [
-  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.', growthStages: ['short', 'medium', 'long'], growthHours: 2, spriteHByState: { long: 1.5 } },
+  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.', growthStages: ['short', 'medium', 'long'], growthHours: 0.05 /* TEMP: 3 min/stage for testing — set back to 2 */, spriteHByState: { long: 1.5 } },
   { key: 'soil', name: 'Soil', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#7c4a1e', desc: 'Bare planting soil.' },
   { key: 'gravel', name: 'Gravel', type: 'terrain', w: 1, h: 1, clearance: 0, price: 8, available: 999, color: '#9aa0a6', desc: 'Decorative gravel path.' },
   { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, spriteH: 2, price: 40, available: 12, color: '#3d9be0', desc: 'Flowering shrub. Needs regular watering.' },
