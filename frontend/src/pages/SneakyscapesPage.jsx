@@ -291,6 +291,7 @@ export default function SneakyscapesPage() {
   const [preview, setPreview] = useState(null); // {zone, rowIndex, col, valid}
   const [side, setSide] = useState('back'); // 'front' | 'back'
   const [movingId, setMovingId] = useState(null);
+  const [locked, setLocked] = useState(true); // when locked, touches pan the map instead of dragging items
   const [menu, setMenu] = useState(null); // {id, x, y} long-press popout
   const [dupCount, setDupCount] = useState(1);
   const [panelOpen, setPanelOpen] = useState(false); // Stardew menu panel
@@ -737,7 +738,8 @@ export default function SneakyscapesPage() {
           gridColumn: `${p.col + b.c0} / span ${b.w}`,
           gridRow: `${rowStart} / span ${rowSpan}`,
           zIndex: 20 + bottomRow,
-          pointerEvents: dragItem ? 'none' : 'auto',
+          // locked → ignore touches so the map pans; unlocked → grabbable
+          pointerEvents: dragItem || locked ? 'none' : 'auto',
           touchAction: 'none',
         };
         if (sprite) {
@@ -750,7 +752,7 @@ export default function SneakyscapesPage() {
           bodyStyle.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.35)';
         }
         nodes.push(
-          <div key={p.id} onPointerDown={onItemPointerDown(p)} style={bodyStyle}
+          <div key={p.id} onPointerDown={locked ? undefined : onItemPointerDown(p)} style={bodyStyle}
             className="relative flex min-h-0 min-w-0 cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white active:cursor-grabbing">
             {!sprite && <span className="px-0.5 text-center drop-shadow">{item.name}</span>}
             {!sprite && <span style={frontEdgeStyle(p.rot)} />}
@@ -850,6 +852,23 @@ export default function SneakyscapesPage() {
           textShadow: '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 2px 6px rgba(0,0,0,0.7)',
         }}>
         {clockLabel}
+      </button>
+
+      {/* lock toggle (top-right) — locked by default so panning doesn't drag items */}
+      <button onClick={() => setLocked((v) => !v)} aria-label={locked ? 'Unlock items' : 'Lock items'}
+        className="absolute right-3 z-40 flex h-10 w-10 items-center justify-center rounded-xl active:scale-95"
+        style={{ top: hudTop, backgroundColor: UI.hud, border: `1px solid ${UI.border}`, color: locked ? UI.text : UI.accent, boxShadow: '0 4px 12px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+        {locked ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0" />
+          </svg>
+        )}
       </button>
 
       {/* floating drag chip */}
