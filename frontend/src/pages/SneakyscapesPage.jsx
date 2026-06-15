@@ -65,6 +65,18 @@ const PANEL_TABS = [
 ];
 const SLOT_MIN = 12; // pad the inventory grid out with empty slots
 
+// Time-based growth: a placed item with growthStages advances one stage every
+// growthHours since placedAt (e.g. grass: short@2h, medium@4h, long@6h). Returns
+// the current stage token, or null before the first stage (→ 'default' sprite).
+// (Later this will be modulated by the weather API / watering.)
+function derivedGrowth(item, placedAt, nowMs) {
+  if (!item.growthStages || !placedAt) return null;
+  const hours = (nowMs - placedAt) / 3600000;
+  const stageIndex = Math.floor(hours / (item.growthHours || 2)) - 1;
+  if (stageIndex < 0) return null;
+  return item.growthStages[Math.min(stageIndex, item.growthStages.length - 1)];
+}
+
 // Astronomical seasons (N. hemisphere). Boundaries: Spring 20 Mar, Summer 21 Jun,
 // Autumn 22 Sep, Winter 21 Dec. Returns 'spring'|'summer'|'autumn'|'winter'.
 function seasonForDate(d) {
@@ -185,7 +197,7 @@ function buildGridMap() {
 /* ------------------------------------------------------------------ */
 
 const CATALOG = [
-  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.' },
+  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.', growthStages: ['short', 'medium', 'long'], growthHours: 2 },
   { key: 'soil', name: 'Soil', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#7c4a1e', desc: 'Bare planting soil.' },
   { key: 'gravel', name: 'Gravel', type: 'terrain', w: 1, h: 1, clearance: 0, price: 8, available: 999, color: '#9aa0a6', desc: 'Decorative gravel path.' },
   { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, spriteH: 2, price: 40, available: 12, color: '#3d9be0', desc: 'Flowering shrub. Needs regular watering.' },
@@ -504,7 +516,7 @@ export default function SneakyscapesPage() {
         } else {
           setPlaced((prev) => [
             ...prev,
-            { id: INSTANCE_SEQ++, itemKey: item.key, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey, rot: result.rot || 0 },
+            { id: INSTANCE_SEQ++, itemKey: item.key, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey, rot: result.rot || 0, placedAt: Date.now() },
           ]);
         }
       }
@@ -646,7 +658,7 @@ export default function SneakyscapesPage() {
         const ok = cells.every((x) => x.inBounds && !gridMap[x.key].blocked && !occ.has(x.key));
         if (ok) {
           cells.forEach((x) => occ.add(x.key));
-          copies.push({ id: INSTANCE_SEQ++, itemKey: item.key, zone: z, rowIndex: ri, col: c, anchorKey: keyOf(z, ri, c), rot: src.rot || 0 });
+          copies.push({ id: INSTANCE_SEQ++, itemKey: item.key, zone: z, rowIndex: ri, col: c, anchorKey: keyOf(z, ri, c), rot: src.rot || 0, placedAt: Date.now() });
         }
       }
     }
@@ -723,7 +735,10 @@ export default function SneakyscapesPage() {
               className="pointer-events-none z-10 border border-dashed border-black/40" />
           );
         }
-        const sprite = resolveItemSprite(item.key, env, p); // scene + per-item state
+        // Time-based growth (e.g. grass length) is derived from placedAt, so it
+        // advances on its own as the clock ticks. Doesn't override an explicit growth.
+        const grown = p.growth ?? derivedGrowth(item, p.placedAt, now.getTime());
+        const sprite = resolveItemSprite(item.key, env, grown ? { ...p, growth: grown } : p);
 
         // Tall sprites overdraw UPWARD beyond the footprint (no blocking). Only
         // when there's a sprite, and only for upright rotations (refined in Pixi).
