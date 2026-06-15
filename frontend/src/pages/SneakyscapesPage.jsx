@@ -182,7 +182,8 @@ function buildGridMap() {
 /*    a tall shrub. Only affects rendering when a sprite is present;   */
 /*    the flat colour fallback always uses the footprint size.         */
 /*  - spriteHByState: { <growth>: rows } overrides spriteH per state,  */
-/*    e.g. grass { long: 2 } → long grass is 2 tiles tall, short is 1. */
+/*    rows may be fractional, e.g. grass { long: 1.5 } → long grass    */
+/*    rises 1.5 tiles, short stays 1.                                  */
 /* Items are depth-sorted front→back: lower on screen draws in front.  */
 /*                                                                    */
 /* STATE / VARIANT MODEL (drives which sprite shows):                 */
@@ -199,7 +200,7 @@ function buildGridMap() {
 /* ------------------------------------------------------------------ */
 
 const CATALOG = [
-  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.', growthStages: ['short', 'medium', 'long'], growthHours: 2, spriteHByState: { long: 2 } },
+  { key: 'grass', name: 'Grass', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#43a047', desc: 'Flat lawn turf.', growthStages: ['short', 'medium', 'long'], growthHours: 2, spriteHByState: { long: 1.5 } },
   { key: 'soil', name: 'Soil', type: 'terrain', w: 1, h: 1, clearance: 0, price: 5, available: 999, color: '#7c4a1e', desc: 'Bare planting soil.' },
   { key: 'gravel', name: 'Gravel', type: 'terrain', w: 1, h: 1, clearance: 0, price: 8, available: 999, color: '#9aa0a6', desc: 'Decorative gravel path.' },
   { key: 'hydrangea', name: 'Hydrangea', type: 'entity', w: 1, h: 1, clearance: 0, spriteH: 2, price: 40, available: 12, color: '#3d9be0', desc: 'Flowering shrub. Needs regular watering.' },
@@ -766,39 +767,39 @@ export default function SneakyscapesPage() {
         const grown = p.growth ?? derivedGrowth(item, p.placedAt, now.getTime());
         const sprite = resolveItemSprite(item.key, env, grown ? { ...p, growth: grown } : p);
 
-        // Tall sprites overdraw UPWARD beyond the footprint (no blocking). Only
-        // when there's a sprite, and only for upright rotations (refined in Pixi).
-        // Height can vary by state (e.g. long grass is 2 tiles tall, short is 1).
+        // Visual height as a multiple of the footprint height. Can be fractional
+        // (e.g. long grass = 1.5 tiles). The body always occupies just the
+        // footprint; a taller sprite OVERDRAWS upward via overflow (no blocking).
+        // Only for upright rotations (refined in Pixi).
         const effSpriteH = (grown && item.spriteHByState?.[grown]) || item.spriteH || item.h;
-        const extra = sprite && !p.rot ? Math.max(0, effSpriteH - item.h) : 0;
-        let rowStart = gTop + b.r0 + 1 - extra;
-        let rowSpan = b.h + extra;
-        if (rowStart < 1) { rowSpan += rowStart - 1; rowStart = 1; } // clamp at grid top
+        const heightPct = sprite && !p.rot ? (effSpriteH / b.h) * 100 : 100;
 
         // Depth sort: items lower on screen (larger bottom row) render in front.
         const bottomRow = gTop + b.r0 + b.h;
         const bodyStyle = {
           gridColumn: `${p.col + b.c0} / span ${b.w}`,
-          gridRow: `${rowStart} / span ${rowSpan}`,
+          gridRow: `${gTop + b.r0 + 1} / span ${b.h}`,
           zIndex: 20 + bottomRow,
+          overflow: sprite ? 'visible' : 'hidden', // let tall sprites spill upward
           // locked → ignore touches so the map pans; unlocked → grabbable
           pointerEvents: dragItem || locked ? 'none' : 'auto',
           touchAction: 'none',
         };
-        if (sprite) {
-          bodyStyle.backgroundImage = `url(${sprite})`;
-          bodyStyle.backgroundSize = '100% 100%';
-          bodyStyle.backgroundPosition = 'bottom';
-          bodyStyle.imageRendering = 'pixelated';
-        } else {
+        if (!sprite) {
           bodyStyle.backgroundColor = item.color;
           bodyStyle.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.35)';
         }
         nodes.push(
           <div key={p.id} onPointerDown={locked ? undefined : onItemPointerDown(p)} style={bodyStyle}
-            className="relative flex min-h-0 min-w-0 cursor-grab touch-none items-center justify-center overflow-hidden text-[7px] font-semibold leading-tight text-white active:cursor-grabbing">
-            {!sprite && <span className="px-0.5 text-center drop-shadow">{item.name}</span>}
-            {!sprite && <span style={frontEdgeStyle(p.rot)} />}
+            className="relative flex min-h-0 min-w-0 cursor-grab touch-none items-center justify-center text-[7px] font-semibold leading-tight text-white active:cursor-grabbing">
+            {sprite ? (
+              <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${heightPct}%`, backgroundImage: `url(${sprite})`, backgroundSize: '100% 100%', backgroundPosition: 'bottom', imageRendering: 'pixelated' }} />
+            ) : (
+              <>
+                <span className="px-0.5 text-center drop-shadow">{item.name}</span>
+                <span style={frontEdgeStyle(p.rot)} />
+              </>
+            )}
           </div>
         );
         return nodes;
