@@ -276,7 +276,9 @@ function sanitizePlaced(data) {
         p && CATALOG_BY_KEY[p.itemKey] &&
         Number.isInteger(p.rowIndex) && Number.isInteger(p.col) && [0, 1, 2, 3].includes(p.zone)
     )
-    .map((p) => ({ ...p, rot: ((Number(p.rot) || 0) % 4 + 4) % 4 }));
+    // Backfill a growth clock for items saved before placedAt existed, otherwise
+    // they'd never grow (derivedGrowth needs a timestamp).
+    .map((p) => ({ ...p, rot: ((Number(p.rot) || 0) % 4 + 4) % 4, placedAt: p.placedAt || Date.now() }));
   const maxId = clean.reduce((m, p) => Math.max(m, p.id || 0), 0);
   if (maxId >= INSTANCE_SEQ) INSTANCE_SEQ = maxId + 1;
   return clean;
@@ -796,7 +798,7 @@ export default function SneakyscapesPage() {
               <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${heightPct}%`, backgroundImage: `url(${sprite})`, backgroundSize: '100% 100%', backgroundPosition: 'bottom', imageRendering: 'pixelated' }} />
             ) : (
               <>
-                <span className="px-0.5 text-center drop-shadow">{item.name}</span>
+                <span className="px-0.5 text-center drop-shadow">{grown ?? item.name}</span>
                 <span style={frontEdgeStyle(p.rot)} />
               </>
             )}
