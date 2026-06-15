@@ -65,6 +65,16 @@ const PANEL_TABS = [
 ];
 const SLOT_MIN = 12; // pad the inventory grid out with empty slots
 
+// Astronomical seasons (N. hemisphere). Boundaries: Spring 20 Mar, Summer 21 Jun,
+// Autumn 22 Sep, Winter 21 Dec. Returns 'spring'|'summer'|'autumn'|'winter'.
+function seasonForDate(d) {
+  const md = (d.getMonth() + 1) * 100 + d.getDate(); // e.g. 15 Jun → 615
+  if (md >= 1221 || md <= 319) return 'winter';
+  if (md <= 620) return 'spring';
+  if (md <= 921) return 'summer';
+  return 'autumn';
+}
+
 // Fixed board palette (theme-independent game canvas).
 const CELL_A = '#356b3b';
 const CELL_B = '#2f5d34';
@@ -283,7 +293,7 @@ export default function SneakyscapesPage() {
   const [now, setNow] = useState(() => new Date());
   // Scene drives sprite variants. season/weather will come from a weather API
   // later; time 'auto' follows the clock. Overridable here for testing art.
-  const [scene, setScene] = useState({ season: 'summer', weather: 'clear', time: 'auto' });
+  const [scene, setScene] = useState({ season: 'auto', weather: 'clear', time: 'auto' });
   const swipeX = useRef(null);
 
   const lastPt = useRef(null);
@@ -642,7 +652,8 @@ export default function SneakyscapesPage() {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
   const timeOfDay = scene.time !== 'auto' ? scene.time : (hour < 6 || hour >= 20 ? 'night' : 'day');
-  const env = { season: scene.season, weather: scene.weather, timeOfDay };
+  const season = scene.season !== 'auto' ? scene.season : seasonForDate(now); // date-driven unless overridden
+  const env = { season, weather: scene.weather, timeOfDay };
   const baseTile = resolveBaseTile(env);
 
   /* ---------------- static board (cells/gutter/dividers) ---------------- */
@@ -787,10 +798,12 @@ export default function SneakyscapesPage() {
 
   // Floating HUD sits clear of the iPhone status bar / notch.
   const hudTop = 'calc(env(safe-area-inset-top, 0px) + 10px)';
-  // Pixel-style clock label, e.g. "08:27 15/06".
-  const clockLabel =
-    `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ` +
-    `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // Pixel-style clock label, e.g. "08:47 Mon 15 June — Spring".
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const weekday = now.toLocaleDateString(undefined, { weekday: 'short' });
+  const monthName = now.toLocaleDateString(undefined, { month: 'long' });
+  const seasonName = season.charAt(0).toUpperCase() + season.slice(1);
+  const clockLabel = `${hhmm} ${weekday} ${now.getDate()} ${monthName} — ${seasonName}`;
 
   return (
     // Fixed full-viewport overlay ABOVE the app header (z-50) → true full-screen,
@@ -804,14 +817,14 @@ export default function SneakyscapesPage() {
 
       {/* centered pixel clock/date — tap to open the menu */}
       <button onClick={() => { setPanelTab('items'); setPanelOpen(true); }} aria-label="Open menu"
-        className="absolute left-1/2 z-40 -translate-x-1/2 px-2 py-0.5 active:scale-95"
+        className="absolute left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 active:scale-95"
         style={{
           top: hudTop,
           color: UI.text,
           fontFamily: 'ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace',
           fontWeight: 800,
-          fontSize: '17px',
-          letterSpacing: '0.5px',
+          fontSize: '14px',
+          letterSpacing: '0.3px',
           fontVariantNumeric: 'tabular-nums',
           textShadow: '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 2px 6px rgba(0,0,0,0.7)',
         }}>
@@ -978,7 +991,7 @@ export default function SneakyscapesPage() {
                   <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised }}>
                     <p className="mb-2 text-[10px] uppercase tracking-wide" style={{ color: UI.muted }}>Scene (testing)</p>
                     {[
-                      { key: 'season', label: 'Season', opts: ['spring', 'summer', 'autumn', 'winter'] },
+                      { key: 'season', label: 'Season', opts: ['auto', 'spring', 'summer', 'autumn', 'winter'] },
                       { key: 'weather', label: 'Weather', opts: ['clear', 'rain', 'snow'] },
                       { key: 'time', label: 'Time', opts: ['auto', 'day', 'night'] },
                     ].map((row) => (
@@ -1021,16 +1034,16 @@ export default function SneakyscapesPage() {
 
                   {/* wipe the whole garden */}
                   <button onClick={clearAll} disabled={placed.length === 0}
-                    style={{ backgroundColor: '#b3402f', opacity: placed.length === 0 ? 0.4 : 1 }}
+                    style={{ backgroundColor: '#6b7280', opacity: placed.length === 0 ? 0.4 : 1 }}
                     className="w-full rounded-xl py-2 text-sm font-semibold text-white">
                     Clear all items
                   </button>
 
                   {/* quit the game (back to the app) */}
                   <button onClick={() => navigate('/')}
-                    className="w-full rounded-xl py-2 text-sm font-semibold"
-                    style={{ backgroundColor: UI.raised, color: UI.text, border: `1px solid ${UI.border}` }}>
-                    Quit to app
+                    style={{ backgroundColor: '#b3402f' }}
+                    className="w-full rounded-xl py-2 text-sm font-semibold text-white">
+                    Quit
                   </button>
                 </div>
               )}
