@@ -321,6 +321,7 @@ export default function SneakyscapesPage() {
   const dragRef = useRef(null);
   const movingRef = useRef(null);
   const dragRotRef = useRef(0); // rotation (0..3) of the item currently being dragged
+  const dragGrowthRef = useRef(null); // explicit growth/variant for the item being placed (null = auto)
   const lastTapRef = useRef({ id: null, t: 0 }); // double-tap-to-rotate tracking
   const hydratedRef = useRef(false); // true once the server layout has loaded
   const saveTimer = useRef(null);
@@ -430,15 +431,37 @@ export default function SneakyscapesPage() {
   // Pick an item out of the journal's Items tab and immediately start dragging
   // it onto the grid. Closing the panel reveals the cells under the finger so
   // elementFromPoint can hit-test them mid-drag.
-  const startDragFromPanel = (item, x, y) => {
+  const startDragFromPanel = (item, x, y, growth = null) => {
     setPanelOpen(false);
     movingRef.current = null;
     setMovingId(null);
     dragRef.current = item;
     dragRotRef.current = 0; // fresh item — no rotation yet
+    dragGrowthRef.current = growth; // explicit length/variant, or null = auto-grow
     setDragItem(item);
     setGhost({ x, y });
     lastPt.current = { x, y };
+  };
+
+  // Drag a specific variant thumbnail (e.g. a grass length) out onto the grid.
+  const onVariantPointerDown = (item, growth) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const move = (ev) => {
+      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
+        teardown();
+        startDragFromPanel(item, ev.clientX, ev.clientY, growth);
+      }
+    };
+    const up = () => teardown();
+    const teardown = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   };
 
   // Inventory-slot gesture: tap = inspect (show detail), drag = place on the grid.
@@ -516,7 +539,7 @@ export default function SneakyscapesPage() {
         } else {
           setPlaced((prev) => [
             ...prev,
-            { id: INSTANCE_SEQ++, itemKey: item.key, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey, rot: result.rot || 0, placedAt: Date.now() },
+            { id: INSTANCE_SEQ++, itemKey: item.key, zone: result.zone, rowIndex: result.rowIndex, col: result.col, anchorKey, rot: result.rot || 0, placedAt: Date.now(), ...(dragGrowthRef.current ? { growth: dragGrowthRef.current } : {}) },
           ]);
         }
       }
@@ -552,6 +575,7 @@ export default function SneakyscapesPage() {
     setMovingId(p.id);
     dragRef.current = item;
     dragRotRef.current = p.rot || 0; // re-dragging keeps the item's set rotation
+    dragGrowthRef.current = null; // moving preserves the instance's existing growth
     setDragItem(item);
     setGhost({ x, y });
     lastPt.current = { x, y };
@@ -986,6 +1010,28 @@ export default function SneakyscapesPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* variant thumbnails (e.g. grass lengths) — drag one onto the grid */}
+                  {selectedItem?.growthStages && (
+                    <div className="flex gap-1.5">
+                      {['default', ...selectedItem.growthStages].map((g) => {
+                        const url = resolveItemSprite(selectedItem.key, env, g === 'default' ? {} : { growth: g });
+                        return (
+                          <div key={g}
+                            onPointerDown={onVariantPointerDown(selectedItem, g === 'default' ? null : g)}
+                            style={{
+                              touchAction: 'none',
+                              border: `1px solid ${UI.border}`,
+                              backgroundColor: url ? UI.raised : selectedItem.color,
+                              backgroundImage: url ? `url(${url})` : undefined,
+                              backgroundSize: '100% 100%',
+                              imageRendering: 'pixelated',
+                            }}
+                            className="h-12 w-12 shrink-0 cursor-grab rounded-lg active:scale-95" />
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* selected item detail panel */}
                   <div className="rounded-xl p-3" style={{ backgroundColor: UI.raised, border: `1px solid ${UI.border}` }}>
