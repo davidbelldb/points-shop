@@ -135,7 +135,7 @@ function buildBlockedSet() {
   };
 
   // Zone 0: ONLY rows N..W, cols 8..13 are AVAILABLE; the rest is house.
-  const z0AvailRows = ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W'];
+  const z0AvailRows = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W'];
   ROWS.forEach((rowLetter, rowIndex) => {
     COLS.forEach((col) => {
       const available = z0AvailRows.includes(rowLetter) && col >= 8 && col <= 13;
