@@ -56,6 +56,14 @@ const FRONT_STACK = [0];
 const BACK_STACK = [3, 2, 1];
 const stackForZone = (zone) => (zone === 0 ? FRONT_STACK : BACK_STACK);
 
+// Front garden fills the page: an empty spacer track of this many row-heights
+// sits ABOVE the 23 playable rows, so the tile area (and the bottom-aligned
+// house image) drop to the bottom of the screen. Viewport-tuned for now.
+const FRONT_TOP_SPACER = 3.258;
+// Grid row of the first playable row: row 1 normally; row 2 on the front board
+// (after the spacer track). Cells/overlays/preview/house all use this.
+const rowBaseFor = (stack) => (stack.length === 1 && stack[0] === 0 ? 2 : 1);
+
 // Placeholder — the player will name their plot during game setup later.
 const SNEAKYSCAPE_NAME = "Katie's Sneakyscape";
 // Tabbed menu pages — Stardew-style. Add more pages here as the game grows.
@@ -709,6 +717,7 @@ export default function SneakyscapesPage() {
 
   const boards = useMemo(() => {
     const make = (stack) => {
+      const rowBase = rowBaseFor(stack);
       const els = [];
       stack.forEach((zone, si) => {
         ROWS.forEach((rowLetter, ri) => {
@@ -718,7 +727,7 @@ export default function SneakyscapesPage() {
             const checker = (ri + col) % 2 === 0;
             const style = {
               gridColumn: col,
-              gridRow: g + 1,
+              gridRow: g + rowBase,
               border: CELL_LINE,
               backgroundColor: cell.blocked ? HOUSE : checker ? CELL_A : CELL_B,
             };
@@ -750,6 +759,7 @@ export default function SneakyscapesPage() {
       .filter((p) => stack.includes(p.zone) && p.id !== movingId)
       .flatMap((p) => {
         const item = CATALOG_BY_KEY[p.itemKey];
+        const rowBase = rowBaseFor(stack);
         const gTop = stack.indexOf(p.zone) * 23 + p.rowIndex;
         const cells = rotatedCells(item, p.rot);
         const baseCells = cells.filter((c) => !c.buf);
@@ -760,7 +770,7 @@ export default function SneakyscapesPage() {
           const f = bbox(bufCells);
           nodes.push(
             <div key={`${p.id}-buf`}
-              style={{ gridColumn: `${p.col + f.c0} / span ${f.w}`, gridRow: `${gTop + f.r0 + 1} / span ${f.h}`, backgroundColor: SHADOW_FILL, backgroundImage: SHADOW_HATCH }}
+              style={{ gridColumn: `${p.col + f.c0} / span ${f.w}`, gridRow: `${gTop + f.r0 + rowBase} / span ${f.h}`, backgroundColor: SHADOW_FILL, backgroundImage: SHADOW_HATCH }}
               className="pointer-events-none z-10 border border-dashed border-black/40" />
           );
         }
@@ -780,7 +790,7 @@ export default function SneakyscapesPage() {
         const bottomRow = gTop + b.r0 + b.h;
         const bodyStyle = {
           gridColumn: `${p.col + b.c0} / span ${b.w}`,
-          gridRow: `${gTop + b.r0 + 1} / span ${b.h}`,
+          gridRow: `${gTop + b.r0 + rowBase} / span ${b.h}`,
           zIndex: 20 + bottomRow,
           overflow: sprite ? 'visible' : 'hidden', // let tall sprites spill upward
           // locked → ignore touches so the map pans; unlocked → grabbable
@@ -809,13 +819,14 @@ export default function SneakyscapesPage() {
 
   const renderPreviewOverlay = (stack) => {
     if (!preview || !dragItem || !stack.includes(preview.zone)) return null;
+    const rowBase = rowBaseFor(stack);
     const gTop = stack.indexOf(preview.zone) * 23 + preview.rowIndex;
     const box = bbox(rotatedCells(dragItem, preview.rot)); // base + shadow combined
     return (
       <div className="pointer-events-none"
         style={{
           gridColumn: `${preview.col + box.c0} / span ${box.w}`,
-          gridRow: `${gTop + box.r0 + 1} / span ${box.h}`,
+          gridRow: `${gTop + box.r0 + rowBase} / span ${box.h}`,
           zIndex: 9999, // always above the depth-sorted items
           backgroundColor: preview.valid ? 'rgba(34,197,94,0.40)' : 'rgba(239,68,68,0.42)',
           boxShadow: preview.valid ? 'inset 0 0 0 2px #16a34a' : 'inset 0 0 0 2px #dc2626',
@@ -827,21 +838,23 @@ export default function SneakyscapesPage() {
     const totalRows = stack.length * 23;
     const isFront = stack.length === 1 && stack[0] === 0;
     const house = isFront ? resolveHouseSprite('front', env) : null;
+    // Front board: empty spacer row on top so the 23 playable rows + house drop
+    // to the bottom of the page. Back board: full-height square grid as before.
+    const gridTemplateRows = isFront
+      ? `${FRONT_TOP_SPACER}fr repeat(23, 1fr)`
+      : `repeat(${totalRows}, 1fr)`;
+    const aspectRatio = isFront ? `13 / ${23 + FRONT_TOP_SPACER}` : `13 / ${totalRows}`;
     return (
       // Fixed aspect-ratio + equal 1fr rows/cols → every cell is a TRUE square and
       // overlays land exactly on the same grid lines (no sub-pixel drift).
       <div className="relative grid w-full select-none"
-        style={{
-          gridTemplateColumns: 'repeat(13, 1fr)',
-          gridTemplateRows: `repeat(${totalRows}, 1fr)`,
-          aspectRatio: `13 / ${totalRows}`,
-        }}>
+        style={{ gridTemplateColumns: 'repeat(13, 1fr)', gridTemplateRows, aspectRatio }}>
         {cells}
         {house && (
-          // House image spans the whole front grid; the art is transparent over
-          // the playable bottom-right. Sits under placed items, ignores touches.
+          // House image spans the 23 tile rows (below the spacer), bottom-aligned.
+          // Transparent over the playable cells; under items; ignores touches.
           <div className="pointer-events-none"
-            style={{ gridColumn: '1 / span 13', gridRow: '1 / span 23', backgroundImage: `url(${house})`, backgroundSize: '100% 100%', imageRendering: 'pixelated', zIndex: 5 }} />
+            style={{ gridColumn: '1 / span 13', gridRow: '2 / span 23', backgroundImage: `url(${house})`, backgroundSize: '100% 100%', imageRendering: 'pixelated', zIndex: 5 }} />
         )}
         {renderPlacedOverlays(stack)}
         {renderPreviewOverlay(stack)}
