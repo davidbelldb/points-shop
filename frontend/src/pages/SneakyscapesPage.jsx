@@ -826,7 +826,7 @@ export default function SneakyscapesPage() {
   const renderBoard = (stack, cells) => {
     const totalRows = stack.length * 23;
     const isFront = stack.length === 1 && stack[0] === 0;
-    const house = isFront ? resolveHouseSprite('front') : null;
+    const house = isFront ? resolveHouseSprite('front', env) : null;
     return (
       // Fixed aspect-ratio + equal 1fr rows/cols → every cell is a TRUE square and
       // overlays land exactly on the same grid lines (no sub-pixel drift).

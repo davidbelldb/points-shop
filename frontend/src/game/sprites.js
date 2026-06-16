@@ -87,9 +87,16 @@ export function resolveBaseTile(env = {}) {
 }
 
 /**
- * House overlay for the non-playable footprint.
- *   resolveHouseSprite('front')  →  sprites/sneakyscapes/house/front_house.png
+ * House overlay for the non-playable footprint — scene-aware.
+ *   resolveHouseSprite('front', env) tries, in order:
+ *     house/front_house_<season|weather|night>   (e.g. front_house_summer.png)
+ *   then falls back to  house/front_house.png
  */
-export function resolveHouseSprite(which) {
-  return SPRITE_REGISTRY[`house/${which}_house`.toLowerCase()] || null;
+export function resolveHouseSprite(which, env = {}) {
+  for (const name of variantCandidates(env, {})) {
+    const key = name === 'default' ? `house/${which}_house` : `house/${which}_house_${name}`;
+    const url = SPRITE_REGISTRY[key.toLowerCase()];
+    if (url) return url;
+  }
+  return null;
 }
