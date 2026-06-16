@@ -7,8 +7,8 @@
                   offline. The fresh index.html always wins when online.
    - /api/* and /media/* are untouched (media has HTTP immutable caching). */
 
-const ASSET_CACHE = 'sneaky-assets-v2';
-const SHELL_CACHE = 'sneaky-shell-v2';
+const ASSET_CACHE = 'sneaky-assets-v3';
+const SHELL_CACHE = 'sneaky-shell-v3';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
