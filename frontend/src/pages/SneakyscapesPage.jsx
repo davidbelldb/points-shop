@@ -56,12 +56,13 @@ const FRONT_STACK = [0];
 const BACK_STACK = [3, 2, 1];
 const stackForZone = (zone) => (zone === 0 ? FRONT_STACK : BACK_STACK);
 
-// Front garden fills the page: an empty spacer track of this many row-heights
-// sits ABOVE the 23 playable rows, so the tile area (and the bottom-aligned
-// house image) drop to the bottom of the screen. Viewport-tuned for now.
+// Zone 0 is taller than its 23 playable rows by this many grid-squares — the
+// house structure occupies the extra space ABOVE the front-garden tiles. It's
+// measured in grid-squares (the front_house art is 26.258 squares tall at 13
+// wide), so it's device-independent. The 23 playable rows sit at the bottom.
 const FRONT_TOP_SPACER = 3.258;
 // Grid row of the first playable row: row 1 normally; row 2 on the front board
-// (after the spacer track). Cells/overlays/preview/house all use this.
+// (after the extra house-height track). Cells/overlays/preview use this.
 const rowBaseFor = (stack) => (stack.length === 1 && stack[0] === 0 ? 2 : 1);
 
 // Placeholder — the player will name their plot during game setup later.
@@ -851,10 +852,10 @@ export default function SneakyscapesPage() {
         style={{ gridTemplateColumns: 'repeat(13, 1fr)', gridTemplateRows, aspectRatio }}>
         {cells}
         {house && (
-          // House image spans the 23 tile rows (below the spacer), bottom-aligned.
-          // Transparent over the playable cells; under items; ignores touches.
+          // House image spans the FULL front grid (extra house-height row + the
+          // 23 tile rows). Transparent over the playable cells; under items.
           <div className="pointer-events-none"
-            style={{ gridColumn: '1 / span 13', gridRow: '2 / span 23', backgroundImage: `url(${house})`, backgroundSize: '100% 100%', imageRendering: 'pixelated', zIndex: 5 }} />
+            style={{ gridColumn: '1 / span 13', gridRow: '1 / span 24', backgroundImage: `url(${house})`, backgroundSize: '100% 100%', imageRendering: 'pixelated', zIndex: 5 }} />
         )}
         {renderPlacedOverlays(stack)}
         {renderPreviewOverlay(stack)}
