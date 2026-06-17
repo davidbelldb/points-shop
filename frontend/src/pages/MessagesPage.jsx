@@ -1990,7 +1990,7 @@ export default function MessagesPage() {
               }}
               placeholder={replyTo ? `Reply to ${replyTo.senderName}…` : 'Say something...'}
               autoComplete="off"
-              className="block flex-1 rounded-2xl border border-neutral-200 bg-white px-4 py-2.5 text-sm leading-5 focus:border-amber-500 focus:outline-none resize-none overflow-hidden"
+              className="block flex-1 rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm leading-5 focus:border-amber-500 focus:outline-none resize-none overflow-hidden"
               style={{ minHeight: 40, maxHeight: 120 }}
             />
 
