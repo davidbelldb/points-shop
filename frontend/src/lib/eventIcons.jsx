@@ -201,6 +201,49 @@ const Book = (p) => (
   </SvgWrap>
 );
 
+const Underwear = (p) => (
+  <SvgWrap {...p}>
+    {/* waistband */}
+    <path d="M3 6h18" />
+    {/* left leg */}
+    <path d="M3 6c0 0 1 10 4 12" />
+    {/* right leg */}
+    <path d="M21 6c0 0-1 10-4 12" />
+    {/* gusset / crotch curve */}
+    <path d="M7 18c1-3 2.5-5 5-5s4 2 5 5" />
+  </SvgWrap>
+);
+
+const Laptop = (p) => (
+  <SvgWrap {...p}>
+    <rect x="2" y="4" width="20" height="14" rx="2" />
+    <line x1="2" y1="20" x2="22" y2="20" />
+    <line x1="8" y1="20" x2="16" y2="20" strokeWidth="2.5" />
+  </SvgWrap>
+);
+
+const GameController = (p) => (
+  <SvgWrap {...p}>
+    <path d="M6 12H4a2 2 0 0 0-2 2l1 5a2 2 0 0 0 2 1h2a2 2 0 0 0 2-1l1-3h4l1 3a2 2 0 0 0 2 1h2a2 2 0 0 0 2-1l1-5a2 2 0 0 0-2-2h-2" />
+    <path d="M6 12V8a6 6 0 0 1 12 0v4" />
+    <line x1="9" y1="15" x2="9" y2="15" strokeWidth="2.5" strokeLinecap="round" />
+    <line x1="15" y1="13" x2="15" y2="17" />
+    <line x1="13" y1="15" x2="17" y2="15" />
+  </SvgWrap>
+);
+
+// Lips — a simple, tasteful "sexy" icon
+const Lips = (p) => (
+  <SvgWrap {...p}>
+    {/* upper lip */}
+    <path d="M3 10c2-2 4-3 6-2 1 .5 2 1 3 1s2-.5 3-1c2-1 4 0 6 2" />
+    {/* lower lip */}
+    <path d="M3 10c1 4 4 7 9 7s8-3 9-7" />
+    {/* cupid's bow dip */}
+    <path d="M9 8c1 1 2 1.5 3 1.5S14 9 15 8" />
+  </SvgWrap>
+);
+
 /* Ordered list — order is what the picker strip displays. The first entry
    acts as the default fallback when an event has no icon stored. */
 export const EVENT_ICONS = [
@@ -222,8 +265,12 @@ export const EVENT_ICONS = [
   { key: 'beach',       label: 'Beach',       Icon: Beach },
   { key: 'car',         label: 'Driving',     Icon: Car },
   { key: 'plane',       label: 'Travel',      Icon: Plane },
-  { key: 'paw',         label: 'Pets',        Icon: Paw },
-  { key: 'book',        label: 'Reading',     Icon: Book },
+  { key: 'paw',            label: 'Pets',           Icon: Paw },
+  { key: 'book',           label: 'Reading',        Icon: Book },
+  { key: 'underwear',      label: 'Underwear',      Icon: Underwear },
+  { key: 'laptop',         label: 'Laptop',         Icon: Laptop },
+  { key: 'gamecontroller', label: 'Gaming',         Icon: GameController },
+  { key: 'lips',           label: 'Sexy',           Icon: Lips },
 ];
 
 export function getEventIcon(key) {
