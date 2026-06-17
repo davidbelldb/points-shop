@@ -1,6 +1,6 @@
 import {
   findOtherUser, listMessages, sendMessage, markAllRead, deleteMessage,
-  editMessage, setReaction,
+  editMessage, setReaction, toggleSparkle,
 } from './chat.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
@@ -71,6 +71,16 @@ export default async function chatRoutes(fastify) {
     const accountId = getEffectiveAccountId(req);
     try {
       return await editMessage(req.params.id, accountId, body);
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  // Toggle sparkle on a message — either participant may sparkle any message.
+  fastify.put('/api/messages/:id/sparkle', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    try {
+      return await toggleSparkle(req.params.id, accountId);
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }

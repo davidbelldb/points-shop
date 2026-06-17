@@ -20,7 +20,7 @@ export async function listMessages(accountId, otherId, limit = 200) {
     `SELECT * FROM (
        SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
               m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
-              m.slider_response,
+              m.slider_response, m.sparkled,
               s.username AS sender_username,
               s.name     AS sender_name,
               s.photo_url AS sender_photo,
@@ -75,6 +75,19 @@ export async function editMessage(messageId, accountId, body) {
 
 // Map of reaction key → emoji used in notification copy. Keep in sync with
 // the frontend's render map and the routes-level ALLOWED_REACTIONS whitelist.
+// Toggle the sparkled flag on a message. Either participant may sparkle it.
+export async function toggleSparkle(messageId, accountId) {
+  const { rows } = await query(
+    `UPDATE chat_messages
+        SET sparkled = NOT sparkled
+      WHERE id = $1
+        AND (sender_id = $2 OR recipient_id = $2)
+      RETURNING id, sparkled`,
+    [messageId, accountId],
+  );
+  return rows[0] ?? null;
+}
+
 const REACTION_EMOJI = { heart: '💜' };
 
 // Set or clear a single reaction on a message. Either participant may react.

@@ -570,7 +570,7 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
+function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onToggleSparkle, onOpenStory, onOpenPhoto, onSwipeReply }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
@@ -621,8 +621,9 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
     if (tapTimer.current) {
       clearTimeout(tapTimer.current);
       tapTimer.current = null;
-      // double-tap → sparkle burst!
+      // double-tap → sparkle burst + persist
       triggerSparkles();
+      onToggleSparkle?.(m.id);
     } else {
       tapTimer.current = setTimeout(() => {
         tapTimer.current = null;
@@ -763,6 +764,25 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
         <SparkleInstance key={s.id} color={s.color} size={s.size} style={s.style} />
       ))}
 
+      {/* Persistent sparkles — shown indefinitely when m.sparkled is true */}
+      {m.sparkled && [
+        { id: 'p0', color: '#FFC700', size: 14, style: { top: '-10%', left: '10%'  }, delay: '0s'    },
+        { id: 'p1', color: '#61dbbb', size: 11, style: { top: '5%',   left: '80%'  }, delay: '0.6s'  },
+        { id: 'p2', color: '#ed70bd', size: 16, style: { top: '70%',  left: '90%'  }, delay: '1.2s'  },
+        { id: 'p3', color: '#FFD60A', size: 10, style: { top: '85%',  left: '15%'  }, delay: '1.8s'  },
+        { id: 'p4', color: '#FF6AC1', size: 13, style: { top: '40%',  left: '-5%'  }, delay: '0.9s'  },
+      ].map(s => (
+        <SparkleInstance
+          key={s.id}
+          color={s.color}
+          size={s.size}
+          style={{
+            ...s.style,
+            animation: `sparkle-come-in-out 2s ${s.delay} ease-in-out infinite`,
+          }}
+        />
+      ))}
+
 {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
 
@@ -779,7 +799,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
               loading="lazy"
               data-bubble-action
               onClick={(e) => { e.stopPropagation(); onOpenPhoto?.(m.body); }}
-              onDoubleClick={(e) => { e.stopPropagation(); triggerSparkles(); }}
+              onDoubleClick={(e) => { e.stopPropagation(); triggerSparkles(); onToggleSparkle?.(m.id); }}
             />
           )}
           {/* Sparkle overlay for photos/GIFs */}
@@ -1394,6 +1414,16 @@ export default function MessagesPage() {
     catch (e) { setError(e.message); await refresh(false); }
   }
 
+  async function toggleSparkle(id) {
+    // Optimistically flip sparkled
+    setData((prev) => ({
+      ...prev,
+      messages: prev.messages.map((m) => (m.id === id ? { ...m, sparkled: !m.sparkled } : m)),
+    }));
+    try { await api.toggleSparkle(id); }
+    catch (e) { setError(e.message); await refresh(false); }
+  }
+
   // Pre-compute cluster position for every message so the render loop can
   // tighten spacing, skip avatars, and handle rounding without re-scanning.
   const messagesWithCluster = useMemo(() => {
@@ -1547,6 +1577,7 @@ export default function MessagesPage() {
                           onDelete={() => remove(m.id)}
                           onForceDelete={() => setConfirmDeleteId(m.id)}
                           onSetReaction={(emoji) => setReaction(m.id, emoji)}
+                          onToggleSparkle={toggleSparkle}
                           onOpenPhoto={(src) => setLightboxSrc(src)}
                           onSwipeReply={handleSwipeReply}
                         />

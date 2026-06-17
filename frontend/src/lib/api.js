@@ -68,6 +68,8 @@ export const api = {
     request(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
   setMessageReaction: (id, reaction) =>
     request(`/messages/${id}/reaction`, { method: 'PUT', body: JSON.stringify({ reaction }) }),
+  toggleSparkle: (id) =>
+    request(`/messages/${id}/sparkle`, { method: 'PUT' }),
   listCalendarEvents: (fromIso, toIso) =>
     request(`/calendar/events?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`),
   listCalendarUpcoming: (limit = 3) =>
