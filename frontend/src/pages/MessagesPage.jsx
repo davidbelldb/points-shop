@@ -681,8 +681,8 @@ function MessageBubble({ m, mine, clusterPos = 'solo', suppressStoryPreview = fa
     ? ({ solo: 'rounded-2xl rounded-br-[4px]', first: 'rounded-2xl rounded-br-[4px]', middle: 'rounded-2xl rounded-r-[4px]', last: 'rounded-2xl rounded-tr-[4px]' })[clusterPos] ?? 'rounded-2xl'
     : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
   const tone = mine
-    ? `${rounding} bg-amber-100 text-amber-900`
-    : `${rounding} bg-pink-100 text-pink-900`;
+    ? `${rounding} bg-[#21433b] text-white`
+    : `${rounding} bg-[#4e1d37] text-white`;
   const bodyIsGif   = isGifUrl(m.body);
   const bodyIsPhoto = isUploadedPhoto(m.body);
   const bodyIsAudio = isAudioUrl(m.body);
@@ -807,12 +807,12 @@ function MessageBubble({ m, mine, clusterPos = 'solo', suppressStoryPreview = fa
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             autoFocus rows={2}
-            className="block w-full resize-none rounded-md border border-amber-200 bg-white/70 px-2 py-1 text-sm text-neutral-900 focus:outline-none"
+            className="block w-full resize-none rounded-md border border-white/20 bg-white/10 px-2 py-1 text-sm text-white placeholder-white/50 focus:outline-none"
             onClick={(e) => e.stopPropagation()}
           />
           <div className="flex justify-end gap-2 text-xs font-semibold">
             <button data-bubble-action onClick={(e) => { e.stopPropagation(); onCancelEdit(); }} className="rounded-md px-2 py-1 text-neutral-600 hover:bg-white/40">Cancel</button>
-            <button data-bubble-action disabled={!draft.trim() || draft === m.body} onClick={(e) => { e.stopPropagation(); onSaveEdit(draft); }} className="rounded-md bg-amber-600 px-2 py-1 text-amber-900 disabled:opacity-40">Save</button>
+            <button data-bubble-action disabled={!draft.trim() || draft === m.body} onClick={(e) => { e.stopPropagation(); onSaveEdit(draft); }} className="rounded-md bg-white/20 px-2 py-1 text-white disabled:opacity-40">Save</button>
           </div>
         </div>
       ) : (
@@ -825,7 +825,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', suppressStoryPreview = fa
             <button
               data-bubble-action
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-white/40 text-amber-900 group-hover:flex"
+              className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-white/20 text-white group-hover:flex"
               aria-label="Delete"
             >×</button>
           )}
@@ -978,8 +978,8 @@ function AudioPlayer({ src, mine, fallbackDur = 0 }) {
   const progress   = displayDur > 0 ? cur / displayDur : 0;
   // Both sides: teal play button. Bar fill differs so you can tell whose is whose.
   const btnBg   = '#61dbbb';
-  const barFill = mine ? '#ed70bd' : '#61dbbb';
-  const barEmpty= mine ? '#fce7f3' : '#d1faf0';
+  const barFill = mine ? '#61dbbb' : '#ed70bd';
+  const barEmpty= mine ? '#3a7a6a' : '#7a3055';
   const timeCss = '#ffffff';
 
   function seek(e) {
