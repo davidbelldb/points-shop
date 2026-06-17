@@ -1444,13 +1444,19 @@ export default function MessagesPage() {
                   {isNudge ? (
                     /* ── System event pill ── */
                     <div className="my-1 flex justify-center">
-                      <span className="select-none rounded-full bg-neutral-100 px-3 py-1 text-[11px] text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+                      <span
+                        className="select-none rounded-full px-3 py-1 text-[11px]"
+                        style={{ background: theme === 'dark' ? '#262626' : '#f0f0f0', color: theme === 'dark' ? '#6b6b6b' : '#a3a3a0' }}
+                      >
                         {mine ? 'You nudged' : (data.other?.name ?? 'They') + ' nudged you'} · {timeLabel(m.created_at)}
                       </span>
                     </div>
                   ) : isRain ? (
                     <div className="my-1 flex justify-center">
-                      <span className="select-none rounded-full bg-neutral-100 px-3 py-1 text-[11px] text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+                      <span
+                        className="select-none rounded-full px-3 py-1 text-[11px]"
+                        style={{ background: theme === 'dark' ? '#262626' : '#f0f0f0', color: theme === 'dark' ? '#6b6b6b' : '#a3a3a0' }}
+                      >
                         {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s · {timeLabel(m.created_at)}
                       </span>
                     </div>
