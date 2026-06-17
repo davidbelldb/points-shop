@@ -763,18 +763,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
         <SparkleInstance key={s.id} color={s.color} size={s.size} style={s.style} />
       ))}
 
-      {/* Bubble tail — CSS triangle on the last/solo bubble of each cluster */}
-      {(clusterPos === 'solo' || clusterPos === 'last') && !bodyIsMedia && (
-        <span
-          aria-hidden="true"
-          style={mine
-            ? { position: 'absolute', bottom: 0, right: -5, width: 0, height: 0, borderLeft: '5px solid #fef3c7', borderBottom: '5px solid transparent' }
-            : { position: 'absolute', bottom: 0, left: -5, width: 0, height: 0, borderRight: '5px solid #fce7f3', borderBottom: '5px solid transparent' }
-          }
-        />
-      )}
-
-      {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
+{m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
 
       {bodyIsMedia ? (
