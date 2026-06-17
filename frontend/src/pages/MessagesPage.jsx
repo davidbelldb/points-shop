@@ -47,6 +47,17 @@ const NUDGE_BODY = '__nudge__';
     html.sneaky-shake {
       animation: sneaky-shake 0.75s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
     }
+
+    /* ── Sparkle burst (Josh W. Comeau technique) ── */
+    @keyframes sparkle-come-in-out {
+      0%   { transform: scale(0); }
+      50%  { transform: scale(1); }
+      100% { transform: scale(0); }
+    }
+    @keyframes sparkle-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(180deg); }
+    }
   `;
   document.head.appendChild(style);
 })();
@@ -402,6 +413,51 @@ function GifPicker({ onSelect, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
+// Sparkle burst (Josh W. Comeau technique — two-layer animation)
+// Outer wrapper: scale(0→1→0). Inner SVG: rotate(0→180deg). Independent easing.
+// ---------------------------------------------------------------------------
+const SPARKLE_COLORS = ['#FFC700', '#61dbbb', '#ed70bd', '#FFD60A', '#FF6AC1'];
+const SPARKLE_PATH   = 'M26.5 25.5C19.0043 33.3697 0 34 0 34C0 34 19.1013 35.3684 26.5 43.5C33.234 50.901 34 68 34 68C34 68 36.9884 50.7065 44.5 43.5C51.6431 36.647 68 34 68 34C68 34 51.6947 32.0939 44.5 25.5C36.5605 18.2235 34 0 34 0C34 0 33.6591 17.9837 26.5 25.5Z';
+
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function generateSparkle() {
+  return {
+    id: String(randInt(10000, 99999)),
+    createdAt: Date.now(),
+    color: SPARKLE_COLORS[Math.floor(Math.random() * SPARKLE_COLORS.length)],
+    size: randInt(10, 22),
+    style: {
+      top:  randInt(-15, 110) + '%',
+      left: randInt(-10, 110) + '%',
+    },
+  };
+}
+
+function SparkleInstance({ color, size, style }) {
+  return (
+    <span style={{
+      position: 'absolute',
+      display: 'block',
+      pointerEvents: 'none',
+      zIndex: 20,
+      animation: 'sparkle-come-in-out 700ms ease-in-out forwards',
+      ...style,
+    }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 68 68"
+        fill="none"
+        style={{ display: 'block', animation: 'sparkle-spin 1000ms linear forwards' }}
+      >
+        <path d={SPARKLE_PATH} fill={color} />
+      </svg>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared avatar
 // ---------------------------------------------------------------------------
 function Avatar({ url, name, size = 'md' }) {
@@ -519,17 +575,39 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
   const swipeRef  = useRef(null);
+  const sparkleIntervalRef = useRef(null);
   const [draft, setDraft]           = useState(m.body);
   const [dragX, setDragX]           = useState(0);
   const [armed, setArmed]           = useState(false);
   const [leftArmed, setLeftArmed]   = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [sparkles, setSparkles]     = useState([]);
 
   useEffect(() => { if (isEditing) setDraft(m.body); }, [isEditing, m.body]);
   useEffect(() => () => {
     if (tapTimer.current)  clearTimeout(tapTimer.current);
     if (holdTimer.current) clearTimeout(holdTimer.current);
+    if (sparkleIntervalRef.current) clearInterval(sparkleIntervalRef.current);
   }, []);
+
+  function triggerSparkles() {
+    if (sparkleIntervalRef.current) clearInterval(sparkleIntervalRef.current);
+    setSparkles([]);
+    let count = 0;
+    sparkleIntervalRef.current = setInterval(() => {
+      count++;
+      const now = Date.now();
+      setSparkles(prev => {
+        const alive = prev.filter(s => now - s.createdAt < 750);
+        return [...alive, generateSparkle()];
+      });
+      if (count >= 10) {
+        clearInterval(sparkleIntervalRef.current);
+        sparkleIntervalRef.current = null;
+        setTimeout(() => setSparkles([]), 800);
+      }
+    }, 80);
+  }
 
   function cancelHold() {
     if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
@@ -543,7 +621,8 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
     if (tapTimer.current) {
       clearTimeout(tapTimer.current);
       tapTimer.current = null;
-      // double-tap: no-op now (reactions via long-press)
+      // double-tap → sparkle burst!
+      triggerSparkles();
     } else {
       tapTimer.current = setTimeout(() => {
         tapTimer.current = null;
@@ -678,6 +757,11 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
           </svg>
         </span>
       )}
+
+      {/* Sparkle burst — rendered above bubble content on double-tap */}
+      {sparkles.map(s => (
+        <SparkleInstance key={s.id} color={s.color} size={s.size} style={s.style} />
+      ))}
 
       {/* Bubble tail — CSS triangle on the last/solo bubble of each cluster */}
       {(clusterPos === 'solo' || clusterPos === 'last') && !bodyIsMedia && (
