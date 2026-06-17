@@ -1681,19 +1681,19 @@ export default function MessagesPage() {
               const rainKind = RAIN_KIND_MAP[m.body];
               const isRain = !!rainKind;
 
-              // Rain aggregation: if previous visible message is the same sender
-              // raining the same kind within 4 min, this is a continuation — skip it.
-              // The head accumulates a count from looking ahead.
-              if (isRain) {
+              // System event aggregation: consecutive same-body same-sender events
+              // within 4 min collapse into a single pill with a count.
+              const isSystemEvent = isNudge || isRain;
+              if (isSystemEvent) {
                 const prev = messagesWithCluster.slice(0, msgIdx).reverse()
                   .find(p => !p.storyReactionContinuation);
                 if (prev && prev.body === m.body && prev.sender_id === m.sender_id
                     && new Date(m.created_at) - new Date(prev.created_at) < 4 * 60 * 1000) {
-                  return null; // merged into head
+                  return null; // merged into head pill
                 }
               }
-              // Count how many consecutive same-rain follow this one within 4 min
-              const rainCount = isRain ? (() => {
+              const ORDINALS = ['', '', 'twice', 'three times', 'four times', 'five times', 'six times'];
+              const eventCount = isSystemEvent ? (() => {
                 let count = 1;
                 for (let j = msgIdx + 1; j < messagesWithCluster.length; j++) {
                   const nx = messagesWithCluster[j];
@@ -1704,10 +1704,7 @@ export default function MessagesPage() {
                 }
                 return count;
               })() : 1;
-              const ORDINALS = ['', '', 'twice', 'three times', 'four times', 'five times', 'six times'];
-              const rainCountLabel = rainCount > 1
-                ? (ORDINALS[rainCount] ?? `${rainCount} times`)
-                : null;
+              const countLabel = eventCount > 1 ? (ORDINALS[eventCount] ?? `${eventCount} times`) : null;
               const { clusterPos } = m;
 
               // Spacing: first/solo get top breathing room; middle/last stay tight
@@ -1729,7 +1726,7 @@ export default function MessagesPage() {
                         className="select-none rounded-full px-3 py-1 text-[11px]"
                         style={{ background: theme === 'dark' ? '#262626' : '#f0f0f0', color: theme === 'dark' ? '#6b6b6b' : '#a3a3a0' }}
                       >
-                        {mine ? 'You nudged' : (data.other?.name ?? 'They') + ' nudged you'} · {timeLabel(m.created_at)}
+                        {mine ? 'You' : (data.other?.name ?? 'They')} nudged{mine ? '' : ' you'}{countLabel ? ` ${countLabel}` : ''} · {timeLabel(m.created_at)}
                       </span>
                     </div>
                   ) : isRain ? (
@@ -1738,7 +1735,7 @@ export default function MessagesPage() {
                         className="select-none rounded-full px-3 py-1 text-[11px]"
                         style={{ background: theme === 'dark' ? '#262626' : '#f0f0f0', color: theme === 'dark' ? '#6b6b6b' : '#a3a3a0' }}
                       >
-                        {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s{rainCountLabel ? ` ${rainCountLabel}` : ''} · {timeLabel(m.created_at)}
+                        {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s{countLabel ? ` ${countLabel}` : ''} · {timeLabel(m.created_at)}
                       </span>
                     </div>
                   ) : (
