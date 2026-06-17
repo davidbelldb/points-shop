@@ -779,8 +779,13 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
               loading="lazy"
               data-bubble-action
               onClick={(e) => { e.stopPropagation(); onOpenPhoto?.(m.body); }}
+              onDoubleClick={(e) => { e.stopPropagation(); triggerSparkles(); }}
             />
           )}
+          {/* Sparkle overlay for photos/GIFs */}
+          {!bodyIsAudio && sparkles.map(s => (
+            <SparkleInstance key={s.id} color={s.color} size={s.size} style={{ ...s.style, position: 'absolute', pointerEvents: 'none' }} />
+          ))}
           {!bodyIsAudio && (
             <p className="absolute bottom-1 right-2 text-[10px] text-white/80 drop-shadow">{timeLabel(m.created_at)}</p>
           )}

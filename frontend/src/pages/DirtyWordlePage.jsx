@@ -226,6 +226,60 @@ const GHOST_BTN = 'flex-1 inline-flex items-center justify-center rounded-xl bor
 
 // ─── Leaderboard modal ────────────────────────────────────────────────────────
 
+// Build a compact PNG of just the completed guess rows — no labels, no empty rows.
+// Used for the "Share in chat" button so the shared image is as small as the result.
+function buildShareBlob(resultGrid) {
+  return new Promise((resolve) => {
+    const CELL = 40;
+    const GAP  = 5;
+    const PAD  = 10;
+    const COLS = resultGrid[0]?.length ?? WORD_LENGTH;
+    const ROWS = resultGrid.length;
+
+    const W = COLS * CELL + (COLS - 1) * GAP + PAD * 2;
+    const H = ROWS * CELL + (ROWS - 1) * GAP + PAD * 2;
+
+    const canvas = document.createElement('canvas');
+    const DPR = 2;
+    canvas.width  = W * DPR;
+    canvas.height = H * DPR;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(DPR, DPR);
+
+    ctx.fillStyle = '#1e1e1c';
+    ctx.fillRect(0, 0, W, H);
+
+    const cellColor = (s) =>
+      s === 'correct' ? '#61dbbb' : s === 'present' ? '#ed70bd' : '#525252';
+
+    const roundRect = (x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    };
+
+    resultGrid.forEach((row, ri) => {
+      row.forEach((state, ci) => {
+        const cx = PAD + ci * (CELL + GAP);
+        const cy = PAD + ri * (CELL + GAP);
+        ctx.fillStyle = cellColor(state);
+        roundRect(cx, cy, CELL, CELL, 6);
+        ctx.fill();
+      });
+    });
+
+    canvas.toBlob(resolve, 'image/png');
+  });
+}
+
 // Draw the two-player side-by-side grid onto an offscreen canvas and return
 // it as a PNG Blob. Pure canvas — no html2canvas dependency needed.
 function buildGridBlob(players, todayRows, viewDate) {
@@ -718,7 +772,7 @@ export default function DirtyWordlePage() {
         guesses_taken: guesses.length,
         pts: ptsEarned ?? 0,
       };
-      const blob = await buildGridBlob([player], [todayRow], today);
+      const blob = await buildShareBlob(resultGrid);
       const file = new File([blob], 'wordle-result.png', { type: 'image/png' });
       const { url } = await api.upload(file);
       await api.sendMessage(url);
