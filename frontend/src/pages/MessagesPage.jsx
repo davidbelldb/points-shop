@@ -514,7 +514,7 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
+function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
@@ -597,7 +597,13 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
     setDragX(0); setArmed(false); setLeftArmed(false); s.tracking = false; s.decided = false;
   }
 
-  const tone = mine ? 'rounded-br-sm bg-amber-100 text-amber-900' : 'rounded-bl-sm bg-pink-100 text-pink-900';
+  // Tighter inner corners on the "sender side" for consecutive messages in a cluster
+  const rounding = mine
+    ? ({ solo: 'rounded-2xl rounded-br-[4px]', first: 'rounded-2xl rounded-br-[4px]', middle: 'rounded-2xl rounded-r-[4px]', last: 'rounded-2xl rounded-tr-[4px]' })[clusterPos] ?? 'rounded-2xl'
+    : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
+  const tone = mine
+    ? `${rounding} bg-amber-100 text-amber-900`
+    : `${rounding} bg-pink-100 text-pink-900`;
   const bodyIsGif   = isGifUrl(m.body);
   const bodyIsPhoto = isUploadedPhoto(m.body);
   const bodyIsAudio = isAudioUrl(m.body);
@@ -673,6 +679,17 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
         </span>
       )}
 
+      {/* Bubble tail — CSS triangle on the last/solo bubble of each cluster */}
+      {(clusterPos === 'solo' || clusterPos === 'last') && !bodyIsMedia && (
+        <span
+          aria-hidden="true"
+          style={mine
+            ? { position: 'absolute', bottom: 0, right: -5, width: 0, height: 0, borderLeft: '5px solid #fef3c7', borderBottom: '5px solid transparent' }
+            : { position: 'absolute', bottom: 0, left: -5, width: 0, height: 0, borderRight: '5px solid #fce7f3', borderBottom: '5px solid transparent' }
+          }
+        />
+      )}
+
       {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
 
@@ -703,7 +720,10 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
             >×</button>
           )}
           {rxEmoji && (
-            <span className={`pointer-events-none absolute -bottom-2 z-10 ${mine ? 'left-1' : 'right-1'} text-base leading-none`} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}>
+            <span
+              className={`pointer-events-none absolute -bottom-3 z-10 ${mine ? 'left-1' : 'right-1'} flex items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-sm shadow-sm ring-1 ring-black/5`}
+              style={{ lineHeight: 1 }}
+            >
               {rxEmoji}
             </span>
           )}
@@ -725,10 +745,9 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
       ) : (
         <>
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.body}</p>
-          <p className="mt-1 text-[10px] opacity-50">
-            {m.edited_at && <span>edited {'·'} </span>}
-            {timeLabel(m.created_at)}
-          </p>
+          {m.edited_at && (
+            <p className="mt-0.5 text-[10px] opacity-40">edited</p>
+          )}
           {mine && (
             <button
               data-bubble-action
@@ -738,7 +757,10 @@ function MessageBubble({ m, mine, isEditing, onStartEdit, onCancelEdit, onSaveEd
             >×</button>
           )}
           {rxEmoji && (
-            <span className={`pointer-events-none absolute -bottom-2 z-10 ${mine ? 'left-1' : 'right-1'} text-base leading-none`} style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}>
+            <span
+              className={`pointer-events-none absolute -bottom-3 z-10 ${mine ? 'left-1' : 'right-1'} flex items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-sm shadow-sm ring-1 ring-black/5`}
+              style={{ lineHeight: 1 }}
+            >
               {rxEmoji}
             </span>
           )}
@@ -1029,17 +1051,26 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!data.messages.length) return;
-    const isNew = data.messages.length > lastCountRef.current;
+    const prevCount = lastCountRef.current;
+    const isNew = data.messages.length > prevCount;
     lastCountRef.current = data.messages.length;
     if (!isNew) return;
-    // Scroll to absolute bottom. Setting both covers iOS Safari (body) and other
-    // browsers (documentElement). Large number is clamped to actual scrollHeight.
-    const scrollToBottom = () => {
-      document.documentElement.scrollTop = 999999;
-      document.body.scrollTop = 999999;
+
+    // Initial load (prevCount was 0) → always scroll.
+    // Subsequent new messages → only scroll if user is already near the bottom,
+    // so we don't yank them away while reading history.
+    const isInitial = prevCount === 0;
+    const isNearBottom = () => {
+      const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+      return scrollHeight - scrollTop - clientHeight < 120;
     };
-    // Double rAF ensures layout is fully committed before we measure.
-    requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
+
+    if (isInitial || isNearBottom()) {
+      // Double rAF ensures layout is fully committed before we scroll.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
+      }));
+    }
   }, [data.messages.length]);
 
   // Track composer bar height so the spacer always pushes content clear of it.
@@ -1253,6 +1284,27 @@ export default function MessagesPage() {
     catch (e) { setError(e.message); await refresh(false); }
   }
 
+  // Pre-compute cluster position for every message so the render loop can
+  // tighten spacing, skip avatars, and handle rounding without re-scanning.
+  const messagesWithCluster = useMemo(() => {
+    const msgs = data.messages;
+    return msgs.map((m, i) => {
+      const isSystem = m.body === NUDGE_BODY || RAIN_BODIES.has(m.body);
+      if (isSystem) return { ...m, clusterPos: 'system' };
+      const prev = msgs[i - 1];
+      const next = msgs[i + 1];
+      const prevSame = prev && prev.sender_id === m.sender_id && prev.body !== NUDGE_BODY && !RAIN_BODIES.has(prev.body);
+      const nextSame = next && next.sender_id === m.sender_id && next.body !== NUDGE_BODY && !RAIN_BODIES.has(next.body);
+      return {
+        ...m,
+        clusterPos: !prevSame && !nextSame ? 'solo'
+                  : !prevSame && nextSame  ? 'first'
+                  : prevSame  && nextSame  ? 'middle'
+                  :                          'last',
+      };
+    });
+  }, [data.messages]);
+
   let lastDay = null;
 
   return (
@@ -1281,9 +1333,9 @@ export default function MessagesPage() {
           <p className="text-sm text-neutral-500">It's looking a bit bare {'—'} like your backside.</p>
         )}
 
-        {data.messages.length > 0 && (
-          <ul className="space-y-4">
-            {data.messages.map((m) => {
+        {messagesWithCluster.length > 0 && (
+          <ul className="flex flex-col gap-0">
+            {messagesWithCluster.map((m) => {
               const mine = m.sender_id === user?.id;
               const day = dayLabel(m.created_at);
               const showDay = day !== lastDay;
@@ -1291,39 +1343,66 @@ export default function MessagesPage() {
               const isNudge = m.body === NUDGE_BODY;
               const rainKind = RAIN_KIND_MAP[m.body];
               const isRain = !!rainKind;
+              const { clusterPos } = m;
+
+              // Spacing: first/solo get top breathing room; middle/last stay tight
+              const topMargin = (clusterPos === 'solo' || clusterPos === 'first') ? 'mt-3' : 'mt-0.5';
+              // Extra bottom clearance when a reaction emoji floats below the bubble
+              const bottomPad = m.reaction ? 'mb-4' : '';
+
               return (
-                <li key={m.id}>
+                <li key={m.id} className={`${topMargin} ${bottomPad}`}>
                   {showDay && (
-                    <p className="my-3 text-center text-xs font-medium uppercase tracking-wide text-neutral-400">
+                    <p className="mb-3 mt-4 text-center text-xs font-medium uppercase tracking-wide text-neutral-400">
                       {day}
                     </p>
                   )}
                   {isNudge ? (
-                    <p className="my-1 text-center text-xs text-neutral-400 select-none">
-                      {mine ? 'You nudged' : (data.other?.name ?? 'They') + ' nudged you'} · {timeLabel(m.created_at)}
-                    </p>
-                  ) : isRain ? (
-                    <p className="my-1 text-center text-xs text-neutral-400 select-none">
-                      {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s · {timeLabel(m.created_at)}
-                    </p>
-                  ) : (
-                    <div className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-                      {!mine && <Avatar url={m.sender_photo} name={m.sender_name} />}
-                      <MessageBubble
-                        m={m}
-                        mine={mine}
-                        isEditing={editingId === m.id}
-                        onOpenStory={openStoryById}
-                        onStartEdit={() => setEditingId(m.id)}
-                        onCancelEdit={() => setEditingId(null)}
-                        onSaveEdit={(body) => saveEdit(m.id, body)}
-                        onDelete={() => remove(m.id)}
-                        onForceDelete={() => setConfirmDeleteId(m.id)}
-                        onSetReaction={(emoji) => setReaction(m.id, emoji)}
-                        onOpenPhoto={(src) => setLightboxSrc(src)}
-                        onSwipeReply={handleSwipeReply}
-                      />
+                    /* ── System event pill ── */
+                    <div className="my-1 flex justify-center">
+                      <span className="select-none rounded-full bg-neutral-100 px-3 py-1 text-[11px] text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+                        {mine ? 'You nudged' : (data.other?.name ?? 'They') + ' nudged you'} · {timeLabel(m.created_at)}
+                      </span>
                     </div>
+                  ) : isRain ? (
+                    <div className="my-1 flex justify-center">
+                      <span className="select-none rounded-full bg-neutral-100 px-3 py-1 text-[11px] text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+                        {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s · {timeLabel(m.created_at)}
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+                        {/* Avatar placeholder: always reserve the width so bubbles stay aligned;
+                            only render the actual avatar on the last/solo message of a cluster */}
+                        {!mine && (
+                          clusterPos === 'solo' || clusterPos === 'last'
+                            ? <Avatar url={m.sender_photo} name={m.sender_name} />
+                            : <div className="w-9 shrink-0" aria-hidden />
+                        )}
+                        <MessageBubble
+                          m={m}
+                          mine={mine}
+                          clusterPos={clusterPos}
+                          isEditing={editingId === m.id}
+                          onOpenStory={openStoryById}
+                          onStartEdit={() => setEditingId(m.id)}
+                          onCancelEdit={() => setEditingId(null)}
+                          onSaveEdit={(body) => saveEdit(m.id, body)}
+                          onDelete={() => remove(m.id)}
+                          onForceDelete={() => setConfirmDeleteId(m.id)}
+                          onSetReaction={(emoji) => setReaction(m.id, emoji)}
+                          onOpenPhoto={(src) => setLightboxSrc(src)}
+                          onSwipeReply={handleSwipeReply}
+                        />
+                      </div>
+                      {/* Timestamp — shown only once per cluster, below the last/solo bubble */}
+                      {(clusterPos === 'solo' || clusterPos === 'last') && (
+                        <p className={`mt-0.5 text-[10px] text-neutral-400 ${mine ? 'pr-1 text-right' : 'pl-11 text-left'}`}>
+                          {timeLabel(m.created_at)}
+                        </p>
+                      )}
+                    </>
                   )}
                 </li>
               );
