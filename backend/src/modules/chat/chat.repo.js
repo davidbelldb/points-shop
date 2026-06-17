@@ -17,31 +17,34 @@ export async function findOtherUser(accountId) {
 
 export async function listMessages(accountId, otherId, limit = 200) {
   const { rows } = await query(
-    `SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
-            m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
-            m.slider_response,
-            s.username AS sender_username,
-            s.name     AS sender_name,
-            s.photo_url AS sender_photo,
-            st.media_url   AS story_media_url,
-            st.media_type  AS story_media_type,
-            st.caption     AS story_caption,
-            st.author_id   AS story_author_id,
-            st.stickers    AS story_stickers,
-            sta.name       AS story_author_name,
-            rm.body        AS reply_to_body,
-            rm.sender_id   AS reply_to_sender_id,
-            rms.name       AS reply_to_sender_name
-       FROM chat_messages m
-       JOIN accounts s   ON s.id  = m.sender_id
-       LEFT JOIN sneaky_stories  st  ON st.id  = m.reply_to_story_id
-       LEFT JOIN accounts        sta ON sta.id = st.author_id
-       LEFT JOIN chat_messages   rm  ON rm.id  = m.reply_to_message_id
-       LEFT JOIN accounts        rms ON rms.id = rm.sender_id
-      WHERE (m.sender_id = $1 AND m.recipient_id = $2)
-         OR (m.sender_id = $2 AND m.recipient_id = $1)
-      ORDER BY m.created_at ASC
-      LIMIT $3`,
+    `SELECT * FROM (
+       SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
+              m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
+              m.slider_response,
+              s.username AS sender_username,
+              s.name     AS sender_name,
+              s.photo_url AS sender_photo,
+              st.media_url   AS story_media_url,
+              st.media_type  AS story_media_type,
+              st.caption     AS story_caption,
+              st.author_id   AS story_author_id,
+              st.stickers    AS story_stickers,
+              sta.name       AS story_author_name,
+              rm.body        AS reply_to_body,
+              rm.sender_id   AS reply_to_sender_id,
+              rms.name       AS reply_to_sender_name
+         FROM chat_messages m
+         JOIN accounts s   ON s.id  = m.sender_id
+         LEFT JOIN sneaky_stories  st  ON st.id  = m.reply_to_story_id
+         LEFT JOIN accounts        sta ON sta.id = st.author_id
+         LEFT JOIN chat_messages   rm  ON rm.id  = m.reply_to_message_id
+         LEFT JOIN accounts        rms ON rms.id = rm.sender_id
+        WHERE (m.sender_id = $1 AND m.recipient_id = $2)
+           OR (m.sender_id = $2 AND m.recipient_id = $1)
+        ORDER BY m.created_at DESC
+        LIMIT $3
+     ) sub
+     ORDER BY created_at ASC`,
     [accountId, otherId, limit],
   );
   return rows;
