@@ -119,10 +119,19 @@ export async function setReaction(messageId, accountId, reaction) {
   return updated;
 }
 
+// Human-readable labels for system message bodies used in push notifications.
+const SYSTEM_LABELS = {
+  '__nudge__':        { title: (name) => `${name} nudged you!`,               preview: null },
+  '__rain_twirl__':   { title: (name) => `${name} made it rain twirls`,       preview: null },
+  '__rain_popcorn__': { title: (name) => `${name} made it rain popcorn`,      preview: null },
+  '__rain_duck__':    { title: (name) => `${name} made it rain ducks`,        preview: null },
+};
+
 // Detect the type of a chat message body so we can write a meaningful
 // push notification. Mirrors the frontend isAudioUrl / isUploadedPhoto logic.
 function classifyMessage(body) {
   if (typeof body !== 'string') return 'message';
+  if (SYSTEM_LABELS[body]) return 'system';
   const isMedia = body.startsWith('/media/') || /^https?:\/\//.test(body);
   if (!isMedia) return 'message';
   const lower = body.split('?')[0].toLowerCase();
@@ -160,13 +169,16 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
   const senderName = senderRes.rows[0]?.name ?? 'Someone';
 
   const type = classifyMessage(trimmed);
-  const title = `${senderName} sent you a sneaky ${type}`;
-  // For media messages the body is a URL — show a friendly placeholder instead.
-  const preview = type === 'message'
-    ? (trimmed.length > 100 ? trimmed.slice(0, 97) + '...' : trimmed)
-    : type === 'voice note' ? '🎙️ Voice note'
-    : type === 'GIF'        ? '🎞️ GIF'
-    :                         '📷 Photo';
+  const systemLabel = SYSTEM_LABELS[trimmed];
+  const title   = systemLabel
+    ? systemLabel.title(senderName)
+    : `${senderName} sent you a sneaky ${type}`;
+  const preview = systemLabel
+    ? ''
+    : type === 'message'    ? (trimmed.length > 100 ? trimmed.slice(0, 97) + '...' : trimmed)
+    : type === 'voice note' ? 'Voice note'
+    : type === 'GIF'        ? 'GIF'
+    :                         'Photo';
 
   await query(
     `INSERT INTO notifications (account_id, type, title, body, link_url)
