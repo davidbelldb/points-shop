@@ -1163,15 +1163,17 @@ export default function MessagesPage() {
     // Subsequent new messages → only scroll if user is already near the bottom,
     // so we don't yank them away while reading history.
     const isInitial = prevCount === 0;
+    // iOS Safari reports scroll on body or documentElement inconsistently —
+    // check both. Also accept scrollTop === 0 when the page hasn't scrolled yet.
     const isNearBottom = () => {
-      const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-      return scrollHeight - scrollTop - clientHeight < 120;
+      const el = document.scrollingElement ?? document.documentElement;
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 160;
     };
 
     if (isInitial || isNearBottom()) {
       // Double rAF ensures layout is fully committed before we scroll.
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
+        bottomRef.current?.scrollIntoView({ behavior: isInitial ? 'instant' : 'smooth', block: 'end' });
       }));
     }
   }, [data.messages.length]);
@@ -1686,15 +1688,15 @@ export default function MessagesPage() {
           <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={sendPhoto} />
 
           {replyTo && (
-            <div className="mt-2 flex items-center gap-2 rounded-xl border-l-2 border-amber-500 bg-amber-50 px-3 py-1.5 text-xs">
+            <div className="mt-2 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: theme === 'dark' ? '#2a2a28' : '#f0f0ee' }}>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#61dbbb' }}>
                   Replying to {replyTo.senderName}
                 </p>
-                <p className="line-clamp-1 text-neutral-700">{replyTo.body}</p>
+                <p className="line-clamp-1 text-xs" style={{ color: theme === 'dark' ? '#a3a3a3' : '#525252' }}>{replyTo.body}</p>
               </div>
-              <button onClick={() => setReplyTo(null)} aria-label="Cancel reply" className="shrink-0 rounded-full p-1 text-neutral-500 hover:bg-amber-100">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <button onClick={() => setReplyTo(null)} aria-label="Cancel reply" className="shrink-0 rounded-full p-1" style={{ color: theme === 'dark' ? '#737373' : '#a3a3a3' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
                 </svg>
               </button>
