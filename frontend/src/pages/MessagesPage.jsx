@@ -9,6 +9,52 @@ import SliderSticker from '../components/stories/SliderSticker.jsx';
 
 const POLL_MS = 5000;
 const DOUBLE_TAP_MS = 240;
+const NUDGE_BODY = '__nudge__';
+
+// ---------------------------------------------------------------------------
+// Shake animation — injected once into the document head and triggered by
+// toggling the `sneaky-shake` class on document.documentElement.
+// ---------------------------------------------------------------------------
+(function injectShakeStyle() {
+  if (document.getElementById('sneaky-shake-style')) return;
+  const style = document.createElement('style');
+  style.id = 'sneaky-shake-style';
+  style.textContent = `
+    @keyframes sneaky-shake {
+      0%   { transform: translate(0, 0) rotate(0deg); }
+      5%   { transform: translate(-8px, -6px) rotate(-2deg); }
+      10%  { transform: translate(9px,  5px) rotate(2deg); }
+      15%  { transform: translate(-7px,  8px) rotate(-1.5deg); }
+      20%  { transform: translate(8px, -7px) rotate(1.8deg); }
+      25%  { transform: translate(-9px,  4px) rotate(-2.2deg); }
+      30%  { transform: translate(7px,  9px) rotate(1.5deg); }
+      35%  { transform: translate(-6px, -8px) rotate(-1deg); }
+      40%  { transform: translate(9px,  6px) rotate(2.1deg); }
+      45%  { transform: translate(-8px,  7px) rotate(-1.8deg); }
+      50%  { transform: translate(6px, -6px) rotate(1.2deg); }
+      55%  { transform: translate(-5px,  5px) rotate(-0.8deg); }
+      60%  { transform: translate(4px, -4px) rotate(0.6deg); }
+      65%  { transform: translate(-3px,  3px) rotate(-0.4deg); }
+      70%  { transform: translate(2px, -2px) rotate(0.2deg); }
+      75%  { transform: translate(-2px,  1px) rotate(-0.2deg); }
+      80%  { transform: translate(1px, -1px) rotate(0.1deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+    html.sneaky-shake {
+      animation: sneaky-shake 0.75s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+function triggerShake() {
+  const el = document.documentElement;
+  el.classList.remove('sneaky-shake');
+  // Force reflow so removing+adding the class restarts the animation.
+  void el.offsetWidth;
+  el.classList.add('sneaky-shake');
+  setTimeout(() => el.classList.remove('sneaky-shake'), 800);
+}
 
 // ---------------------------------------------------------------------------
 // Giphy GIF API — using the public beta key (rate-limited, suitable for
@@ -570,6 +616,20 @@ function PhotoButton({ onClick }) {
   );
 }
 
+function NudgeButton({ onClick, disabled, name }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="Send a nudge"
+      className="h-10 shrink-0 rounded-full border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95 disabled:opacity-40"
+    >
+      nudge {name}
+    </button>
+  );
+}
+
 function MicButton({ recording, onClick }) {
   return (
     <button
@@ -769,6 +829,11 @@ export default function MessagesPage() {
   async function refresh(markRead = true) {
     try {
       const result = await api.getMessages();
+      // Shake if the OTHER person sent us an unread nudge.
+      const hasUnreadNudge = result.messages.some(
+        (m) => m.body === NUDGE_BODY && !m.read_at && m.sender_id !== user?.id,
+      );
+      if (hasUnreadNudge) triggerShake();
       setData(result);
       if (markRead && result.messages.length > 0) {
         await api.markMessagesRead();
@@ -818,6 +883,20 @@ export default function MessagesPage() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  async function sendNudge() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.sendMessage(NUDGE_BODY, null, null);
+      await refresh(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function send(e) {
     if (e?.preventDefault) e.preventDefault();
@@ -1019,6 +1098,7 @@ export default function MessagesPage() {
               const day = dayLabel(m.created_at);
               const showDay = day !== lastDay;
               lastDay = day;
+              const isNudge = m.body === NUDGE_BODY;
               return (
                 <li key={m.id}>
                   {showDay && (
@@ -1026,23 +1106,29 @@ export default function MessagesPage() {
                       {day}
                     </p>
                   )}
-                  <div className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-                    {!mine && <Avatar url={m.sender_photo} name={m.sender_name} />}
-                    <MessageBubble
-                      m={m}
-                      mine={mine}
-                      isEditing={editingId === m.id}
-                      onOpenStory={openStoryById}
-                      onStartEdit={() => setEditingId(m.id)}
-                      onCancelEdit={() => setEditingId(null)}
-                      onSaveEdit={(body) => saveEdit(m.id, body)}
-                      onDelete={() => remove(m.id)}
-                      onForceDelete={() => setConfirmDeleteId(m.id)}
-                      onSetReaction={(emoji) => setReaction(m.id, emoji)}
-                      onOpenPhoto={(src) => setLightboxSrc(src)}
-                      onSwipeReply={handleSwipeReply}
-                    />
-                  </div>
+                  {isNudge ? (
+                    <p className="my-1 text-center text-xs text-neutral-400 select-none">
+                      {mine ? 'You nudged' : (data.other?.name ?? 'They') + ' nudged you'} · {timeLabel(m.created_at)}
+                    </p>
+                  ) : (
+                    <div className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+                      {!mine && <Avatar url={m.sender_photo} name={m.sender_name} />}
+                      <MessageBubble
+                        m={m}
+                        mine={mine}
+                        isEditing={editingId === m.id}
+                        onOpenStory={openStoryById}
+                        onStartEdit={() => setEditingId(m.id)}
+                        onCancelEdit={() => setEditingId(null)}
+                        onSaveEdit={(body) => saveEdit(m.id, body)}
+                        onDelete={() => remove(m.id)}
+                        onForceDelete={() => setConfirmDeleteId(m.id)}
+                        onSetReaction={(emoji) => setReaction(m.id, emoji)}
+                        onOpenPhoto={(src) => setLightboxSrc(src)}
+                        onSwipeReply={handleSwipeReply}
+                      />
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -1122,6 +1208,7 @@ export default function MessagesPage() {
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
+                  <NudgeButton disabled={busy} name={data.other?.name ?? 'them'} onClick={() => { setShowMedia(false); sendNudge(); }} />
                   <span className="text-xs text-neutral-400 ml-1">Sneaky media, innit.</span>
                 </div>
               )}

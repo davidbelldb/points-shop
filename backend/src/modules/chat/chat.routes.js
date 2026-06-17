@@ -17,10 +17,16 @@ export default async function chatRoutes(fastify) {
     return { other, messages };
   });
 
+  const NUDGE_BODY = '__nudge__';
+
   fastify.post('/api/messages', async (req, reply) => {
     const { body, reply_to_story_id, reply_to_message_id, slider_response } = req.body ?? {};
     if (typeof body !== 'string' || !body.trim()) {
       return reply.code(400).send({ error: 'body required' });
+    }
+    // Nudges may not be sent as replies (they're standalone events).
+    if (body.trim() === NUDGE_BODY && (reply_to_story_id || reply_to_message_id)) {
+      return reply.code(400).send({ error: 'nudges cannot be replies' });
     }
     const accountId = getEffectiveAccountId(req);
     const other = await findOtherUser(accountId);
@@ -57,6 +63,9 @@ export default async function chatRoutes(fastify) {
     const { body } = req.body ?? {};
     if (typeof body !== 'string' || !body.trim()) {
       return reply.code(400).send({ error: 'body required' });
+    }
+    if (body.trim() === NUDGE_BODY) {
+      return reply.code(400).send({ error: 'cannot edit a nudge' });
     }
     const accountId = getEffectiveAccountId(req);
     try {
