@@ -570,7 +570,7 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, clusterPos = 'solo', suppressStoryPreview = false, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
+function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
@@ -763,7 +763,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', suppressStoryPreview = fa
         <SparkleInstance key={s.id} color={s.color} size={s.size} style={s.style} />
       ))}
 
-{m.reply_to_story_id && !isEditing && !suppressStoryPreview && <StoryReplyPreview m={m} onClick={onOpenStory} />}
+{m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
 
       {bodyIsMedia ? (
@@ -817,7 +817,12 @@ function MessageBubble({ m, mine, clusterPos = 'solo', suppressStoryPreview = fa
         </div>
       ) : (
         <>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.body}</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {m.body}
+            {m.extraStoryEmojis?.length > 0 && (
+              <span className="ml-1">{m.extraStoryEmojis.join(' ')}</span>
+            )}
+          </p>
           {m.edited_at && (
             <p className="mt-0.5 text-[10px] opacity-40">edited</p>
           )}
@@ -1163,6 +1168,33 @@ export default function MessagesPage() {
     return () => ro.disconnect();
   }, []);
 
+  // iOS keyboard avoidance: when the visual viewport shrinks (keyboard opens),
+  // lift the composer to sit flush with the top of the keyboard.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const el = composerRef.current;
+    if (!el) return;
+
+    function update() {
+      // How far the bottom of the visual viewport is from the bottom of the layout viewport
+      const offset = window.innerHeight - vv.height - vv.offsetTop;
+      el.style.bottom = `${Math.max(0, offset)}px`;
+      // Scroll to keep last message visible
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
+      });
+    }
+
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      el.style.bottom = '';
+    };
+  }, []);
+
   async function sendRain(kind) {
     if (busy || raining) return;
     setRaining(rainConfig(kind)); // sender sees it immediately
@@ -1363,17 +1395,53 @@ export default function MessagesPage() {
     const msgs = data.messages;
     return msgs.map((m, i) => {
       const isSystem = m.body === NUDGE_BODY || RAIN_BODIES.has(m.body);
-      if (isSystem) return { ...m, clusterPos: 'system' };
+      if (isSystem) return { ...m, clusterPos: 'system', storyReactionContinuation: false, extraStoryEmojis: [] };
+
       const prev = msgs[i - 1];
-      const next = msgs[i + 1];
+
+      // Detect a consecutive same-story reaction from the same sender → suppress as a continuation
+      const isStoryCont = !!(
+        m.reply_to_story_id
+        && prev
+        && prev.reply_to_story_id === m.reply_to_story_id
+        && prev.sender_id === m.sender_id
+        && !(prev.body === NUDGE_BODY || RAIN_BODIES.has(prev.body))
+      );
+      if (isStoryCont) {
+        return { ...m, clusterPos: 'hidden', storyReactionContinuation: true, extraStoryEmojis: [] };
+      }
+
+      // For the head of a story-reaction chain, gather all subsequent same-story emoji bodies
+      const extraStoryEmojis = [];
+      if (m.reply_to_story_id) {
+        let j = i + 1;
+        while (
+          j < msgs.length
+          && msgs[j].reply_to_story_id === m.reply_to_story_id
+          && msgs[j].sender_id === m.sender_id
+          && !(msgs[j].body === NUDGE_BODY || RAIN_BODIES.has(msgs[j].body))
+        ) {
+          extraStoryEmojis.push(msgs[j].body);
+          j++;
+        }
+      }
+
+      // nextSame skips over continuations so they don't affect the head's cluster position
+      const next = msgs.slice(i + 1).find(n =>
+        !(n.reply_to_story_id && n.reply_to_story_id === m.reply_to_story_id && n.sender_id === m.sender_id)
+        && !(n.body === NUDGE_BODY || RAIN_BODIES.has(n.body))
+      );
       const prevSame = prev && prev.sender_id === m.sender_id && prev.body !== NUDGE_BODY && !RAIN_BODIES.has(prev.body);
-      const nextSame = next && next.sender_id === m.sender_id && next.body !== NUDGE_BODY && !RAIN_BODIES.has(next.body);
+      const nextSame = next && next.sender_id === m.sender_id;
+
       return {
         ...m,
         clusterPos: !prevSame && !nextSame ? 'solo'
                   : !prevSame && nextSame  ? 'first'
                   : prevSame  && nextSame  ? 'middle'
                   :                          'last',
+        storyReactionContinuation: false,
+        extraStoryEmojis,
       };
     });
   }, [data.messages]);
@@ -1409,6 +1477,9 @@ export default function MessagesPage() {
         {messagesWithCluster.length > 0 && (
           <ul className="flex flex-col gap-0">
             {messagesWithCluster.map((m, msgIdx) => {
+              // Story-reaction continuations are merged into the head bubble — skip rendering
+              if (m.storyReactionContinuation) return null;
+
               const mine = m.sender_id === user?.id;
               const day = dayLabel(m.created_at);
               const showDay = day !== lastDay;
@@ -1417,15 +1488,6 @@ export default function MessagesPage() {
               const rainKind = RAIN_KIND_MAP[m.body];
               const isRain = !!rainKind;
               const { clusterPos } = m;
-
-              // Suppress the story-reply preview on consecutive messages that all
-              // reply to the same story from the same sender — show it once only.
-              const prevMsg = messagesWithCluster[msgIdx - 1];
-              const suppressStoryPreview = !!(
-                m.reply_to_story_id
-                && prevMsg?.reply_to_story_id === m.reply_to_story_id
-                && prevMsg?.sender_id === m.sender_id
-              );
 
               // Spacing: first/solo get top breathing room; middle/last stay tight
               const topMargin = (clusterPos === 'solo' || clusterPos === 'first') ? 'mt-3' : 'mt-0.5';
@@ -1472,7 +1534,6 @@ export default function MessagesPage() {
                           m={m}
                           mine={mine}
                           clusterPos={clusterPos}
-                          suppressStoryPreview={suppressStoryPreview}
                           isEditing={editingId === m.id}
                           onOpenStory={openStoryById}
                           onStartEdit={() => setEditingId(m.id)}
