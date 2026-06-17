@@ -118,21 +118,54 @@ function ColourGrid({ grid, cellSize = 32 }) {
 
 const TILE_TEXT = { correct: '#0d3d2e', present: '#fff' };
 
-function Tile({ letter, state, delay = 0, revealed, isDark }) {
+function Tile({ letter, state, colIdx = 0, animating = false, isDark }) {
   const isColoured = ['correct','present','absent'].includes(state);
-
   const absentBg   = isDark ? '#525252' : '#939391';
-  const absentText = '#ffffff';
 
-  const bg = isColoured
-    ? (state === 'absent' ? absentBg : { correct: '#61dbbb', present: '#ed70bd' }[state])
-    : isDark ? '#1f1f1e' : '#e8e8e6';
+  // Final (revealed) colors
+  const toBg   = state === 'correct' ? '#61dbbb'
+               : state === 'present' ? '#ed70bd'
+               : state === 'absent'  ? absentBg
+               : isDark ? '#1f1f1e' : '#e8e8e6';
+  const toBord = state === 'correct' ? '#61dbbb'
+               : state === 'present' ? '#ed70bd'
+               : state === 'absent'  ? absentBg
+               : state === 'active'  ? (isDark ? '#6b6b68' : '#a3a3a0')
+               : (isDark ? '#30302e' : '#d4d4d0');
+  const toText = state === 'absent'  ? '#ffffff'
+               : isColoured          ? TILE_TEXT[state]
+               : (isDark ? '#ffffff' : '#171717');
 
-  const border = isColoured
-    ? (state === 'absent' ? absentBg : { correct: '#61dbbb', present: '#ed70bd' }[state])
-    : state === 'active'
-      ? (isDark ? '#6b6b68' : '#a3a3a0')
-      : (isDark ? '#30302e' : '#d4d4d0');
+  // Starting (uncoloured) colors used before the flip animation reveals the result
+  const fromBg   = isDark ? '#1f1f1e' : '#e8e8e6';
+  const fromBord = isDark ? '#6b6b68' : '#a3a3a0';
+  const fromText = isDark ? '#ffffff'  : '#171717';
+
+  // 'dw-flip-hit' includes a pulse for correct/present; 'dw-flip-miss' is flip only
+  const isPulse  = animating && (state === 'correct' || state === 'present');
+  const animName = animating ? (isPulse ? 'dw-flip-hit' : 'dw-flip-miss') : 'none';
+  const delay    = colIdx * 100; // ms stagger between tiles
+
+  if (animating) {
+    return (
+      <div
+        style={{
+          width: 56, height: 56,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 22, fontWeight: 700,
+          borderRadius: 6,
+          border: `2px solid ${fromBord}`,
+          background: fromBg,
+          color: fromText,
+          '--tf': fromBg, '--tb': fromBord, '--cf': fromText,
+          '--tc': toBg,   '--tbc': toBord,  '--ct': toText,
+          animation: `${animName} 650ms ease-in-out ${delay}ms both`,
+        }}
+      >
+        {letter}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -140,13 +173,12 @@ function Tile({ letter, state, delay = 0, revealed, isDark }) {
         width: 56, height: 56,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 22, fontWeight: 700,
-        border: `2px solid ${border}`,
+        border: `2px solid ${toBord}`,
         borderRadius: 6,
-        background: bg,
-        color: state === 'absent' ? absentText : isColoured ? TILE_TEXT[state] : (isDark ? '#ffffff' : '#171717'),
-        transition: revealed ? `background 0.15s ${delay}ms, border-color 0.15s ${delay}ms` : 'border-color 0.1s',
-        transform: letter && !revealed ? 'scale(1.08)' : 'scale(1)',
-        transitionProperty: revealed ? 'background, border-color' : 'transform, border-color',
+        background: toBg,
+        color: toText,
+        transform: letter && !isColoured ? 'scale(1.08)' : 'scale(1)',
+        transition: 'transform 0.1s, border-color 0.1s',
       }}
     >
       {letter}
@@ -554,6 +586,7 @@ export default function DirtyWordlePage() {
 
   const [guesses,          setGuesses]          = useState(saved.guesses      ?? []);
   const [currentGuess,     setCurrentGuess]     = useState('');
+  const [revealingRow,     setRevealingRow]     = useState(null);
   const [gameOver,         setGameOver]         = useState(saved.gameOver     ?? false);
   const [won,              setWon]              = useState(saved.won          ?? false);
   const [ptsEarned,        setPtsEarned]        = useState(saved.ptsEarned    ?? null);
@@ -627,6 +660,11 @@ export default function DirtyWordlePage() {
     const newGuesses = [...guesses, currentGuess];
     const isWon      = currentGuess === target;
     const isOver     = isWon || newGuesses.length >= MAX_GUESSES;
+
+    // Kick off the flip animation for the just-submitted row; clear after all tiles finish
+    const rowIdx = guesses.length;
+    setRevealingRow(rowIdx);
+    setTimeout(() => setRevealingRow(null), 1400);
 
     setGuesses(newGuesses);
     setCurrentGuess('');
@@ -740,7 +778,7 @@ export default function DirtyWordlePage() {
               {Array.from({ length: WORD_LENGTH }, (_, colIdx) => {
                 const letter = word[colIdx] ?? '';
                 const state  = result ? result[colIdx] : letter ? 'active' : 'empty';
-                return <Tile key={colIdx} letter={letter} state={state} delay={colIdx * 80} revealed={submitted} isDark={isDark} />;
+                return <Tile key={colIdx} letter={letter} state={state} colIdx={colIdx} animating={submitted && rowIdx === revealingRow} isDark={isDark} />;
               })}
             </div>
           );
@@ -813,6 +851,24 @@ export default function DirtyWordlePage() {
           40%      { transform: translateX(8px); }
           60%      { transform: translateX(-5px); }
           80%      { transform: translateX(5px); }
+        }
+
+        /* Tile flip for correct/present tiles — flip reveals colour then pulses */
+        @keyframes dw-flip-hit {
+          0%   { transform: perspective(250px) rotateX(0deg)   scale(1);   background: var(--tf);  border-color: var(--tb);  color: var(--cf); }
+          46%  { transform: perspective(250px) rotateX(-90deg) scale(1);   background: var(--tf);  border-color: var(--tb);  color: var(--cf); }
+          54%  { transform: perspective(250px) rotateX(90deg)  scale(1);   background: var(--tc);  border-color: var(--tbc); color: var(--ct); }
+          78%  { transform: perspective(250px) rotateX(0deg)   scale(1);   background: var(--tc);  border-color: var(--tbc); color: var(--ct); }
+          90%  { transform: scale(1.14);                                    background: var(--tc);  border-color: var(--tbc); color: var(--ct); }
+          100% { transform: scale(1);                                       background: var(--tc);  border-color: var(--tbc); color: var(--ct); }
+        }
+
+        /* Tile flip for absent tiles — flip only, no pulse */
+        @keyframes dw-flip-miss {
+          0%   { transform: perspective(250px) rotateX(0deg)   scale(1);   background: var(--tf);  border-color: var(--tb);  color: var(--cf); }
+          46%  { transform: perspective(250px) rotateX(-90deg) scale(1);   background: var(--tf);  border-color: var(--tb);  color: var(--cf); }
+          54%  { transform: perspective(250px) rotateX(90deg)  scale(1);   background: var(--tc);  border-color: var(--tbc); color: var(--ct); }
+          100% { transform: perspective(250px) rotateX(0deg)   scale(1);   background: var(--tc);  border-color: var(--tbc); color: var(--ct); }
         }
       `}</style>
     </div>
