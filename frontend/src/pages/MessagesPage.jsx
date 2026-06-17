@@ -68,6 +68,37 @@ const NUDGE_BODY = '__nudge__';
       0%, 60%, 100% { transform: translateY(0);    opacity: 0.5; }
       30%            { transform: translateY(-6px); opacity: 1;   }
     }
+
+    /* ── Send animation (bubble launches up from composer) ── */
+    @keyframes bubble-send-in {
+      0%   { opacity: 0; transform: translateY(24px) scale(0.82); }
+      55%  { opacity: 1; transform: translateY(-5px) scale(1.03); }
+      78%  { transform: translateY(2px) scale(0.99); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── Receive animation (spring overshoot bounce) ── */
+    @keyframes bubble-receive-in {
+      0%   { opacity: 0; transform: translateY(10px) scale(0.78); }
+      50%  { opacity: 1; transform: scale(1.06); }
+      70%  { transform: scale(0.97); }
+      85%  { transform: scale(1.02); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Status aura pulse ── */
+    @keyframes aura-pulse {
+      0%, 100% { opacity: 0.55; transform: scale(1); }
+      50%       { opacity: 0.9;  transform: scale(1.1); }
+    }
+
+    /* ── Long-press bubble lift ── */
+    .bubble-held {
+      transform: scale(1.04) translateY(-3px) !important;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+      transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease !important;
+      z-index: 10;
+    }
   `;
   document.head.appendChild(style);
 })();
@@ -588,7 +619,10 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onToggleSparkle, onVote, onOpenStory, onOpenPhoto, onSwipeReply }) {
+const SECRET_PREFIX = '__secret__:';
+function isSecretBody(body) { return typeof body === 'string' && body.startsWith(SECRET_PREFIX); }
+
+function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onToggleSparkle, onVote, onOpenStory, onOpenPhoto, onSwipeReply, isRevealed, onRevealSecret }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
@@ -600,6 +634,7 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
   const [leftArmed, setLeftArmed]   = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [sparkles, setSparkles]     = useState([]);
+  const [isHeld, setIsHeld]         = useState(false);
 
   useEffect(() => { if (isEditing) setDraft(m.body); }, [isEditing, m.body]);
   useEffect(() => () => {
@@ -660,8 +695,9 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
       if (swipeRef.current && !swipeRef.current.decided) {
         swipeRef.current.suppressClick = true;
         if (tapTimer.current) { clearTimeout(tapTimer.current); tapTimer.current = null; }
-        setShowPicker(true);
+        setIsHeld(true);
         try { navigator.vibrate?.(30); } catch { /* noop */ }
+        setTimeout(() => { setIsHeld(false); setShowPicker(true); }, 140);
       }
     }, 500);
   }
@@ -699,13 +735,18 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
   const rounding = mine
     ? ({ solo: 'rounded-2xl rounded-br-[4px]', first: 'rounded-2xl rounded-br-[4px]', middle: 'rounded-2xl rounded-r-[4px]', last: 'rounded-2xl rounded-tr-[4px]' })[clusterPos] ?? 'rounded-2xl'
     : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
-  const tone = mine
+  const toneClass = mine
+    ? theme === 'dark' ? `${rounding} text-white` : `${rounding} text-[#0d3d2e]`
+    : theme === 'dark' ? `${rounding} text-white` : `${rounding} text-[#3b0f2a]`;
+  const toneBg = mine
     ? theme === 'dark'
-      ? `${rounding} bg-[#21433b] text-white`
-      : `${rounding} bg-[#c8ede4] text-[#0d3d2e]`
+      ? 'linear-gradient(145deg, #2a5c4d 0%, #0d2b22 100%)'
+      : 'linear-gradient(145deg, #d4f5eb 0%, #a8e8d4 100%)'
     : theme === 'dark'
-      ? `${rounding} bg-[#4e1d37] text-white`
-      : `${rounding} bg-[#f0d5e8] text-[#3b0f2a]`;
+      ? 'linear-gradient(145deg, #6b2548 0%, #2d0a1e 100%)'
+      : 'linear-gradient(145deg, #f5d8ec 0%, #e8b5d8 100%)';
+  // keep 'tone' as alias so existing code referencing it still works
+  const tone = toneClass;
   const bodyIsGif   = isGifUrl(m.body);
   const bodyIsPhoto = isUploadedPhoto(m.body);
   const bodyIsAudio = isAudioUrl(m.body);
@@ -721,8 +762,13 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? 'none' : 'transform 0.22s ease-out', touchAction: 'pan-y' }}
-      className={`group relative max-w-[78%] cursor-pointer select-none ${bodyIsMedia || bodyIsPoll ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
+      style={{
+        transform: dragX ? `translateX(${dragX}px)` : undefined,
+        transition: dragX ? 'none' : 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+        touchAction: 'pan-y',
+        ...(!(bodyIsMedia || bodyIsPoll) ? { background: toneBg } : {}),
+      }}
+      className={`group relative max-w-[78%] cursor-pointer select-none${isHeld ? ' bubble-held' : ''} ${bodyIsMedia || bodyIsPoll ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
     >
       {/* Emoji picker — floats above bubble on long-press */}
       {showPicker && (
@@ -865,6 +911,27 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
             <button data-bubble-action onClick={(e) => { e.stopPropagation(); onCancelEdit(); }} className="rounded-md px-2 py-1 text-neutral-600 hover:bg-white/40">Cancel</button>
             <button data-bubble-action disabled={!draft.trim() || draft === m.body} onClick={(e) => { e.stopPropagation(); onSaveEdit(draft); }} className="rounded-md bg-white/20 px-2 py-1 text-white disabled:opacity-40">Save</button>
           </div>
+        </div>
+      ) : isSecretBody(m.body) ? (
+        /* ── Secret message ── */
+        <div
+          data-bubble-action
+          onClick={(e) => { e.stopPropagation(); if (!isRevealed) onRevealSecret?.(m.id); }}
+          style={{ minWidth: 80, userSelect: 'none' }}
+        >
+          {isRevealed || mine ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {m.body.slice(SECRET_PREFIX.length)}
+            </p>
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="text-sm leading-relaxed select-none" style={{ filter: 'blur(6px)', pointerEvents: 'none' }}>
+                {m.body.slice(SECRET_PREFIX.length)}
+              </p>
+              <span className="shrink-0 text-xs opacity-70">👀 tap</span>
+            </div>
+          )}
+          <p className="mt-0.5 text-[10px] opacity-40">🤫 secret</p>
         </div>
       ) : (
         <>
@@ -1195,6 +1262,165 @@ function AudioPlayer({ src, mine, fallbackDur = 0 }) {
 }
 
 // ---------------------------------------------------------------------------
+// Photo lightbox with pinch-to-zoom + momentum physics
+// ---------------------------------------------------------------------------
+function PhotoLightbox({ src, onClose }) {
+  const containerRef = useRef(null);
+  const stateRef = useRef({
+    scale: 1, tx: 0, ty: 0,
+    vx: 0, vy: 0,
+    pointers: [],
+    lastDist: null, lastMid: null,
+    rafId: null,
+  });
+  const [transform, setTransform] = useState({ scale: 1, tx: 0, ty: 0 });
+
+  function applyTransform(s) {
+    setTransform({ scale: s.scale, tx: s.tx, ty: s.ty });
+  }
+
+  function clamp(s) {
+    const minScale = 1, maxScale = 6;
+    s.scale = Math.min(maxScale, Math.max(minScale, s.scale));
+    if (s.scale <= 1) { s.tx = 0; s.ty = 0; }
+  }
+
+  function startInertia() {
+    const s = stateRef.current;
+    if (s.rafId) cancelAnimationFrame(s.rafId);
+    function tick() {
+      if (Math.abs(s.vx) < 0.1 && Math.abs(s.vy) < 0.1) { s.rafId = null; return; }
+      s.tx += s.vx; s.ty += s.vy;
+      s.vx *= 0.92; s.vy *= 0.92;
+      clamp(s);
+      applyTransform(s);
+      s.rafId = requestAnimationFrame(tick);
+    }
+    s.rafId = requestAnimationFrame(tick);
+  }
+
+  function onPointerDown(e) {
+    const s = stateRef.current;
+    if (s.rafId) { cancelAnimationFrame(s.rafId); s.rafId = null; }
+    s.pointers = [...s.pointers.filter(p => p.id !== e.pointerId), { id: e.pointerId, x: e.clientX, y: e.clientY }];
+    if (s.pointers.length === 1) { s.lastMid = { x: e.clientX, y: e.clientY }; s.lastDist = null; }
+    if (s.pointers.length === 2) {
+      const [a, b] = s.pointers;
+      s.lastDist = Math.hypot(b.x - a.x, b.y - a.y);
+      s.lastMid  = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+    s.vx = 0; s.vy = 0;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+  }
+
+  function onPointerMove(e) {
+    const s = stateRef.current;
+    const idx = s.pointers.findIndex(p => p.id === e.pointerId);
+    if (idx === -1) return;
+    const prev = s.pointers[idx];
+    s.pointers[idx] = { id: e.pointerId, x: e.clientX, y: e.clientY };
+
+    if (s.pointers.length === 1) {
+      if (s.scale <= 1) return; // don't pan when not zoomed
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      s.tx += dx; s.ty += dy;
+      s.vx = dx; s.vy = dy;
+      clamp(s); applyTransform(s);
+    } else if (s.pointers.length === 2) {
+      const [a, b] = s.pointers;
+      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      const mid  = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if (s.lastDist) {
+        const ratio = dist / s.lastDist;
+        s.scale *= ratio;
+        // Translate toward pinch midpoint
+        const rect = containerRef.current?.getBoundingClientRect();
+        const cx = mid.x - (rect?.left ?? 0) - (rect?.width ?? 0) / 2;
+        const cy = mid.y - (rect?.top ?? 0) - (rect?.height ?? 0) / 2;
+        s.tx = cx + (s.tx - cx) * ratio + (mid.x - s.lastMid.x);
+        s.ty = cy + (s.ty - cy) * ratio + (mid.y - s.lastMid.y);
+      }
+      s.lastDist = dist; s.lastMid = mid;
+      clamp(s); applyTransform(s);
+    }
+  }
+
+  function onPointerUp(e) {
+    const s = stateRef.current;
+    s.pointers = s.pointers.filter(p => p.id !== e.pointerId);
+    if (s.pointers.length === 0) {
+      if (s.scale <= 1) { s.tx = 0; s.ty = 0; applyTransform(s); }
+      else startInertia();
+      s.lastDist = null;
+    }
+  }
+
+  // Double-tap to zoom in/out
+  const lastTapRef = useRef(0);
+  function onTap(e) {
+    const now = Date.now();
+    if (now - lastTapRef.current < 260) {
+      const s = stateRef.current;
+      if (s.scale > 1.5) { s.scale = 1; s.tx = 0; s.ty = 0; }
+      else {
+        const rect = containerRef.current?.getBoundingClientRect();
+        s.scale = 3;
+        s.tx = -((e.clientX - (rect?.left ?? 0)) - (rect?.width ?? 0) / 2) * 2;
+        s.ty = -((e.clientY - (rect?.top ?? 0)) - (rect?.height ?? 0) / 2) * 2;
+        clamp(s);
+      }
+      applyTransform(s);
+    }
+    lastTapRef.current = now;
+  }
+
+  useEffect(() => () => { if (stateRef.current.rafId) cancelAnimationFrame(stateRef.current.rafId); }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        ref={containerRef}
+        style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClick={onTap}
+      >
+        <img
+          src={src}
+          alt="Photo"
+          draggable={false}
+          style={{
+            maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
+            transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`,
+            transformOrigin: 'center center',
+            userSelect: 'none', pointerEvents: 'none',
+            transition: stateRef.current.pointers.length === 0 && transform.scale <= 1 ? 'transform 0.3s ease' : 'none',
+          }}
+        />
+      </div>
+      <button
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
+      </button>
+      {transform.scale > 1 && (
+        <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-white/40 select-none">double-tap to reset</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 export default function MessagesPage() {
@@ -1221,6 +1447,9 @@ export default function MessagesPage() {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [raining, setRaining] = useState(null);
+  const [animatedIds, setAnimatedIds] = useState(new Set()); // IDs to animate on entry
+  const [secretsRevealed, setSecretsRevealed] = useState(new Set()); // locally revealed secret messages
+  const [secretSendPrimed, setSecretSendPrimed] = useState(false); // long-hold send button
   const recorderRef  = useRef(null);
   const recChunksRef = useRef([]);
   const recTimerRef  = useRef(null);
@@ -1231,6 +1460,8 @@ export default function MessagesPage() {
   const composerRef   = useRef(null);
   const lastCountRef  = useRef(0);
   const typingTimerRef = useRef(null);
+  const secretSendTimerRef = useRef(null);
+  const seenMessageIdsRef = useRef(new Set());
   const [composerHeight, setComposerHeight] = useState(80);
 
   async function openStoryById(storyId) {
@@ -1255,6 +1486,17 @@ export default function MessagesPage() {
         (m) => RAIN_BODIES.has(m.body) && !m.read_at && m.sender_id !== user?.id,
       );
       if (unreadRain) setRaining((cur) => cur ?? rainConfig(RAIN_KIND_MAP[unreadRain.body]));
+
+      // Track new message IDs for entry animations (receive bounce)
+      const newIds = result.messages
+        .filter(m => !seenMessageIdsRef.current.has(m.id) && m.sender_id !== user?.id)
+        .map(m => m.id);
+      if (newIds.length > 0 && seenMessageIdsRef.current.size > 0) {
+        setAnimatedIds(prev => { const s = new Set(prev); newIds.forEach(id => s.add(id)); return s; });
+        setTimeout(() => setAnimatedIds(prev => { const s = new Set(prev); newIds.forEach(id => s.delete(id)); return s; }), 600);
+      }
+      result.messages.forEach(m => seenMessageIdsRef.current.add(m.id));
+
       setData(result);
       if (markRead && result.messages.length > 0) {
         await api.markMessagesRead();
@@ -1380,16 +1622,25 @@ export default function MessagesPage() {
     }
   }
 
-  async function send(e) {
+  async function send(e, forceSecret = false) {
     if (e?.preventDefault) e.preventDefault();
     if (!draft.trim() || busy) return;
+    const isSecret = forceSecret || secretSendPrimed;
+    const body = isSecret ? `__secret__:${draft.trim()}` : draft.trim();
     setBusy(true);
     setError(null);
+    setSecretSendPrimed(false);
     try {
-      await api.sendMessage(draft, null, replyTo?.id ?? null);
+      const sent = await api.sendMessage(body, null, replyTo?.id ?? null);
       setDraft('');
       if (inputRef.current) inputRef.current.style.height = '40px';
       setReplyTo(null);
+      // Animate the message we just sent
+      if (sent?.id) {
+        seenMessageIdsRef.current.add(sent.id);
+        setAnimatedIds(prev => { const s = new Set(prev); s.add(`send:${sent.id}`); return s; });
+        setTimeout(() => setAnimatedIds(prev => { const s = new Set(prev); s.delete(`send:${sent.id}`); return s; }), 600);
+      }
       await refresh(false);
       await refreshBasket();
     } catch (e) {
@@ -1646,7 +1897,25 @@ export default function MessagesPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {data.other && <Avatar url={data.other.photo_url} name={data.other.name} size="lg" />}
+            {data.other && (() => {
+              const lastTyping = data.other.typing_at ? new Date(data.other.typing_at).getTime() : 0;
+              const activeRecently = Date.now() - lastTyping < 5 * 60 * 1000;
+              const auraColor = activeRecently ? '#f59e0b' : '#525252';
+              const auraAnim  = activeRecently ? 'aura-pulse 2.4s ease-in-out infinite' : 'aura-pulse 5s ease-in-out infinite';
+              return (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  {/* glow ring */}
+                  <div style={{
+                    position: 'absolute', inset: -5,
+                    borderRadius: '50%',
+                    background: `radial-gradient(circle, ${auraColor}55 0%, transparent 72%)`,
+                    animation: auraAnim,
+                    pointerEvents: 'none',
+                  }} />
+                  <Avatar url={data.other.photo_url} name={data.other.name} size="lg" />
+                </div>
+              );
+            })()}
             <div>
               <h1 className="text-lg font-semibold leading-tight">
                 {data.other ? data.other.name : 'Messages'}
@@ -1712,8 +1981,16 @@ export default function MessagesPage() {
               // Extra bottom clearance when a reaction emoji floats below the bubble
               const bottomPad = m.reaction ? 'mb-4' : '';
 
+              const isSendAnim    = animatedIds.has(`send:${m.id}`);
+              const isReceiveAnim = animatedIds.has(m.id);
+              const entryAnim     = isSendAnim
+                ? 'bubble-send-in 0.38s cubic-bezier(0.34,1.56,0.64,1) both'
+                : isReceiveAnim
+                  ? 'bubble-receive-in 0.42s cubic-bezier(0.34,1.56,0.64,1) both'
+                  : undefined;
+
               return (
-                <li key={m.id} className={`${topMargin} ${bottomPad}`}>
+                <li key={m.id} className={`${topMargin} ${bottomPad}`} style={entryAnim ? { animation: entryAnim } : undefined}>
                   {showDay && (
                     <p className="mb-3 mt-4 text-center text-xs font-medium uppercase tracking-wide text-neutral-400">
                       {day}
@@ -1765,6 +2042,8 @@ export default function MessagesPage() {
                           myId={user?.id}
                           onOpenPhoto={(src) => setLightboxSrc(src)}
                           onSwipeReply={handleSwipeReply}
+                          isRevealed={secretsRevealed.has(m.id)}
+                          onRevealSecret={(id) => setSecretsRevealed(prev => { const s = new Set(prev); s.add(id); return s; })}
                         />
                       </div>
                       {/* Timestamp — shown only once per cluster, below the last/solo bubble */}
@@ -1997,13 +2276,32 @@ export default function MessagesPage() {
             <button
               type="submit"
               disabled={busy || !draft.trim()}
-              aria-label="Send"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white disabled:opacity-40 active:scale-95 transition"
+              aria-label={secretSendPrimed ? 'Send secret (release to send)' : 'Send'}
+              onPointerDown={() => {
+                if (!draft.trim()) return;
+                secretSendTimerRef.current = setTimeout(() => {
+                  setSecretSendPrimed(true);
+                  try { navigator.vibrate?.([20, 60, 20]); } catch { /* noop */ }
+                }, 600);
+              }}
+              onPointerUp={() => { clearTimeout(secretSendTimerRef.current); }}
+              onPointerCancel={() => { clearTimeout(secretSendTimerRef.current); setSecretSendPrimed(false); }}
+              style={{
+                background: secretSendPrimed
+                  ? 'linear-gradient(135deg, #7c3aed, #c026d3)'
+                  : undefined,
+                transition: 'background 0.2s ease, transform 0.1s',
+              }}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-40 active:scale-95 transition ${secretSendPrimed ? '' : 'bg-amber-600'}`}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
+              {secretSendPrimed ? (
+                <span style={{ fontSize: 18 }}>🤫</span>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              )}
             </button>
           </form>
         </div>
@@ -2057,28 +2355,9 @@ export default function MessagesPage() {
         </div>
       )}
 
-      {/* Photo lightbox */}
+      {/* Photo lightbox with pinch-to-zoom physics */}
       {lightboxSrc && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
-          onClick={() => setLightboxSrc(null)}
-        >
-          <img
-            src={lightboxSrc}
-            alt="Photo"
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            onClick={() => setLightboxSrc(null)}
-            aria-label="Close"
-            className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
-            </svg>
-          </button>
-        </div>
+        <PhotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       )}
     </>
   );
