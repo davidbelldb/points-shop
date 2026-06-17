@@ -700,8 +700,12 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
     ? ({ solo: 'rounded-2xl rounded-br-[4px]', first: 'rounded-2xl rounded-br-[4px]', middle: 'rounded-2xl rounded-r-[4px]', last: 'rounded-2xl rounded-tr-[4px]' })[clusterPos] ?? 'rounded-2xl'
     : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
   const tone = mine
-    ? `${rounding} bg-[#21433b] text-white`
-    : `${rounding} bg-[#4e1d37] text-white`;
+    ? theme === 'dark'
+      ? `${rounding} bg-[#21433b] text-white`
+      : `${rounding} bg-[#c8ede4] text-[#0d3d2e]`
+    : theme === 'dark'
+      ? `${rounding} bg-[#4e1d37] text-white`
+      : `${rounding} bg-[#f0d5e8] text-[#3b0f2a]`;
   const bodyIsGif   = isGifUrl(m.body);
   const bodyIsPhoto = isUploadedPhoto(m.body);
   const bodyIsAudio = isAudioUrl(m.body);
@@ -841,7 +845,7 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
           )}
           {rxEmoji && (
             <span
-              className={`pointer-events-none absolute -bottom-3 z-10 ${mine ? 'left-1' : 'right-1'} flex items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-sm shadow-sm ring-1 ring-black/5`}
+              className={`pointer-events-none absolute -bottom-3.5 z-10 ${mine ? 'left-1' : 'right-1'} flex items-center justify-center rounded-full bg-white px-2 py-1 text-base shadow-sm ring-2 ring-black/15`}
               style={{ lineHeight: 1 }}
             >
               {rxEmoji}
@@ -883,7 +887,7 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
           )}
           {rxEmoji && (
             <span
-              className={`pointer-events-none absolute -bottom-3 z-10 ${mine ? 'left-1' : 'right-1'} flex items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-sm shadow-sm ring-1 ring-black/5`}
+              className={`pointer-events-none absolute -bottom-3.5 z-10 ${mine ? 'left-1' : 'right-1'} flex items-center justify-center rounded-full bg-white px-2 py-1 text-base shadow-sm ring-2 ring-black/15`}
               style={{ lineHeight: 1 }}
             >
               {rxEmoji}
@@ -988,17 +992,24 @@ function fmtAudio(s) {
 
 // ─── Poll bubble ─────────────────────────────────────────────────────────────
 function PollBubble({ m, mine, onVote }) {
+  const { theme } = useTheme();
   const poll = parsePoll(m.body);
   if (!poll) return null;
   const votes = m.poll_votes ?? [];
   const myVote = votes.find(v => v.account_id === m._myId)?.option_idx ?? null;
   const total  = votes.length;
+  const bg = mine
+    ? (theme === 'dark' ? '#21433b' : '#c8ede4')
+    : (theme === 'dark' ? '#4e1d37' : '#f0d5e8');
+  const textColor = mine
+    ? (theme === 'dark' ? '#ffffff' : '#0d3d2e')
+    : (theme === 'dark' ? '#ffffff' : '#3b0f2a');
 
   return (
-    <div className="w-[220px] overflow-hidden rounded-2xl" style={{ background: mine ? '#21433b' : '#4e1d37' }}>
+    <div className="w-[220px] overflow-hidden rounded-2xl" style={{ background: bg }}>
       <div className="px-4 pt-3 pb-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">Poll</p>
-        <p className="mt-0.5 text-sm font-semibold text-white leading-snug">{poll.question}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: textColor, opacity: 0.5 }}>Poll</p>
+        <p className="mt-0.5 text-sm font-semibold leading-snug" style={{ color: textColor }}>{poll.question}</p>
       </div>
       <div className="flex flex-col gap-1.5 px-3 pb-3">
         {poll.options.map((opt, idx) => {
@@ -1012,21 +1023,20 @@ function PollBubble({ m, mine, onVote }) {
               onClick={() => onVote(m.id, idx)}
               className="relative w-full overflow-hidden rounded-xl text-left transition active:scale-[0.97]"
               style={{
-                background: chosen ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.10)',
-                border: chosen ? '1.5px solid rgba(255,255,255,0.5)' : '1.5px solid transparent',
+                background: chosen ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.06)',
+                border: chosen ? `1.5px solid ${textColor}` : '1.5px solid transparent',
               }}
             >
-              {/* Fill bar */}
               {hasVoted && (
                 <div
                   className="absolute inset-y-0 left-0 rounded-xl transition-all duration-500"
-                  style={{ width: `${pct}%`, background: 'rgba(255,255,255,0.10)' }}
+                  style={{ width: `${pct}%`, background: 'rgba(0,0,0,0.08)' }}
                 />
               )}
               <div className="relative flex items-center justify-between px-3 py-2">
-                <span className="text-sm text-white">{opt}</span>
+                <span className="text-sm" style={{ color: textColor }}>{opt}</span>
                 {hasVoted && (
-                  <span className="text-[11px] font-semibold text-white/60">{pct}%</span>
+                  <span className="text-[11px] font-semibold" style={{ color: textColor, opacity: 0.6 }}>{pct}%</span>
                 )}
               </div>
             </button>
@@ -1034,7 +1044,7 @@ function PollBubble({ m, mine, onVote }) {
         })}
       </div>
       {total > 0 && (
-        <p className="pb-2 text-center text-[10px] text-white/40">{total} vote{total !== 1 ? 's' : ''}</p>
+        <p className="pb-2 text-center text-[10px]" style={{ color: textColor, opacity: 0.4 }}>{total} vote{total !== 1 ? 's' : ''}</p>
       )}
     </div>
   );
@@ -1670,6 +1680,34 @@ export default function MessagesPage() {
               const isNudge = m.body === NUDGE_BODY;
               const rainKind = RAIN_KIND_MAP[m.body];
               const isRain = !!rainKind;
+
+              // Rain aggregation: if previous visible message is the same sender
+              // raining the same kind within 4 min, this is a continuation — skip it.
+              // The head accumulates a count from looking ahead.
+              if (isRain) {
+                const prev = messagesWithCluster.slice(0, msgIdx).reverse()
+                  .find(p => !p.storyReactionContinuation);
+                if (prev && prev.body === m.body && prev.sender_id === m.sender_id
+                    && new Date(m.created_at) - new Date(prev.created_at) < 4 * 60 * 1000) {
+                  return null; // merged into head
+                }
+              }
+              // Count how many consecutive same-rain follow this one within 4 min
+              const rainCount = isRain ? (() => {
+                let count = 1;
+                for (let j = msgIdx + 1; j < messagesWithCluster.length; j++) {
+                  const nx = messagesWithCluster[j];
+                  if (nx.storyReactionContinuation) continue;
+                  if (nx.body !== m.body || nx.sender_id !== m.sender_id) break;
+                  if (new Date(nx.created_at) - new Date(m.created_at) >= 4 * 60 * 1000) break;
+                  count++;
+                }
+                return count;
+              })() : 1;
+              const ORDINALS = ['', '', 'twice', 'three times', 'four times', 'five times', 'six times'];
+              const rainCountLabel = rainCount > 1
+                ? (ORDINALS[rainCount] ?? `${rainCount} times`)
+                : null;
               const { clusterPos } = m;
 
               // Spacing: first/solo get top breathing room; middle/last stay tight
@@ -1700,7 +1738,7 @@ export default function MessagesPage() {
                         className="select-none rounded-full px-3 py-1 text-[11px]"
                         style={{ background: theme === 'dark' ? '#262626' : '#f0f0f0', color: theme === 'dark' ? '#6b6b6b' : '#a3a3a0' }}
                       >
-                        {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s · {timeLabel(m.created_at)}
+                        {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s{rainCountLabel ? ` ${rainCountLabel}` : ''} · {timeLabel(m.created_at)}
                       </span>
                     </div>
                   ) : (
