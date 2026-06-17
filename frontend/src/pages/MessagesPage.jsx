@@ -831,7 +831,7 @@ export default function MessagesPage() {
       const result = await api.getMessages();
       // Shake if the OTHER person sent us an unread nudge.
       const hasUnreadNudge = result.messages.some(
-        (m) => m.body === NUDGE_BODY && !m.read_at && m.sender_id !== user?.id,
+        (m) => m.body === NUDGE_BODY && !m.read_at,
       );
       if (hasUnreadNudge) triggerShake();
       setData(result);
