@@ -2145,14 +2145,19 @@ export default function MessagesPage() {
                 <div className="py-2 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#61dbbb' }}>Sneaky Poll</p>
-                    <button onClick={() => setPollOpen(false)} className="text-neutral-400 text-lg leading-none">×</button>
+                    <button onClick={() => setPollOpen(false)} style={{ color: theme === 'dark' ? '#a3a3a3' : '#737373' }} className="text-lg leading-none">×</button>
                   </div>
                   <input
                     autoFocus
                     value={pollQuestion}
                     onChange={e => setPollQuestion(e.target.value)}
                     placeholder="Ask a question…"
-                    className="w-full rounded-xl border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#61dbbb]"
+                    style={{
+                      background: theme === 'dark' ? '#1a1a1a' : '#ffffff',
+                      border: `1px solid ${theme === 'dark' ? '#3a3a3a' : '#e5e5e5'}`,
+                      color: theme === 'dark' ? '#ffffff' : '#171717',
+                    }}
+                    className="w-full rounded-xl px-3 py-2 text-sm placeholder-neutral-400 focus:outline-none"
                   />
                   {pollOptions.map((opt, i) => (
                     <div key={i} className="flex items-center gap-2">
@@ -2160,10 +2165,15 @@ export default function MessagesPage() {
                         value={opt}
                         onChange={e => setPollOptions(prev => prev.map((o, j) => j === i ? e.target.value : o))}
                         placeholder={`Option ${i + 1}`}
-                        className="flex-1 rounded-xl border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#61dbbb]"
+                        style={{
+                          background: theme === 'dark' ? '#1a1a1a' : '#ffffff',
+                          border: `1px solid ${theme === 'dark' ? '#3a3a3a' : '#e5e5e5'}`,
+                          color: theme === 'dark' ? '#ffffff' : '#171717',
+                        }}
+                        className="flex-1 rounded-xl px-3 py-2 text-sm placeholder-neutral-400 focus:outline-none"
                       />
                       {pollOptions.length > 2 && (
-                        <button onClick={() => setPollOptions(prev => prev.filter((_, j) => j !== i))} className="text-neutral-500 text-lg">×</button>
+                        <button onClick={() => setPollOptions(prev => prev.filter((_, j) => j !== i))} style={{ color: theme === 'dark' ? '#737373' : '#a3a3a3' }} className="text-lg">×</button>
                       )}
                     </div>
                   ))}
@@ -2171,7 +2181,8 @@ export default function MessagesPage() {
                     {pollOptions.length < 4 && (
                       <button
                         onClick={() => setPollOptions(prev => [...prev, ''])}
-                        className="text-xs text-neutral-400 hover:text-white transition"
+                        style={{ color: theme === 'dark' ? '#a3a3a3' : '#737373' }}
+                        className="text-xs transition hover:opacity-70"
                       >+ Add option</button>
                     )}
                     <button
@@ -2188,13 +2199,13 @@ export default function MessagesPage() {
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
-                  {/* Poll button */}
+                  {/* Poll button — matches other tray icons */}
                   <button
                     onClick={() => setPollOpen(true)}
                     title="Create poll"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 transition active:scale-90" style={{ color: '#61dbbb' }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/>
                     </svg>
                   </button>
