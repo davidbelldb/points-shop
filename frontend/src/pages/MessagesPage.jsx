@@ -625,7 +625,7 @@ function NudgeButton({ onClick, disabled, name }) {
       aria-label="Send a nudge"
       className="h-10 shrink-0 rounded-full border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95 disabled:opacity-40"
     >
-      nudge {name}
+      Nudge {name}
     </button>
   );
 }
