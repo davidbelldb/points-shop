@@ -62,6 +62,7 @@ export default function App() {
   const isHome = location.pathname === '/';
   const isGame = location.pathname.startsWith('/games/');
   const isFullGame = location.pathname === '/games/streets-of-cambs-rage';
+  const isMessages = location.pathname.startsWith('/messages');
   const bannerOn = settings.banner_enabled === 'true' && (settings.banner_text || '').trim();
 
   // Hide the header on the game page when in landscape — gives edge-to-edge
@@ -218,7 +219,7 @@ export default function App() {
         );
       })()}
       {showFloater && <SurveyBanner />}
-      <main className={isFullGame ? 'flex-1 min-h-0 flex flex-col w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-8' : 'w-full pb-24 lg:px-8'}`}>
+      <main className={isFullGame ? 'flex-1 min-h-0 flex flex-col w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-8' : isMessages ? 'w-full pb-0 lg:px-8' : 'w-full pb-24 lg:px-8'}`}>
         <Outlet />
       </main>
       </div>{/* end md:pl-56 wrapper */}
