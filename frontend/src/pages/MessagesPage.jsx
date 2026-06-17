@@ -570,7 +570,7 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
+function MessageBubble({ m, mine, clusterPos = 'solo', suppressStoryPreview = false, isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onOpenStory, onOpenPhoto, onSwipeReply }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
@@ -763,7 +763,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
         <SparkleInstance key={s.id} color={s.color} size={s.size} style={s.style} />
       ))}
 
-{m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
+{m.reply_to_story_id && !isEditing && !suppressStoryPreview && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
 
       {bodyIsMedia ? (
@@ -1408,7 +1408,7 @@ export default function MessagesPage() {
 
         {messagesWithCluster.length > 0 && (
           <ul className="flex flex-col gap-0">
-            {messagesWithCluster.map((m) => {
+            {messagesWithCluster.map((m, msgIdx) => {
               const mine = m.sender_id === user?.id;
               const day = dayLabel(m.created_at);
               const showDay = day !== lastDay;
@@ -1417,6 +1417,15 @@ export default function MessagesPage() {
               const rainKind = RAIN_KIND_MAP[m.body];
               const isRain = !!rainKind;
               const { clusterPos } = m;
+
+              // Suppress the story-reply preview on consecutive messages that all
+              // reply to the same story from the same sender — show it once only.
+              const prevMsg = messagesWithCluster[msgIdx - 1];
+              const suppressStoryPreview = !!(
+                m.reply_to_story_id
+                && prevMsg?.reply_to_story_id === m.reply_to_story_id
+                && prevMsg?.sender_id === m.sender_id
+              );
 
               // Spacing: first/solo get top breathing room; middle/last stay tight
               const topMargin = (clusterPos === 'solo' || clusterPos === 'first') ? 'mt-3' : 'mt-0.5';
@@ -1463,6 +1472,7 @@ export default function MessagesPage() {
                           m={m}
                           mine={mine}
                           clusterPos={clusterPos}
+                          suppressStoryPreview={suppressStoryPreview}
                           isEditing={editingId === m.id}
                           onOpenStory={openStoryById}
                           onStartEdit={() => setEditingId(m.id)}
