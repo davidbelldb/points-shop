@@ -3,7 +3,7 @@ import { sendPush } from '../notifications/push.js';
 
 export async function findOtherUser(accountId) {
   const { rows } = await query(
-    `SELECT id, username, name, photo_url, role
+    `SELECT id, username, name, photo_url, role, typing_at
        FROM accounts
       WHERE id != $1
       ORDER BY
@@ -15,12 +15,23 @@ export async function findOtherUser(accountId) {
   return rows[0] ?? null;
 }
 
+export async function setTyping(accountId) {
+  await query(
+    `UPDATE accounts SET typing_at = NOW() WHERE id = $1`,
+    [accountId],
+  );
+}
+
 export async function listMessages(accountId, otherId, limit = 200) {
   const { rows } = await query(
     `SELECT * FROM (
        SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
               m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
               m.slider_response, m.sparkled,
+              COALESCE((
+                SELECT json_agg(json_build_object('account_id', pv.account_id, 'option_idx', pv.option_idx))
+                  FROM chat_poll_votes pv WHERE pv.message_id = m.id
+              ), '[]'::json) AS poll_votes,
               s.username AS sender_username,
               s.name     AS sender_name,
               s.photo_url AS sender_photo,
@@ -71,6 +82,21 @@ export async function editMessage(messageId, accountId, body) {
     throw err;
   }
   return rows[0];
+}
+
+// Cast or change a vote on a poll message. Returns all current votes for that message.
+export async function votePoll(messageId, accountId, optionIdx) {
+  await query(
+    `INSERT INTO chat_poll_votes (message_id, account_id, option_idx)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (message_id, account_id) DO UPDATE SET option_idx = $3, voted_at = NOW()`,
+    [messageId, accountId, optionIdx],
+  );
+  const { rows } = await query(
+    `SELECT account_id, option_idx FROM chat_poll_votes WHERE message_id = $1`,
+    [messageId],
+  );
+  return rows;
 }
 
 // Map of reaction key → emoji used in notification copy. Keep in sync with

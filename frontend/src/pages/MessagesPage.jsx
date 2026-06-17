@@ -58,6 +58,16 @@ const NUDGE_BODY = '__nudge__';
       from { transform: rotate(0deg); }
       to   { transform: rotate(180deg); }
     }
+
+    /* ── Typing indicator ── */
+    @keyframes typing-bubble-in {
+      0%   { opacity: 0; transform: translateY(8px) scale(0.92); }
+      100% { opacity: 1; transform: translateY(0)   scale(1); }
+    }
+    @keyframes typing-dot {
+      0%, 60%, 100% { transform: translateY(0);    opacity: 0.5; }
+      30%            { transform: translateY(-6px); opacity: 1;   }
+    }
   `;
   document.head.appendChild(style);
 })();
@@ -248,6 +258,14 @@ const GIF_PAGE_LIMIT = 20;
 // Detect whether a message body is a GIF URL we sent ourselves.
 function isGifUrl(body) {
   return typeof body === 'string' && /^https?:\/\/media\d*\.giphy\.com\/.+\.gif(\?.*)?$/.test(body);
+}
+
+// Detect poll messages — body is JSON prefixed with __poll__
+function isPollBody(body) {
+  return typeof body === 'string' && body.startsWith('__poll__:');
+}
+function parsePoll(body) {
+  try { return JSON.parse(body.slice('__poll__:'.length)); } catch { return null; }
 }
 
 // Detect audio voice notes — handles both /media/ relative paths and full URLs.
@@ -570,7 +588,7 @@ function dayLabel(iso) {
 const SWIPE_TRIGGER = 60;
 const SWIPE_MAX     = 80;
 
-function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onToggleSparkle, onOpenStory, onOpenPhoto, onSwipeReply }) {
+function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onToggleSparkle, onVote, onOpenStory, onOpenPhoto, onSwipeReply }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
   const holdTimer = useRef(null);
@@ -627,7 +645,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
     } else {
       tapTimer.current = setTimeout(() => {
         tapTimer.current = null;
-        const isMedia = isGifUrl(m.body) || isUploadedPhoto(m.body);
+        const isMedia = isGifUrl(m.body) || isUploadedPhoto(m.body) || isPollBody(m.body);
         if (mine && !isMedia) onStartEdit();
       }, DOUBLE_TAP_MS);
     }
@@ -687,6 +705,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
   const bodyIsGif   = isGifUrl(m.body);
   const bodyIsPhoto = isUploadedPhoto(m.body);
   const bodyIsAudio = isAudioUrl(m.body);
+  const bodyIsPoll  = isPollBody(m.body);
   const bodyIsMedia = bodyIsGif || bodyIsPhoto || bodyIsAudio;
   const rxEmoji     = reactionEmoji(m.reaction);
 
@@ -699,7 +718,7 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
       onPointerCancel={onPointerUp}
       onContextMenu={(e) => e.preventDefault()}
       style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? 'none' : 'transform 0.22s ease-out', touchAction: 'pan-y' }}
-      className={`group relative max-w-[78%] cursor-pointer select-none ${bodyIsMedia ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
+      className={`group relative max-w-[78%] cursor-pointer select-none ${bodyIsMedia || bodyIsPoll ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
     >
       {/* Emoji picker — floats above bubble on long-press */}
       {showPicker && (
@@ -786,7 +805,10 @@ function MessageBubble({ m, mine, clusterPos = 'solo', isEditing, onStartEdit, o
 {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
 
-      {bodyIsMedia ? (
+      {bodyIsPoll ? (
+        /* Poll bubble */
+        <PollBubble m={{ ...m, _myId: myId }} mine={mine} onVote={onVote} />
+      ) : bodyIsMedia ? (
         /* Photo / GIF / Audio bubble */
         <div className={`relative ${bodyIsAudio ? `rounded-2xl px-0 py-0 ${tone}` : 'overflow-hidden rounded-2xl'}`}>
           {bodyIsAudio ? (
@@ -964,6 +986,91 @@ function fmtAudio(s) {
   return `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}`;
 }
 
+// ─── Poll bubble ─────────────────────────────────────────────────────────────
+function PollBubble({ m, mine, onVote }) {
+  const poll = parsePoll(m.body);
+  if (!poll) return null;
+  const votes = m.poll_votes ?? [];
+  const myVote = votes.find(v => v.account_id === m._myId)?.option_idx ?? null;
+  const total  = votes.length;
+
+  return (
+    <div className="w-[220px] overflow-hidden rounded-2xl" style={{ background: mine ? '#21433b' : '#4e1d37' }}>
+      <div className="px-4 pt-3 pb-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">Poll</p>
+        <p className="mt-0.5 text-sm font-semibold text-white leading-snug">{poll.question}</p>
+      </div>
+      <div className="flex flex-col gap-1.5 px-3 pb-3">
+        {poll.options.map((opt, idx) => {
+          const count  = votes.filter(v => v.option_idx === idx).length;
+          const pct    = total > 0 ? Math.round((count / total) * 100) : 0;
+          const chosen = myVote === idx;
+          const hasVoted = myVote !== null;
+          return (
+            <button
+              key={idx}
+              onClick={() => onVote(m.id, idx)}
+              className="relative w-full overflow-hidden rounded-xl text-left transition active:scale-[0.97]"
+              style={{
+                background: chosen ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.10)',
+                border: chosen ? '1.5px solid rgba(255,255,255,0.5)' : '1.5px solid transparent',
+              }}
+            >
+              {/* Fill bar */}
+              {hasVoted && (
+                <div
+                  className="absolute inset-y-0 left-0 rounded-xl transition-all duration-500"
+                  style={{ width: `${pct}%`, background: 'rgba(255,255,255,0.10)' }}
+                />
+              )}
+              <div className="relative flex items-center justify-between px-3 py-2">
+                <span className="text-sm text-white">{opt}</span>
+                {hasVoted && (
+                  <span className="text-[11px] font-semibold text-white/60">{pct}%</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {total > 0 && (
+        <p className="pb-2 text-center text-[10px] text-white/40">{total} vote{total !== 1 ? 's' : ''}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Typing indicator bubble ──────────────────────────────────────────────────
+// Shows an animated bubble with three hopping dots when the other person is typing.
+// The bubble slides up and fades in, matching their bubble colour (#4e1d37).
+function TypingBubble({ photoUrl, name }) {
+  return (
+    <div
+      className="flex items-end gap-2"
+      style={{ animation: 'typing-bubble-in 220ms cubic-bezier(0.34,1.56,0.64,1) both' }}
+    >
+      <Avatar url={photoUrl} name={name} />
+      <div
+        className="flex items-center gap-1.5 rounded-2xl rounded-bl-[4px] px-4 py-3"
+        style={{ background: '#4e1d37' }}
+      >
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            style={{
+              display: 'inline-block',
+              width: 7, height: 7,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.75)',
+              animation: `typing-dot 1.2s ${i * 0.18}s ease-in-out infinite`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // fallbackDur is used for MediaRecorder blobs which often report NaN/Infinity
 // duration until the seek-to-end trick resolves the real value.
 function AudioPlayer({ src, mine, fallbackDur = 0 }) {
@@ -1098,6 +1205,9 @@ export default function MessagesPage() {
   const [recBlob, setRecBlob]       = useState(null);
   const [recBlobUrl, setRecBlobUrl] = useState(null);
   const [showMedia, setShowMedia]   = useState(false);
+  const [pollOpen, setPollOpen]     = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions]   = useState(['', '']);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [raining, setRaining] = useState(null);
@@ -1110,6 +1220,7 @@ export default function MessagesPage() {
   const bottomRef     = useRef(null);
   const composerRef   = useRef(null);
   const lastCountRef  = useRef(0);
+  const typingTimerRef = useRef(null);
   const [composerHeight, setComposerHeight] = useState(80);
 
   async function openStoryById(storyId) {
@@ -1143,6 +1254,14 @@ export default function MessagesPage() {
       setError(e.message);
     }
   }
+
+  // Tick every second so the typing-indicator timestamp check re-evaluates
+  // without waiting for the next full poll cycle.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -1416,6 +1535,33 @@ export default function MessagesPage() {
     catch (e) { setError(e.message); await refresh(false); }
   }
 
+  async function sendPoll() {
+    const q = pollQuestion.trim();
+    const opts = pollOptions.map(o => o.trim()).filter(Boolean);
+    if (!q || opts.length < 2) return;
+    const body = `__poll__:${JSON.stringify({ question: q, options: opts })}`;
+    setBusy(true);
+    try {
+      await api.sendMessage(body);
+      setPollOpen(false);
+      setPollQuestion('');
+      setPollOptions(['', '']);
+      setShowMedia(false);
+      await refresh(false);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function castVote(id, optionIdx) {
+    try {
+      const { votes } = await api.votePoll(id, optionIdx);
+      setData(prev => ({
+        ...prev,
+        messages: prev.messages.map(m => m.id === id ? { ...m, poll_votes: votes } : m),
+      }));
+    } catch (e) { setError(e.message); }
+  }
+
   async function toggleSparkle(id) {
     // Optimistically flip sparkled
     setData((prev) => ({
@@ -1580,6 +1726,8 @@ export default function MessagesPage() {
                           onForceDelete={() => setConfirmDeleteId(m.id)}
                           onSetReaction={(emoji) => setReaction(m.id, emoji)}
                           onToggleSparkle={toggleSparkle}
+                          onVote={castVote}
+                          myId={user?.id}
                           onOpenPhoto={(src) => setLightboxSrc(src)}
                           onSwipeReply={handleSwipeReply}
                         />
@@ -1602,6 +1750,19 @@ export default function MessagesPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
       </div>
+      {/* Typing indicator — shown when the other person stamped typing_at within 4 s */}
+      {(() => {
+        const ts = data.other?.typing_at;
+        if (!ts) return null;
+        const isTyping = Date.now() - new Date(ts).getTime() < 4000;
+        if (!isTyping) return null;
+        return (
+          <div className="mt-3 px-0">
+            <TypingBubble photoUrl={data.other.photo_url} name={data.other.name} />
+          </div>
+        );
+      })()}
+
       {/* Spacer — matches live composer bar height so last message is never hidden */}
       <div style={{ height: composerHeight }} aria-hidden />
       <div ref={bottomRef} aria-hidden />
@@ -1665,12 +1826,64 @@ export default function MessagesPage() {
                     </button>
                   </div>
                 </div>
+              ) : pollOpen ? (
+                /* ── Poll composer ── */
+                <div className="py-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#61dbbb' }}>New Poll</p>
+                    <button onClick={() => setPollOpen(false)} className="text-neutral-400 text-lg leading-none">×</button>
+                  </div>
+                  <input
+                    autoFocus
+                    value={pollQuestion}
+                    onChange={e => setPollQuestion(e.target.value)}
+                    placeholder="Ask a question…"
+                    className="w-full rounded-xl border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#61dbbb]"
+                  />
+                  {pollOptions.map((opt, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={opt}
+                        onChange={e => setPollOptions(prev => prev.map((o, j) => j === i ? e.target.value : o))}
+                        placeholder={`Option ${i + 1}`}
+                        className="flex-1 rounded-xl border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#61dbbb]"
+                      />
+                      {pollOptions.length > 2 && (
+                        <button onClick={() => setPollOptions(prev => prev.filter((_, j) => j !== i))} className="text-neutral-500 text-lg">×</button>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    {pollOptions.length < 4 && (
+                      <button
+                        onClick={() => setPollOptions(prev => [...prev, ''])}
+                        className="text-xs text-neutral-400 hover:text-white transition"
+                      >+ Add option</button>
+                    )}
+                    <button
+                      onClick={sendPoll}
+                      disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2 || busy}
+                      className="ml-auto rounded-xl px-4 py-1.5 text-sm font-semibold text-[#0d3d2e] disabled:opacity-40 transition"
+                      style={{ background: '#61dbbb' }}
+                    >Send Poll</button>
+                  </div>
+                </div>
               ) : (
                 /* ── State 3: normal media picker ── */
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
+                  {/* Poll button */}
+                  <button
+                    onClick={() => setPollOpen(true)}
+                    title="Create poll"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-neutral-300 transition active:scale-90"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/>
+                    </svg>
+                  </button>
                   <NudgeButton disabled={busy} name={data.other?.name ?? 'them'} onClick={() => { setShowMedia(false); sendNudge(); }} />
                   <ModelButton disabled={!!raining} title="Rain twirls" onClick={() => { setShowMedia(false); sendRain('twirl'); }}>
                     <TwirlThumb />
@@ -1731,6 +1944,11 @@ export default function MessagesPage() {
                 setDraft(e.target.value);
                 e.target.style.height = 'auto';
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                // Throttle typing pings to once per 2 s
+                if (!typingTimerRef.current) {
+                  api.setTyping().catch(() => {});
+                  typingTimerRef.current = setTimeout(() => { typingTimerRef.current = null; }, 2000);
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }

@@ -1,6 +1,6 @@
 import {
   findOtherUser, listMessages, sendMessage, markAllRead, deleteMessage,
-  editMessage, setReaction, toggleSparkle,
+  editMessage, setReaction, toggleSparkle, setTyping, votePoll,
 } from './chat.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
@@ -76,6 +76,13 @@ export default async function chatRoutes(fastify) {
     }
   });
 
+  // Stamp typing_at on the current user so the other person can see the indicator.
+  fastify.put('/api/messages/typing', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    await setTyping(accountId);
+    return { ok: true };
+  });
+
   // Toggle sparkle on a message — either participant may sparkle any message.
   fastify.put('/api/messages/:id/sparkle', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
@@ -96,6 +103,18 @@ export default async function chatRoutes(fastify) {
     const accountId = getEffectiveAccountId(req);
     try {
       return await setReaction(req.params.id, accountId, reaction ?? null);
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  // Cast or change a poll vote. Body: { option_idx: number }
+  fastify.put('/api/messages/:id/vote', async (req, reply) => {
+    const { option_idx } = req.body ?? {};
+    if (typeof option_idx !== 'number') return reply.code(400).send({ error: 'option_idx required' });
+    const accountId = getEffectiveAccountId(req);
+    try {
+      return { votes: await votePoll(req.params.id, accountId, option_idx) };
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }
