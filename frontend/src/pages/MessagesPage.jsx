@@ -1400,7 +1400,7 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 /* ── State 3: normal media picker ── */
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
