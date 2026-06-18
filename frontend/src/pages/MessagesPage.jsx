@@ -471,7 +471,7 @@ function isSecretBody(body) { return typeof body === 'string' && body.startsWith
 // Scrub-to-reveal secret message — tracks total pointer travel distance.
 // After ~120px of scrubbing the message unblurs.
 const SCRUB_THRESHOLD = 120;
-function SecretBubble({ body, revealed, onReveal }) {
+function SecretBubble({ body, revealed, onReveal, isMine }) {
   const [scrubbed, setScrubbed] = useState(0);
   const [done, setDone]         = useState(revealed);
   const lastXRef = useRef(null);
@@ -506,11 +506,12 @@ function SecretBubble({ body, revealed, onReveal }) {
   return (
     <div data-bubble-action style={{ minWidth: 80, userSelect: 'none' }}>
       <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        style={{ cursor: done ? 'default' : 'ew-resize', touchAction: 'pan-y' }}
+        onPointerDown={isMine ? undefined : onPointerDown}
+        onPointerMove={isMine ? undefined : onPointerMove}
+        onPointerUp={isMine ? undefined : onPointerUp}
+        onPointerCancel={isMine ? undefined : onPointerUp}
+        onClick={isMine && !done ? () => { setDone(true); onReveal?.(); } : undefined}
+        style={{ cursor: done ? 'default' : isMine ? 'pointer' : 'ew-resize', touchAction: 'pan-y' }}
       >
         <p
           className="whitespace-pre-wrap text-sm leading-relaxed select-none"
@@ -520,11 +521,17 @@ function SecretBubble({ body, revealed, onReveal }) {
         </p>
         {!done && (
           <div className="mt-1.5">
-            {/* Scrub progress bar */}
-            <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
-            </div>
-            <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
+            {isMine ? (
+              <p className="text-[10px] opacity-50 select-none">🔒 sent as secret · tap to preview</p>
+            ) : (
+              <>
+                {/* Scrub progress bar */}
+                <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
+                </div>
+                <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -646,7 +653,12 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
   const rounding = mine
     ? ({ solo: 'rounded-2xl rounded-br-[4px]', first: 'rounded-2xl rounded-br-[4px]', middle: 'rounded-2xl rounded-r-[4px]', last: 'rounded-2xl rounded-tr-[4px]' })[clusterPos] ?? 'rounded-2xl'
     : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
-  const tone = mine
+  const isSecretMsg = isSecretBody(m.body);
+  const tone = isSecretMsg
+    ? theme === 'dark'
+      ? `${rounding} bg-[#5b3f8a] text-white`
+      : `${rounding} bg-[#c3b3e9] text-[#2a1160]`
+    : mine
     ? theme === 'dark'
       ? `${rounding} bg-[#21433b] text-white`
       : `${rounding} bg-[#c8ede4] text-[#0d3d2e]`
@@ -823,7 +835,8 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
         /* ── Secret message ── */
         <SecretBubble
           body={m.body.slice(SECRET_PREFIX.length)}
-          revealed={isRevealed || mine}
+          revealed={isRevealed}
+          isMine={mine}
           onReveal={() => onRevealSecret?.(m.id)}
         />
       ) : (
