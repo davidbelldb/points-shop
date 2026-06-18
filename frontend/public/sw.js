@@ -7,14 +7,19 @@
                   offline. The fresh index.html always wins when online.
    - /api/* and /media/* are untouched (media has HTTP immutable caching). */
 
-const ASSET_CACHE = 'sneaky-assets-v3';
-const SHELL_CACHE = 'sneaky-shell-v3';
+const ASSET_CACHE  = 'sneaky-assets-v4';
+const SHELL_CACHE  = 'sneaky-shell-v4';
+const MODEL_CACHE  = 'sneaky-models-v4';
+
+// Large static files that are expensive to re-download.
+// Cache-first forever (filenames never change).
+const MODEL_EXTS = ['.glb', '.gltf', '.stl', '.bin'];
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     // Drop caches from older versions of this worker.
-    const keep = new Set([ASSET_CACHE, SHELL_CACHE]);
+    const keep = new Set([ASSET_CACHE, SHELL_CACHE, MODEL_CACHE]);
     for (const key of await caches.keys()) {
       if (key.startsWith('sneaky-') && !keep.has(key)) await caches.delete(key);
     }
@@ -33,6 +38,20 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/assets/')) {
     event.respondWith((async () => {
       const cache = await caches.open(ASSET_CACHE);
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) cache.put(req, res.clone());
+      return res;
+    })());
+    return;
+  }
+
+  // Large 3D model files — cache-first, permanent. These never change after
+  // deploy and are expensive to re-download (twirl.glb = 8 MB).
+  if (MODEL_EXTS.some(ext => url.pathname.endsWith(ext))) {
+    event.respondWith((async () => {
+      const cache = await caches.open(MODEL_CACHE);
       const hit = await cache.match(req);
       if (hit) return hit;
       const res = await fetch(req);
