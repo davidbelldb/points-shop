@@ -207,12 +207,17 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
   const senderRes = await query(`SELECT name FROM accounts WHERE id = $1`, [senderId]);
   const senderName = senderRes.rows[0]?.name ?? 'Someone';
 
+  const isSecret = trimmed.startsWith('__secret__:');
   const type = classifyMessage(trimmed);
   const systemLabel = SYSTEM_LABELS[trimmed];
   const title   = systemLabel
     ? systemLabel.title(senderName)
+    : isSecret
+    ? `${senderName} sent you a sneaky secret message`
     : `${senderName} sent you a sneaky ${type}`;
   const preview = systemLabel
+    ? ''
+    : isSecret
     ? ''
     : type === 'message'    ? (trimmed.length > 100 ? trimmed.slice(0, 97) + '...' : trimmed)
     : type === 'voice note' ? 'Voice note'
