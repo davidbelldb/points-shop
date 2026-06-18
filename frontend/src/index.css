@@ -36,41 +36,19 @@
 :root { --font-pixel: 'Press Start 2P', monospace; }
 
 /* ── iOS PWA full-height fix ─────────────────────────────────────────────────
-   - overflow-x: hidden must NOT be on html — that turns html into a scroll
-     container, which breaks position:sticky on the header in all browsers.
-   - body gets min-height:100dvh so it fills the full physical screen on iOS PWA
-     (100% alone is too short on newer iPhones).
-   - -webkit-fill-available on html overrides 100% in Safari/iOS and must come
-     after it; other engines ignore the property. */
+   overflow-x: hidden must NOT be on html — it turns html into a scroll
+   container which breaks position:sticky everywhere. Body gets both
+   min-height:100dvh AND min-height:-webkit-fill-available so it stretches
+   to the full physical screen on iOS PWA (plain 100% is too short on newer
+   iPhones). -webkit-fill-available on html must come after height:100%. */
 html, body, #root { height: 100%; }
 html { height: -webkit-fill-available; }
-body { min-height: 100dvh; }
+body { min-height: 100dvh; min-height: -webkit-fill-available; }
 
 body { -webkit-tap-highlight-color: transparent; }
 body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
 html { -webkit-text-size-adjust: 100%; }
-
-/* Prevent iOS rubber-band overscroll revealing background behind the app */
 body { overscroll-behavior: none; }
-
-/* Fill the chin gap (env(safe-area-inset-bottom)) so it blends seamlessly.
-   Light-mode matches bg-neutral-50 (#fafafa); dark mode matches #1f1f1e. */
-body::after {
-  content: '';
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  /* max() ensures we cover devices where the reported inset is smaller than
-     the actual physical chin — 60px is generous enough for any current iPhone */
-  height: max(env(safe-area-inset-bottom, 0px), 60px);
-  background: #fafafa;
-  z-index: 0;
-  pointer-events: none;
-}
-html.dark body::after {
-  background: #1f1f1e;
-}
 
 /* ---------- Dark mode ----------
    Toggled by adding `class="dark"` to <html>. We flip the neutrals via
