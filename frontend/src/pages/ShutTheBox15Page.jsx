@@ -1339,7 +1339,10 @@ function Stb15Scene({
 
 function Stb15CanvasShell({ children, onPointerDown, onPointerUp, onTouchStart, onTouchMove, onTouchEnd, tableColour = '#d3f3ea' }) {
   return (
-    <div className="overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
+    <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ background: tableColour }}>
+      {/* Dark-mode overlay — inline style can't use Tailwind dark: variant, so we
+          use a pointer-events-none absolute scrim that dims the light table colour */}
+      <div className="pointer-events-none absolute inset-0 z-10 hidden bg-black/55 dark:block" />
       <div
         className="relative"
         style={{ aspectRatio: '6 / 5', touchAction: 'none' }}

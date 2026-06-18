@@ -35,21 +35,23 @@
 
 :root { --font-pixel: 'Press Start 2P', monospace; }
 
-/* Use -webkit-fill-available so iOS PWA fills the actual visual viewport,
-   not the theoretical 100vh which includes the chin/safe-area gap. */
-html { height: -webkit-fill-available; }
-body, #root { min-height: 100%; min-height: -webkit-fill-available; }
+/* ── iOS PWA full-height fix ─────────────────────────────────────────────────
+   100% alone uses the theoretical viewport which can be shorter than the
+   physical screen on iOS PWA. -webkit-fill-available MUST come after 100%
+   to override it in Safari; other engines ignore the property. Body uses
+   min-height so it can grow beyond the initial viewport if content overflows. */
 html, body, #root { height: 100%; }
-body { -webkit-tap-highlight-color: transparent; }
+html { height: -webkit-fill-available; }
+body { min-height: 100dvh; min-height: -webkit-fill-available; }
 
+body { -webkit-tap-highlight-color: transparent; }
 html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
 
-/* Prevent iOS rubber-band overscroll from revealing background behind the app */
+/* Prevent iOS rubber-band overscroll revealing background behind the app */
 body { overscroll-behavior: none; }
 
-/* Fill the chin gap (env(safe-area-inset-bottom)) at the bottom of the screen
-   with the correct background colour so it's invisible / edge-to-edge.
-   Light-mode default matches bg-neutral-50 (#fafafa); dark mode matches #1f1f1e. */
+/* Fill the chin gap (env(safe-area-inset-bottom)) so it blends seamlessly.
+   Light-mode matches bg-neutral-50 (#fafafa); dark mode matches #1f1f1e. */
 body::after {
   content: '';
   position: fixed;
