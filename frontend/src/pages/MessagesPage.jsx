@@ -480,7 +480,7 @@ function isSecretBody(body) { return typeof body === 'string' && body.startsWith
 
 // Scrub-to-reveal secret message — requires 10 direction reversals (~5-6 back-and-forth strokes).
 const STROKES_REQUIRED = 10;
-const STROKE_MIN_DIST  = 12; // px before a reversal counts
+const STROKE_MIN_DIST  = 35; // px before a reversal counts — keeps hold-wobble from triggering
 function SecretBubble({ body, revealed, onReveal, isMine }) {
   const [strokes, setStrokes] = useState(0);
   const [done, setDone]       = useState(revealed);
