@@ -535,7 +535,7 @@ function SecretBubble({ body, revealed, onReveal, isMine }) {
           </div>
         )}
       </div>
-      <p className="mt-0.5 text-[10px] opacity-40">secret</p>
+      <p className="mt-0.5 text-[10px] opacity-40">sneaky secret</p>
     </div>
   );
 }
