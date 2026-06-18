@@ -468,6 +468,71 @@ const SWIPE_MAX     = 80;
 const SECRET_PREFIX = '__secret__:';
 function isSecretBody(body) { return typeof body === 'string' && body.startsWith(SECRET_PREFIX); }
 
+// Scrub-to-reveal secret message — tracks total pointer travel distance.
+// After ~120px of scrubbing the message unblurs.
+const SCRUB_THRESHOLD = 120;
+function SecretBubble({ body, revealed, onReveal }) {
+  const [scrubbed, setScrubbed] = useState(0);
+  const [done, setDone]         = useState(revealed);
+  const lastXRef = useRef(null);
+
+  useEffect(() => { if (revealed) setDone(true); }, [revealed]);
+
+  function onPointerDown(e) {
+    if (done) return;
+    lastXRef.current = e.clientX;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }
+  function onPointerMove(e) {
+    if (done || lastXRef.current === null) return;
+    const dx = Math.abs(e.clientX - lastXRef.current);
+    lastXRef.current = e.clientX;
+    setScrubbed(prev => {
+      const next = prev + dx;
+      if (next >= SCRUB_THRESHOLD) {
+        setDone(true);
+        onReveal?.();
+        try { navigator.vibrate?.(30); } catch {}
+        return SCRUB_THRESHOLD;
+      }
+      return next;
+    });
+  }
+  function onPointerUp() { lastXRef.current = null; }
+
+  const progress = Math.min(1, scrubbed / SCRUB_THRESHOLD);
+  const blurPx   = done ? 0 : 8 - progress * 8;
+
+  return (
+    <div data-bubble-action style={{ minWidth: 80, userSelect: 'none' }}>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ cursor: done ? 'default' : 'ew-resize', touchAction: 'pan-y' }}
+      >
+        <p
+          className="whitespace-pre-wrap text-sm leading-relaxed select-none"
+          style={{ filter: done ? 'none' : `blur(${blurPx}px)`, transition: done ? 'filter 0.3s ease' : 'none', pointerEvents: 'none' }}
+        >
+          {body}
+        </p>
+        {!done && (
+          <div className="mt-1.5">
+            {/* Scrub progress bar */}
+            <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
+            </div>
+            <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
+          </div>
+        )}
+      </div>
+      <p className="mt-0.5 text-[10px] opacity-40">secret</p>
+    </div>
+  );
+}
+
 function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onForceDelete, onSetReaction, onToggleSparkle, onVote, onOpenStory, onOpenPhoto, onSwipeReply, isRevealed, onRevealSecret }) {
   const { theme } = useTheme();
   const tapTimer  = useRef(null);
@@ -756,25 +821,11 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
         </div>
       ) : isSecretBody(m.body) ? (
         /* ── Secret message ── */
-        <div
-          data-bubble-action
-          onClick={(e) => { e.stopPropagation(); if (!isRevealed) onRevealSecret?.(m.id); }}
-          style={{ minWidth: 80, userSelect: 'none' }}
-        >
-          {isRevealed || mine ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {m.body.slice(SECRET_PREFIX.length)}
-            </p>
-          ) : (
-            <div className="flex items-center gap-2">
-              <p className="text-sm leading-relaxed select-none" style={{ filter: 'blur(6px)', pointerEvents: 'none' }}>
-                {m.body.slice(SECRET_PREFIX.length)}
-              </p>
-              <span className="shrink-0 text-xs opacity-70">👀 tap</span>
-            </div>
-          )}
-          <p className="mt-0.5 text-[10px] opacity-40">🤫 secret</p>
-        </div>
+        <SecretBubble
+          body={m.body.slice(SECRET_PREFIX.length)}
+          revealed={isRevealed || mine}
+          onReveal={() => onRevealSecret?.(m.id)}
+        />
       ) : (
         <>
           <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -2159,7 +2210,7 @@ export default function MessagesPage() {
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-40 active:scale-95 transition ${secretSendPrimed ? '' : 'bg-amber-600'}`}
             >
               {secretSendPrimed ? (
-                <span style={{ fontSize: 18 }}>🤫</span>
+                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>***</span>
               ) : (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13" />
