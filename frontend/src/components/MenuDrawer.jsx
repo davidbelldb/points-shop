@@ -158,7 +158,7 @@ export default function MenuDrawer({ open, onClose }) {
   return (
     <div
       className={`fixed left-0 right-0 bottom-0 z-40 ${open ? '' : 'pointer-events-none'}`}
-      style={{ top: '57px' }}
+      style={{ top: 'calc(57px + env(safe-area-inset-top))' }}
       aria-hidden={!open}
     >
       <div

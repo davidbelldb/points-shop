@@ -98,6 +98,7 @@ export default function BasketDrawer({ open, onClose }) {
   return (
     <div
       className={`fixed inset-0 md:left-56 z-40 ${open ? '' : 'pointer-events-none'}`}
+      style={{ top: 'calc(57px + env(safe-area-inset-top))' }}
       aria-hidden={!open}
     >
       {/* Backdrop */}
@@ -112,7 +113,7 @@ export default function BasketDrawer({ open, onClose }) {
         className={`absolute right-0 top-0 flex h-full w-[80vw] md:w-full md:max-w-md flex-col shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* ── Drawer header ── */}
-        <div className="flex shrink-0 items-center justify-between border-b border-white/20 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/20 px-4 py-3">
           <h2 className="flex items-center gap-2 text-base font-semibold text-white">
             <img src="/sphincter-pink.svg" alt="" className="h-5 w-5" />
             {(() => { const n = `${account?.name ?? 'Your'}'s safe pocket`; return isEmpty ? n : `${n} (${basket.items.length})`; })()}
