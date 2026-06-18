@@ -740,11 +740,11 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
     : theme === 'dark' ? `${rounding} text-white` : `${rounding} text-[#3b0f2a]`;
   const toneBg = mine
     ? theme === 'dark'
-      ? 'linear-gradient(145deg, #2a5c4d 0%, #0d2b22 100%)'
-      : 'linear-gradient(145deg, #d4f5eb 0%, #a8e8d4 100%)'
+      ? 'linear-gradient(180deg, #2a5c4d 0%, #0d2b22 100%)'
+      : 'linear-gradient(180deg, #d4f5eb 0%, #a8e8d4 100%)'
     : theme === 'dark'
-      ? 'linear-gradient(145deg, #6b2548 0%, #2d0a1e 100%)'
-      : 'linear-gradient(145deg, #f5d8ec 0%, #e8b5d8 100%)';
+      ? 'linear-gradient(180deg, #6b2548 0%, #2d0a1e 100%)'
+      : 'linear-gradient(180deg, #f5d8ec 0%, #e8b5d8 100%)';
   // keep 'tone' as alias so existing code referencing it still works
   const tone = toneClass;
   const bodyIsGif   = isGifUrl(m.body);
