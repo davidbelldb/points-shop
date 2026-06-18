@@ -1844,7 +1844,7 @@ export default function MessagesPage() {
         )}
 
         {messagesWithCluster.length > 0 && (
-          <ul className="flex flex-col gap-0">
+          <ul className="flex flex-col gap-0" style={{ touchAction: 'pan-y' }}>
             {messagesWithCluster.map((m, msgIdx) => {
               // Story-reaction continuations are merged into the head bubble — skip rendering
               if (m.storyReactionContinuation) return null;
