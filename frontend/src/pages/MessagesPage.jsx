@@ -1989,7 +1989,7 @@ export default function MessagesPage() {
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
-      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur">
+      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]">
         <div className="px-4 lg:px-8">
           {/* Media tray — slides in above the input row */}
           {showMedia && (
