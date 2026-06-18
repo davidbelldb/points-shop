@@ -771,29 +771,26 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
         </span>
       )}
 
-      {/* Sparkle burst — rendered above bubble content on double-tap */}
-      {sparkles.map(s => (
-        <SparkleInstance key={s.id} color={s.color} size={s.size} style={s.style} />
-      ))}
-
-      {/* Persistent sparkles — shown indefinitely when m.sparkled is true */}
-      {m.sparkled && [
-        { id: 'p0', color: '#FFC700', size: 14, style: { top: '-10%', left: '10%'  }, delay: '0s'    },
-        { id: 'p1', color: '#61dbbb', size: 11, style: { top: '5%',   left: '80%'  }, delay: '0.6s'  },
-        { id: 'p2', color: '#ed70bd', size: 16, style: { top: '70%',  left: '90%'  }, delay: '1.2s'  },
-        { id: 'p3', color: '#FFD60A', size: 10, style: { top: '85%',  left: '15%'  }, delay: '1.8s'  },
-        { id: 'p4', color: '#FF6AC1', size: 13, style: { top: '40%',  left: '-5%'  }, delay: '0.9s'  },
-      ].map(s => (
-        <SparkleInstance
-          key={s.id}
-          color={s.color}
-          size={s.size}
-          style={{
-            ...s.style,
-            animation: `sparkle-come-in-out 2s ${s.delay} ease-in-out infinite`,
-          }}
-        />
-      ))}
+      {/* Sparkle burst + persistent sparkles — clipped to bubble bounds */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl" style={{ zIndex: 1 }}>
+        {sparkles.map(s => (
+          <SparkleInstance key={s.id} color={s.color} size={s.size} style={s.style} />
+        ))}
+        {m.sparkled && [
+          { id: 'p0', color: '#FFC700', size: 14, style: { top: '5%',  left: '10%' }, delay: '0s'   },
+          { id: 'p1', color: '#61dbbb', size: 11, style: { top: '5%',  left: '80%' }, delay: '0.6s' },
+          { id: 'p2', color: '#ed70bd', size: 16, style: { top: '70%', left: '85%' }, delay: '1.2s' },
+          { id: 'p3', color: '#FFD60A', size: 10, style: { top: '80%', left: '15%' }, delay: '1.8s' },
+          { id: 'p4', color: '#FF6AC1', size: 13, style: { top: '40%', left: '5%'  }, delay: '0.9s' },
+        ].map(s => (
+          <SparkleInstance
+            key={s.id}
+            color={s.color}
+            size={s.size}
+            style={{ ...s.style, animation: `sparkle-come-in-out 2s ${s.delay} ease-in-out infinite` }}
+          />
+        ))}
+      </div>
 
 {m.reply_to_story_id && !isEditing && <StoryReplyPreview m={m} onClick={onOpenStory} />}
       {m.reply_to_message_id && m.reply_to_body && !isEditing && <MessageReplyPreview m={m} />}
