@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock.js';
 
 const SWIPE_RIGHT_THRESHOLD = 60;
 
@@ -46,11 +47,8 @@ export default function BasketDrawer({ open, onClose }) {
     };
   }, [open, onClose]);
 
-  /* ── Prevent body scroll while open ── */
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
+  /* ── Prevent body (and the page behind) scrolling while open ── */
+  useBodyScrollLock(open);
 
   /* ── Basket actions ── */
   async function handleApply() {

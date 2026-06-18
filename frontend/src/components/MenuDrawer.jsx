@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle.jsx';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock.js';
 
 const ICON_COLOUR = '#ed70bd';
 
@@ -127,6 +128,7 @@ function Item({ to, label, icon, onClose }) {
 const SWIPE_LEFT_THRESHOLD = 60;
 
 export default function MenuDrawer({ open, onClose }) {
+  useBodyScrollLock(open);
   useEffect(() => {
     if (!open) return undefined;
     function onKey(e) { if (e.key === 'Escape') onClose(); }

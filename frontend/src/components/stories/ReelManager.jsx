@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api.js';
 import StoryViewer from './StoryViewer.jsx';
+import { useBodyScrollLock } from '../../lib/useBodyScrollLock.js';
 
 /* Modal for managing a highlight reel — rename it, remove individual
    stories, delete the whole reel, or tap "Play all" to open the StoryViewer
    queued through every story in chronological order.
    The reel is loaded fresh on mount so we always edit the current state. */
 export default function ReelManager({ reelId, onClose, onChanged }) {
+  useBodyScrollLock();
   const [reel, setReel]         = useState(null);
   const [name, setName]         = useState('');
   const [renaming, setRenaming] = useState(false);

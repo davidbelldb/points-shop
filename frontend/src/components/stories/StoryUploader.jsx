@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
+import { useBodyScrollLock } from '../../lib/useBodyScrollLock.js';
 import SliderSticker from './SliderSticker.jsx';
 import SliderStickerConfig from './SliderStickerConfig.jsx';
 import StickerDrawer from './StickerDrawer.jsx';
@@ -19,6 +20,8 @@ const DEFAULT_IMAGE_SECONDS = 5;
 const MAX_SECONDS = 60;
 
 export default function StoryUploader({ onClose, onPosted }) {
+  // Lock the feed behind this full-screen sheet so scroll gestures stay inside it.
+  useBodyScrollLock();
   const fileRef = useRef(null);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);

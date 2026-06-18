@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import StoryViewer from '../components/stories/StoryViewer.jsx';
 import FeaturedStory from '../components/stories/FeaturedStory.jsx';
 import { EVENT_ICONS, EventIcon, EVENT_ICON_COLOR } from '../lib/eventIcons.jsx';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock.js';
 
 /* ============================================================
    SnackInput — snack field with grocery-catalogue lookup.
@@ -502,6 +503,9 @@ function EventCard({ ev, onClick }) {
    Event editor (create + edit + delete in one).
    ============================================================ */
 function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
+  // Lock the page behind this full-screen sheet so scroll gestures only move
+  // the sheet's own content, not the calendar underneath.
+  useBodyScrollLock();
   const isNew = !initial;
 
   // Default a new event to the picked day at the next hour boundary, lasting an hour.

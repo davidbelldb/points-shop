@@ -1532,6 +1532,10 @@ export default function MessagesPage() {
     if (!vv || !el) return;
 
     let raf = 0;
+    // Reposition ONLY the composer to sit above the keyboard. Crucially this
+    // does NOT scroll the message list — doing that on every viewport event was
+    // yanking the list back to the bottom and made it impossible to scroll up
+    // through history while the keyboard was open.
     function apply() {
       const layoutH = document.documentElement.clientHeight;
       // Distance from the layout-viewport bottom (where the composer's bottom:0
@@ -1540,34 +1544,30 @@ export default function MessagesPage() {
       el.style.transform = lift ? `translate3d(0, ${-lift}px, 0)` : '';
       el.style.willChange = lift ? 'transform' : '';
     }
-    function update() {
+    function onViewportChange() {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        apply();
-        // Keep the latest message visible above the composer.
-        bottomRef.current?.scrollIntoView({ block: 'end' });
-      });
+      raf = requestAnimationFrame(apply);
     }
-    // The keyboard animates in over ~250ms and iOS reports intermediate
-    // viewport sizes; re-measure a few times so we settle on the final height.
-    function updateSettling() {
-      update();
-      [60, 160, 320].forEach((t) => setTimeout(apply, t));
+    // When the field is FIRST focused (keyboard opening), bring the latest
+    // message into view once. The keyboard animates over ~250ms and iOS reports
+    // intermediate viewport sizes, so re-measure a few times to settle — but
+    // only reposition the composer, never re-scroll, after that initial nudge.
+    function onFocusIn() {
+      [0, 60, 160, 320].forEach((t, i) => setTimeout(() => {
+        apply();
+        if (i === 0) bottomRef.current?.scrollIntoView({ block: 'end' });
+      }, t));
     }
 
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    // focusin/out fire before the keyboard finishes animating — the settling
-    // re-measures catch the final size.
-    el.addEventListener('focusin', updateSettling);
-    el.addEventListener('focusout', updateSettling);
+    vv.addEventListener('resize', onViewportChange);
+    vv.addEventListener('scroll', onViewportChange);
+    el.addEventListener('focusin', onFocusIn);
     apply();
     return () => {
       cancelAnimationFrame(raf);
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      el.removeEventListener('focusin', updateSettling);
-      el.removeEventListener('focusout', updateSettling);
+      vv.removeEventListener('resize', onViewportChange);
+      vv.removeEventListener('scroll', onViewportChange);
+      el.removeEventListener('focusin', onFocusIn);
       el.style.transform = '';
       el.style.willChange = '';
     };
