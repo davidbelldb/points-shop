@@ -735,18 +735,15 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
   const rounding = mine
     ? ({ solo: 'rounded-2xl rounded-br-[4px]', first: 'rounded-2xl rounded-br-[4px]', middle: 'rounded-2xl rounded-r-[4px]', last: 'rounded-2xl rounded-tr-[4px]' })[clusterPos] ?? 'rounded-2xl'
     : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
-  const toneClass = mine
-    ? theme === 'dark' ? `${rounding} text-white` : `${rounding} text-[#0d3d2e]`
-    : theme === 'dark' ? `${rounding} text-white` : `${rounding} text-[#3b0f2a]`;
-  const toneBg = mine
+  const tone = mine
     ? theme === 'dark'
-      ? 'linear-gradient(180deg, #2a5c4d 0%, #0d2b22 100%)'
-      : 'linear-gradient(180deg, #d4f5eb 0%, #a8e8d4 100%)'
+      ? `${rounding} bg-[#21433b] text-white`
+      : `${rounding} bg-[#c8ede4] text-[#0d3d2e]`
     : theme === 'dark'
-      ? 'linear-gradient(180deg, #6b2548 0%, #2d0a1e 100%)'
-      : 'linear-gradient(180deg, #f5d8ec 0%, #e8b5d8 100%)';
-  // keep 'tone' as alias so existing code referencing it still works
-  const tone = toneClass;
+      ? `${rounding} bg-[#4e1d37] text-white`
+      : `${rounding} bg-[#f0d5e8] text-[#3b0f2a]`;
+  const toneClass = tone;
+  const toneBg = undefined;
   const bodyIsGif   = isGifUrl(m.body);
   const bodyIsPhoto = isUploadedPhoto(m.body);
   const bodyIsAudio = isAudioUrl(m.body);
@@ -766,7 +763,6 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
         transform: dragX ? `translateX(${dragX}px)` : undefined,
         transition: dragX ? 'none' : 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
         touchAction: 'pan-y',
-        ...(!(bodyIsMedia || bodyIsPoll) ? { background: toneBg } : {}),
       }}
       className={`group relative max-w-[78%] cursor-pointer select-none${isHeld ? ' bubble-held' : ''} ${bodyIsMedia || bodyIsPoll ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
     >
