@@ -549,7 +549,7 @@ function SecretBubble({ body, revealed, onReveal, isMine }) {
             <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
             </div>
-            <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
+            <p className="mt-1 text-[10px] opacity-50 select-none">rub me</p>
           </div>
         )}
       </div>
@@ -2043,8 +2043,8 @@ export default function MessagesPage() {
         );
       })()}
 
-      {/* Spacer — matches live composer bar height + safe area so last message is never hidden */}
-      <div style={{ height: composerHeight + 16 }} aria-hidden />
+      {/* Spacer — composer height + extra so last bubble sits fully above the composer hit area */}
+      <div style={{ height: composerHeight + 64 }} aria-hidden />
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
