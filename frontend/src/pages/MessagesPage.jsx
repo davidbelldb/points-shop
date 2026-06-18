@@ -1463,8 +1463,7 @@ export default function MessagesPage() {
       setComposerHeight(el.offsetHeight);
       // Re-scroll so the last message stays above the (now taller/shorter) bar.
       requestAnimationFrame(() => {
-        document.documentElement.scrollTop = 999999;
-        document.body.scrollTop = 999999;
+        bottomRef.current?.scrollIntoView({ block: 'end' });
       });
     });
     ro.observe(el);
@@ -1984,8 +1983,8 @@ export default function MessagesPage() {
         );
       })()}
 
-      {/* Spacer — matches live composer bar height so last message is never hidden */}
-      <div style={{ height: composerHeight }} aria-hidden />
+      {/* Spacer — matches live composer bar height + safe area so last message is never hidden */}
+      <div style={{ height: composerHeight + 16 }} aria-hidden />
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}

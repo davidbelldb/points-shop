@@ -1352,7 +1352,7 @@ function Stb15CanvasShell({ children, onPointerDown, onPointerUp, onTouchStart, 
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [DEFAULT_CAM.x, DEFAULT_CAM.y, DEFAULT_CAM.z], fov: DEFAULT_CAM.fov }} gl={{ antialias: true, alpha: true }}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [DEFAULT_CAM.x, DEFAULT_CAM.y, DEFAULT_CAM.z], fov: DEFAULT_CAM.fov }} gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping }}>
           <Suspense fallback={null}>{children}</Suspense>
         </Canvas>
       </div>
