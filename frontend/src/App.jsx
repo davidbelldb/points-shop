@@ -82,7 +82,7 @@ export default function App() {
   const hideHeader = isFullGame && isLandscape;
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
+    <div className="min-h-screen min-h-[100dvh] bg-neutral-50 text-neutral-900 antialiased">
       {/* Persistent sidebar — hidden on the full-screen game route so it
           doesn't appear when rotating to landscape on iPhone */}
       {!isFullGame && <SideNav />}

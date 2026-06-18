@@ -35,11 +35,35 @@
 
 :root { --font-pixel: 'Press Start 2P', monospace; }
 
+/* Use -webkit-fill-available so iOS PWA fills the actual visual viewport,
+   not the theoretical 100vh which includes the chin/safe-area gap. */
+html { height: -webkit-fill-available; }
+body, #root { min-height: 100%; min-height: -webkit-fill-available; }
 html, body, #root { height: 100%; }
 body { -webkit-tap-highlight-color: transparent; }
 
-
 html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+
+/* Prevent iOS rubber-band overscroll from revealing background behind the app */
+body { overscroll-behavior: none; }
+
+/* Fill the chin gap (env(safe-area-inset-bottom)) at the bottom of the screen
+   with the correct background colour so it's invisible / edge-to-edge.
+   Light-mode default matches bg-neutral-50 (#fafafa); dark mode matches #1f1f1e. */
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-bottom, 0px);
+  background: #fafafa;
+  z-index: 0;
+  pointer-events: none;
+}
+html.dark body::after {
+  background: #1f1f1e;
+}
 
 /* ---------- Dark mode ----------
    Toggled by adding `class="dark"` to <html>. We flip the neutrals via
