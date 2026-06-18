@@ -53,12 +53,34 @@ import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
 import { ThemeProvider } from './lib/ThemeContext.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './index.css';
 
-// Register the service worker (needed for web push notifications).
+// Vite fires this on the window when a lazily-imported chunk's <link rel=
+// modulepreload> fails — typically a stale chunk after a new deploy. Reload
+// once (guarded) to pull the fresh build rather than leaving a dead route.
+const PRELOAD_RELOAD_KEY = 'sneaky:preload-reload-at';
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  let last = 0;
+  try { last = Number(sessionStorage.getItem(PRELOAD_RELOAD_KEY) || 0); } catch { /* ignore */ }
+  if (Date.now() - last > 10_000) {
+    try { sessionStorage.setItem(PRELOAD_RELOAD_KEY, String(Date.now())); } catch { /* ignore */ }
+    window.location.reload();
+  }
+});
+
+// Register the service worker (needed for web push notifications + offline
+// shell). Check for a newer worker on load and whenever the tab is refocused,
+// so a deployed update is picked up promptly instead of lingering for days.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    }).catch(() => {});
   });
 }
 
@@ -90,6 +112,7 @@ createRoot(document.getElementById('root')).render(
       <ThemeProvider>
         <AuthProvider>
           <SettingsProvider>
+          <ErrorBoundary>
           <Suspense fallback={lazyFallback}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -146,6 +169,7 @@ createRoot(document.getElementById('root')).render(
             </Route>
           </Routes>
           </Suspense>
+          </ErrorBoundary>
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>

@@ -42,13 +42,32 @@
    to the full physical screen on iOS PWA (plain 100% is too short on newer
    iPhones). -webkit-fill-available on html must come after height:100%. */
 html, body, #root { height: 100%; }
-html { height: -webkit-fill-available; }
-body { min-height: 100dvh; min-height: -webkit-fill-available; }
+/* Fallback chain for the document height. Order matters — the LAST supported
+   declaration wins, so modern iOS lands on `svh` (the *small* viewport, i.e.
+   bar expanded). Using svh as the floor guarantees content is never hidden
+   behind the address bar, while letting the WINDOW be the scroller so that
+   when a page's content overflows, iOS 26's bottom address bar minimises on
+   scroll. `dvh`/`-webkit-fill-available` are kept only as older fallbacks. */
+html { min-height: -webkit-fill-available; }
+body { min-height: -webkit-fill-available; min-height: 100dvh; min-height: 100svh; }
 
 body { -webkit-tap-highlight-color: transparent; }
 body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
 html { -webkit-text-size-adjust: 100%; }
 body { overscroll-behavior: none; }
+
+/* ── Safe-area helpers for full-screen modal sheets ──────────────────────────
+   On phones a modal sheet is edge-to-edge, so its header (Cancel / Save / Post
+   / Done) must clear the Dynamic Island and its footer must clear the home
+   indicator. On sm+ the sheet becomes a centred card sitting inside the
+   viewport, so the insets collapse to 0. Apply `.sheet-safe-top` to the
+   sheet's sticky header and `.sheet-safe-bottom` to its scroll/footer region. */
+.sheet-safe-top    { padding-top: env(safe-area-inset-top); }
+.sheet-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+@media (min-width: 640px) {
+  .sheet-safe-top    { padding-top: 0; }
+  .sheet-safe-bottom { padding-bottom: 0; }
+}
 
 /* ---------- Dark mode ----------
    Toggled by adding `class="dark"` to <html>. We flip the neutrals via

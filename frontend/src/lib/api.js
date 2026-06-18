@@ -1,20 +1,53 @@
 const BASE = '/api';
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function request(path, options = {}) {
   const headers = { ...(options.headers ?? {}) };
   if (options.body !== undefined && options.body !== null) {
     headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
   }
-  const res = await fetch(`${BASE}${path}`, { credentials: 'include', ...options, headers });
-  if (!res.ok) {
-    let message = res.statusText;
+
+  // Retry only idempotent reads. A flaky mobile connection or a backend
+  // restarting mid-deploy used to surface as a one-shot "Load failed" screen;
+  // a couple of quick retries absorb those transient blips. Mutations (POST/
+  // PUT/PATCH/DELETE) are never retried — they aren't safe to repeat.
+  const method = (options.method ?? 'GET').toUpperCase();
+  const canRetry = method === 'GET' || method === 'HEAD';
+  const maxAttempts = canRetry ? 3 : 1;
+  const backoff = [250, 600];
+
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const body = await res.json();
-      if (body?.error) message = body.error;
-    } catch {}
-    throw new Error(message || `API ${res.status}`);
+      const res = await fetch(`${BASE}${path}`, { credentials: 'include', ...options, headers });
+      if (!res.ok) {
+        // Transient gateway/availability errors are worth retrying for reads.
+        if (canRetry && [502, 503, 504].includes(res.status) && attempt < maxAttempts - 1) {
+          await sleep(backoff[attempt] ?? 600);
+          continue;
+        }
+        let message = res.statusText;
+        try {
+          const body = await res.json();
+          if (body?.error) message = body.error;
+        } catch {}
+        throw new Error(message || `API ${res.status}`);
+      }
+      return res.json();
+    } catch (err) {
+      lastErr = err;
+      // fetch() rejects with a TypeError on network failure (Safari: "Load
+      // failed"). Retry those for reads; otherwise rethrow immediately.
+      const isNetworkError = err instanceof TypeError;
+      if (canRetry && isNetworkError && attempt < maxAttempts - 1) {
+        await sleep(backoff[attempt] ?? 600);
+        continue;
+      }
+      throw err;
+    }
   }
-  return res.json();
+  throw lastErr;
 }
 
 async function uploadFile(file) {

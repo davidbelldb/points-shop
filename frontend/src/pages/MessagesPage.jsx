@@ -1514,30 +1514,62 @@ export default function MessagesPage() {
     return () => ro.disconnect();
   }, []);
 
-  // iOS keyboard avoidance: when the visual viewport shrinks (keyboard opens),
-  // lift the composer to sit flush with the top of the keyboard.
+  // iOS keyboard avoidance: lift the fixed composer so it sits flush with the
+  // top of the on-screen keyboard. The composer is position:fixed, so it lives
+  // in *layout-viewport* coordinates; the keyboard shrinks the *visual*
+  // viewport. We pin the composer's bottom to the visible bottom edge.
+  //
+  // We deliberately use document.documentElement.clientHeight (the stable
+  // layout-viewport height) rather than window.innerHeight: on iOS 26 Safari
+  // window.innerHeight shifts with the bottom address bar, which made the old
+  // lift under-shoot and leave the field hidden behind the keyboard — while
+  // standalone PWA (where the OS resizes the webview) happened to work. Using
+  // the visual-viewport geometry directly fixes both. A GPU transform repaints
+  // more reliably than animating `bottom` on iOS.
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
     const el = composerRef.current;
-    if (!el) return;
+    if (!vv || !el) return;
 
+    let raf = 0;
+    function apply() {
+      const layoutH = document.documentElement.clientHeight;
+      // Distance from the layout-viewport bottom (where the composer's bottom:0
+      // sits) up to the bottom of the currently-visible region.
+      const lift = Math.max(0, Math.round(layoutH - (vv.offsetTop + vv.height)));
+      el.style.transform = lift ? `translate3d(0, ${-lift}px, 0)` : '';
+      el.style.willChange = lift ? 'transform' : '';
+    }
     function update() {
-      // How far the bottom of the visual viewport is from the bottom of the layout viewport
-      const offset = window.innerHeight - vv.height - vv.offsetTop;
-      el.style.bottom = `${Math.max(0, offset)}px`;
-      // Scroll to keep last message visible
-      requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        apply();
+        // Keep the latest message visible above the composer.
+        bottomRef.current?.scrollIntoView({ block: 'end' });
       });
+    }
+    // The keyboard animates in over ~250ms and iOS reports intermediate
+    // viewport sizes; re-measure a few times so we settle on the final height.
+    function updateSettling() {
+      update();
+      [60, 160, 320].forEach((t) => setTimeout(apply, t));
     }
 
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
+    // focusin/out fire before the keyboard finishes animating — the settling
+    // re-measures catch the final size.
+    el.addEventListener('focusin', updateSettling);
+    el.addEventListener('focusout', updateSettling);
+    apply();
     return () => {
+      cancelAnimationFrame(raf);
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
-      el.style.bottom = '';
+      el.removeEventListener('focusin', updateSettling);
+      el.removeEventListener('focusout', updateSettling);
+      el.style.transform = '';
+      el.style.willChange = '';
     };
   }, []);
 
@@ -2045,7 +2077,7 @@ export default function MessagesPage() {
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
-      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]" style={{ pointerEvents: 'none' }}>
+      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur" style={{ pointerEvents: 'none', paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
         <div className="px-5 lg:px-8" style={{ pointerEvents: 'auto' }}>
           {/* Media tray — slides in above the input row */}
           {showMedia && (

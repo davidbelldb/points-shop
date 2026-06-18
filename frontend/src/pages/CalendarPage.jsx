@@ -570,7 +570,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div className="flex h-full w-full max-w-md flex-col bg-white sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
-        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+        <header className="sheet-safe-top flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <button onClick={onCancel} className="text-sm text-neutral-500">Cancel</button>
           <span className="text-sm font-semibold">{isNew ? 'New event' : 'Edit event'}</span>
           <button onClick={save} disabled={!valid || busy} className="text-sm font-semibold text-amber-700 disabled:opacity-40">
@@ -578,7 +578,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
           </button>
         </header>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto p-4">
           <div>
             <label className="text-xs font-semibold text-neutral-500">Title</label>
             <input

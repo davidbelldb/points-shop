@@ -142,9 +142,14 @@ export async function setReaction(messageId, accountId, reaction) {
   if (value && accountId !== updated.sender_id) {
     const reactorRes = await query(`SELECT name FROM accounts WHERE id = $1`, [accountId]);
     const reactorName = reactorRes.rows[0]?.name ?? 'Someone';
-    const emoji = REACTION_EMOJI[value] ?? '👍';
-    const bodyText = updated.body ?? '';
-    const preview = bodyText.length > 80 ? bodyText.slice(0, 77) + '...' : bodyText;
+    // The frontend sends the literal emoji as the reaction value (e.g. '💜').
+    // REACTION_EMOJI only maps the legacy 'heart' key, so fall back to the
+    // value itself rather than a hard-coded 👍 — that fallback was turning
+    // every emoji reaction into a thumbs-up in the notification copy.
+    const emoji = REACTION_EMOJI[value] ?? value;
+    // Never echo the raw message body: secret messages would leak their
+    // contents (e.g. "__secret__:I miss you") and media would show a URL.
+    const preview = previewForBody(updated.body);
     const title = `${reactorName} reacted ${emoji}`;
 
     await query(
@@ -178,6 +183,21 @@ function classifyMessage(body) {
   if (/\.gif$/.test(lower)) return 'GIF';
   if (/\.(jpg|jpeg|png|webp|heic|heif|avif)$/.test(lower)) return 'photo';
   return 'message';
+}
+
+// Build a notification-safe preview for a message body. Redacts secret-message
+// contents entirely and renders media as a friendly label rather than a URL.
+// Used by reaction notifications so they never leak the underlying message.
+function previewForBody(body) {
+  const trimmed = (body ?? '').trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('__secret__:')) return '';   // never reveal secrets
+  const type = classifyMessage(trimmed);
+  if (type === 'system')     return '';
+  if (type === 'voice note') return 'Voice note';
+  if (type === 'GIF')        return 'GIF';
+  if (type === 'photo')      return 'Photo';
+  return trimmed.length > 80 ? trimmed.slice(0, 77) + '...' : trimmed;
 }
 
 export async function sendMessage(senderId, recipientId, body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) {

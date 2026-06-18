@@ -184,7 +184,7 @@ export default function StoryUploader({ onClose, onPosted }) {
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/60 p-0 sm:items-center sm:p-4">
       <div className="flex h-full w-full max-w-md flex-col bg-white sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
-        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+        <header className="sheet-safe-top flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <button onClick={onClose} className="text-sm text-neutral-500">Cancel</button>
           <span className="text-sm font-semibold">New sneaky story</span>
           <button onClick={post} disabled={!file || busy} className="text-sm font-semibold text-amber-700 disabled:opacity-40">
@@ -192,7 +192,7 @@ export default function StoryUploader({ onClose, onPosted }) {
           </button>
         </header>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto p-4">
           {!file ? (
             <label className="flex aspect-[9/12] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 text-amber-700">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

@@ -7,10 +7,10 @@
                   offline. The fresh index.html always wins when online.
    - /api/* and /media/* are untouched (media has HTTP immutable caching). */
 
-const ASSET_CACHE  = 'sneaky-assets-v5';
-const SHELL_CACHE  = 'sneaky-shell-v5';
-const MODEL_CACHE  = 'sneaky-models-v5';
-const MEDIA_CACHE  = 'sneaky-media-v5';
+const ASSET_CACHE  = 'sneaky-assets-v6';
+const SHELL_CACHE  = 'sneaky-shell-v6';
+const MODEL_CACHE  = 'sneaky-models-v6';
+const MEDIA_CACHE  = 'sneaky-media-v6';
 
 // Large static files that are expensive to re-download.
 // Cache-first forever (filenames never change).
@@ -19,7 +19,14 @@ const MODEL_EXTS = ['.glb', '.gltf', '.stl', '.bin'];
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    // Drop caches from older versions of this worker.
+    // Enable navigation preload so the network request for a navigation starts
+    // in parallel with the worker booting — cuts first-navigation latency and
+    // reduces the transient failures that showed up as "Load failed".
+    if (self.registration.navigationPreload) {
+      try { await self.registration.navigationPreload.enable(); } catch { /* unsupported */ }
+    }
+    // Drop caches from older versions of this worker (this includes the v5
+    // asset cache, so a stale chunk from a previous deploy can't survive).
     const keep = new Set([ASSET_CACHE, SHELL_CACHE, MODEL_CACHE, MEDIA_CACHE]);
     for (const key of await caches.keys()) {
       if (key.startsWith('sneaky-') && !keep.has(key)) await caches.delete(key);
@@ -83,19 +90,32 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App navigations — network-first with offline fallback to the last shell.
+  // App navigations — network-first (the fresh index.html always wins online,
+  // so a new deploy is picked up immediately) with offline fallback to the last
+  // good shell. Uses the navigation preload response when present.
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
-        const res = await fetch(req);
-        if (res.ok) {
+        // event.preloadResponse resolves to the preloaded navigation request,
+        // or undefined when preload is unsupported/disabled.
+        const preloaded = await event.preloadResponse;
+        const res = preloaded || await fetch(req);
+        // Only cache a genuinely good HTML shell — never persist a 5xx served
+        // mid-deploy, which is what previously left a broken page cached.
+        if (res && res.ok) {
           const cache = await caches.open(SHELL_CACHE);
           cache.put('/index.html', res.clone());
         }
         return res;
       } catch {
-        const fallback = await caches.match('/index.html');
-        return fallback ?? Response.error();
+        // Offline (or the network errored) — fall back to the last good shell.
+        const fallback = await caches.match('/index.html', { ignoreSearch: true });
+        return fallback ?? new Response(
+          '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+          + '<body style="margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;'
+          + 'font:16px system-ui;background:#1f1f1e;color:#9ca3af">You appear to be offline. Pull to refresh when you\'re back.</body>',
+          { headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+        );
       }
     })());
   }
