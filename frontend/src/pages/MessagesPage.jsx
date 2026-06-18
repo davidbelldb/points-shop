@@ -478,39 +478,54 @@ const SWIPE_MAX     = 80;
 const SECRET_PREFIX = '__secret__:';
 function isSecretBody(body) { return typeof body === 'string' && body.startsWith(SECRET_PREFIX); }
 
-// Scrub-to-reveal secret message — tracks total pointer travel distance.
-// After ~120px of scrubbing the message unblurs.
-const SCRUB_THRESHOLD = 120;
+// Scrub-to-reveal secret message — requires 10 direction reversals (~5-6 back-and-forth strokes).
+const STROKES_REQUIRED = 10;
+const STROKE_MIN_DIST  = 12; // px before a reversal counts
 function SecretBubble({ body, revealed, onReveal, isMine }) {
-  const [scrubbed, setScrubbed] = useState(0);
-  const [done, setDone]         = useState(revealed);
-  const lastXRef = useRef(null);
+  const [strokes, setStrokes] = useState(0);
+  const [done, setDone]       = useState(revealed);
+  const lastXRef    = useRef(null);
+  const dirRef      = useRef(null); // 1 = right, -1 = left
+  const travelRef   = useRef(0);    // distance in current direction
 
   useEffect(() => { if (revealed) setDone(true); }, [revealed]);
 
   function onPointerDown(e) {
     if (done) return;
-    lastXRef.current = e.clientX;
+    lastXRef.current  = e.clientX;
+    dirRef.current    = null;
+    travelRef.current = 0;
     e.currentTarget.setPointerCapture?.(e.pointerId);
   }
   function onPointerMove(e) {
     if (done || lastXRef.current === null) return;
-    const dx = Math.abs(e.clientX - lastXRef.current);
+    const dx  = e.clientX - lastXRef.current;
     lastXRef.current = e.clientX;
-    setScrubbed(prev => {
-      const next = prev + dx;
-      if (next >= SCRUB_THRESHOLD) {
-        setDone(true);
-        onReveal?.();
-        try { navigator.vibrate?.(30); } catch {}
-        return SCRUB_THRESHOLD;
+    if (dx === 0) return;
+    const dir = dx > 0 ? 1 : -1;
+    if (dirRef.current === null) { dirRef.current = dir; }
+    if (dir === dirRef.current) {
+      travelRef.current += Math.abs(dx);
+    } else {
+      // Direction reversed — only count if we travelled enough
+      if (travelRef.current >= STROKE_MIN_DIST) {
+        setStrokes(prev => {
+          const next = prev + 1;
+          if (next >= STROKES_REQUIRED) {
+            setDone(true);
+            onReveal?.();
+            try { navigator.vibrate?.([20, 30, 20]); } catch {}
+          }
+          return next;
+        });
       }
-      return next;
-    });
+      dirRef.current    = dir;
+      travelRef.current = Math.abs(dx);
+    }
   }
-  function onPointerUp() { lastXRef.current = null; }
+  function onPointerUp() { lastXRef.current = null; dirRef.current = null; travelRef.current = 0; }
 
-  const progress = Math.min(1, scrubbed / SCRUB_THRESHOLD);
+  const progress = Math.min(1, strokes / STROKES_REQUIRED);
   const blurPx   = done ? 0 : 8 - progress * 8;
 
   return (
