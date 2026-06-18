@@ -98,7 +98,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {!hideHeader && <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur pt-[env(safe-area-inset-top)]">
+      {!hideHeader && <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
         <div className="flex w-full items-center justify-between gap-2 px-3 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-2">
             {/* Hamburger — mobile only normally; always shown on game route (no SideNav there) */}

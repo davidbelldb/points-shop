@@ -8,7 +8,11 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icon-512.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Opaque status bar: iOS reserves the top safe area and places the whole
+         web app below it, so content is anchored to the bottom edge and never
+         renders under the clock/signal. (black-translucent = full-bleed, which
+         pulled the UI up under the status bar.) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Sneaky Stuff" />
     <title>Sneaky Stuff</title>
   </head>
