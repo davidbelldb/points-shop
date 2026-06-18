@@ -7,9 +7,10 @@
                   offline. The fresh index.html always wins when online.
    - /api/* and /media/* are untouched (media has HTTP immutable caching). */
 
-const ASSET_CACHE  = 'sneaky-assets-v4';
-const SHELL_CACHE  = 'sneaky-shell-v4';
-const MODEL_CACHE  = 'sneaky-models-v4';
+const ASSET_CACHE  = 'sneaky-assets-v5';
+const SHELL_CACHE  = 'sneaky-shell-v5';
+const MODEL_CACHE  = 'sneaky-models-v5';
+const MEDIA_CACHE  = 'sneaky-media-v5';
 
 // Large static files that are expensive to re-download.
 // Cache-first forever (filenames never change).
@@ -19,7 +20,7 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     // Drop caches from older versions of this worker.
-    const keep = new Set([ASSET_CACHE, SHELL_CACHE, MODEL_CACHE]);
+    const keep = new Set([ASSET_CACHE, SHELL_CACHE, MODEL_CACHE, MEDIA_CACHE]);
     for (const key of await caches.keys()) {
       if (key.startsWith('sneaky-') && !keep.has(key)) await caches.delete(key);
     }
@@ -32,7 +33,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/media/')) return;
+  if (url.pathname.startsWith('/api/')) return; // never cache API responses
 
   // Hashed build assets — cache-first, immutable by construction.
   if (url.pathname.startsWith('/assets/')) {
@@ -56,6 +57,27 @@ self.addEventListener('fetch', (event) => {
       if (hit) return hit;
       const res = await fetch(req);
       if (res.ok) cache.put(req, res.clone());
+      return res;
+    })());
+    return;
+  }
+
+  // Uploaded media (story photos/videos, product images, profile photos, chat
+  // photos, voice notes) — cache-first. The backend marks these immutable with
+  // content-hashed filenames so a cached entry can never be stale.
+  // Cap the media cache at 200 entries so it doesn't grow without bound.
+  if (url.pathname.startsWith('/media/')) {
+    event.respondWith((async () => {
+      const cache = await caches.open(MEDIA_CACHE);
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) {
+        // Evict oldest entries if cache is getting large
+        const keys = await cache.keys();
+        if (keys.length >= 200) await cache.delete(keys[0]);
+        cache.put(req, res.clone());
+      }
       return res;
     })());
     return;
