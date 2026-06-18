@@ -92,6 +92,16 @@ const NUDGE_BODY = '__nudge__';
       50%       { opacity: 0.9;  transform: scale(1.1); }
     }
 
+    @keyframes secret-pop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.07); }
+      70%  { transform: scale(0.96); }
+      100% { transform: scale(1); }
+    }
+    .secret-pop {
+      animation: secret-pop 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
     /* ── Long-press bubble lift ── */
     .bubble-held {
       transform: scale(1.04) translateY(-3px) !important;
@@ -520,17 +530,14 @@ function SecretBubble({ body, revealed, onReveal, isMine }) {
         </p>
         {!done && (
           <div className="mt-1.5">
-            <>
-              {/* Scrub progress bar */}
-              <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
-              </div>
-              <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
-            </>
+            {/* Scrub progress bar */}
+            <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
+            </div>
+            <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
           </div>
         )}
       </div>
-      <p className="mt-0.5 text-[10px] opacity-40">rub to reveal</p>
     </div>
   );
 }
@@ -649,8 +656,17 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
     ? ({ solo: 'rounded-2xl rounded-br-[4px]', first: 'rounded-2xl rounded-br-[4px]', middle: 'rounded-2xl rounded-r-[4px]', last: 'rounded-2xl rounded-tr-[4px]' })[clusterPos] ?? 'rounded-2xl'
     : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
   const isSecretMsg = isSecretBody(m.body);
+  const normalTone = mine
+    ? theme === 'dark'
+      ? `${rounding} bg-[#21433b] text-white`
+      : `${rounding} bg-[#c8ede4] text-[#0d3d2e]`
+    : theme === 'dark'
+      ? `${rounding} bg-[#4e1d37] text-white`
+      : `${rounding} bg-[#f0d5e8] text-[#3b0f2a]`;
   const tone = isSecretMsg
-    ? `${rounding} bg-[#ee70bd] text-white`
+    ? isRevealed
+      ? normalTone
+      : `${rounding} bg-[#3b3b3b] text-white`
     : mine
     ? theme === 'dark'
       ? `${rounding} bg-[#21433b] text-white`
@@ -680,7 +696,7 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
         transition: dragX ? 'none' : 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
         touchAction: 'pan-y',
       }}
-      className={`group relative max-w-[78%] cursor-pointer select-none${isHeld ? ' bubble-held' : ''} ${bodyIsMedia || bodyIsPoll ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
+      className={`group relative max-w-[78%] cursor-pointer select-none${isHeld ? ' bubble-held' : ''}${isSecretMsg && isRevealed ? ' secret-pop' : ''} ${bodyIsMedia || bodyIsPoll ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
     >
       {/* Emoji picker — floats above bubble on long-press */}
       {showPicker && (
@@ -826,12 +842,22 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
         </div>
       ) : isSecretBody(m.body) ? (
         /* ── Secret message ── */
-        <SecretBubble
-          body={m.body.slice(SECRET_PREFIX.length)}
-          revealed={isRevealed}
-          isMine={mine}
-          onReveal={() => onRevealSecret?.(m.id)}
-        />
+        <>
+          <SecretBubble
+            body={m.body.slice(SECRET_PREFIX.length)}
+            revealed={isRevealed}
+            isMine={mine}
+            onReveal={() => onRevealSecret?.(m.id)}
+          />
+          {mine && (
+            <button
+              data-bubble-action
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-white/20 text-white group-hover:flex"
+              aria-label="Delete"
+            >×</button>
+          )}
+        </>
       ) : (
         <>
           <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -1347,6 +1373,7 @@ export default function MessagesPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [raining, setRaining] = useState(null);
   const [animatedIds, setAnimatedIds] = useState(new Set()); // IDs to animate on entry
+  const [secretsRevealed, setSecretsRevealed] = useState(new Set()); // sender-side local preview only
   const [secretSendPrimed, setSecretSendPrimed] = useState(false); // long-hold send button
   const recorderRef  = useRef(null);
   const recChunksRef = useRef([]);
@@ -1953,15 +1980,20 @@ export default function MessagesPage() {
                           myId={user?.id}
                           onOpenPhoto={(src) => setLightboxSrc(src)}
                           onSwipeReply={handleSwipeReply}
-                          isRevealed={!!m.secret_revealed_at}
+                          isRevealed={!!m.secret_revealed_at || secretsRevealed.has(m.id)}
                           onRevealSecret={async (id) => {
-                            // Optimistically update UI
-                            setData(prev => ({
-                              ...prev,
-                              messages: prev.messages.map(msg => msg.id === id ? { ...msg, secret_revealed_at: new Date().toISOString() } : msg),
-                            }));
-                            try { await api.revealSecret(id); }
-                            catch (e) { await refresh(false); }
+                            if (m.sender_id === user?.id) {
+                              // Sender: local preview only — don't touch the DB
+                              setSecretsRevealed(prev => { const s = new Set(prev); s.add(id); return s; });
+                            } else {
+                              // Recipient: persist to DB so both sides see it revealed
+                              setData(prev => ({
+                                ...prev,
+                                messages: prev.messages.map(msg => msg.id === id ? { ...msg, secret_revealed_at: new Date().toISOString() } : msg),
+                              }));
+                              try { await api.revealSecret(id); }
+                              catch (e) { await refresh(false); }
+                            }
                           }}
                         />
                       </div>
