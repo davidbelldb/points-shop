@@ -36,13 +36,11 @@
 :root { --font-pixel: 'Press Start 2P', monospace; }
 
 /* ── iOS PWA full-height fix ─────────────────────────────────────────────────
-   100% alone uses the theoretical viewport which can be shorter than the
-   physical screen on iOS PWA. -webkit-fill-available MUST come after 100%
-   to override it in Safari; other engines ignore the property. Body uses
-   min-height so it can grow beyond the initial viewport if content overflows. */
+   -webkit-fill-available MUST come after height:100% to override Safari's
+   theoretical 100vh; other engines ignore the property. Body stays at 100%
+   so the browser scroll context is unchanged (preserves sticky headers). */
 html, body, #root { height: 100%; }
 html { height: -webkit-fill-available; }
-body { min-height: 100dvh; min-height: -webkit-fill-available; }
 
 body { -webkit-tap-highlight-color: transparent; }
 html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
