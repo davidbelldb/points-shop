@@ -36,14 +36,19 @@
 :root { --font-pixel: 'Press Start 2P', monospace; }
 
 /* ── iOS PWA full-height fix ─────────────────────────────────────────────────
-   -webkit-fill-available MUST come after height:100% to override Safari's
-   theoretical 100vh; other engines ignore the property. Body stays at 100%
-   so the browser scroll context is unchanged (preserves sticky headers). */
+   - overflow-x: hidden must NOT be on html — that turns html into a scroll
+     container, which breaks position:sticky on the header in all browsers.
+   - body gets min-height:100dvh so it fills the full physical screen on iOS PWA
+     (100% alone is too short on newer iPhones).
+   - -webkit-fill-available on html overrides 100% in Safari/iOS and must come
+     after it; other engines ignore the property. */
 html, body, #root { height: 100%; }
 html { height: -webkit-fill-available; }
+body { min-height: 100dvh; }
 
 body { -webkit-tap-highlight-color: transparent; }
-html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; }
 
 /* Prevent iOS rubber-band overscroll revealing background behind the app */
 body { overscroll-behavior: none; }
