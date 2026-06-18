@@ -1990,7 +1990,7 @@ export default function MessagesPage() {
 
       {/* Composer bar */}
       <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]">
-        <div className="px-4 lg:px-8">
+        <div className="px-2 lg:px-8">
           {/* Media tray — slides in above the input row */}
           {showMedia && (
             <div className="pt-3 pb-1">
@@ -2146,7 +2146,7 @@ export default function MessagesPage() {
           )}
 
           {/* Main input row: [+] [textarea] [send] */}
-          <form onSubmit={send} className="flex items-end gap-2 py-3">
+          <form onSubmit={send} className="flex items-end gap-1.5 py-3">
             {/* + / × toggle */}
             <button
               type="button"
