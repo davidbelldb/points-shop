@@ -2043,13 +2043,13 @@ export default function MessagesPage() {
         );
       })()}
 
-      {/* Spacer — composer height + extra so last bubble sits fully above the composer hit area */}
-      <div style={{ height: composerHeight + 64 }} aria-hidden />
+      {/* Spacer — matches live composer bar height + safe area so last message is never hidden */}
+      <div style={{ height: composerHeight + 16 }} aria-hidden />
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
-      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]">
-        <div className="px-5 lg:px-8">
+      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]" style={{ pointerEvents: 'none' }}>
+        <div className="px-5 lg:px-8" style={{ pointerEvents: 'auto' }}>
           {/* Media tray — slides in above the input row */}
           {showMedia && (
             <div className="pt-3 pb-1">
