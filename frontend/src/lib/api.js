@@ -74,6 +74,8 @@ export const api = {
     request(`/messages/typing`, { method: 'PUT' }),
   votePoll: (id, optionIdx) =>
     request(`/messages/${id}/vote`, { method: 'PUT', body: JSON.stringify({ option_idx: optionIdx }) }),
+  revealSecret: (id) =>
+    request(`/messages/${id}/reveal`, { method: 'PUT' }),
   listCalendarEvents: (fromIso, toIso) =>
     request(`/calendar/events?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`),
   listCalendarUpcoming: (limit = 3) =>

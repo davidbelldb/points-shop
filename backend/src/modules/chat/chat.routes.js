@@ -1,6 +1,6 @@
 import {
   findOtherUser, listMessages, sendMessage, markAllRead, deleteMessage,
-  editMessage, setReaction, toggleSparkle, setTyping, votePoll,
+  editMessage, setReaction, toggleSparkle, setTyping, votePoll, revealSecretMessage,
 } from './chat.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
@@ -106,6 +106,14 @@ export default async function chatRoutes(fastify) {
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }
+  });
+
+  // Reveal a secret message — only the recipient may call this.
+  fastify.put('/api/messages/:id/reveal', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const result = await revealSecretMessage(req.params.id, accountId);
+    if (!result) return reply.code(404).send({ error: 'not found or already revealed' });
+    return result;
   });
 
   // Cast or change a poll vote. Body: { option_idx: number }

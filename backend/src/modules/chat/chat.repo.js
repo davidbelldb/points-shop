@@ -27,7 +27,7 @@ export async function listMessages(accountId, otherId, limit = 200) {
     `SELECT * FROM (
        SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
               m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
-              m.slider_response, m.sparkled,
+              m.slider_response, m.sparkled, m.secret_revealed_at,
               COALESCE((
                 SELECT json_agg(json_build_object('account_id', pv.account_id, 'option_idx', pv.option_idx))
                   FROM chat_poll_votes pv WHERE pv.message_id = m.id
@@ -240,6 +240,20 @@ export async function markAllRead(accountId, fromUserId) {
       WHERE account_id = $1 AND type = 'message' AND read_at IS NULL`,
     [accountId],
   );
+}
+
+// Mark a secret message as revealed — only the recipient can trigger this.
+export async function revealSecretMessage(messageId, accountId) {
+  const { rows } = await query(
+    `UPDATE chat_messages
+        SET secret_revealed_at = NOW()
+      WHERE id = $1
+        AND recipient_id = $2
+        AND secret_revealed_at IS NULL
+      RETURNING id, secret_revealed_at`,
+    [messageId, accountId],
+  );
+  return rows[0] ?? null;
 }
 
 export async function deleteMessage(messageId, accountId) {

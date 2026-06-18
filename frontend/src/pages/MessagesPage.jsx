@@ -650,9 +650,7 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
     : ({ solo: 'rounded-2xl rounded-bl-[4px]', first: 'rounded-2xl rounded-bl-[4px]', middle: 'rounded-2xl rounded-l-[4px]', last: 'rounded-2xl rounded-tl-[4px]' })[clusterPos] ?? 'rounded-2xl';
   const isSecretMsg = isSecretBody(m.body);
   const tone = isSecretMsg
-    ? theme === 'dark'
-      ? `${rounding} bg-[#5b3f8a] text-white`
-      : `${rounding} bg-[#c3b3e9] text-[#2a1160]`
+    ? `${rounding} bg-[#ee70bd] text-white`
     : mine
     ? theme === 'dark'
       ? `${rounding} bg-[#21433b] text-white`
@@ -1349,7 +1347,6 @@ export default function MessagesPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [raining, setRaining] = useState(null);
   const [animatedIds, setAnimatedIds] = useState(new Set()); // IDs to animate on entry
-  const [secretsRevealed, setSecretsRevealed] = useState(new Set()); // locally revealed secret messages
   const [secretSendPrimed, setSecretSendPrimed] = useState(false); // long-hold send button
   const recorderRef  = useRef(null);
   const recChunksRef = useRef([]);
@@ -1956,8 +1953,16 @@ export default function MessagesPage() {
                           myId={user?.id}
                           onOpenPhoto={(src) => setLightboxSrc(src)}
                           onSwipeReply={handleSwipeReply}
-                          isRevealed={secretsRevealed.has(m.id)}
-                          onRevealSecret={(id) => setSecretsRevealed(prev => { const s = new Set(prev); s.add(id); return s; })}
+                          isRevealed={!!m.secret_revealed_at}
+                          onRevealSecret={async (id) => {
+                            // Optimistically update UI
+                            setData(prev => ({
+                              ...prev,
+                              messages: prev.messages.map(msg => msg.id === id ? { ...msg, secret_revealed_at: new Date().toISOString() } : msg),
+                            }));
+                            try { await api.revealSecret(id); }
+                            catch (e) { await refresh(false); }
+                          }}
                         />
                       </div>
                       {/* Timestamp — shown only once per cluster, below the last/solo bubble */}
