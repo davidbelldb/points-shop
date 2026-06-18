@@ -506,12 +506,11 @@ function SecretBubble({ body, revealed, onReveal, isMine }) {
   return (
     <div data-bubble-action style={{ minWidth: 80, userSelect: 'none' }}>
       <div
-        onPointerDown={isMine ? undefined : onPointerDown}
-        onPointerMove={isMine ? undefined : onPointerMove}
-        onPointerUp={isMine ? undefined : onPointerUp}
-        onPointerCancel={isMine ? undefined : onPointerUp}
-        onClick={isMine && !done ? () => { setDone(true); onReveal?.(); } : undefined}
-        style={{ cursor: done ? 'default' : isMine ? 'pointer' : 'ew-resize', touchAction: 'pan-y' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ cursor: done ? 'default' : 'ew-resize', touchAction: 'pan-y' }}
       >
         <p
           className="whitespace-pre-wrap text-sm leading-relaxed select-none"
@@ -521,21 +520,17 @@ function SecretBubble({ body, revealed, onReveal, isMine }) {
         </p>
         {!done && (
           <div className="mt-1.5">
-            {isMine ? (
-              <p className="text-[10px] opacity-50 select-none">🔒 sent as secret · tap to preview</p>
-            ) : (
-              <>
-                {/* Scrub progress bar */}
-                <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
-                </div>
-                <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
-              </>
-            )}
+            <>
+              {/* Scrub progress bar */}
+              <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progress * 100}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.05s linear' }} />
+              </div>
+              <p className="mt-1 text-[10px] opacity-50 select-none">rub to reveal</p>
+            </>
           </div>
         )}
       </div>
-      <p className="mt-0.5 text-[10px] opacity-40">sneaky secret</p>
+      <p className="mt-0.5 text-[10px] opacity-40">rub to reveal</p>
     </div>
   );
 }
