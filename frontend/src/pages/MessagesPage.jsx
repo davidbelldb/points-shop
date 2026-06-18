@@ -8,10 +8,10 @@ const LazyRainOverlay = lazy(() => import('./ChatRain.jsx').then(m => ({ default
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
-import StoryViewer from '../components/stories/StoryViewer.jsx';
+const LazyStoryViewer = lazy(() => import('../components/stories/StoryViewer.jsx'));
 import SliderSticker from '../components/stories/SliderSticker.jsx';
 
-const POLL_MS = 5000;
+const POLL_MS = 8000;
 const DOUBLE_TAP_MS = 240;
 const NUDGE_BODY = '__nudge__';
 
@@ -1349,13 +1349,21 @@ export default function MessagesPage() {
     }
   }
 
-  // Tick every second so the typing-indicator timestamp check re-evaluates
-  // without waiting for the next full poll cycle.
+  // Tick every second — but only while the other person is actively typing.
+  // This avoids a gratuitous re-render every second when the chat is idle.
   const [, setTick] = useState(0);
+  const typingActiveRef = useRef(false);
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
+    const ts = data.other?.typing_at;
+    const isTyping = ts && Date.now() - new Date(ts).getTime() < 6000;
+    if (isTyping && !typingActiveRef.current) {
+      typingActiveRef.current = true;
+      const id = setInterval(() => setTick(t => t + 1), 1000);
+      const stop = () => { clearInterval(id); typingActiveRef.current = false; };
+      const timeout = setTimeout(stop, 6000);
+      return () => { clearInterval(id); clearTimeout(timeout); typingActiveRef.current = false; };
+    }
+  }, [data.other?.typing_at]);
 
   useEffect(() => {
     let mounted = true;
@@ -1734,7 +1742,9 @@ export default function MessagesPage() {
         extraStoryEmojis,
       };
     });
-  }, [data.messages]);
+  // Fingerprint: only recompute when message IDs, reactions, sparkle, or votes change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.messages.map(m => `${m.id}:${m.reaction}:${m.sparkled}:${(m.poll_votes??[]).length}:${m.read_at??''}`).join('|')]);
 
   let lastDay = null;
 
@@ -2175,11 +2185,13 @@ export default function MessagesPage() {
       )}
 
       {viewerStory && (
-        <StoryViewer
-          stories={[viewerStory]}
-          initialIndex={0}
-          onClose={() => setViewerStory(null)}
-        />
+        <Suspense fallback={null}>
+          <LazyStoryViewer
+            stories={[viewerStory]}
+            initialIndex={0}
+            onClose={() => setViewerStory(null)}
+          />
+        </Suspense>
       )}
 
       {/* Swipe-delete confirmation */}
