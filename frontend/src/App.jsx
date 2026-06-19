@@ -82,9 +82,10 @@ export default function App() {
 
   const hideHeader = isFullGame && isLandscape;
 
-  // Publish the sticky header's height (incl. the safe-area inset it reserves)
-  // as --app-header-h so full-screen modal sheets can sit BELOW the nav bar
-  // instead of covering it. Re-measured on resize / orientation / header changes.
+  // Publish the fixed header's height (incl. the safe-area inset it reserves)
+  // as --app-header-h so the page content can be padded clear of it and the
+  // modal sheets / drawers can sit BELOW the nav bar. Re-measured on resize /
+  // orientation / header changes.
   useEffect(() => {
     const root = document.documentElement;
     const el = headerRef.current;
@@ -102,6 +103,34 @@ export default function App() {
     };
   }, [hideHeader, user?.impersonating]);
 
+  // Keep the fixed nav bar pinned to the TOP OF THE VISIBLE AREA at all times.
+  // On iOS, when the keyboard opens the browser scrolls the *visual* viewport
+  // down to reveal the focused field, which pushes a layout-anchored fixed/
+  // sticky header up out of view. Following visualViewport.offsetTop with a
+  // transform cancels that out so the nav bar never disappears off the top —
+  // whether you're scrolling chat history or tapping into a note field.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const el = headerRef.current;
+    if (!vv || !el) return undefined;
+    let raf = 0;
+    const follow = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        el.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+      });
+    };
+    vv.addEventListener('resize', follow);
+    vv.addEventListener('scroll', follow);
+    follow();
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener('resize', follow);
+      vv.removeEventListener('scroll', follow);
+      el.style.transform = '';
+    };
+  }, [hideHeader]);
+
   return (
     <div className="min-h-screen min-h-[100dvh] bg-neutral-50 text-neutral-900 antialiased">
       {/* Persistent sidebar — hidden on the full-screen game route so it
@@ -110,7 +139,10 @@ export default function App() {
 
       {/* All page content shifts right by sidebar width on md+
           (not on the game route — no sidebar there) */}
-      <div className={isFullGame ? 'flex flex-col h-screen' : 'md:pl-56'}>
+      <div
+        className={isFullGame ? 'flex flex-col h-screen' : 'md:pl-56'}
+        style={isFullGame || hideHeader ? undefined : { paddingTop: 'var(--app-header-h, 56px)' }}
+      >
       {!hideHeader && user?.impersonating && (
         <div className="bg-amber-100 border-b border-amber-200">
           <div className="mx-auto flex w-full items-center justify-between gap-2 px-3 py-2 text-xs text-amber-900 lg:px-6">
@@ -119,7 +151,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {!hideHeader && <header ref={headerRef} className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {!hideHeader && <header ref={headerRef} className="fixed top-0 left-0 right-0 md:left-56 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex w-full items-center justify-between gap-2 px-3 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-2">
             {/* Hamburger — mobile only normally; always shown on game route (no SideNav there) */}

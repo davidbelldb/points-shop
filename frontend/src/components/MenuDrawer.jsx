@@ -168,26 +168,26 @@ export default function MenuDrawer({ open, onClose }) {
         className={`absolute inset-0 bg-black/50 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`}
       />
       <aside
-        className={`absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <nav data-modal-scroll className="flex flex-1 flex-col overflow-y-auto overscroll-contain p-2 pt-3">
-          <div className="space-y-1">
-            <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
-            <Item to="/store" label="Sneaky Store" icon={<StoreIcon />} onClose={onClose} />
-            <Item to="/notes" label="Sneaky Notes" icon={<NotesIcon />} onClose={onClose} />
-            <Item to="/stories" label="Sneaky Stories" icon={<FeedIcon />} onClose={onClose} />
-            <Item to="/games" label="Sneaky Games" icon={<GameIcon />} onClose={onClose} />
-            <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
-            <Item to="/calendar" label="Sneaky Calendar" icon={<CalendarIcon />} onClose={onClose} />
-            <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
-            <Item to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} onClose={onClose} />
-            <Item to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} onClose={onClose} />
-          </div>
-          <div className="mt-auto pt-2">
-            <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />
-          </div>
+        {/* Scrollable nav list — grows to fill, scrolls when the items are
+            taller than the drawer. */}
+        <nav data-modal-scroll className="flex-1 space-y-1 overflow-y-auto overscroll-contain p-2 pt-3">
+          <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
+          <Item to="/store" label="Sneaky Store" icon={<StoreIcon />} onClose={onClose} />
+          <Item to="/notes" label="Sneaky Notes" icon={<NotesIcon />} onClose={onClose} />
+          <Item to="/stories" label="Sneaky Stories" icon={<FeedIcon />} onClose={onClose} />
+          <Item to="/games" label="Sneaky Games" icon={<GameIcon />} onClose={onClose} />
+          <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
+          <Item to="/calendar" label="Sneaky Calendar" icon={<CalendarIcon />} onClose={onClose} />
+          <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
+          <Item to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} onClose={onClose} />
+          <Item to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} onClose={onClose} />
         </nav>
-        <div className="border-t border-neutral-200 p-2">
+        {/* Pinned footer — always anchored to the bottom of the visible drawer. */}
+        <div className="shrink-0 border-t border-neutral-200 p-2 space-y-1">
+          <Item to="/account" label="Sneaky Account" icon={<UserIcon />} onClose={onClose} />
           <ThemeToggle iconColor={ICON_COLOUR} />
         </div>
       </aside>

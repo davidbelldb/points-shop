@@ -107,8 +107,8 @@ export default function BasketDrawer({ open, onClose }) {
 
       {/* Panel — slides in from the right */}
       <aside
-        style={{ backgroundColor: '#7d3c6b' }}
-        className={`absolute right-0 top-0 flex h-full w-[80vw] md:w-full md:max-w-md flex-col shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ backgroundColor: '#7d3c6b', paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className={`absolute inset-y-0 right-0 flex w-[80vw] md:w-full md:max-w-md flex-col shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* ── Drawer header ── */}
         <div className="flex shrink-0 items-center justify-between border-b border-white/20 px-4 py-3">
