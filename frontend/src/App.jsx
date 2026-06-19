@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useBasket } from './lib/BasketContext.jsx';
 import { useAuth } from './lib/AuthContext.jsx';
@@ -41,6 +41,7 @@ export default function App() {
   const { theme, setTheme } = useTheme();
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [basketOpen, setBasketOpen] = useState(false);
+  const headerRef = useRef(null);
 
   // Sync the theme from the currently-loaded account, so each user gets their own.
   useEffect(() => {
@@ -81,6 +82,26 @@ export default function App() {
 
   const hideHeader = isFullGame && isLandscape;
 
+  // Publish the sticky header's height (incl. the safe-area inset it reserves)
+  // as --app-header-h so full-screen modal sheets can sit BELOW the nav bar
+  // instead of covering it. Re-measured on resize / orientation / header changes.
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = headerRef.current;
+    if (!el) { root.style.setProperty('--app-header-h', '0px'); return undefined; }
+    const set = () => root.style.setProperty('--app-header-h', `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    window.addEventListener('orientationchange', set);
+    window.addEventListener('resize', set);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('orientationchange', set);
+      window.removeEventListener('resize', set);
+    };
+  }, [hideHeader, user?.impersonating]);
+
   return (
     <div className="min-h-screen min-h-[100dvh] bg-neutral-50 text-neutral-900 antialiased">
       {/* Persistent sidebar — hidden on the full-screen game route so it
@@ -98,7 +119,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {!hideHeader && <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white/80 backdrop-blur" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {!hideHeader && <header ref={headerRef} className="sticky top-0 z-20 border-b border-neutral-200 bg-white/80 backdrop-blur" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex w-full items-center justify-between gap-2 px-3 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-2">
             {/* Hamburger — mobile only normally; always shown on game route (no SideNav there) */}

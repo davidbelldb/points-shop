@@ -1531,12 +1531,23 @@ export default function MessagesPage() {
     const el = composerRef.current;
     if (!vv || !el) return;
 
+    // Installed (standalone) iOS PWAs resize the webview itself when the
+    // keyboard appears, so the fixed composer already lands correctly above the
+    // keyboard with NO help from us. Applying a visualViewport transform on top
+    // of that double-lifts it and leaves a gap above the keyboard. So we only
+    // run the lift in Safari (the browser tab), where iOS does NOT resize the
+    // layout viewport and the composer would otherwise hide behind the keyboard.
+    const isStandalone =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+
     let raf = 0;
     // Reposition ONLY the composer to sit above the keyboard. Crucially this
     // does NOT scroll the message list — doing that on every viewport event was
     // yanking the list back to the bottom and made it impossible to scroll up
     // through history while the keyboard was open.
     function apply() {
+      if (isStandalone) { el.style.transform = ''; el.style.willChange = ''; return; }
       const layoutH = document.documentElement.clientHeight;
       // Distance from the layout-viewport bottom (where the composer's bottom:0
       // sits) up to the bottom of the currently-visible region.

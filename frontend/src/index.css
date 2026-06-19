@@ -75,6 +75,25 @@ body { overscroll-behavior: none; }
   .sheet-safe-bottom { padding-bottom: 0; }
 }
 
+/* ── Modal sheet that sits BELOW the app nav bar ─────────────────────────────
+   Full-screen sheets (add event, add story, reel manager) must NOT cover the
+   sticky header — the nav bar stays visible and the sheet fills the area
+   beneath it. --app-header-h is published by App.jsx from the live header
+   height (it already includes the Dynamic-Island safe-area inset). On md+ we
+   also clear the left sidebar. The backdrop therefore only dims the content
+   region, leaving the nav bar fully visible and usable. */
+.sheet-below-nav {
+  position: fixed;
+  top: var(--app-header-h, 0px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+}
+@media (min-width: 768px) {
+  .sheet-below-nav { left: 14rem; } /* matches md:pl-56 sidebar width */
+}
+
 /* ---------- Dark mode ----------
    Toggled by adding `class="dark"` to <html>. We flip the neutrals via
    --color vars; the saturated teal accents (amber-400..600) stay the same

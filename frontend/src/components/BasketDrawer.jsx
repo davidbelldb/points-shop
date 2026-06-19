@@ -157,7 +157,7 @@ export default function BasketDrawer({ open, onClose }) {
         {/* ── Items + options (scrollable) ── */}
         {basket && !isEmpty && (
           <>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            <div data-modal-scroll className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
 
               {/* Items */}
               <ul className="space-y-2">

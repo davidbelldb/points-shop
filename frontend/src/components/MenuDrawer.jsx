@@ -170,7 +170,7 @@ export default function MenuDrawer({ open, onClose }) {
       <aside
         className={`absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <nav className="flex flex-1 flex-col overflow-y-auto p-2 pt-3">
+        <nav data-modal-scroll className="flex flex-1 flex-col overflow-y-auto overscroll-contain p-2 pt-3">
           <div className="space-y-1">
             <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
             <Item to="/store" label="Sneaky Store" icon={<StoreIcon />} onClose={onClose} />

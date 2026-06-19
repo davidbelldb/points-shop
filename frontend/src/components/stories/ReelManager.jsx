@@ -101,9 +101,9 @@ export default function ReelManager({ reelId, onClose, onChanged }) {
   const orderedStories = reel.stories ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/60 p-0 sm:items-center sm:p-4">
-      <div className="flex h-full w-full max-w-md flex-col bg-white sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
-        <header className="sheet-safe-top flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+    <div className="sheet-below-nav flex items-stretch justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+      <div className="flex h-full w-full max-w-md flex-col bg-white shadow-xl sm:h-auto sm:max-h-full sm:rounded-2xl">
+        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <button onClick={onClose} className="text-sm text-neutral-500">Close</button>
           {renaming ? (
             <input
@@ -138,7 +138,7 @@ export default function ReelManager({ reelId, onClose, onChanged }) {
           )}
         </header>
 
-        <div className="sheet-safe-bottom flex-1 space-y-3 overflow-y-auto p-4">
+        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
           {err && <p className="text-xs text-red-600">{err}</p>}
 
           {/* Cover photo manager. Falls back through cover_image_url

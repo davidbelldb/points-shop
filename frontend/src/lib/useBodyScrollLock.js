@@ -1,29 +1,45 @@
 import { useEffect } from 'react';
 
-/* Lock background scrolling while a modal / drawer is open.
+/* Lock background scrolling while a modal / drawer is open — WITHOUT moving the
+   document.
 
-   On iOS, `overflow:hidden` on <body> does NOT stop touch-scrolling the page
-   behind a fixed overlay — the page kept scrolling under the calendar editor,
-   visible as a moving scrollbar. The reliable fix is to pin <body> with
-   position:fixed (preserving the scroll position via a negative top offset) and
-   restore it on close.
+   An earlier version pinned <body> with position:fixed. That reliably stops
+   scrolling, but it also yanks the sticky app header off-screen, which is the
+   opposite of what we want: the nav bar must stay visible above the modal.
 
-   A shared counter supports nested/stacked modals: the lock is applied when the
-   first one opens and only released when the last one closes. */
+   Instead we:
+   1. set overflow:hidden on <html>/<body> (handles desktop wheel + keeps the
+      sticky header exactly where it is), and
+   2. swallow touchmove on iOS — where overflow:hidden alone is ignored — for
+      every touch EXCEPT those inside an element marked [data-modal-scroll]
+      (the modal's own scroll region), so the modal still scrolls internally.
+
+   A shared counter supports stacked modals: locked on the first open, released
+   on the last close. */
 
 let lockCount = 0;
-let savedScrollY = 0;
+
+function isInsideScrollable(target) {
+  let el = target;
+  while (el && el !== document.body) {
+    if (el.nodeType === 1 && el.hasAttribute('data-modal-scroll')) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
+function onTouchMove(e) {
+  // Allow pinch-zoom and any gesture inside a designated scroll region.
+  if (e.touches && e.touches.length > 1) return;
+  if (isInsideScrollable(e.target)) return;
+  e.preventDefault();
+}
 
 function applyLock() {
   if (lockCount === 0) {
-    savedScrollY = window.scrollY || window.pageYOffset || 0;
-    const body = document.body;
-    body.style.position = 'fixed';
-    body.style.top = `-${savedScrollY}px`;
-    body.style.left = '0';
-    body.style.right = '0';
-    body.style.width = '100%';
-    body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
   }
   lockCount += 1;
 }
@@ -31,15 +47,9 @@ function applyLock() {
 function releaseLock() {
   lockCount = Math.max(0, lockCount - 1);
   if (lockCount === 0) {
-    const body = document.body;
-    body.style.position = '';
-    body.style.top = '';
-    body.style.left = '';
-    body.style.right = '';
-    body.style.width = '';
-    body.style.overflow = '';
-    // Restore the scroll position the page had before it was locked.
-    window.scrollTo(0, savedScrollY);
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+    document.removeEventListener('touchmove', onTouchMove, { passive: false });
   }
 }
 
