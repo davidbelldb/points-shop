@@ -103,21 +103,28 @@ export default function App() {
     };
   }, [hideHeader, user?.impersonating]);
 
-  // Keep the fixed nav bar pinned to the TOP OF THE VISIBLE AREA at all times.
-  // On iOS, when the keyboard opens the browser scrolls the *visual* viewport
-  // down to reveal the focused field, which pushes a layout-anchored fixed/
-  // sticky header up out of view. Following visualViewport.offsetTop with a
-  // transform cancels that out so the nav bar never disappears off the top —
-  // whether you're scrolling chat history or tapping into a note field.
+  // Keep the fixed nav bar pinned to the top of the VISIBLE area ONLY while the
+  // keyboard is open. On iOS the keyboard scrolls the visual viewport down to
+  // reveal the focused field, which would push a fixed header out of view;
+  // following visualViewport.offsetTop cancels that out.
+  //
+  // Crucially this is gated to "keyboard open". During ordinary scrolling the
+  // visual viewport's offsetTop also wobbles (momentum / rubber-band), and
+  // reacting to that was making the nav bar drift while scrolling. When the
+  // keyboard is closed we force transform to none so the header is a pure
+  // position:fixed bar that never moves, no matter how you scroll.
   useEffect(() => {
     const vv = window.visualViewport;
     const el = headerRef.current;
     if (!vv || !el) return undefined;
     let raf = 0;
+    let maxH = vv.height;
     const follow = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        el.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+        maxH = Math.max(maxH, vv.height);
+        const keyboardOpen = (maxH - vv.height) > 150;
+        el.style.transform = (keyboardOpen && vv.offsetTop) ? `translateY(${vv.offsetTop}px)` : '';
       });
     };
     vv.addEventListener('resize', follow);

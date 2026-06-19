@@ -1203,14 +1203,20 @@ function AudioPlayer({ src, mine, fallbackDur = 0 }) {
 // ---------------------------------------------------------------------------
 function PhotoLightbox({ src, onClose }) {
   const containerRef = useRef(null);
+  const imgRef = useRef(null);
   const stateRef = useRef({
     scale: 1, tx: 0, ty: 0,
     vx: 0, vy: 0,
     pointers: [],
     lastDist: null, lastMid: null,
     rafId: null,
+    startX: 0, startY: 0, moved: false,   // for tap-away + swipe-to-close
   });
   const [transform, setTransform] = useState({ scale: 1, tx: 0, ty: 0 });
+  // Downward drag offset used for the swipe-down-to-close gesture (only when
+  // the image isn't zoomed). Drives a translate + backdrop fade.
+  const [dragClose, setDragClose] = useState(0);
+  const CLOSE_THRESHOLD = 110;
 
   function applyTransform(s) {
     setTransform({ scale: s.scale, tx: s.tx, ty: s.ty });
@@ -1240,7 +1246,10 @@ function PhotoLightbox({ src, onClose }) {
     const s = stateRef.current;
     if (s.rafId) { cancelAnimationFrame(s.rafId); s.rafId = null; }
     s.pointers = [...s.pointers.filter(p => p.id !== e.pointerId), { id: e.pointerId, x: e.clientX, y: e.clientY }];
-    if (s.pointers.length === 1) { s.lastMid = { x: e.clientX, y: e.clientY }; s.lastDist = null; }
+    if (s.pointers.length === 1) {
+      s.lastMid = { x: e.clientX, y: e.clientY }; s.lastDist = null;
+      s.startX = e.clientX; s.startY = e.clientY; s.moved = false;
+    }
     if (s.pointers.length === 2) {
       const [a, b] = s.pointers;
       s.lastDist = Math.hypot(b.x - a.x, b.y - a.y);
@@ -1258,13 +1267,24 @@ function PhotoLightbox({ src, onClose }) {
     s.pointers[idx] = { id: e.pointerId, x: e.clientX, y: e.clientY };
 
     if (s.pointers.length === 1) {
-      if (s.scale <= 1) return; // don't pan when not zoomed
+      if (s.scale <= 1) {
+        // Not zoomed → a downward drag is a swipe-to-close gesture.
+        const totalX = e.clientX - s.startX;
+        const totalY = e.clientY - s.startY;
+        if (Math.abs(totalX) > 8 || Math.abs(totalY) > 8) s.moved = true;
+        // Only track mostly-vertical, downward movement.
+        if (totalY > 0 && totalY > Math.abs(totalX)) setDragClose(totalY);
+        else setDragClose(0);
+        return;
+      }
       const dx = e.clientX - prev.x;
       const dy = e.clientY - prev.y;
       s.tx += dx; s.ty += dy;
       s.vx = dx; s.vy = dy;
+      s.moved = true;
       clamp(s); applyTransform(s);
     } else if (s.pointers.length === 2) {
+      s.moved = true;
       const [a, b] = s.pointers;
       const dist = Math.hypot(b.x - a.x, b.y - a.y);
       const mid  = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -1287,18 +1307,27 @@ function PhotoLightbox({ src, onClose }) {
     const s = stateRef.current;
     s.pointers = s.pointers.filter(p => p.id !== e.pointerId);
     if (s.pointers.length === 0) {
-      if (s.scale <= 1) { s.tx = 0; s.ty = 0; applyTransform(s); }
-      else startInertia();
+      if (s.scale <= 1) {
+        // Released a swipe-down: close if dragged far enough, else snap back.
+        if (dragClose > CLOSE_THRESHOLD) { onClose(); return; }
+        setDragClose(0);
+        s.tx = 0; s.ty = 0; applyTransform(s);
+      } else {
+        startInertia();
+      }
       s.lastDist = null;
     }
   }
 
-  // Double-tap to zoom in/out
+  // Double-tap to zoom in/out; single tap on the dark area closes.
   const lastTapRef = useRef(0);
   function onTap(e) {
+    const s = stateRef.current;
+    if (s.moved) return; // this was a drag/pinch, not a tap
     const now = Date.now();
-    if (now - lastTapRef.current < 260) {
-      const s = stateRef.current;
+    const isDouble = now - lastTapRef.current < 260;
+    lastTapRef.current = now;
+    if (isDouble) {
       if (s.scale > 1.5) { s.scale = 1; s.tx = 0; s.ty = 0; }
       else {
         const rect = containerRef.current?.getBoundingClientRect();
@@ -1308,16 +1337,26 @@ function PhotoLightbox({ src, onClose }) {
         clamp(s);
       }
       applyTransform(s);
+      return;
     }
-    lastTapRef.current = now;
+    // Single tap while not zoomed: close if it landed OUTSIDE the image (the
+    // dark surround). Taps on the image do nothing (reserved for double-tap).
+    if (s.scale <= 1) {
+      const r = imgRef.current?.getBoundingClientRect();
+      const onImg = r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      if (!onImg) onClose();
+    }
   }
 
   useEffect(() => () => { if (stateRef.current.rafId) cancelAnimationFrame(stateRef.current.rafId); }, []);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{
+        backgroundColor: `rgba(0,0,0,${Math.max(0.4, 0.95 - dragClose / 320)})`,
+        transition: dragClose === 0 ? 'background-color 0.3s ease' : 'none',
+      }}
     >
       <div
         ref={containerRef}
@@ -1329,12 +1368,13 @@ function PhotoLightbox({ src, onClose }) {
         onClick={onTap}
       >
         <img
+          ref={imgRef}
           src={src}
           alt="Photo"
           draggable={false}
           style={{
             maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
-            transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`,
+            transform: `translate(${transform.tx}px, ${transform.ty + (transform.scale <= 1 ? dragClose : 0)}px) scale(${transform.scale})`,
             transformOrigin: 'center center',
             userSelect: 'none', pointerEvents: 'none',
             transition: stateRef.current.pointers.length === 0 && transform.scale <= 1 ? 'transform 0.3s ease' : 'none',
@@ -1344,7 +1384,8 @@ function PhotoLightbox({ src, onClose }) {
       <button
         onClick={onClose}
         aria-label="Close"
-        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
+        className="absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
+        style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
@@ -1500,21 +1541,15 @@ export default function MessagesPage() {
 
   // Composer positioning + keyboard avoidance.
   //
-  // Two failure modes we're fixing for good:
-  //  1. Composer hidden behind the keyboard (Safari) / floated into the middle
-  //     (a previous clientHeight attempt). The fix: when the keyboard is open,
-  //     pin the composer's BOTTOM edge to the bottom of the *visible* viewport
-  //     using ONLY visualViewport geometry (vv.offsetTop + vv.height). That's
-  //     the same coordinate space as the position:fixed composer, so it has
-  //     none of the window.innerHeight / clientHeight ambiguity that broke it.
-  //  2. The list snapping back to the bottom whenever you try to scroll history
-  //     with the keyboard open. The fix: NEVER scrollIntoView on viewport
-  //     resize/scroll — only once when the field is first focused, and on a
-  //     composer-size change only if you were already at the bottom.
-  //
-  // When the keyboard is CLOSED we clear the inline positioning and let the
-  // composer's normal `bottom:0` apply, so it doesn't fight the iOS 26 address
-  // bar collapsing on scroll.
+  // Lift the fixed composer above the on-screen keyboard by the keyboard's
+  // HEIGHT, derived purely from how much the visual viewport SHRANK
+  // (maxVvHeight - vv.height). This deliberately uses NO window.innerHeight /
+  // clientHeight (ambiguous on iOS 26) and NO vv.offsetTop — chasing offsetTop
+  // on every scroll event is what made the composer jitter while scrolling
+  // history. The lift therefore only changes when the keyboard shows/hides
+  // (a `resize`), never during a scroll, so it sits rock-steady and flush to
+  // the top of the keyboard. Scrolling back through history stays free because
+  // we only auto-scroll to the latest message once, when the field is focused.
   useEffect(() => {
     const el = composerRef.current;
     if (!el) return;
@@ -1528,61 +1563,46 @@ export default function MessagesPage() {
       return (window.innerHeight + window.scrollY) >= (doc.scrollHeight - 200);
     }
 
-    function position() {
+    function applyKeyboardInset() {
       if (!vv) return;
       maxVvHeight = Math.max(maxVvHeight, vv.height);
-      // Keyboard considered open once it eats a meaningful chunk of the viewport.
-      const keyboardOpen = (maxVvHeight - vv.height) > 150;
-      if (keyboardOpen) {
-        const h = el.offsetHeight;
-        el.style.top = `${Math.round(vv.offsetTop + vv.height - h)}px`;
-        el.style.bottom = 'auto';
-      } else {
-        el.style.top = '';
-        el.style.bottom = '';
-      }
+      const kb = Math.max(0, Math.round(maxVvHeight - vv.height));
+      // >80px ⇒ the keyboard is up (ignores tiny address-bar wobble). Lift the
+      // composer by exactly that; otherwise fall back to its normal bottom:0.
+      el.style.bottom = kb > 80 ? `${kb}px` : '';
     }
 
-    let raf = 0;
-    function onViewport() {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(position);
-    }
-    function onWindowScroll() { atBottom.current = nearBottom(); }
     function onFocusIn() {
       atBottom.current = true;
-      // Re-measure through the keyboard animation; scroll to the latest message
-      // exactly once (not on every frame — that's what blocked scrolling back).
-      [0, 80, 200, 360].forEach((t, i) => setTimeout(() => {
-        position();
+      // Re-measure through the keyboard's open animation and scroll to the
+      // latest message ONCE (not on every frame — that blocked scrolling back).
+      [0, 120, 280, 450].forEach((t, i) => setTimeout(() => {
+        applyKeyboardInset();
         if (i === 0) bottomRef.current?.scrollIntoView({ block: 'end' });
       }, t));
     }
+    function onWindowScroll() { atBottom.current = nearBottom(); }
 
     // Composer height changes (media tray / reply banner): resize the spacer and
-    // reposition; only re-pin to the bottom if the user was already there.
+    // only re-pin to the bottom if the user was already there.
     const ro = new ResizeObserver(() => {
       setComposerHeight(el.offsetHeight);
-      position();
       if (atBottom.current) {
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
       }
     });
     ro.observe(el);
 
-    vv?.addEventListener('resize', onViewport);
-    vv?.addEventListener('scroll', onViewport);
+    // ONLY reposition on resize (keyboard show/hide) — never on scroll.
+    vv?.addEventListener('resize', applyKeyboardInset);
     el.addEventListener('focusin', onFocusIn);
     window.addEventListener('scroll', onWindowScroll, { passive: true });
-    position();
+    applyKeyboardInset();
     return () => {
-      cancelAnimationFrame(raf);
       ro.disconnect();
-      vv?.removeEventListener('resize', onViewport);
-      vv?.removeEventListener('scroll', onViewport);
+      vv?.removeEventListener('resize', applyKeyboardInset);
       el.removeEventListener('focusin', onFocusIn);
       window.removeEventListener('scroll', onWindowScroll);
-      el.style.top = '';
       el.style.bottom = '';
     };
   }, []);
