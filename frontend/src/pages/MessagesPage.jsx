@@ -1514,73 +1514,33 @@ export default function MessagesPage() {
     return () => ro.disconnect();
   }, []);
 
-  // iOS keyboard avoidance: lift the fixed composer so it sits flush with the
-  // top of the on-screen keyboard. The composer is position:fixed, so it lives
-  // in *layout-viewport* coordinates; the keyboard shrinks the *visual*
-  // viewport. We pin the composer's bottom to the visible bottom edge.
-  //
-  // We deliberately use document.documentElement.clientHeight (the stable
-  // layout-viewport height) rather than window.innerHeight: on iOS 26 Safari
-  // window.innerHeight shifts with the bottom address bar, which made the old
-  // lift under-shoot and leave the field hidden behind the keyboard — while
-  // standalone PWA (where the OS resizes the webview) happened to work. Using
-  // the visual-viewport geometry directly fixes both. A GPU transform repaints
-  // more reliably than animating `bottom` on iOS.
+  // iOS keyboard avoidance: when the visual viewport shrinks (keyboard opens),
+  // lift the composer to sit flush with the top of the keyboard.
+  // NOTE: This is the original, known-good implementation. A previous attempt to
+  // "improve" it (transform + clientHeight) over-lifted the composer into the
+  // middle of the screen on iOS 26 — reverted to exactly what worked before.
   useEffect(() => {
     const vv = window.visualViewport;
+    if (!vv) return;
     const el = composerRef.current;
-    if (!vv || !el) return;
+    if (!el) return;
 
-    // Installed (standalone) iOS PWAs resize the webview itself when the
-    // keyboard appears, so the fixed composer already lands correctly above the
-    // keyboard with NO help from us. Applying a visualViewport transform on top
-    // of that double-lifts it and leaves a gap above the keyboard. So we only
-    // run the lift in Safari (the browser tab), where iOS does NOT resize the
-    // layout viewport and the composer would otherwise hide behind the keyboard.
-    const isStandalone =
-      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-      window.navigator.standalone === true;
-
-    let raf = 0;
-    // Reposition ONLY the composer to sit above the keyboard. Crucially this
-    // does NOT scroll the message list — doing that on every viewport event was
-    // yanking the list back to the bottom and made it impossible to scroll up
-    // through history while the keyboard was open.
-    function apply() {
-      if (isStandalone) { el.style.transform = ''; el.style.willChange = ''; return; }
-      const layoutH = document.documentElement.clientHeight;
-      // Distance from the layout-viewport bottom (where the composer's bottom:0
-      // sits) up to the bottom of the currently-visible region.
-      const lift = Math.max(0, Math.round(layoutH - (vv.offsetTop + vv.height)));
-      el.style.transform = lift ? `translate3d(0, ${-lift}px, 0)` : '';
-      el.style.willChange = lift ? 'transform' : '';
-    }
-    function onViewportChange() {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(apply);
-    }
-    // When the field is FIRST focused (keyboard opening), bring the latest
-    // message into view once. The keyboard animates over ~250ms and iOS reports
-    // intermediate viewport sizes, so re-measure a few times to settle — but
-    // only reposition the composer, never re-scroll, after that initial nudge.
-    function onFocusIn() {
-      [0, 60, 160, 320].forEach((t, i) => setTimeout(() => {
-        apply();
-        if (i === 0) bottomRef.current?.scrollIntoView({ block: 'end' });
-      }, t));
+    function update() {
+      // How far the bottom of the visual viewport is from the bottom of the layout viewport
+      const offset = window.innerHeight - vv.height - vv.offsetTop;
+      el.style.bottom = `${Math.max(0, offset)}px`;
+      // Scroll to keep last message visible
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
+      });
     }
 
-    vv.addEventListener('resize', onViewportChange);
-    vv.addEventListener('scroll', onViewportChange);
-    el.addEventListener('focusin', onFocusIn);
-    apply();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
     return () => {
-      cancelAnimationFrame(raf);
-      vv.removeEventListener('resize', onViewportChange);
-      vv.removeEventListener('scroll', onViewportChange);
-      el.removeEventListener('focusin', onFocusIn);
-      el.style.transform = '';
-      el.style.willChange = '';
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      el.style.bottom = '';
     };
   }, []);
 
@@ -2088,7 +2048,7 @@ export default function MessagesPage() {
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
-      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur" style={{ pointerEvents: 'none', paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
+      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]" style={{ pointerEvents: 'none' }}>
         <div className="px-5 lg:px-8" style={{ pointerEvents: 'auto' }}>
           {/* Media tray — slides in above the input row */}
           {showMedia && (
