@@ -95,8 +95,8 @@ export default function BasketDrawer({ open, onClose }) {
 
   return (
     <div
-      className={`fixed inset-0 md:left-56 z-[45] ${open ? '' : 'pointer-events-none'}`}
-      style={{ top: 'var(--app-header-h, calc(57px + env(safe-area-inset-top)))' }}
+      className={`fixed inset-x-0 md:left-56 z-[45] ${open ? '' : 'pointer-events-none'}`}
+      style={{ top: 'var(--app-header-h)', height: 'calc(100dvh - var(--app-header-h))' }}
       aria-hidden={!open}
     >
       {/* Backdrop */}

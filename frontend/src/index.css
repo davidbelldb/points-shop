@@ -33,7 +33,12 @@
   --color-amber-900: #106655;
 }
 
-:root { --font-pixel: 'Press Start 2P', monospace; }
+:root {
+  --font-pixel: 'Press Start 2P', monospace;
+  /* Live header height is published by App.jsx; this is the pre-measure default
+     (header content ≈57px + the Dynamic-Island safe-area inset it reserves). */
+  --app-header-h: calc(57px + env(safe-area-inset-top));
+}
 
 /* ── iOS PWA full-height fix ─────────────────────────────────────────────────
    overflow-x: hidden must NOT be on html — it turns html into a scroll
@@ -84,10 +89,14 @@ body { overscroll-behavior: none; }
    region, leaving the nav bar fully visible and usable. */
 .sheet-below-nav {
   position: fixed;
-  top: var(--app-header-h, 0px);
+  top: var(--app-header-h);
   left: 0;
   right: 0;
-  bottom: 0;
+  /* Size by dvh (like the home page) rather than bottom:0. While a modal is
+     open the page is scroll-locked, which on iOS shrinks the viewport that a
+     `bottom:0` fixed element resolves against — leaving it short of the real
+     bottom. `dvh` is measured against the actual viewport, so it fills. */
+  height: calc(100dvh - var(--app-header-h));
   z-index: 40;            /* below drawers (45) and the nav bar (50) */
   /* The backdrop and panel must never pan/zoom. The inner scroll region opts
      back into vertical panning via `touch-pan-y`. This kills the sideways drag
