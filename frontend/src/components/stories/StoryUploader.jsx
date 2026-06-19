@@ -195,7 +195,7 @@ export default function StoryUploader({ onClose, onPosted }) {
           </button>
         </header>
 
-        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y p-4">
           {!file ? (
             <label className="flex aspect-[9/12] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 text-amber-700">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

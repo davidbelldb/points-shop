@@ -88,7 +88,11 @@ body { overscroll-behavior: none; }
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 40;
+  z-index: 40;            /* below drawers (45) and the nav bar (50) */
+  /* The backdrop and panel must never pan/zoom. The inner scroll region opts
+     back into vertical panning via `touch-pan-y`. This kills the sideways drag
+     where the form could be swiped left/right. */
+  touch-action: none;
 }
 @media (min-width: 768px) {
   .sheet-below-nav { left: 14rem; } /* matches md:pl-56 sidebar width */

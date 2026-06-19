@@ -1498,48 +1498,91 @@ export default function MessagesPage() {
     }
   }, [data.messages.length]);
 
-  // Track composer bar height so the spacer always pushes content clear of it.
-  // ResizeObserver fires whenever the tray opens/closes or reply banner appears.
+  // Composer positioning + keyboard avoidance.
+  //
+  // Two failure modes we're fixing for good:
+  //  1. Composer hidden behind the keyboard (Safari) / floated into the middle
+  //     (a previous clientHeight attempt). The fix: when the keyboard is open,
+  //     pin the composer's BOTTOM edge to the bottom of the *visible* viewport
+  //     using ONLY visualViewport geometry (vv.offsetTop + vv.height). That's
+  //     the same coordinate space as the position:fixed composer, so it has
+  //     none of the window.innerHeight / clientHeight ambiguity that broke it.
+  //  2. The list snapping back to the bottom whenever you try to scroll history
+  //     with the keyboard open. The fix: NEVER scrollIntoView on viewport
+  //     resize/scroll — only once when the field is first focused, and on a
+  //     composer-size change only if you were already at the bottom.
+  //
+  // When the keyboard is CLOSED we clear the inline positioning and let the
+  // composer's normal `bottom:0` apply, so it doesn't fight the iOS 26 address
+  // bar collapsing on scroll.
   useEffect(() => {
     const el = composerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      setComposerHeight(el.offsetHeight);
-      // Re-scroll so the last message stays above the (now taller/shorter) bar.
-      requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ block: 'end' });
-      });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // iOS keyboard avoidance: when the visual viewport shrinks (keyboard opens),
-  // lift the composer to sit flush with the top of the keyboard.
-  // NOTE: This is the original, known-good implementation. A previous attempt to
-  // "improve" it (transform + clientHeight) over-lifted the composer into the
-  // middle of the screen on iOS 26 — reverted to exactly what worked before.
-  useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
-    const el = composerRef.current;
-    if (!el) return;
 
-    function update() {
-      // How far the bottom of the visual viewport is from the bottom of the layout viewport
-      const offset = window.innerHeight - vv.height - vv.offsetTop;
-      el.style.bottom = `${Math.max(0, offset)}px`;
-      // Scroll to keep last message visible
-      requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
-      });
+    let maxVvHeight = vv ? vv.height : 0;
+    const atBottom = { current: true };
+
+    function nearBottom() {
+      const doc = document.documentElement;
+      return (window.innerHeight + window.scrollY) >= (doc.scrollHeight - 200);
     }
 
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
+    function position() {
+      if (!vv) return;
+      maxVvHeight = Math.max(maxVvHeight, vv.height);
+      // Keyboard considered open once it eats a meaningful chunk of the viewport.
+      const keyboardOpen = (maxVvHeight - vv.height) > 150;
+      if (keyboardOpen) {
+        const h = el.offsetHeight;
+        el.style.top = `${Math.round(vv.offsetTop + vv.height - h)}px`;
+        el.style.bottom = 'auto';
+      } else {
+        el.style.top = '';
+        el.style.bottom = '';
+      }
+    }
+
+    let raf = 0;
+    function onViewport() {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(position);
+    }
+    function onWindowScroll() { atBottom.current = nearBottom(); }
+    function onFocusIn() {
+      atBottom.current = true;
+      // Re-measure through the keyboard animation; scroll to the latest message
+      // exactly once (not on every frame — that's what blocked scrolling back).
+      [0, 80, 200, 360].forEach((t, i) => setTimeout(() => {
+        position();
+        if (i === 0) bottomRef.current?.scrollIntoView({ block: 'end' });
+      }, t));
+    }
+
+    // Composer height changes (media tray / reply banner): resize the spacer and
+    // reposition; only re-pin to the bottom if the user was already there.
+    const ro = new ResizeObserver(() => {
+      setComposerHeight(el.offsetHeight);
+      position();
+      if (atBottom.current) {
+        requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
+      }
+    });
+    ro.observe(el);
+
+    vv?.addEventListener('resize', onViewport);
+    vv?.addEventListener('scroll', onViewport);
+    el.addEventListener('focusin', onFocusIn);
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+    position();
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      vv?.removeEventListener('resize', onViewport);
+      vv?.removeEventListener('scroll', onViewport);
+      el.removeEventListener('focusin', onFocusIn);
+      window.removeEventListener('scroll', onWindowScroll);
+      el.style.top = '';
       el.style.bottom = '';
     };
   }, []);

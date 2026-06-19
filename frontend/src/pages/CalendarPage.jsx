@@ -582,7 +582,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
           </button>
         </header>
 
-        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y p-4">
           <div>
             <label className="text-xs font-semibold text-neutral-500">Title</label>
             <input

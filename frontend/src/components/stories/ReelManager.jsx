@@ -138,7 +138,7 @@ export default function ReelManager({ reelId, onClose, onChanged }) {
           )}
         </header>
 
-        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
+        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y p-4">
           {err && <p className="text-xs text-red-600">{err}</p>}
 
           {/* Cover photo manager. Falls back through cover_image_url
