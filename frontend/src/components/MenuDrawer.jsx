@@ -159,8 +159,8 @@ export default function MenuDrawer({ open, onClose }) {
   // Header is `py-3` (24px) around a 32px content row + 1px border ≈ 57px.
   return (
     <div
-      className={`fixed left-0 right-0 z-[45] ${open ? '' : 'pointer-events-none'}`}
-      style={{ top: 'var(--app-header-h)', height: 'calc(100lvh - var(--app-header-h))' }}
+      className={`fixed left-0 right-0 bottom-0 z-[45] ${open ? '' : 'pointer-events-none'}`}
+      style={{ top: 'var(--app-header-h)' }}
       aria-hidden={!open}
     >
       <div

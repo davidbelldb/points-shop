@@ -92,12 +92,8 @@ body { overscroll-behavior: none; }
   top: var(--app-header-h);
   left: 0;
   right: 0;
-  /* Size by lvh (the LARGE / stable viewport = full screen) rather than
-     bottom:0 or dvh. bottom:0 stops short while scroll-locked; dvh is dynamic
-     and only fills the screen during the over-scroll rubber-band, leaving a
-     gap at rest. lvh is the maximum viewport and never fluctuates, so the
-     sheet fills to the true bottom by default. */
-  height: calc(100lvh - var(--app-header-h));
+  bottom: 0;              /* simple + responsive; the scroll-lock no longer
+                            shrinks the viewport, so this reaches the true bottom */
   z-index: 40;            /* below drawers (45) and the nav bar (50) */
   /* The backdrop and panel must never pan/zoom. The inner scroll region opts
      back into vertical panning via `touch-pan-y`. This kills the sideways drag
