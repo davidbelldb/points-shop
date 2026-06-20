@@ -88,16 +88,24 @@ export default function App() {
   // orientation / header changes.
   useEffect(() => {
     const root = document.documentElement;
+    // --app-vh = the REAL viewport height the pages fill (window.innerHeight).
+    // CSS viewport units (svh/dvh/lvh) didn't match the page height in the
+    // installed PWA; measuring it directly does, so the drawers/sheets can be
+    // sized to exactly the same height as every page.
+    const setVh = () => root.style.setProperty('--app-vh', `${window.innerHeight}px`);
     const el = headerRef.current;
-    if (!el) { root.style.setProperty('--app-header-h', '0px'); return undefined; }
-    const set = () => root.style.setProperty('--app-header-h', `${el.offsetHeight}px`);
+    const set = () => {
+      setVh();
+      if (el) root.style.setProperty('--app-header-h', `${el.offsetHeight}px`);
+      else root.style.setProperty('--app-header-h', '0px');
+    };
     set();
-    const ro = new ResizeObserver(set);
-    ro.observe(el);
+    const ro = el ? new ResizeObserver(set) : null;
+    if (ro && el) ro.observe(el);
     window.addEventListener('orientationchange', set);
     window.addEventListener('resize', set);
     return () => {
-      ro.disconnect();
+      ro?.disconnect();
       window.removeEventListener('orientationchange', set);
       window.removeEventListener('resize', set);
     };

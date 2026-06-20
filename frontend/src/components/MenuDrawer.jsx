@@ -160,10 +160,10 @@ export default function MenuDrawer({ open, onClose }) {
   return (
     <div
       className={`fixed left-0 right-0 z-[45] ${open ? '' : 'pointer-events-none'}`}
-      // Match the height of every page: pages floor at 100svh (the body's
-      // min-height). svh is the stable "visible area" unit, so the drawer fills
-      // exactly the visible page and the footer anchors to the visible bottom.
-      style={{ top: 'var(--app-header-h)', height: 'calc(100svh - var(--app-header-h))' }}
+      // Match every page's height exactly: --app-vh is the real measured
+      // window.innerHeight (set in App.jsx), which is what the pages fill. CSS
+      // viewport units didn't match in the installed PWA; the measured value does.
+      style={{ top: 'var(--app-header-h)', height: 'calc(var(--app-vh, 100svh) - var(--app-header-h))' }}
       aria-hidden={!open}
     >
       <div
