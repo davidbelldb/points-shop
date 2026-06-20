@@ -43,6 +43,9 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   // Floating quick-reaction emojis, revealed by swiping up over the story
   // and hidden whenever the reply input takes focus.
   const [reactionsVisible, setReactionsVisible] = useState(false);
+  // Replies threaded to the current story — floated Instagram-style over the
+  // media (responder's avatar + their message), above the caption.
+  const [replies, setReplies] = useState([]);
   // Pause sources combine — paused if any of: pressing, reply input focused,
   // highlight reel modal open, or swipe-up emoji tray visible.
   const [pausedByPress, setPausedByPress] = useState(false);
@@ -91,6 +94,36 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     if (!story?.id || isMine) return;
     api.markStoryViewed(story.id).catch(() => {});
   }, [story?.id, isMine]);
+
+  // Pull the replies threaded to this story whenever it changes so they can
+  // float over the media. Fire-and-forget; failures just leave it empty.
+  useEffect(() => {
+    if (!story?.id) { setReplies([]); return undefined; }
+    let cancelled = false;
+    setReplies([]);
+    api.listStoryReplies(story.id)
+      .then((r) => { if (!cancelled) setReplies(Array.isArray(r) ? r : []); })
+      .catch(() => { if (!cancelled) setReplies([]); });
+    return () => { cancelled = true; };
+  }, [story?.id]);
+
+  // Optimistically drop a just-sent reply into the floating stack so the
+  // sender sees their own bubble immediately, without re-fetching.
+  function pushOwnReply(body) {
+    const trimmed = (body ?? '').trim();
+    if (!trimmed) return;
+    setReplies((prev) => [
+      ...prev,
+      {
+        id: `local-${Date.now()}`,
+        body: trimmed,
+        sender_id: user?.id ?? null,
+        sender_name: user?.name ?? 'You',
+        sender_photo: user?.photo_url ?? null,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+  }
 
   // Native touchend listener for the swipe-up gesture. Swiping up over the
   // story reveals the floating quick-reaction emojis on top of the media.
@@ -276,6 +309,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     setSending(true);
     try {
       await api.sendMessage(`${trimmed}`, story.id);
+      pushOwnReply(trimmed);
       setReply('');
       setPausedByReply(false);
       // Short reactions (single emoji) get the IG-style burst; longer text
@@ -369,6 +403,11 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
         @keyframes storyReactionBob {
           0%, 100% { transform: translateY(0); }
           50%      { transform: translateY(-8px); }
+        }
+        @keyframes storyReplyIn {
+          0%   { opacity: 0; transform: translateY(14px) scale(0.92); }
+          60%  { opacity: 1; transform: translateY(-2px) scale(1.02); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
 
@@ -490,6 +529,45 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             decoding="async"
             fetchPriority="high"
           />
+        )}
+
+        {/* Floating reply bubbles — Instagram-style. Each shows the
+            responder's profile photo + their message, stacked oldest-to-
+            newest and sitting ABOVE the caption/description. Purely visual
+            (pointer-events-none) so taps still advance the story. Capped to
+            the most recent few to keep the media readable. */}
+        {replies.length > 0 && (
+          <div
+            className="pointer-events-none absolute inset-x-0 z-20 flex flex-col items-start gap-1.5 px-4"
+            style={{ bottom: story.caption ? '4.25rem' : '1rem' }}
+          >
+            {replies.slice(-4).map((r) => (
+              <div
+                key={r.id}
+                className="flex max-w-[80%] items-end gap-2"
+                style={{ animation: 'storyReplyIn 320ms cubic-bezier(0.34,1.56,0.64,1) backwards' }}
+              >
+                {r.sender_photo ? (
+                  <img
+                    src={r.sender_photo}
+                    alt=""
+                    width={28}
+                    height={28}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-7 w-7 shrink-0 rounded-full object-cover ring-2 ring-white/70"
+                  />
+                ) : (
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/25 text-xs font-semibold uppercase text-white ring-2 ring-white/70">
+                    {r.sender_name?.charAt(0) ?? '?'}
+                  </span>
+                )}
+                <span className="inline-block break-words rounded-2xl rounded-bl-sm bg-black/60 px-3 py-1.5 text-sm font-medium text-white shadow-lg backdrop-blur-sm">
+                  {r.body}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
 
         {story.caption && (

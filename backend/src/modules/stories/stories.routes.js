@@ -1,5 +1,6 @@
 import {
   listActive, listArchive, getStory, createStory, deleteStory, markStoryViewed,
+  listStoryReplies,
 } from './stories.repo.js';
 import {
   listReels, getReel, getReelOwner, createReel, updateReel, deleteReel,
@@ -34,6 +35,12 @@ export default async function storiesRoutes(fastify) {
     const s = await getStory(req.params.id, accountId);
     if (!s) return reply.code(404).send({ error: 'not found' });
     return s;
+  });
+
+  /* Replies threaded to a story — float Instagram-style over the media in
+     the viewer. Both participants can read them (it's a two-person app). */
+  fastify.get('/api/stories/:id/replies', async (req) => {
+    return listStoryReplies(req.params.id);
   });
 
   /* Mark a story as seen by the current viewer. Idempotent + author-safe. */

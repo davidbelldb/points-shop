@@ -81,6 +81,30 @@ export async function getStory(id, callerId = null) {
   return rows[0] ?? null;
 }
 
+/* Replies to a story — chat messages threaded to it via reply_to_story_id.
+   Used by the viewer to float Instagram-style reply bubbles over the media.
+   Returns each reply with the responder's name + profile photo, oldest first
+   so the UI can stack newest at the bottom. Slider stickers also post a
+   chat reply, so we skip rows that are pure slider responses (no real text)
+   to avoid floating cryptic "42%" bubbles over the story. */
+export async function listStoryReplies(storyId, limit = 30) {
+  if (!storyId) return [];
+  const { rows } = await query(
+    `SELECT m.id, m.body, m.created_at, m.sender_id,
+            a.name      AS sender_name,
+            a.photo_url AS sender_photo
+       FROM chat_messages m
+       JOIN accounts a ON a.id = m.sender_id
+      WHERE m.reply_to_story_id = $1
+        AND m.slider_response IS NULL
+        AND COALESCE(TRIM(m.body), '') <> ''
+      ORDER BY m.created_at ASC
+      LIMIT $2`,
+    [storyId, limit],
+  );
+  return rows;
+}
+
 /* Record that `viewerId` has viewed `storyId`. Idempotent — re-opening
    a story doesn't bump the timestamp. Authors viewing their own story
    are a no-op (the UI doesn't count author self-views as a "seen"). */

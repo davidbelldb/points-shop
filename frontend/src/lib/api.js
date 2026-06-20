@@ -131,6 +131,7 @@ export const api = {
   createStory: (data) => request('/stories', { method: 'POST', body: JSON.stringify(data) }),
   deleteStory: (id) => request(`/stories/${id}`, { method: 'DELETE' }),
   markStoryViewed: (id) => request(`/stories/${id}/view`, { method: 'POST' }),
+  listStoryReplies: (id) => request(`/stories/${id}/replies`),
   // Default scope is 'mine' — only the caller's own reels.
   // Pass { scope: 'all' } for the shared home-strip view.
   listReels: ({ scope } = {}) => request(`/reels${scope === 'all' ? '?scope=all' : ''}`),
