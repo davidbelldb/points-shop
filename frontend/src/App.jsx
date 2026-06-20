@@ -88,11 +88,24 @@ export default function App() {
   // orientation / header changes.
   useEffect(() => {
     const root = document.documentElement;
-    // --app-vh = the REAL viewport height the pages fill (window.innerHeight).
-    // CSS viewport units (svh/dvh/lvh) didn't match the page height in the
-    // installed PWA; measuring it directly does, so the drawers/sheets can be
-    // sized to exactly the same height as every page.
-    const setVh = () => root.style.setProperty('--app-vh', `${window.innerHeight}px`);
+    // --app-vh = the height the PAGES actually fill. The pages stretch to
+    // `-webkit-fill-available`, which on iOS (esp. the installed PWA) is TALLER
+    // than window.innerHeight and than 100svh/dvh/lvh. We measure that exact
+    // value with a throwaway probe so the drawers/sheets can be the same height
+    // as every page — no guessing at viewport units.
+    const setVh = () => {
+      let h = window.innerHeight;
+      try {
+        const probe = document.createElement('div');
+        probe.style.cssText =
+          'position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;height:-webkit-fill-available';
+        document.body.appendChild(probe);
+        const measured = probe.getBoundingClientRect().height;
+        document.body.removeChild(probe);
+        if (measured > 0) h = measured;
+      } catch { /* ignore — fall back to innerHeight */ }
+      root.style.setProperty('--app-vh', `${Math.round(h)}px`);
+    };
     const el = headerRef.current;
     const set = () => {
       setVh();
