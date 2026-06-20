@@ -92,8 +92,9 @@ body { overscroll-behavior: none; }
   top: var(--app-header-h);
   left: 0;
   right: 0;
-  bottom: 0;              /* simple + responsive; the scroll-lock no longer
-                            shrinks the viewport, so this reaches the true bottom */
+  /* Match the page height (pages floor at 100svh, the body min-height). svh is
+     the stable "visible area" unit, so the sheet fills the visible page. */
+  height: calc(100svh - var(--app-header-h));
   z-index: 40;            /* below drawers (45) and the nav bar (50) */
   /* The backdrop and panel must never pan/zoom. The inner scroll region opts
      back into vertical panning via `touch-pan-y`. This kills the sideways drag
