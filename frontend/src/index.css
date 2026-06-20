@@ -92,11 +92,12 @@ body { overscroll-behavior: none; }
   top: var(--app-header-h);
   left: 0;
   right: 0;
-  /* Size by dvh (like the home page) rather than bottom:0. While a modal is
-     open the page is scroll-locked, which on iOS shrinks the viewport that a
-     `bottom:0` fixed element resolves against — leaving it short of the real
-     bottom. `dvh` is measured against the actual viewport, so it fills. */
-  height: calc(100dvh - var(--app-header-h));
+  /* Size by lvh (the LARGE / stable viewport = full screen) rather than
+     bottom:0 or dvh. bottom:0 stops short while scroll-locked; dvh is dynamic
+     and only fills the screen during the over-scroll rubber-band, leaving a
+     gap at rest. lvh is the maximum viewport and never fluctuates, so the
+     sheet fills to the true bottom by default. */
+  height: calc(100lvh - var(--app-header-h));
   z-index: 40;            /* below drawers (45) and the nav bar (50) */
   /* The backdrop and panel must never pan/zoom. The inner scroll region opts
      back into vertical panning via `touch-pan-y`. This kills the sideways drag
