@@ -1555,6 +1555,15 @@ export default function MessagesPage() {
     if (!el) return;
     const vv = window.visualViewport;
 
+    // Installed (standalone) iOS PWAs resize the webview themselves when the
+    // keyboard appears, so the fixed composer already lands above the keyboard.
+    // Lifting it ourselves on top of that double-lifts it (it flew up behind
+    // the nav bar). So in standalone we do NOTHING to the position; only Safari
+    // (where the layout viewport does NOT resize) gets the JS lift.
+    const isStandalone =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+
     let maxVvHeight = vv ? vv.height : 0;
     const atBottom = { current: true };
 
@@ -1564,7 +1573,7 @@ export default function MessagesPage() {
     }
 
     function applyKeyboardInset() {
-      if (!vv) return;
+      if (!vv || isStandalone) { el.style.bottom = ''; return; }
       maxVvHeight = Math.max(maxVvHeight, vv.height);
       const kb = Math.max(0, Math.round(maxVvHeight - vv.height));
       // >80px ⇒ the keyboard is up (ignores tiny address-bar wobble). Lift the

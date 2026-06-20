@@ -37,7 +37,11 @@ function onTouchMove(e) {
 
 function applyLock() {
   if (lockCount === 0) {
-    document.documentElement.style.overflow = 'hidden';
+    // IMPORTANT: do NOT set overflow:hidden on <html>. On iOS WebKit that
+    // shrinks the viewport that fixed / 100dvh elements resolve against, which
+    // left a grey strip below the drawers (they stopped short of the real
+    // bottom). The non-passive touchmove blocker is what actually locks iOS
+    // scrolling; body overflow:hidden covers desktop wheel scrolling.
     document.body.style.overflow = 'hidden';
     document.addEventListener('touchmove', onTouchMove, { passive: false });
   }
@@ -47,7 +51,6 @@ function applyLock() {
 function releaseLock() {
   lockCount = Math.max(0, lockCount - 1);
   if (lockCount === 0) {
-    document.documentElement.style.overflow = '';
     document.body.style.overflow = '';
     document.removeEventListener('touchmove', onTouchMove, { passive: false });
   }

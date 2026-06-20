@@ -117,6 +117,13 @@ export default function App() {
     const vv = window.visualViewport;
     const el = headerRef.current;
     if (!vv || !el) return undefined;
+    // In a standalone PWA the webview resizes for the keyboard, so the fixed
+    // header already stays put — running the follow transform there just made
+    // it drift. Only Safari (non-standalone) needs it.
+    const isStandalone =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+    if (isStandalone) { el.style.transform = ''; return undefined; }
     let raf = 0;
     let maxH = vv.height;
     const follow = () => {
