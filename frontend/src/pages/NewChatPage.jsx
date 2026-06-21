@@ -52,7 +52,7 @@ export default function NewChatPage() {
 
   // The perched crow uses the final landing frame's sprite.
   const landFrames = scrolls.config.land || [];
-  const landCrowFile = landFrames[landFrames.length - 1]?.sprite_file || 'crow_land_11.png';
+  const landCrowFile = landFrames[landFrames.length - 1]?.sprite_file || 'crow_land_10.png';
 
   // Send crow is rendered 55% bigger than the base size. Memoise the frame
   // slices so the animation layer doesn't restart on every re-render.
@@ -60,17 +60,6 @@ export default function NewChatPage() {
   const introFrames = useMemo(() => (scrolls.config.send || []).slice(0, 3), [scrolls.config.send]);
   const flyoffFrames = useMemo(() => (scrolls.config.send || []).slice(2), [scrolls.config.send]);
 
-  // Tapping the perched crow opens the newest unread scroll (which marks it read,
-  // removing it — so the perch clears once nothing is unread).
-  function openNewestScroll() {
-    const newest = scrolls.scrolls[0];
-    if (newest) {
-      setReaderScroll(newest);
-      if (!newest.read_at) scrolls.markRead(newest.id);
-    } else {
-      setListOpen(true);
-    }
-  }
 
   return (
     <>
@@ -137,7 +126,8 @@ export default function NewChatPage() {
             crowFile={landCrowFile}
             side="right"
             showCrow={!landFlight}
-            onTap={openNewestScroll}
+            count={scrolls.unread}
+            onTap={() => setListOpen(true)}
           />
           {landFlight && (
             <CrowAnimationLayer
@@ -159,22 +149,7 @@ export default function NewChatPage() {
               Private sandbox — only you can see this. Nothing here touches your real chat.
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setListOpen(true)}
-              className="relative text-sm font-medium text-amber-700"
-              title="Scrolls"
-            >
-              Scrolls
-              {scrolls.unread > 0 && (
-                <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
-                  {scrolls.unread}
-                </span>
-              )}
-            </button>
-            <Link to="/messages" className="text-sm text-neutral-500">Back</Link>
-          </div>
+          <Link to="/messages" className="shrink-0 text-sm text-neutral-500">Back</Link>
         </header>
 
         <div className={`rounded-2xl border p-4 ${card}`}>

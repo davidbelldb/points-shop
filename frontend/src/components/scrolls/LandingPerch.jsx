@@ -16,6 +16,7 @@ export default function LandingPerch({
   side = 'right',
   anchorY = 58,
   showCrow = true,
+  count = 0,
   onTap,
   perchX = 50,
   perchBottom = 56,
@@ -79,6 +80,20 @@ export default function LandingPerch({
               />
             ) : (
               <span style={{ fontSize: '6vmin', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.4))' }}>🐦‍⬛</span>
+            )}
+            {count > 0 && (
+              <span
+                style={{
+                  position: 'absolute', top: '-8%', right: '-8%',
+                  minWidth: '5vmin', height: '5vmin', padding: '0 1vmin',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: '999px', background: '#dc2626', color: '#fff',
+                  fontSize: '3vmin', fontWeight: 700, lineHeight: 1,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                }}
+              >
+                {count}
+              </span>
             )}
           </button>
         )}
