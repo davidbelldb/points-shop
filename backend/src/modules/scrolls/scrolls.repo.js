@@ -23,6 +23,7 @@ export async function getFrames(layer = null) {
 
 // Admin: patch the single settings row. Only whitelisted columns.
 const SETTINGS_COLS = new Set([
+  'enabled',
   'frame_rate_fps', 'crow_speed_kmh', 'speed_multiplier', 'min_flight_seconds',
   'max_flight_seconds', 'max_chars', 'scroll_font', 'scroll_bg_file',
   'seal_open_file', 'seal_stamped_file', 'send_branch_file', 'land_branch_file',

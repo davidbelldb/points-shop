@@ -301,6 +301,30 @@ function FramesEditor({ layer, initial, fps, branch, onSaved }) {
   );
 }
 
+function EnabledToggle({ enabled, onSaved }) {
+  const [saving, setSaving] = useState(false);
+  async function toggle() {
+    setSaving(true);
+    try { await api.scrolls.saveSettings({ enabled: !enabled }); onSaved?.(); }
+    finally { setSaving(false); }
+  }
+  return (
+    <div className={`flex items-center justify-between rounded-xl border p-3 ${enabled ? 'border-emerald-300 bg-emerald-50' : 'border-neutral-200 bg-neutral-50'}`}>
+      <div>
+        <p className="text-sm font-semibold">Scrolls live in chat {enabled ? '— ON' : '— off'}</p>
+        <p className="text-xs text-neutral-500">When off, the whole feature is hidden from /messages for everyone.</p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={saving}
+        className={`rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40 ${enabled ? 'bg-emerald-600' : 'bg-neutral-500'}`}
+      >
+        {saving ? '…' : enabled ? 'Turn off' : 'Turn on'}
+      </button>
+    </div>
+  );
+}
+
 export default function AdminScrollsSection() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -320,6 +344,7 @@ export default function AdminScrollsSection() {
 
   return (
     <div className="space-y-4">
+      <EnabledToggle enabled={!!config.settings?.enabled} onSaved={load} />
       <p className="text-xs text-neutral-500">
         Coordinates are on a 0–100 stage (0 = left/top, 100 = right/bottom), responsive across devices.
         Send flies low-left → high-right; landing comes high-right → low-right. Drop sprites in

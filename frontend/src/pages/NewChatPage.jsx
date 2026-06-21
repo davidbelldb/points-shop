@@ -98,6 +98,10 @@ export default function NewChatPage() {
       {/* Intro: crow flies in and perches on the send branch (frames 00–02),
           pausing on 02; tapping it opens the compose modal. The perch stays
           (behind the modal) so the fly-off can continue seamlessly from 02. */}
+      {/* Tap anywhere but the crow cancels the send. */}
+      {(sendStage === 'intro' || sendStage === 'perched') && !composeOpen && (
+        <div onClick={() => setSendStage('idle')} style={{ position: 'fixed', inset: 0, zIndex: 34 }} />
+      )}
       {(sendStage === 'intro' || sendStage === 'perched') && (
         <CrowAnimationLayer
           frames={introFrames}

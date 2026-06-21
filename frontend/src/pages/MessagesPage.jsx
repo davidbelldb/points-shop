@@ -1951,6 +1951,7 @@ export default function MessagesPage() {
 
   // Scroll config-derived values.
   const scrollSettings = scrolls.config.settings || {};
+  const scrollsEnabled = !!scrollSettings.enabled; // admin launch toggle
   const scrollFps = scrollSettings.frame_rate_fps || 12;
   const scrollLandFrames = scrolls.config.land || [];
   const scrollLandLast = scrollLandFrames[scrollLandFrames.length - 1];
@@ -1961,6 +1962,8 @@ export default function MessagesPage() {
 
   return (
     <>
+      {scrollsEnabled && (
+      <>
       {/* ── Scrolls (raven messages) overlays ── */}
       {scrollComposeOpen && (
         <ScrollComposeModal
@@ -1985,6 +1988,10 @@ export default function MessagesPage() {
           scale={scrollSettings.send_branch_scale} rotation={scrollSettings.send_branch_rotation}
           opacity={scrollSettings.send_branch_opacity}
         />
+      )}
+      {/* Tap anywhere but the crow cancels the send. */}
+      {(sendStage === 'intro' || sendStage === 'perched') && !scrollComposeOpen && (
+        <div onClick={() => setSendStage('idle')} style={{ position: 'fixed', inset: 0, zIndex: 34 }} />
       )}
       {(sendStage === 'intro' || sendStage === 'perched') && (
         <CrowAnimationLayer
@@ -2018,6 +2025,8 @@ export default function MessagesPage() {
             />
           )}
         </>
+      )}
+      </>
       )}
 
       <div className="space-y-4">
@@ -2335,18 +2344,19 @@ export default function MessagesPage() {
               ) : (
                 /* ── State 3: normal media picker ── */
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  {/* Scroll (raven message) */}
-                  <button
-                    type="button"
-                    onClick={() => { setShowMedia(false); setSendStage('intro'); }}
-                    title="Send a scroll"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M7 4h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7" /><path d="M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2" />
-                      <line x1="9.5" y1="9" x2="15" y2="9" /><line x1="9.5" y1="13" x2="15" y2="13" />
-                    </svg>
-                  </button>
+                  {scrollsEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => { setShowMedia(false); setSendStage('intro'); }}
+                      title="Send a scroll"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 4h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7" /><path d="M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2" />
+                        <line x1="9.5" y1="9" x2="15" y2="9" /><line x1="9.5" y1="13" x2="15" y2="13" />
+                      </svg>
+                    </button>
+                  )}
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
