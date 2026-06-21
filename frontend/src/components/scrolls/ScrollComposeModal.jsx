@@ -183,8 +183,8 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             Send a Sneaky Scroll
           </h2>
 
-          {/* gap so the message drops inside the decorated frame */}
-          <div style={{ height: '9%' }} />
+          {/* gap so the message drops well inside the decorated frame */}
+          <div style={{ height: '21%' }} />
 
           <textarea
             autoFocus
