@@ -31,11 +31,14 @@ export function useScrolls() {
   const refreshUnread = useCallback(async () => {
     try {
       const { unread: n } = await api.scrolls.unread();
-      if ((n ?? 0) > prevUnreadRef.current) setArrivedTick((t) => t + 1);
+      if ((n ?? 0) > prevUnreadRef.current) {
+        setArrivedTick((t) => t + 1);
+        refresh(); // pull the freshly-arrived scroll into the list immediately
+      }
       prevUnreadRef.current = n ?? 0;
       setUnread(n ?? 0);
     } catch { /* transient */ }
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     loadConfig();

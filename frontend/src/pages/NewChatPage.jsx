@@ -5,6 +5,7 @@ import { useTheme } from '../lib/ThemeContext.jsx';
 import { useScrolls } from '../components/scrolls/useScrolls.js';
 import ScrollComposeModal from '../components/scrolls/ScrollComposeModal.jsx';
 import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
+import ScrollReader from '../components/scrolls/ScrollReader.jsx';
 import CrowAnimationLayer from '../components/scrolls/CrowAnimationLayer.jsx';
 import ScrollBranch from '../components/scrolls/ScrollBranch.jsx';
 
@@ -25,6 +26,7 @@ export default function NewChatPage() {
   const [sendFlight, setSendFlight] = useState(false);
   const [landFlight, setLandFlight] = useState(false);
   const [perched, setPerched] = useState(false);
+  const [readerScroll, setReaderScroll] = useState(null);
 
   // Deep-link from the arrival push (/new-chat?scrolls=1) opens the list.
   useEffect(() => {
@@ -67,6 +69,13 @@ export default function NewChatPage() {
           onClose={() => { setListOpen(false); setPerched(false); scrolls.refresh(); }}
         />
       )}
+      {readerScroll && (
+        <ScrollReader
+          scroll={readerScroll}
+          settings={settings}
+          onClose={() => { setReaderScroll(null); scrolls.refresh(); }}
+        />
+      )}
       {composeOpen && <ScrollBranch file={settings.send_branch_file} side="left" />}
       <CrowAnimationLayer
         frames={scrolls.config.send}
@@ -83,7 +92,17 @@ export default function NewChatPage() {
             playing={landFlight}
             perchOnEnd
             onComplete={() => { setLandFlight(false); setPerched(true); }}
-            onFinalTap={() => { setListOpen(true); setPerched(false); }}
+            onFinalTap={() => {
+              // Tapping the landed crow opens the newly-arrived scroll directly.
+              const newest = scrolls.scrolls[0];
+              setPerched(false);
+              if (newest) {
+                setReaderScroll(newest);
+                if (!newest.read_at) scrolls.markRead(newest.id);
+              } else {
+                setListOpen(true);
+              }
+            }}
           />
         </>
       )}

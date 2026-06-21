@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { assetUrl } from './scrollAssets.js';
+import { useTheme } from '../../lib/ThemeContext.jsx';
+import ScrollReader from './ScrollReader.jsx';
 
 function formatSent(ts) {
   try {
@@ -10,101 +11,85 @@ function formatSent(ts) {
   } catch { return ts; }
 }
 
-/* The "scrolls" pop-out: every received scroll rendered on parchment in the
-   olde font, stamped with its in-world sent date/time. Opening an unread scroll
-   marks it read. */
+/* The "scrolls" pop-out — standard site modal chrome (rounded card over a dimmed
+   page, light/dark). Tapping a scroll opens the full-size reader. */
 export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, onClose }) {
-  const [openId, setOpenId] = useState(null);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const [openScroll, setOpenScroll] = useState(null);
   const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
-  const bgUrl = assetUrl(settings.scroll_bg_file);
+
+  const cardBg = isDark ? '#171717' : '#ffffff';
+  const rowBg = isDark ? '#262626' : '#f5f5f5';
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape' && !openScroll) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, openScroll]);
 
-  function toggle(s) {
-    setOpenId((cur) => (cur === s.id ? null : s.id));
+  function open(s) {
+    setOpenScroll(s);
     if (!s.read_at) onRead?.(s.id);
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto p-4 py-10"
-      style={{ background: 'rgba(20,12,4,0.6)', backdropFilter: 'blur(2px)' }}
-      onClick={onClose}
-    >
-      <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xl text-amber-50" style={{ fontFamily: font }}>Scrolls</h2>
-          <button onClick={onClose} className="text-2xl leading-none text-amber-50/80 hover:text-amber-50" aria-label="Close">×</button>
-        </div>
+    <>
+      <div
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
+        onClick={onClose}
+      >
+        <div
+          className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-3xl p-6 shadow-2xl"
+          style={{ background: cardBg }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold" style={{ color: isDark ? '#fafafa' : '#171717' }}>Scrolls</h2>
+            <button onClick={onClose} className="text-2xl leading-none text-neutral-400 hover:text-neutral-600" aria-label="Close">×</button>
+          </div>
 
-        {scrolls.length === 0 && (
-          <p className="rounded-xl bg-amber-50/90 px-4 py-6 text-center text-sm text-amber-900" style={{ fontFamily: font }}>
-            No ravens have reached you yet.
-          </p>
-        )}
+          {scrolls.length === 0 && (
+            <p className="rounded-xl px-4 py-6 text-center text-sm" style={{ background: rowBg, color: isDark ? '#a3a3a3' : '#737373' }}>
+              No ravens have reached you yet.
+            </p>
+          )}
 
-        <ul className="space-y-3">
-          {scrolls.map((s) => {
-            const isOpen = openId === s.id;
-            return (
+          <ul className="space-y-2">
+            {scrolls.map((s) => (
               <li key={s.id}>
                 <button
                   type="button"
-                  onClick={() => toggle(s)}
-                  className="block w-full overflow-hidden rounded-[12px] text-left shadow-lg transition active:scale-[0.99]"
-                  style={{
-                    backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
-                    backgroundSize: 'cover', backgroundPosition: 'center',
-                    background: bgUrl ? undefined : 'linear-gradient(155deg, #f3e7c6 0%, #e8d39c 60%, #dcc488 100%)',
-                    border: '1px solid rgba(90,60,20,0.4)',
-                  }}
+                  onClick={() => open(s)}
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition active:scale-[0.99]"
+                  style={{ background: rowBg }}
                 >
-                  <div className="px-5 py-4" style={{ fontFamily: font }}>
-                    <div className="flex items-center justify-between text-[11px] text-amber-900/70">
-                      <span>
-                        From {s.sender_name || s.sender_username || 'a friend'}
-                        {s.simulated && (
-                          <span className="ml-1.5 rounded bg-amber-900/20 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-900/70">Test</span>
-                        )}
-                      </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+                      <span>From {s.sender_name || s.sender_username || 'a friend'}</span>
+                      {s.simulated && (
+                        <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-600">Test</span>
+                      )}
                       {!s.read_at && (
-                        <span className="rounded-full bg-red-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-50">
-                          New
-                        </span>
+                        <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">New</span>
                       )}
                     </div>
-
-                    <p
-                      className={`mt-2 text-amber-950 ${isOpen ? '' : 'line-clamp-2'}`}
-                      style={{ fontSize: '1.05rem', lineHeight: 1.5 }}
-                    >
+                    <p className="mt-0.5 line-clamp-1 text-sm" style={{ color: isDark ? '#e5e5e5' : '#262626', fontFamily: font }}>
                       {s.body}
                     </p>
-
-                    {isOpen && (
-                      <div className="mt-3 border-t border-amber-900/25 pt-2 text-[11px] text-amber-900/70">
-                        {(s.origin_label || s.dest_label) && (
-                          <p>
-                            {s.origin_label || 'parts unknown'}
-                            {' → '}
-                            {s.dest_label || 'parts unknown'}
-                            {s.distance_km ? ` · ${Math.round(s.distance_km).toLocaleString()} km` : ''}
-                          </p>
-                        )}
-                        <p className="mt-0.5 italic">Sent {formatSent(s.sent_at)}</p>
-                      </div>
-                    )}
+                    <p className="mt-0.5 text-[10px] text-neutral-400">{formatSent(s.sent_at)}</p>
                   </div>
+                  <span className="shrink-0 text-neutral-400">›</span>
                 </button>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        </div>
       </div>
-    </div>
+
+      {openScroll && (
+        <ScrollReader scroll={openScroll} settings={settings} onClose={() => setOpenScroll(null)} />
+      )}
+    </>
   );
 }
