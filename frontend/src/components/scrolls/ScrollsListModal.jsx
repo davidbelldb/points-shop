@@ -65,7 +65,12 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
                 >
                   <div className="px-5 py-4" style={{ fontFamily: font }}>
                     <div className="flex items-center justify-between text-[11px] text-amber-900/70">
-                      <span>From {s.sender_name || s.sender_username || 'a friend'}</span>
+                      <span>
+                        From {s.sender_name || s.sender_username || 'a friend'}
+                        {s.simulated && (
+                          <span className="ml-1.5 rounded bg-amber-900/20 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-900/70">Test</span>
+                        )}
+                      </span>
                       {!s.read_at && (
                         <span className="rounded-full bg-red-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-50">
                           New

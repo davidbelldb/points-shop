@@ -108,7 +108,7 @@ export function flightSeconds(distanceKm, settings) {
 
 export async function createScroll({
   senderId, recipientId, body,
-  origin = {}, dest = {},
+  origin = {}, dest = {}, simulated = false,
 }) {
   const text = (body ?? '').trim();
   if (!text) { const e = new Error('Scroll body required'); e.statusCode = 400; throw e; }
@@ -127,14 +127,14 @@ export async function createScroll({
        (sender_id, recipient_id, body,
         origin_label, origin_lat, origin_lng,
         dest_label, dest_lat, dest_lng,
-        distance_km, flight_seconds, deliver_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, NOW() + ($11 * interval '1 second'))
+        distance_km, flight_seconds, simulated, deliver_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, NOW() + ($11 * interval '1 second'))
      RETURNING *`,
     [
       senderId, recipientId, text,
       origin.label ?? null, origin.lat ?? null, origin.lng ?? null,
       dest.label ?? null, dest.lat ?? null, dest.lng ?? null,
-      distanceKm, secs,
+      distanceKm, secs, !!simulated,
     ],
   );
   return rows[0];

@@ -3,7 +3,7 @@ import {
   createScroll, listReceived, unreadCount, markRead, resolveDueScrolls,
 } from './scrolls.repo.js';
 import { findOtherUser } from '../chat/chat.repo.js';
-import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
+import { getEffectiveAccountId, getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
 // Background delivery resolver. A scroll only "arrives" once its crow has flown
 // the distance; this timer flips due scrolls to delivered and fires the arrival
@@ -61,17 +61,31 @@ export default async function scrollRoutes(fastify) {
   });
 
   fastify.post('/api/scrolls', async (req, reply) => {
-    const accountId = getEffectiveAccountId(req);
-    const other = await findOtherUser(accountId);
-    if (!other) return reply.code(400).send({ error: 'No recipient available' });
-    const { body, origin, dest } = req.body ?? {};
+    const { body, origin, dest, simulate } = req.body ?? {};
+
+    // Simulation (the /new-chat test harness): the scroll loops back to your
+    // own actual account — full pipeline, but the partner is never the
+    // recipient, so they see nothing. We use the ACTUAL account id (not the
+    // effective one) so a test scroll can never land on the partner even while
+    // impersonating them.
+    let senderId, recipientId;
+    if (simulate) {
+      senderId = recipientId = getActualAccountId(req);
+    } else {
+      senderId = getEffectiveAccountId(req);
+      const other = await findOtherUser(senderId);
+      if (!other) return reply.code(400).send({ error: 'No recipient available' });
+      recipientId = other.id;
+    }
+
     try {
       const scroll = await createScroll({
-        senderId: accountId,
-        recipientId: other.id,
+        senderId,
+        recipientId,
         body,
         origin: origin ?? {},
         dest: dest ?? {},
+        simulated: !!simulate,
       });
       return reply.code(201).send(scroll);
     } catch (err) {

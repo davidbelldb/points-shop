@@ -99,7 +99,7 @@ function PlacePicker({ label, value, onPick, allowGps }) {
 /* The compose modal: a blank-scroll background with an olde-font message, an
    origin + destination for the flight-time sim, and a wax-seal stamp that
    doubles as the send button (stamp animation -> send -> parent flies the crow). */
-export default function ScrollComposeModal({ settings = {}, onSend, onSent, onClose }) {
+export default function ScrollComposeModal({ settings = {}, testMode = false, onSend, onSent, onClose }) {
   const [body, setBody] = useState('');
   const [origin, setOrigin] = useState(null);
   const [dest, setDest] = useState(null);
@@ -179,11 +179,17 @@ export default function ScrollComposeModal({ settings = {}, onSend, onSent, onCl
           >×</button>
 
           <h2
-            className="mb-3 text-center text-2xl text-amber-950"
+            className="mb-1 text-center text-2xl text-amber-950"
             style={{ fontFamily: font, letterSpacing: '0.5px' }}
           >
             A Scroll by Raven
           </h2>
+
+          {testMode && (
+            <p className="mb-3 rounded-md bg-amber-900/15 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
+              Test mode · this scroll flies back to you only
+            </p>
+          )}
 
           <textarea
             autoFocus
