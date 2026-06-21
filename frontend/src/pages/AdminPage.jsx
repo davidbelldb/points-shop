@@ -15,6 +15,7 @@ import AdminDuckySection from './AdminDuckySection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
+import AdminScrollsSection from './AdminScrollsSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
 const inputCls =
@@ -169,6 +170,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Ducky Derby" storageKey="admin::ducky">
         <AdminDuckySection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Scrolls (raven messages)" storageKey="admin::scrolls">
+        <AdminScrollsSection />
       </AdminCollapsible>
 
       <AdminCollapsible title="Relationship Timeline" storageKey="admin::timeline">
