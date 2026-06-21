@@ -10,6 +10,40 @@ const DROPDOWN_BG = '#d2a469';
 // Cambridge, UK bounding box for the destination lookup.
 const CAMBRIDGE_VIEWBOX = '0.02,52.27,0.25,52.12';
 
+// Message constraints: 20 chars per line, max 4 lines (=> 80 chars total).
+const MAX_LINE = 20;
+const MAX_LINES = 4;
+const MAX_TOTAL = MAX_LINE * MAX_LINES;
+
+/* Wrap raw input into at most MAX_LINES lines of at most MAX_LINE chars. A word
+   that would overflow the current line moves to the next line, and each new line
+   starts its 20-char count fresh (no carry-over). Words longer than 20 chars are
+   hard-broken. Explicit newlines are honoured. Anything past 4 lines is dropped. */
+function wrapMessage(input) {
+  const segments = String(input).replace(/\r\n?/g, '\n').split('\n');
+  const lines = [];
+  for (let si = 0; si < segments.length && lines.length < MAX_LINES; si++) {
+    const words = segments[si].split(' ');
+    let cur = '';
+    for (let wi = 0; wi < words.length && lines.length < MAX_LINES; wi++) {
+      let w = words[wi];
+      while (w.length > MAX_LINE && lines.length < MAX_LINES) {
+        if (cur) { lines.push(cur); cur = ''; if (lines.length >= MAX_LINES) break; }
+        lines.push(w.slice(0, MAX_LINE));
+        w = w.slice(MAX_LINE);
+      }
+      if (lines.length >= MAX_LINES) break;
+      if (w === '') continue;
+      if (cur === '') cur = w;
+      else if ((cur + ' ' + w).length <= MAX_LINE) cur += ' ' + w;
+      else { lines.push(cur); cur = (lines.length < MAX_LINES) ? w : ''; }
+    }
+    if (cur !== '' && lines.length < MAX_LINES) lines.push(cur);
+    else if (cur === '' && si < segments.length - 1 && lines.length < MAX_LINES && segments[si] === '') lines.push('');
+  }
+  return lines.slice(0, MAX_LINES).join('\n');
+}
+
 /* Destination picker — Nominatim lookup limited to Cambridge, UK. Styled to sit
    on the parchment: ImperialBlack font, single centred field, dropdown in black
    on #d2a469. */
@@ -97,7 +131,6 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
   const [error, setError] = useState(null);
   const [sealBroken, setSealBroken] = useState(false);
 
-  const maxChars = Number(settings.max_chars) || 280;
   const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
   const bgUrl = assetUrl(settings.scroll_bg_file);
   const sealOpen = assetUrl(settings.seal_open_file);
@@ -189,14 +222,14 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
           <textarea
             autoFocus
             value={body}
-            maxLength={maxChars}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => setBody(wrapMessage(e.target.value))}
             placeholder="Pen thy message…"
-            rows={4}
+            rows={MAX_LINES}
+            wrap="hard"
             className="w-full resize-none bg-transparent text-center text-xl leading-snug text-black placeholder-black/40 focus:outline-none"
-            style={{ fontFamily: font }}
+            style={{ fontFamily: font, whiteSpace: 'pre-wrap' }}
           />
-          <div className="w-full text-right text-[10px] text-black/50">{body.length}/{maxChars}</div>
+          <div className="w-full text-right text-[10px] text-black/50">{body.replace(/\n/g, '').length}/{MAX_TOTAL}</div>
 
           <div className="flex-1" />
 

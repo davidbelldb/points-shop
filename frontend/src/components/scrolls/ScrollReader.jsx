@@ -49,7 +49,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
             From {scroll.sender_name || scroll.sender_username || 'a friend'}
             {scroll.simulated ? ' · test' : ''}
           </p>
-          <p className="text-black" style={{ fontSize: 'clamp(1.4rem, 4.5vw, 2.4rem)', lineHeight: 1.5 }}>
+          <p className="text-black" style={{ fontSize: 'clamp(1.4rem, 4.5vw, 2.4rem)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
             {scroll.body}
           </p>
           <div className="mt-8 text-xs text-black/60">
