@@ -178,10 +178,13 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
         >×</button>
 
         {/* Overlaid content, inset to the parchment's writable area. */}
-        <div className="absolute inset-0 flex flex-col items-center text-center" style={{ padding: '11% 14% 8%' }}>
+        <div className="absolute inset-0 flex flex-col items-center text-center" style={{ padding: '5.5% 14% 7%' }}>
           <h2 className="text-2xl text-black" style={{ fontFamily: font, letterSpacing: '0.5px' }}>
             Send a Sneaky Scroll
           </h2>
+
+          {/* gap so the message drops inside the decorated frame */}
+          <div style={{ height: '9%' }} />
 
           <textarea
             autoFocus
@@ -190,7 +193,7 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             onChange={(e) => setBody(e.target.value)}
             placeholder="Pen thy message…"
             rows={4}
-            className="mt-2 w-full resize-none bg-transparent text-center text-xl leading-snug text-black placeholder-black/40 focus:outline-none"
+            className="w-full resize-none bg-transparent text-center text-xl leading-snug text-black placeholder-black/40 focus:outline-none"
             style={{ fontFamily: font }}
           />
           <div className="w-full text-right text-[10px] text-black/50">{body.length}/{maxChars}</div>
