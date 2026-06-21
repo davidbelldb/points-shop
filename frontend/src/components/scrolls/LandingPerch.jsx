@@ -19,6 +19,7 @@ export default function LandingPerch({
   perchX = 50,
   perchBottom = 56,
   perchW = 58,
+  crowScale = 1,
   baseVmin = 22.5,
   zIndex = 35,
 }) {
@@ -63,7 +64,7 @@ export default function LandingPerch({
               position: 'absolute',
               left: `${perchX}%`,
               bottom: `${perchBottom}%`,
-              width: `${perchW}%`,
+              width: `${perchW * (Number(crowScale) || 1)}%`,
               transform: 'translateX(-50%)',
               padding: 0, border: 'none', background: 'transparent',
               cursor: 'pointer', pointerEvents: 'auto',

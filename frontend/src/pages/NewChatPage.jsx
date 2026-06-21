@@ -50,7 +50,9 @@ export default function NewChatPage() {
 
   // The perched crow uses the final landing frame's sprite.
   const landFrames = scrolls.config.land || [];
-  const landCrowFile = landFrames[landFrames.length - 1]?.sprite_file || 'crow_land_10.png';
+  const landLast = landFrames[landFrames.length - 1];
+  const landCrowFile = landLast?.sprite_file || 'crow_land_10.png';
+  const landCrowScale = Number(landLast?.scale) || 1;
 
   // Memoise the frame slices so the animation layer doesn't restart on every
   // re-render. (Crow size is now driven purely by each frame's config scale —
@@ -127,6 +129,7 @@ export default function NewChatPage() {
             scale={settings.land_branch_scale}
             rotation={settings.land_branch_rotation}
             opacity={settings.land_branch_opacity}
+            crowScale={landCrowScale}
             showCrow={!landFlight}
             count={scrolls.unread}
             onTap={() => setListOpen(true)}
