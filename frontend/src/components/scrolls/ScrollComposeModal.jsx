@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '../../lib/ThemeContext.jsx';
 import { assetUrl, haversineKm, flightSeconds, humanizeSeconds } from './scrollAssets.js';
 
-/* Reusable place picker — typed search + Nominatim autocomplete, mirroring the
-   stories location sticker. Styled to sit on the standard modal card. */
-function PlacePicker({ label, value, onPick, allowGps, isDark }) {
+const PARCHMENT_FALLBACK = 'linear-gradient(155deg, #f3e7c6 0%, #e8d39c 55%, #dcc488 100%)';
+
+function surfaceStyle(bgUrl) {
+  return bgUrl
+    ? { backgroundImage: `url(${bgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: PARCHMENT_FALLBACK };
+}
+
+/* Place picker — typed search + Nominatim autocomplete, styled to sit on the
+   parchment surface (translucent white inputs, black text). */
+function PlacePicker({ label, value, onPick, allowGps }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const debounceRef = useRef(null);
-
-  const inputStyle = {
-    background: isDark ? '#1f1f1f' : '#ffffff',
-    border: `1px solid ${isDark ? '#3a3a3a' : '#e5e5e5'}`,
-    color: isDark ? '#fafafa' : '#171717',
-  };
 
   async function search(query) {
     if (!query.trim()) { setResults([]); setOpen(false); return; }
@@ -69,9 +70,9 @@ function PlacePicker({ label, value, onPick, allowGps, isDark }) {
   return (
     <div style={{ position: 'relative' }}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{label}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-black/60">{label}</span>
         {allowGps && (
-          <button type="button" onClick={snapGps} className="text-[10px] text-[#3aa88b] underline">
+          <button type="button" onClick={snapGps} className="text-[10px] text-black/70 underline">
             use my location
           </button>
         )}
@@ -81,22 +82,18 @@ function PlacePicker({ label, value, onPick, allowGps, isDark }) {
         onChange={onInput}
         onFocus={() => results.length && setOpen(true)}
         placeholder={value?.label || 'Search a place…'}
-        style={inputStyle}
-        className="mt-0.5 w-full rounded-lg px-2.5 py-1.5 text-sm placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#61dbbb]"
+        className="mt-0.5 w-full rounded-lg px-2.5 py-1.5 text-sm text-black placeholder-black/40 focus:outline-none focus:ring-1 focus:ring-black/40"
+        style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(90,60,20,0.35)' }}
       />
-      {busy && <span className="absolute right-2 top-7 text-[10px] text-neutral-400">…</span>}
+      {busy && <span className="absolute right-2 top-7 text-[10px] text-black/40">…</span>}
       {open && results.length > 0 && (
-        <ul
-          className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg shadow-lg"
-          style={{ background: isDark ? '#1f1f1f' : '#ffffff', border: `1px solid ${isDark ? '#3a3a3a' : '#e5e5e5'}` }}
-        >
+        <ul className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg bg-white shadow-lg" style={{ border: '1px solid rgba(90,60,20,0.35)' }}>
           {results.map((r) => (
             <li key={r.place_id}>
               <button
                 type="button"
                 onClick={() => choose(r)}
-                className="block w-full px-2.5 py-1.5 text-left text-xs hover:bg-neutral-500/10"
-                style={{ color: isDark ? '#e5e5e5' : '#404040' }}
+                className="block w-full px-2.5 py-1.5 text-left text-xs text-black hover:bg-black/5"
               >
                 {r.display_name}
               </button>
@@ -108,13 +105,10 @@ function PlacePicker({ label, value, onPick, allowGps, isDark }) {
   );
 }
 
-/* Compose modal — wrapped in the site's standard modal chrome (rounded card over
-   a dimmed page, light/dark aware). The scroll background sprite is used as the
-   parchment writing surface inside the card. */
+/* Compose modal — the scroll_blank parchment IS the modal surface (rounded card
+   over a dimmed page), matching the reader. Message in the scroll font, black
+   for legibility. Closes only via the explicit ✕ or Escape. */
 export default function ScrollComposeModal({ settings = {}, testMode = false, onSend, onSent, onClose }) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
-
   const [body, setBody] = useState('');
   const [origin, setOrigin] = useState(null);
   const [dest, setDest] = useState(null);
@@ -128,9 +122,6 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
   const bgUrl = assetUrl(settings.scroll_bg_file);
   const sealOpen = assetUrl(settings.seal_open_file);
   const sealStamped = assetUrl(settings.seal_stamped_file);
-
-  const cardBg = isDark ? '#171717' : '#ffffff';
-  const boxBg = isDark ? '#262626' : '#f5f5f5';
 
   const flight = useMemo(() => {
     const km = haversineKm(origin?.lat, origin?.lng, dest?.lat, dest?.lng);
@@ -166,66 +157,50 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl p-6 shadow-2xl"
-        style={{ background: cardBg }}
+        className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl px-6 py-6 shadow-2xl"
+        style={{ ...surfaceStyle(bgUrl), border: '1px solid rgba(90,60,20,0.4)' }}
       >
-        <div className="mb-1 flex items-start justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Send a scroll</p>
-          <button
-            type="button"
-            onClick={() => !sending && onClose()}
-            className="-mt-1 text-2xl leading-none text-neutral-400 hover:text-neutral-600"
-            aria-label="Close"
-          >×</button>
-        </div>
+        <button
+          type="button"
+          onClick={() => !sending && onClose()}
+          className="absolute right-3 top-2 text-3xl leading-none text-black/60 hover:text-black"
+          aria-label="Close"
+        >×</button>
+
+        <h2 className="mb-1 text-center text-2xl text-black" style={{ fontFamily: font, letterSpacing: '0.5px' }}>
+          A Scroll by Raven
+        </h2>
 
         {testMode && (
-          <p className="mb-3 rounded-md bg-amber-500/15 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-amber-600">
-            Test mode · this scroll flies back to you only
+          <p className="mx-auto mb-2 w-fit rounded-md bg-black/10 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-black/70">
+            Test · flies back to you only
           </p>
         )}
 
-        {/* Parchment writing surface */}
-        <div
-          className="relative overflow-hidden rounded-2xl px-5 py-5"
-          style={{
-            backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            background: bgUrl ? undefined : 'linear-gradient(155deg, #f3e7c6 0%, #e8d39c 55%, #dcc488 100%)',
-            border: '1px solid rgba(90,60,20,0.35)',
-            minHeight: 200,
-          }}
-        >
-          <h2 className="mb-2 text-center text-2xl text-amber-950" style={{ fontFamily: font, letterSpacing: '0.5px' }}>
-            A Scroll by Raven
-          </h2>
-          <textarea
-            autoFocus
-            value={body}
-            maxLength={maxChars}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Pen thy message…"
-            rows={4}
-            className="w-full resize-none bg-transparent text-center text-lg leading-relaxed text-amber-950 placeholder-amber-900/40 focus:outline-none"
-            style={{ fontFamily: font }}
-          />
-          <div className="text-right text-[10px] text-amber-900/60">{body.length}/{maxChars}</div>
+        <textarea
+          autoFocus
+          value={body}
+          maxLength={maxChars}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Pen thy message…"
+          rows={5}
+          className="w-full resize-none bg-transparent text-center text-xl leading-relaxed text-black placeholder-black/40 focus:outline-none"
+          style={{ fontFamily: font }}
+        />
+        <div className="mb-3 text-right text-[10px] text-black/50">{body.length}/{maxChars}</div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <PlacePicker label="From" value={origin} onPick={setOrigin} allowGps />
+          <PlacePicker label="To" value={dest} onPick={setDest} />
         </div>
 
-        {/* Controls on the standard card */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <PlacePicker label="From" value={origin} onPick={setOrigin} allowGps isDark={isDark} />
-          <PlacePicker label="To" value={dest} onPick={setDest} isDark={isDark} />
-        </div>
-
-        <div className="mt-3 rounded-xl px-4 py-2.5 text-center text-xs" style={{ background: boxBg, color: isDark ? '#d4d4d4' : '#404040' }}>
+        <div className="mt-3 text-center text-xs text-black/70" style={{ fontFamily: font }}>
           {origin && dest
             ? `≈ ${Math.round(flight.km).toLocaleString()} km · thy crow shall arrive in ${humanizeSeconds(flight.secs)}`
             : 'Set a from & to, and the crow’s journey will be timed.'}
         </div>
 
-        {error && <p className="mt-2 text-center text-xs text-red-500">{error}</p>}
+        {error && <p className="mt-2 text-center text-xs text-red-700">{error}</p>}
 
         {/* Wax seal = send button */}
         <div className="mt-4 flex justify-center">
@@ -234,37 +209,29 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             onClick={fireSend}
             disabled={!body.trim() || sending}
             title="Seal & send"
-            className="relative flex h-20 w-20 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40"
+            className="relative flex h-24 w-24 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40"
           >
-            {(() => {
-              const url = stamping ? (sealStamped || sealOpen) : sealOpen;
-              if (url && !sealBroken) {
-                return (
-                  <img
-                    src={url}
-                    alt="wax seal"
-                    onError={() => setSealBroken(true)}
-                    className="h-20 w-20 object-contain"
-                    style={{ animation: stamping ? 'scroll-seal-stamp 0.55s cubic-bezier(0.3,1.5,0.5,1) both' : undefined }}
-                    draggable={false}
-                  />
-                );
-              }
-              return (
-                <span
-                  className="flex h-16 w-16 items-center justify-center rounded-full text-[10px] font-bold uppercase tracking-wide text-amber-50 shadow-lg"
-                  style={{
-                    background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)',
-                    animation: stamping ? 'scroll-seal-stamp 0.55s cubic-bezier(0.3,1.5,0.5,1) both' : undefined,
-                  }}
-                >
-                  {sending ? '···' : 'Seal'}
-                </span>
-              );
-            })()}
+            <span
+              className="relative flex h-24 w-24 items-center justify-center"
+              style={{ animation: stamping ? 'scroll-seal-stamp 0.55s cubic-bezier(0.3,1.5,0.5,1) both' : undefined }}
+            >
+              {(() => {
+                const url = stamping ? (sealStamped || sealOpen) : sealOpen;
+                return url && !sealBroken
+                  ? <img src={url} alt="wax seal" onError={() => setSealBroken(true)} className="h-24 w-24 object-contain" draggable={false} />
+                  : <span className="h-20 w-20 rounded-full shadow-lg" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />;
+              })()}
+              {/* SEAL label over the sprite */}
+              <span
+                className="pointer-events-none absolute inset-0 flex items-center justify-center text-base font-bold uppercase tracking-[0.15em]"
+                style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
+              >
+                {sending ? '···' : 'SEAL'}
+              </span>
+            </span>
           </button>
         </div>
-        <p className="mt-1 text-center text-[10px] text-neutral-500">
+        <p className="mt-1 text-center text-[10px] text-black/60" style={{ fontFamily: font }}>
           {sending ? 'Dispatching the raven…' : 'Press the seal to send'}
         </p>
       </div>

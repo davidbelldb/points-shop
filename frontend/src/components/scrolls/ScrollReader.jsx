@@ -45,14 +45,14 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
         }}
       >
         <div className="flex flex-1 flex-col items-center justify-center px-8 py-12 text-center" style={{ fontFamily: font }}>
-          <p className="mb-6 text-sm uppercase tracking-[0.2em] text-amber-900/70">
+          <p className="mb-6 text-sm uppercase tracking-[0.2em] text-black/60">
             From {scroll.sender_name || scroll.sender_username || 'a friend'}
             {scroll.simulated ? ' · test' : ''}
           </p>
-          <p className="text-amber-950" style={{ fontSize: 'clamp(1.4rem, 4.5vw, 2.4rem)', lineHeight: 1.5 }}>
+          <p className="text-black" style={{ fontSize: 'clamp(1.4rem, 4.5vw, 2.4rem)', lineHeight: 1.5 }}>
             {scroll.body}
           </p>
-          <div className="mt-8 text-xs text-amber-900/70">
+          <div className="mt-8 text-xs text-black/60">
             {(scroll.origin_label || scroll.dest_label) && (
               <p>
                 {scroll.origin_label || 'parts unknown'} → {scroll.dest_label || 'parts unknown'}
