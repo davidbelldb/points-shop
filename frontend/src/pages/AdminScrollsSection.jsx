@@ -17,19 +17,9 @@ const SETTINGS_FIELDS = [
   { key: 'scroll_bg_file', label: 'Scroll background file', type: 'text' },
   { key: 'seal_open_file', label: 'Wax seal (open) file', type: 'text' },
   { key: 'seal_stamped_file', label: 'Wax seal (stamped) file', type: 'text' },
-  { key: 'send_branch_file', label: 'Send branch file (left)', type: 'text' },
-  { key: 'send_branch_x', label: 'Send branch X', type: 'number' },
-  { key: 'send_branch_y', label: 'Send branch Y', type: 'number' },
-  { key: 'send_branch_scale', label: 'Send branch scale', type: 'number' },
-  { key: 'send_branch_rotation', label: 'Send branch rotation°', type: 'number' },
-  { key: 'send_branch_opacity', label: 'Send branch opacity', type: 'number' },
-  { key: 'land_branch_file', label: 'Landing branch file (right)', type: 'text' },
-  { key: 'land_branch_x', label: 'Landing branch X', type: 'number' },
-  { key: 'land_branch_y', label: 'Landing branch Y', type: 'number' },
-  { key: 'land_branch_scale', label: 'Landing branch scale', type: 'number' },
-  { key: 'land_branch_rotation', label: 'Landing branch rotation°', type: 'number' },
-  { key: 'land_branch_opacity', label: 'Landing branch opacity', type: 'number' },
 ];
+// Branch sprite + X/Y/scale/rotation/opacity are edited as a pinned row inside
+// each sequence's frame list (see FramesEditor), not here.
 const NUMERIC = new Set(SETTINGS_FIELDS.filter((f) => f.type === 'number').map((f) => f.key));
 
 function SettingsForm({ settings, onSaved }) {
@@ -177,6 +167,14 @@ function FramesEditor({ layer, initial, fps, branch, onSaved }) {
 
   useEffect(() => { setRows(initial || []); setDirty(false); }, [initial]);
 
+  // Pinned branch row (edits scrolls_settings, not the frames table).
+  const [branchDraft, setBranchDraft] = useState(branch || {});
+  useEffect(() => { setBranchDraft(branch || {}); }, [branch]);
+  const BK = layer === 'send'
+    ? { file: 'send_branch_file', x: 'send_branch_x', y: 'send_branch_y', scale: 'send_branch_scale', rotation: 'send_branch_rotation', opacity: 'send_branch_opacity' }
+    : { file: 'land_branch_file', x: 'land_branch_x', y: 'land_branch_y', scale: 'land_branch_scale', rotation: 'land_branch_rotation', opacity: 'land_branch_opacity' };
+  function setBranchCell(key, val) { setBranchDraft((d) => ({ ...d, [key]: val })); setDirty(true); }
+
   function setCell(idx, key, val) {
     setRows((r) => r.map((row, j) => (j === idx ? { ...row, [key]: val } : row)));
     setDirty(true);
@@ -207,6 +205,12 @@ function FramesEditor({ layer, initial, fps, branch, onSaved }) {
         duration_ms: parseInt(row.duration_ms, 10) || 80,
       }));
       await api.scrolls.saveFrames(layer, clean);
+      await api.scrolls.saveSettings({
+        [BK.file]: String(branchDraft.file || '').trim(),
+        [BK.x]: Number(branchDraft.x), [BK.y]: Number(branchDraft.y),
+        [BK.scale]: Number(branchDraft.scale), [BK.rotation]: Number(branchDraft.rotation),
+        [BK.opacity]: Number(branchDraft.opacity),
+      });
       setDirty(false);
       onSaved?.();
     } finally { setSaving(false); }
@@ -216,7 +220,7 @@ function FramesEditor({ layer, initial, fps, branch, onSaved }) {
     <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
       <p className="text-sm font-semibold capitalize">{layer} sequence — {rows.length} frames</p>
 
-      <LayerPreview frames={rows} fps={fps} branch={branch} />
+      <LayerPreview frames={rows} fps={fps} branch={branchDraft} />
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -228,6 +232,21 @@ function FramesEditor({ layer, initial, fps, branch, onSaved }) {
             </tr>
           </thead>
           <tbody>
+            {layer === 'send' && (
+              <tr className="border-y-2 border-amber-300 bg-amber-100/60">
+                <td className="pr-1 text-[9px] font-bold uppercase text-amber-700">branch</td>
+                {FRAME_COLS.map(([key, , type]) => (key === 'duration_ms'
+                  ? <td key={key} className="px-1 text-center text-neutral-300">—</td>
+                  : (
+                    <td key={key} className="px-1 py-0.5">
+                      <input type={type} value={branchDraft[key] ?? ''} onChange={(e) => setBranchCell(key, e.target.value)}
+                        className={`rounded border border-amber-300 bg-white px-1 py-0.5 ${key === 'sprite_file' ? 'w-32' : 'w-14'}`}
+                        step={type === 'number' ? 'any' : undefined} />
+                    </td>
+                  )))}
+                <td />
+              </tr>
+            )}
             {rows.map((row, idx) => (
               <tr key={idx} className="border-t border-neutral-200">
                 <td className="pr-1 text-neutral-400">{idx}</td>
@@ -249,6 +268,21 @@ function FramesEditor({ layer, initial, fps, branch, onSaved }) {
                 </td>
               </tr>
             ))}
+            {layer === 'land' && (
+              <tr className="border-y-2 border-amber-300 bg-amber-100/60">
+                <td className="pr-1 text-[9px] font-bold uppercase text-amber-700">branch</td>
+                {FRAME_COLS.map(([key, , type]) => (key === 'duration_ms'
+                  ? <td key={key} className="px-1 text-center text-neutral-300">—</td>
+                  : (
+                    <td key={key} className="px-1 py-0.5">
+                      <input type={type} value={branchDraft[key] ?? ''} onChange={(e) => setBranchCell(key, e.target.value)}
+                        className={`rounded border border-amber-300 bg-white px-1 py-0.5 ${key === 'sprite_file' ? 'w-32' : 'w-14'}`}
+                        step={type === 'number' ? 'any' : undefined} />
+                    </td>
+                  )))}
+                <td />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -260,7 +294,7 @@ function FramesEditor({ layer, initial, fps, branch, onSaved }) {
           disabled={!dirty || saving}
           className="rounded-md bg-amber-600 px-4 py-1 text-xs font-semibold text-white disabled:opacity-40"
         >
-          {saving ? 'Saving…' : `Save ${layer} frames`}
+          {saving ? 'Saving…' : `Save ${layer} (frames + branch)`}
         </button>
       </div>
     </div>
