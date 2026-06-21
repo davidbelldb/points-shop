@@ -314,10 +314,10 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
                   : <span className="h-16 w-16 rounded-full shadow-lg" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />;
               })()}
               <span
-                className="pointer-events-none absolute inset-0 flex items-center justify-center text-base font-bold uppercase tracking-[0.15em]"
+                className="pointer-events-none absolute inset-0 flex items-center justify-center text-base font-bold tracking-[0.06em]"
                 style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
               >
-                {sending ? '···' : 'SEAL'}
+                {sending ? '···' : 'Seal'}
               </span>
             </span>
           </button>

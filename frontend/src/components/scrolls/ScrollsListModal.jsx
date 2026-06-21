@@ -76,14 +76,8 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
                     className="absolute inset-0 flex flex-col items-center justify-center text-center"
                     style={{ paddingLeft: '8%', paddingRight: '24%', fontFamily: font }}
                   >
-                    <span className="flex items-center gap-1.5 text-sm font-semibold text-black/80">
+                    <span className="text-sm font-semibold text-black/80">
                       From {s.sender_name || s.sender_username || 'a friend'}
-                      {s.simulated && (
-                        <span className="rounded bg-black/15 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-black/70">Test</span>
-                      )}
-                      {!s.read_at && (
-                        <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">New</span>
-                      )}
                     </span>
                     <span className="text-[11px] text-black/60">{formatSent(s.sent_at)}</span>
                   </div>
@@ -94,7 +88,7 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
                       ? <img src={sealUrl} alt="" draggable={false} className="h-16 w-16 object-contain" />
                       : <span className="h-14 w-14 rounded-full shadow" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />}
                     <span
-                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold uppercase tracking-wide"
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold tracking-wide"
                       style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
                     >
                       Open

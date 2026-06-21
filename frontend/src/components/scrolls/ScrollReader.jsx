@@ -85,7 +85,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
             ? <img src={sealStamped} alt="" onError={() => setSealBroken(true)} className="h-[91px] w-[91px] object-contain" draggable={false} />
             : <span className="h-[76px] w-[76px] rounded-full shadow-lg" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />}
           <span
-            className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-bold uppercase tracking-[0.1em]"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-bold tracking-[0.04em]"
             style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
           >
             Close
