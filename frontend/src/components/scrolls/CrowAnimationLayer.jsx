@@ -64,7 +64,7 @@ export default function CrowAnimationLayer({
   perchOnEnd = false,
   onFinalTap = null,
   onComplete = null,
-  baseSizePct = 14,
+  baseSizePct = 10.5,
   zIndex = 60,
 }) {
   const [idx, setIdx] = useState(0);
@@ -138,7 +138,6 @@ export default function CrowAnimationLayer({
             border: 'none',
             cursor: 'pointer',
             pointerEvents: 'auto',
-            animation: 'scroll-perch-bob 1.6s ease-in-out infinite',
           }}
         >
           <CrowFrame frame={{ ...frame, x: 50, y: 50 }} baseSizePct={baseSizePct} />

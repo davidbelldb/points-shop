@@ -36,7 +36,7 @@ export default function LandingPerch({
       aria-hidden={!showCrow}
     >
       {/* Branch box defines the coordinate space the crow is placed within. */}
-      <div style={{ position: 'relative', width: '30vmin', maxWidth: 220 }}>
+      <div style={{ position: 'relative', width: '22.5vmin', maxWidth: 165 }}>
         {branchUrl && !branchBroke ? (
           <img
             src={branchUrl}
@@ -67,7 +67,6 @@ export default function LandingPerch({
               transform: 'translateX(-50%)',
               padding: 0, border: 'none', background: 'transparent',
               cursor: 'pointer', pointerEvents: 'auto',
-              animation: 'scroll-perch-bob-x 1.8s ease-in-out infinite',
             }}
           >
             {crowUrl && !crowBroke ? (

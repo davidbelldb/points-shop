@@ -24,7 +24,7 @@ export default function NewChatPage() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
-  const [sendFlight, setSendFlight] = useState(false);
+  const [sendStage, setSendStage] = useState('idle'); // idle | intro | perched | flight
   const [landFlight, setLandFlight] = useState(false);
   const [readerScroll, setReaderScroll] = useState(null);
 
@@ -74,7 +74,7 @@ export default function NewChatPage() {
           settings={settings}
           testMode
           onSend={(p) => scrolls.send({ ...p, simulate: true })}
-          onSent={() => { setComposeOpen(false); setSendFlight(true); }}
+          onSent={() => { setComposeOpen(false); setTimeout(() => setSendStage('flight'), 500); }}
           onClose={() => setComposeOpen(false)}
         />
       )}
@@ -93,13 +93,31 @@ export default function NewChatPage() {
           onClose={() => { setReaderScroll(null); scrolls.refresh(); }}
         />
       )}
-      {composeOpen && <ScrollBranch file={settings.send_branch_file} side="left" />}
-      <CrowAnimationLayer
-        frames={scrolls.config.send}
-        fps={fps}
-        playing={sendFlight}
-        onComplete={() => setSendFlight(false)}
-      />
+      {/* Send branch is visible for the whole send sequence (intro → perch → fly-off). */}
+      {sendStage !== 'idle' && <ScrollBranch file={settings.send_branch_file} side="left" />}
+
+      {/* Intro: crow flies in and perches on the send branch (frames 00–02),
+          pausing on 02; tapping it opens the compose modal. */}
+      {(sendStage === 'intro' || sendStage === 'perched') && (
+        <CrowAnimationLayer
+          frames={(scrolls.config.send || []).slice(0, 3)}
+          fps={fps}
+          playing={sendStage === 'intro'}
+          perchOnEnd
+          onComplete={() => setSendStage('perched')}
+          onFinalTap={() => { setSendStage('idle'); setComposeOpen(true); }}
+        />
+      )}
+
+      {/* Fly-off: full send sequence, 0.5s after SEAL. */}
+      {sendStage === 'flight' && (
+        <CrowAnimationLayer
+          frames={scrolls.config.send}
+          fps={fps}
+          playing
+          onComplete={() => setSendStage('idle')}
+        />
+      )}
       {/* Landing: branch + crow. The branch shows whenever a crow is inbound or
           perched; the perched crow (locked to the branch) persists while there's
           an unread scroll, and the fly-in plays once on a fresh arrival. */}
@@ -176,7 +194,7 @@ export default function NewChatPage() {
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => { setTrayOpen(false); setComposeOpen(true); }}
+                onClick={() => { setTrayOpen(false); setSendStage('intro'); }}
                 title="Send a scroll"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
               >

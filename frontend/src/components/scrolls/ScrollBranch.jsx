@@ -12,8 +12,8 @@ export default function ScrollBranch({ file, side = 'left', anchorY = 58, zIndex
     top: `${anchorY}%`,
     [side]: 0,
     transform: 'translateY(-50%)',
-    width: '30vmin',
-    maxWidth: 220,
+    width: '22.5vmin',
+    maxWidth: 165,
     pointerEvents: 'none',
     zIndex,
   };
