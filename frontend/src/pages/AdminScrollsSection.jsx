@@ -18,7 +18,17 @@ const SETTINGS_FIELDS = [
   { key: 'seal_open_file', label: 'Wax seal (open) file', type: 'text' },
   { key: 'seal_stamped_file', label: 'Wax seal (stamped) file', type: 'text' },
   { key: 'send_branch_file', label: 'Send branch file (left)', type: 'text' },
+  { key: 'send_branch_x', label: 'Send branch X', type: 'number' },
+  { key: 'send_branch_y', label: 'Send branch Y', type: 'number' },
+  { key: 'send_branch_scale', label: 'Send branch scale', type: 'number' },
+  { key: 'send_branch_rotation', label: 'Send branch rotation°', type: 'number' },
+  { key: 'send_branch_opacity', label: 'Send branch opacity', type: 'number' },
   { key: 'land_branch_file', label: 'Landing branch file (right)', type: 'text' },
+  { key: 'land_branch_x', label: 'Landing branch X', type: 'number' },
+  { key: 'land_branch_y', label: 'Landing branch Y', type: 'number' },
+  { key: 'land_branch_scale', label: 'Landing branch scale', type: 'number' },
+  { key: 'land_branch_rotation', label: 'Landing branch rotation°', type: 'number' },
+  { key: 'land_branch_opacity', label: 'Landing branch opacity', type: 'number' },
 ];
 const NUMERIC = new Set(SETTINGS_FIELDS.filter((f) => f.type === 'number').map((f) => f.key));
 
@@ -79,7 +89,7 @@ function SettingsForm({ settings, onSaved }) {
 
 /* Contained preview: maps the 0..100 frame coords into a bounded stage so you
    can tune x/y and watch the sequence without it flying off-screen. */
-function LayerPreview({ frames, fps }) {
+function LayerPreview({ frames, fps, branch }) {
   const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(false);
   const timer = useRef(null);
@@ -104,6 +114,22 @@ function LayerPreview({ frames, fps }) {
   return (
     <div className="space-y-2">
       <div className="relative w-full overflow-hidden rounded-lg border border-neutral-300 bg-gradient-to-b from-sky-100 to-amber-50" style={{ aspectRatio: '3 / 2' }}>
+        {/* branch (behind the crow) */}
+        {branch?.file && assetUrl(branch.file) && (
+          <img
+            src={assetUrl(branch.file)}
+            alt=""
+            draggable={false}
+            style={{
+              position: 'absolute',
+              left: `${branch.x ?? 50}%`,
+              top: `${branch.y ?? 58}%`,
+              width: `${22 * (Number(branch.scale) || 1)}%`,
+              transform: `translate(-50%,-50%) rotate(${Number(branch.rotation) || 0}deg)`,
+              opacity: branch.opacity == null ? 1 : Number(branch.opacity),
+            }}
+          />
+        )}
         {/* crow at current frame */}
         <div
           style={{
@@ -144,7 +170,7 @@ const FRAME_COLS = [
   ['duration_ms', 'ms', 'number'],
 ];
 
-function FramesEditor({ layer, initial, fps, onSaved }) {
+function FramesEditor({ layer, initial, fps, branch, onSaved }) {
   const [rows, setRows] = useState(initial || []);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -190,7 +216,7 @@ function FramesEditor({ layer, initial, fps, onSaved }) {
     <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
       <p className="text-sm font-semibold capitalize">{layer} sequence — {rows.length} frames</p>
 
-      <LayerPreview frames={rows} fps={fps} />
+      <LayerPreview frames={rows} fps={fps} branch={branch} />
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -266,8 +292,24 @@ export default function AdminScrollsSection() {
         <code className="px-1">frontend/public/scrolls/</code>.
       </p>
       <SettingsForm settings={config.settings} onSaved={load} />
-      <FramesEditor layer="send" initial={config.send} fps={fps} onSaved={load} />
-      <FramesEditor layer="land" initial={config.land} fps={fps} onSaved={load} />
+      <FramesEditor
+        layer="send" initial={config.send} fps={fps} onSaved={load}
+        branch={{
+          file: config.settings?.send_branch_file,
+          x: config.settings?.send_branch_x, y: config.settings?.send_branch_y,
+          scale: config.settings?.send_branch_scale, rotation: config.settings?.send_branch_rotation,
+          opacity: config.settings?.send_branch_opacity,
+        }}
+      />
+      <FramesEditor
+        layer="land" initial={config.land} fps={fps} onSaved={load}
+        branch={{
+          file: config.settings?.land_branch_file,
+          x: config.settings?.land_branch_x, y: config.settings?.land_branch_y,
+          scale: config.settings?.land_branch_scale, rotation: config.settings?.land_branch_rotation,
+          opacity: config.settings?.land_branch_opacity,
+        }}
+      />
     </div>
   );
 }

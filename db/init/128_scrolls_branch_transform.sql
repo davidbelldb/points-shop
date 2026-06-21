@@ -1,0 +1,13 @@
+-- Make the send + land branches positionable like the crow frames: X/Y on the
+-- 0..100 stage, plus scale, rotation (deg) and opacity. Tunable in /admin.
+ALTER TABLE scrolls_settings
+  ADD COLUMN IF NOT EXISTS send_branch_x        DOUBLE PRECISION NOT NULL DEFAULT 12,
+  ADD COLUMN IF NOT EXISTS send_branch_y        DOUBLE PRECISION NOT NULL DEFAULT 58,
+  ADD COLUMN IF NOT EXISTS send_branch_scale    DOUBLE PRECISION NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS send_branch_rotation DOUBLE PRECISION NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS send_branch_opacity  DOUBLE PRECISION NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS land_branch_x        DOUBLE PRECISION NOT NULL DEFAULT 88,
+  ADD COLUMN IF NOT EXISTS land_branch_y        DOUBLE PRECISION NOT NULL DEFAULT 58,
+  ADD COLUMN IF NOT EXISTS land_branch_scale    DOUBLE PRECISION NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS land_branch_rotation DOUBLE PRECISION NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS land_branch_opacity  DOUBLE PRECISION NOT NULL DEFAULT 1;

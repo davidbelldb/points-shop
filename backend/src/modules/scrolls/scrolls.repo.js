@@ -26,6 +26,8 @@ const SETTINGS_COLS = new Set([
   'frame_rate_fps', 'crow_speed_kmh', 'speed_multiplier', 'min_flight_seconds',
   'max_flight_seconds', 'max_chars', 'scroll_font', 'scroll_bg_file',
   'seal_open_file', 'seal_stamped_file', 'send_branch_file', 'land_branch_file',
+  'send_branch_x', 'send_branch_y', 'send_branch_scale', 'send_branch_rotation', 'send_branch_opacity',
+  'land_branch_x', 'land_branch_y', 'land_branch_scale', 'land_branch_rotation', 'land_branch_opacity',
 ]);
 
 export async function updateSettings(patch = {}) {

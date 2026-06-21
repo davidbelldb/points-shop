@@ -89,7 +89,16 @@ export default function NewChatPage() {
         />
       )}
       {/* Send branch is visible for the whole send sequence (intro → perch → fly-off). */}
-      {sendStage !== 'idle' && <ScrollBranch file={settings.send_branch_file} side="left" />}
+      {sendStage !== 'idle' && (
+        <ScrollBranch
+          file={settings.send_branch_file}
+          x={settings.send_branch_x}
+          y={settings.send_branch_y}
+          scale={settings.send_branch_scale}
+          rotation={settings.send_branch_rotation}
+          opacity={settings.send_branch_opacity}
+        />
+      )}
 
       {/* Intro: crow flies in and perches on the send branch (frames 00–02),
           pausing on 02; tapping it opens the compose modal. The perch stays
@@ -124,7 +133,11 @@ export default function NewChatPage() {
           <LandingPerch
             branchFile={settings.land_branch_file}
             crowFile={landCrowFile}
-            side="right"
+            x={settings.land_branch_x}
+            y={settings.land_branch_y}
+            scale={settings.land_branch_scale}
+            rotation={settings.land_branch_rotation}
+            opacity={settings.land_branch_opacity}
             showCrow={!landFlight}
             count={scrolls.unread}
             onTap={() => setListOpen(true)}
