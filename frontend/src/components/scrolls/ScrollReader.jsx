@@ -47,12 +47,13 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
           />
         )}
 
-        {/* Origin address — at the top of the scroll roll */}
-        {scroll.origin_label && (
-          <p className="absolute inset-x-0 text-center text-[11px] italic text-black/60" style={{ top: '7%', fontFamily: font }}>
-            from {scroll.origin_label}
-          </p>
-        )}
+        {/* Origin address + sent date — both at the top of the scroll roll */}
+        <div className="absolute inset-x-0 text-center" style={{ top: '5.5%', fontFamily: font }}>
+          {scroll.origin_label && (
+            <p className="text-[11px] italic text-black/60">from {scroll.origin_label}</p>
+          )}
+          <p className="text-[11px] italic text-black/55">Sent {formatSent(scroll.sent_at)}</p>
+        </div>
 
         {/* Message centred in the frame; destination + distance beneath (footer) */}
         <div
@@ -77,12 +78,12 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
           type="button"
           onClick={onClose}
           title="Close"
-          className="absolute left-1/2 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full transition active:scale-95"
-          style={{ bottom: 'calc(15% - 20px)' }}
+          className="absolute left-1/2 flex h-[91px] w-[91px] -translate-x-1/2 items-center justify-center rounded-full transition active:scale-95"
+          style={{ bottom: 'calc(15% - 35px)' }}
         >
           {sealStamped && !sealBroken
-            ? <img src={sealStamped} alt="" onError={() => setSealBroken(true)} className="h-24 w-24 object-contain" draggable={false} />
-            : <span className="h-20 w-20 rounded-full shadow-lg" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />}
+            ? <img src={sealStamped} alt="" onError={() => setSealBroken(true)} className="h-[91px] w-[91px] object-contain" draggable={false} />
+            : <span className="h-[76px] w-[76px] rounded-full shadow-lg" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />}
           <span
             className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-bold uppercase tracking-[0.1em]"
             style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
@@ -90,14 +91,6 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
             Close
           </span>
         </button>
-
-        {/* Sent date — dropped onto the bottom rolled area */}
-        <p
-          className="absolute inset-x-0 text-center text-[11px] italic text-black/60"
-          style={{ bottom: '6%', fontFamily: font }}
-        >
-          Sent {formatSent(scroll.sent_at)}
-        </p>
       </div>
     </div>
   );

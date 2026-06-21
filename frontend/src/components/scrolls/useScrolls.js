@@ -53,8 +53,10 @@ export function useScrolls() {
     return scroll;
   }, [refreshUnread]);
 
+  // Reading a scroll removes it (ephemeral): drop it from the list locally and
+  // delete it server-side.
   const markRead = useCallback(async (id) => {
-    setScrolls((prev) => prev.map((s) => (s.id === id ? { ...s, read_at: new Date().toISOString() } : s)));
+    setScrolls((prev) => prev.filter((s) => s.id !== id));
     setUnread((n) => Math.max(0, n - 1));
     prevUnreadRef.current = Math.max(0, prevUnreadRef.current - 1);
     try { await api.scrolls.markRead(id); } catch { /* best effort */ }

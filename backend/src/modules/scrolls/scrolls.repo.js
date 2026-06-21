@@ -165,10 +165,10 @@ export async function unreadCount(recipientId) {
   return rows[0]?.n ?? 0;
 }
 
+// Reading a scroll removes it (ephemeral — gone once read).
 export async function markRead(scrollId, accountId) {
   await query(
-    `UPDATE scrolls SET read_at = NOW()
-      WHERE id = $1 AND recipient_id = $2 AND read_at IS NULL`,
+    `DELETE FROM scrolls WHERE id = $1 AND recipient_id = $2`,
     [scrollId, accountId],
   );
   return { ok: true };

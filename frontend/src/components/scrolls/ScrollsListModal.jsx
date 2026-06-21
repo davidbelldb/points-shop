@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from '../../lib/ThemeContext.jsx';
 import ScrollReader from './ScrollReader.jsx';
+import { assetUrl } from './scrollAssets.js';
 
 function formatSent(ts) {
   try {
@@ -21,6 +22,8 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
 
   const cardBg = isDark ? '#171717' : '#ffffff';
   const rowBg = isDark ? '#262626' : '#f5f5f5';
+  const closedUrl = assetUrl(settings.scroll_closed_file || 'scroll_closed_1.png');
+  const sealUrl = assetUrl(settings.seal_stamped_file);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !openScroll) onClose(); };
@@ -55,31 +58,48 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
             </p>
           )}
 
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {scrolls.map((s) => (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => open(s)}
-                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition active:scale-[0.99]"
-                  style={{ background: rowBg }}
+                  className="relative block w-full transition active:scale-[0.99]"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
-                      <span>From {s.sender_name || s.sender_username || 'a friend'}</span>
+                  {/* Closed-scroll graphic */}
+                  {closedUrl
+                    ? <img src={closedUrl} alt="" draggable={false} className="block w-full select-none" />
+                    : <div className="h-20 rounded-xl" style={{ background: rowBg }} />}
+
+                  {/* Sender + date overlaid on the scroll (kept clear of the seal) */}
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center text-center"
+                    style={{ paddingLeft: '8%', paddingRight: '24%', fontFamily: font }}
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-black/80">
+                      From {s.sender_name || s.sender_username || 'a friend'}
                       {s.simulated && (
-                        <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-600">Test</span>
+                        <span className="rounded bg-black/15 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-black/70">Test</span>
                       )}
                       {!s.read_at && (
                         <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">New</span>
                       )}
-                    </div>
-                    <p className="mt-0.5 line-clamp-1 text-sm" style={{ color: isDark ? '#e5e5e5' : '#262626', fontFamily: font }}>
-                      {s.body}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-neutral-400">{formatSent(s.sent_at)}</p>
+                    </span>
+                    <span className="text-[11px] text-black/60">{formatSent(s.sent_at)}</span>
                   </div>
-                  <span className="shrink-0 text-neutral-400">›</span>
+
+                  {/* OPEN wax seal on the right */}
+                  <span className="absolute right-[4%] top-1/2 flex h-16 w-16 -translate-y-1/2 items-center justify-center">
+                    {sealUrl
+                      ? <img src={sealUrl} alt="" draggable={false} className="h-16 w-16 object-contain" />
+                      : <span className="h-14 w-14 rounded-full shadow" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />}
+                    <span
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold uppercase tracking-wide"
+                      style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
+                    >
+                      Open
+                    </span>
+                  </span>
                 </button>
               </li>
             ))}

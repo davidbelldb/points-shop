@@ -11,7 +11,7 @@ const DROPDOWN_BG = '#d2a469';
 const CAMBRIDGE_VIEWBOX = '0.02,52.27,0.25,52.12';
 
 // Message constraints: 20 chars per line, max 4 lines (=> 80 chars total).
-const MAX_LINE = 20;
+const MAX_LINE = 25;
 const MAX_LINES = 4;
 const MAX_TOTAL = MAX_LINE * MAX_LINES;
 
@@ -43,7 +43,9 @@ function wrapMessage(input) {
       else { lines.push(cur); cur = (lines.length < MAX_LINES) ? w : ''; }
     }
     if (cur !== '' && lines.length < MAX_LINES) lines.push(cur);
-    else if (cur === '' && si < segments.length - 1 && lines.length < MAX_LINES && segments[si] === '') lines.push('');
+    // Honour explicit newlines (incl. a trailing one) so the user can add their
+    // own carriage returns — an empty segment becomes an empty line.
+    else if (cur === '' && segments[si] === '' && lines.length < MAX_LINES) lines.push('');
   }
   let out = lines.slice(0, MAX_LINES).join('\n');
   if (endsWithSpace) {
@@ -213,8 +215,11 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
       : 'Choose a destination.';
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-3">
-      <div className="relative">
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-3"
+      onClick={() => !sending && onClose()}
+    >
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
         {/* Full scroll image (no crop). Fallback box if not yet supplied. */}
         {bgUrl ? (
           <img src={bgUrl} alt="" draggable={false} className="block max-h-[94vh] w-auto max-w-[94vw] select-none" />
@@ -225,17 +230,9 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
           />
         )}
 
-        <button
-          type="button"
-          onClick={() => !sending && onClose()}
-          className="absolute right-[7%] z-20 text-3xl leading-none text-black/70 hover:text-black"
-          style={{ top: 'calc(5% + 2px)' }}
-          aria-label="Close"
-        >×</button>
-
         {/* Overlaid content, inset to the parchment's writable area. */}
         <div className="absolute inset-0 flex flex-col items-center text-center" style={{ padding: '5.5% 14% 7%' }}>
-          <h2 className="text-2xl text-black" style={{ fontFamily: font, letterSpacing: '0.5px' }}>
+          <h2 className="text-2xl text-black" style={{ fontFamily: font, letterSpacing: '0.5px', position: 'relative', top: '1px' }}>
             Send a Sneaky Scroll
           </h2>
 
@@ -248,7 +245,6 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             onChange={(e) => setBody(wrapMessage(e.target.value))}
             placeholder="Pen thy message…"
             rows={MAX_LINES}
-            wrap="hard"
             className="w-full resize-none bg-transparent text-center text-xl leading-snug text-black placeholder-black/40 focus:outline-none"
             style={{ fontFamily: font, whiteSpace: 'pre-wrap' }}
           />
