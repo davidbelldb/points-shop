@@ -182,15 +182,13 @@ export async function resolveDueScrolls() {
     `UPDATE scrolls
         SET delivered = TRUE, delivered_at = NOW(), status = 'delivered'
       WHERE delivered = FALSE AND deliver_at <= NOW()
-      RETURNING id, sender_id, recipient_id`,
+      RETURNING id, recipient_id, origin_label`,
   );
   for (const s of rows) {
-    const { rows: who } = await query(`SELECT name FROM accounts WHERE id = $1`, [s.sender_id]);
-    const name = who[0]?.name || 'Someone';
     try {
       await sendPush(s.recipient_id, {
         title: 'A crow has arrived',
-        body: `${name}'s crow has arrived with important news`,
+        body: `Important news from ${s.origin_label || 'afar'}`,
         url: '/new-chat?scrolls=1',
         tag: 'scroll-arrival',
       });

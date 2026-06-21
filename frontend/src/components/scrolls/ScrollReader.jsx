@@ -69,7 +69,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
             </p>
           </div>
           {destLine && (
-            <p className="mt-2 text-[11px] leading-tight text-black/70" style={{ fontFamily: font }}>to {destLine}</p>
+            <p className="mt-2 text-[11px] leading-tight text-black/70" style={{ fontFamily: font, marginBottom: '3rem' }}>to {destLine}</p>
           )}
         </div>
 
