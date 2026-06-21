@@ -77,7 +77,16 @@ function DestinationPicker({ value, onPick, font }) {
         { headers: { 'Accept-Language': 'en' } },
       );
       const data = await res.json();
-      setResults(Array.isArray(data) ? data : []);
+      // Street names only, de-duplicated.
+      const seen = new Set();
+      const streets = [];
+      for (const r of (Array.isArray(data) ? data : [])) {
+        const road = r.address?.road;
+        if (!road || seen.has(road)) continue;
+        seen.add(road);
+        streets.push({ ...r, road });
+      }
+      setResults(streets);
       setOpen(true);
     } catch { setResults([]); }
     finally { setBusy(false); }
@@ -91,7 +100,7 @@ function DestinationPicker({ value, onPick, font }) {
   }
 
   function choose(r) {
-    const lbl = r.display_name?.split(',').slice(0, 2).join(',').trim() || r.display_name;
+    const lbl = r.road || r.display_name?.split(',')[0].trim() || r.display_name;
     onPick({ label: lbl, lat: Number(r.lat), lng: Number(r.lon) });
     setQ(lbl);
     setResults([]);
@@ -105,8 +114,8 @@ function DestinationPicker({ value, onPick, font }) {
         onChange={onInput}
         onFocus={() => results.length && setOpen(true)}
         placeholder="Destination"
-        style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(90,60,20,0.45)', fontFamily: font }}
-        className="w-full rounded-lg px-3 py-1.5 text-center text-base text-black placeholder-black/50 focus:outline-none focus:ring-1 focus:ring-black/40"
+        style={{ background: 'transparent', border: 'none', fontFamily: font }}
+        className="w-full px-3 py-1.5 text-center text-base text-black placeholder-black/50 focus:outline-none"
       />
       {busy && <span className="absolute right-2 top-2 text-[10px] text-black/40">…</span>}
       {open && results.length > 0 && (
@@ -122,7 +131,7 @@ function DestinationPicker({ value, onPick, font }) {
                 className="block w-full px-3 py-1.5 text-left text-sm text-black hover:bg-black/10"
                 style={{ fontFamily: font }}
               >
-                {r.display_name}
+                {r.road || r.display_name}
               </button>
             </li>
           ))}
@@ -165,7 +174,7 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
           { headers: { 'Accept-Language': 'en' } },
         );
         const data = await res.json();
-        const lbl = data.display_name?.split(',').slice(0, 2).join(',').trim() || 'your location';
+        const lbl = data.address?.road || data.display_name?.split(',')[0].trim() || 'your location';
         setOrigin({ label: lbl, lat: latitude, lng: longitude });
       } catch { setOrigin({ label: 'your location', lat: pos.coords.latitude, lng: pos.coords.longitude }); }
     }, () => { /* denied — origin stays unknown */ }, { timeout: 10000 });
