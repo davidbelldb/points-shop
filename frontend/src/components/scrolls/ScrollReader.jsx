@@ -58,7 +58,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
         {/* Message centred in the frame; destination + distance beneath (footer) */}
         <div
           className="absolute inset-x-0 flex flex-col items-center text-center"
-          style={{ top: '17%', bottom: '24%', paddingLeft: '15%', paddingRight: '15%' }}
+          style={{ top: '20%', bottom: '24%', paddingLeft: '15%', paddingRight: '15%' }}
         >
           <div className="flex flex-1 flex-col items-center justify-center">
             <p
@@ -69,7 +69,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
             </p>
           </div>
           {destLine && (
-            <p className="mt-2 text-[11px] leading-tight text-black/70" style={{ fontFamily: font, marginBottom: '3rem' }}>to {destLine}</p>
+            <p className="mt-2 text-[11px] leading-tight text-black/70" style={{ fontFamily: font, marginBottom: '1.6rem' }}>to {destLine}</p>
           )}
         </div>
 

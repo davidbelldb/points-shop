@@ -66,7 +66,7 @@ export default function CrowAnimationLayer({
   perchOnEnd = false,
   onFinalTap = null,
   onComplete = null,
-  baseSizePct = 10.5,
+  baseSizePct = 14,
   zIndex = 60,
 }) {
   const [idx, setIdx] = useState(0);

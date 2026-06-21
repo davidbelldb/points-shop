@@ -54,9 +54,9 @@ export default function NewChatPage() {
   const landFrames = scrolls.config.land || [];
   const landCrowFile = landFrames[landFrames.length - 1]?.sprite_file || 'crow_land_10.png';
 
-  // Send crow is rendered 55% bigger than the base size. Memoise the frame
-  // slices so the animation layer doesn't restart on every re-render.
-  const SEND_CROW_SIZE = 16.3;
+  // Memoise the frame slices so the animation layer doesn't restart on every
+  // re-render. (Crow size is now driven purely by each frame's config scale —
+  // send and land share the same base.)
   const introFrames = useMemo(() => (scrolls.config.send || []).slice(0, 3), [scrolls.config.send]);
   const flyoffFrames = useMemo(() => (scrolls.config.send || []).slice(2), [scrolls.config.send]);
 
@@ -109,7 +109,6 @@ export default function NewChatPage() {
           fps={fps}
           playing={sendStage === 'intro'}
           perchOnEnd
-          baseSizePct={SEND_CROW_SIZE}
           onComplete={() => setSendStage('perched')}
           onFinalTap={() => setComposeOpen(true)}
         />
@@ -121,7 +120,6 @@ export default function NewChatPage() {
           frames={flyoffFrames}
           fps={fps}
           playing
-          baseSizePct={SEND_CROW_SIZE}
           onComplete={() => setSendStage('idle')}
         />
       )}
