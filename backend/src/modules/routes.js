@@ -25,6 +25,7 @@ import notificationsRoutes from './notifications/notifications.routes.js';
 import surveysRoutes from './surveys/surveys.routes.js';
 import authRoutes from './auth/auth.routes.js';
 import chatRoutes from './chat/chat.routes.js';
+import scrollRoutes from './scrolls/scrolls.routes.js';
 import todRoutes from './tod/tod.routes.js';
 import gamesRoutes from './games/games.routes.js';
 import giftsweeperRoutes from './games/giftsweeper.routes.js';
@@ -69,6 +70,7 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(surveysRoutes);
   await fastify.register(authRoutes);
   await fastify.register(chatRoutes);
+  await fastify.register(scrollRoutes);
   await fastify.register(todRoutes);
   await fastify.register(gamesRoutes);
   await fastify.register(giftsweeperRoutes);
