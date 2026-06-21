@@ -20,7 +20,7 @@ export default function LandingPerch({
   perchBottom = 56,
   perchW = 58,
   baseVmin = 22.5,
-  zIndex = 60,
+  zIndex = 35,
 }) {
   const branchUrl = assetUrl(branchFile);
   const crowUrl = assetUrl(crowFile);

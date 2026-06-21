@@ -43,11 +43,11 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
         onClick={onClose}
       >
         <div
-          className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-3xl p-6 shadow-2xl"
+          className="flex max-h-[85vh] w-full max-w-md flex-col rounded-3xl p-6 shadow-2xl"
           style={{ background: cardBg }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex shrink-0 items-center justify-between">
             <h2 className="text-lg font-semibold" style={{ color: isDark ? '#fafafa' : '#171717' }}>Scrolls</h2>
             <button onClick={onClose} className="text-2xl leading-none text-neutral-400 hover:text-neutral-600" aria-label="Close">×</button>
           </div>
@@ -58,7 +58,7 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
             </p>
           )}
 
-          <ul className="space-y-3">
+          <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto">
             {scrolls.map((s) => (
               <li key={s.id}>
                 <button
@@ -108,7 +108,16 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
       </div>
 
       {openScroll && (
-        <ScrollReader scroll={openScroll} settings={settings} onClose={() => setOpenScroll(null)} />
+        <ScrollReader
+          scroll={openScroll}
+          settings={settings}
+          onClose={() => {
+            // Reading deletes the scroll. If none remain, close straight to chat;
+            // otherwise return to the (now shorter) list.
+            if (scrolls.length === 0) onClose();
+            else setOpenScroll(null);
+          }}
+        />
       )}
     </>
   );

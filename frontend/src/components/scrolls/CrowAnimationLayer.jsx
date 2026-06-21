@@ -67,7 +67,7 @@ export default function CrowAnimationLayer({
   onFinalTap = null,
   onComplete = null,
   baseSizePct = 14,
-  zIndex = 60,
+  zIndex = 35,
 }) {
   const [idx, setIdx] = useState(0);
   const [done, setDone] = useState(false);

@@ -5,7 +5,6 @@ import { useTheme } from '../lib/ThemeContext.jsx';
 import { useScrolls } from '../components/scrolls/useScrolls.js';
 import ScrollComposeModal from '../components/scrolls/ScrollComposeModal.jsx';
 import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
-import ScrollReader from '../components/scrolls/ScrollReader.jsx';
 import CrowAnimationLayer from '../components/scrolls/CrowAnimationLayer.jsx';
 import ScrollBranch from '../components/scrolls/ScrollBranch.jsx';
 import LandingPerch from '../components/scrolls/LandingPerch.jsx';
@@ -26,7 +25,6 @@ export default function NewChatPage() {
   const [trayOpen, setTrayOpen] = useState(false);
   const [sendStage, setSendStage] = useState('idle'); // idle | intro | perched | flight
   const [landFlight, setLandFlight] = useState(false);
-  const [readerScroll, setReaderScroll] = useState(null);
 
   // Deep-link from the arrival push (/new-chat?scrolls=1) opens the list.
   useEffect(() => {
@@ -79,13 +77,6 @@ export default function NewChatPage() {
           settings={settings}
           onRead={scrolls.markRead}
           onClose={() => { setListOpen(false); scrolls.refresh(); }}
-        />
-      )}
-      {readerScroll && (
-        <ScrollReader
-          scroll={readerScroll}
-          settings={settings}
-          onClose={() => { setReaderScroll(null); scrolls.refresh(); }}
         />
       )}
       {/* Send branch is visible for the whole send sequence (intro → perch → fly-off). */}

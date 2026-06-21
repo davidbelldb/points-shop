@@ -12,7 +12,7 @@ export default function ScrollBranch({
   rotation = 0,
   opacity = 1,
   baseVmin = 22.5,
-  zIndex = 55,
+  zIndex = 30,
 }) {
   const [broken, setBroken] = useState(false);
   const url = assetUrl(file);
