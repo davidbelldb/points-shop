@@ -84,6 +84,16 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me'),
   bootstrap: () => request('/bootstrap'),
+  // Scrolls (raven messages) — see /new-chat feature.
+  scrolls: {
+    list:     () => request('/scrolls'),
+    unread:   () => request('/scrolls/unread'),
+    send:     (payload) => request('/scrolls', { method: 'POST', body: JSON.stringify(payload) }),
+    markRead: (id) => request(`/scrolls/${id}/read`, { method: 'POST' }),
+    config:   () => request('/scrolls/config'),
+    saveSettings: (patch) => request('/scrolls/config/settings', { method: 'PUT', body: JSON.stringify(patch) }),
+    saveFrames:   (layer, frames) => request(`/scrolls/config/frames/${layer}`, { method: 'PUT', body: JSON.stringify({ frames }) }),
+  },
   getMessages: () => request('/messages'),
   sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>
     request('/messages', {

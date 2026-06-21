@@ -15,6 +15,7 @@ import PointsHistoryPage from './pages/PointsHistoryPage.jsx';
 import RewardsPage from './pages/RewardsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MessagesPage from './pages/MessagesPage.jsx';
+import NewChatPage from './pages/NewChatPage.jsx';
 
 // ── Lazy — heavy feature bundles, fetched only when their route is opened.
 // The games carry three.js / react-three-fiber / rapier; Notes carries
@@ -132,6 +133,10 @@ createRoot(document.getElementById('root')).render(
               <Route path="order/:id" element={<OrderConfirmationPage />} />
               <Route path="account" element={<AccountPage />} />
               <Route path="messages" element={<MessagesPage />} />
+              {/* Scrolls feature dev clone — URL-only, admin-gated inside the
+                  page, intentionally NOT linked in any menu. Merges into
+                  /messages when tested. */}
+              <Route path="new-chat" element={<NewChatPage />} />
               <Route path="games" element={<GamesPage />} />
               <Route path="games/truth-or-dare" element={<TruthOrDarePage />} />
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />
