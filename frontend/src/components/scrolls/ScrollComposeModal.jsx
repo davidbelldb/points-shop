@@ -20,7 +20,11 @@ const MAX_TOTAL = MAX_LINE * MAX_LINES;
    starts its 20-char count fresh (no carry-over). Words longer than 20 chars are
    hard-broken. Explicit newlines are honoured. Anything past 4 lines is dropped. */
 function wrapMessage(input) {
-  const segments = String(input).replace(/\r\n?/g, '\n').split('\n');
+  const src = String(input).replace(/\r\n?/g, '\n');
+  // Preserve an in-progress trailing space so the user can actually type spaces
+  // (re-wrapping on every keystroke would otherwise strip it instantly).
+  const endsWithSpace = / $/.test(src);
+  const segments = src.split('\n');
   const lines = [];
   for (let si = 0; si < segments.length && lines.length < MAX_LINES; si++) {
     const words = segments[si].split(' ');
@@ -41,7 +45,16 @@ function wrapMessage(input) {
     if (cur !== '' && lines.length < MAX_LINES) lines.push(cur);
     else if (cur === '' && si < segments.length - 1 && lines.length < MAX_LINES && segments[si] === '') lines.push('');
   }
-  return lines.slice(0, MAX_LINES).join('\n');
+  let out = lines.slice(0, MAX_LINES).join('\n');
+  if (endsWithSpace) {
+    const parts = out.split('\n');
+    const last = parts.length - 1;
+    if (parts[last].length > 0 && parts[last].length < MAX_LINE) {
+      parts[last] += ' ';
+      out = parts.join('\n');
+    }
+  }
+  return out;
 }
 
 /* Destination picker — Nominatim lookup limited to Cambridge, UK. Styled to sit
