@@ -52,6 +52,8 @@ export default function NewChatPage() {
   const landFrames = scrolls.config.land || [];
   const landLast = landFrames[landFrames.length - 1];
   const landCrowFile = landLast?.sprite_file || 'crow_land_10.png';
+  const landCrowX = landLast?.x ?? 88;
+  const landCrowY = landLast?.y ?? 50;
   const landCrowScale = Number(landLast?.scale) || 1;
 
   // Memoise the frame slices so the animation layer doesn't restart on every
@@ -129,6 +131,8 @@ export default function NewChatPage() {
             scale={settings.land_branch_scale}
             rotation={settings.land_branch_rotation}
             opacity={settings.land_branch_opacity}
+            crowX={landCrowX}
+            crowY={landCrowY}
             crowScale={landCrowScale}
             showCrow={!landFlight}
             count={scrolls.unread}
