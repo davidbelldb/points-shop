@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { assetUrl, haversineKm, flightSeconds, humanizeSeconds } from './scrollAssets.js';
 
+// scroll_blank.png is 1360 x 1542.
+const SCROLL_W = 1360;
+const SCROLL_H = 1542;
 const PARCHMENT_FALLBACK = 'linear-gradient(155deg, #f3e7c6 0%, #e8d39c 55%, #dcc488 100%)';
+const DROPDOWN_BG = '#d2a469';
 
-function surfaceStyle(bgUrl) {
-  return bgUrl
-    ? { backgroundImage: `url(${bgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: PARCHMENT_FALLBACK };
-}
+// Cambridge, UK bounding box for the destination lookup.
+const CAMBRIDGE_VIEWBOX = '0.02,52.27,0.25,52.12';
 
-/* Place picker — typed search + Nominatim autocomplete, styled to sit on the
-   parchment surface (translucent white inputs, black text). */
-function PlacePicker({ label, value, onPick, allowGps }) {
+/* Destination picker — Nominatim lookup limited to Cambridge, UK. Styled to sit
+   on the parchment: ImperialBlack font, single centred field, dropdown in black
+   on #d2a469. */
+function DestinationPicker({ value, onPick, font }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -23,7 +25,8 @@ function PlacePicker({ label, value, onPick, allowGps }) {
     setBusy(true);
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`
+        + `&limit=6&addressdetails=1&countrycodes=gb&viewbox=${CAMBRIDGE_VIEWBOX}&bounded=1`,
         { headers: { 'Accept-Language': 'en' } },
       );
       const data = await res.json();
@@ -48,52 +51,29 @@ function PlacePicker({ label, value, onPick, allowGps }) {
     setOpen(false);
   }
 
-  async function snapGps() {
-    if (!navigator.geolocation) return;
-    setBusy(true);
-    try {
-      const pos = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }));
-      const { latitude, longitude } = pos.coords;
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
-        { headers: { 'Accept-Language': 'en' } },
-      );
-      const data = await res.json();
-      const lbl = data.display_name?.split(',').slice(0, 2).join(',').trim() || 'My location';
-      onPick({ label: lbl, lat: latitude, lng: longitude });
-      setQ(lbl);
-    } catch { /* denied / unavailable */ }
-    finally { setBusy(false); }
-  }
-
   return (
-    <div style={{ position: 'relative' }}>
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-black/60">{label}</span>
-        {allowGps && (
-          <button type="button" onClick={snapGps} className="text-[10px] text-black/70 underline">
-            use my location
-          </button>
-        )}
-      </div>
+    <div className="relative mx-auto w-[78%]">
       <input
         value={q}
         onChange={onInput}
         onFocus={() => results.length && setOpen(true)}
-        placeholder={value?.label || 'Search a place…'}
-        className="mt-0.5 w-full rounded-lg px-2.5 py-1.5 text-sm text-black placeholder-black/40 focus:outline-none focus:ring-1 focus:ring-black/40"
-        style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(90,60,20,0.35)' }}
+        placeholder="Destination"
+        style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(90,60,20,0.45)', fontFamily: font }}
+        className="w-full rounded-lg px-3 py-1.5 text-center text-base text-black placeholder-black/50 focus:outline-none focus:ring-1 focus:ring-black/40"
       />
-      {busy && <span className="absolute right-2 top-7 text-[10px] text-black/40">…</span>}
+      {busy && <span className="absolute right-2 top-2 text-[10px] text-black/40">…</span>}
       {open && results.length > 0 && (
-        <ul className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg bg-white shadow-lg" style={{ border: '1px solid rgba(90,60,20,0.35)' }}>
+        <ul
+          className="absolute left-0 z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg shadow-lg"
+          style={{ background: DROPDOWN_BG, border: '1px solid rgba(90,60,20,0.45)' }}
+        >
           {results.map((r) => (
             <li key={r.place_id}>
               <button
                 type="button"
                 onClick={() => choose(r)}
-                className="block w-full px-2.5 py-1.5 text-left text-xs text-black hover:bg-black/5"
+                className="block w-full px-3 py-1.5 text-left text-sm text-black hover:bg-black/10"
+                style={{ fontFamily: font }}
               >
                 {r.display_name}
               </button>
@@ -105,12 +85,12 @@ function PlacePicker({ label, value, onPick, allowGps }) {
   );
 }
 
-/* Compose modal — the scroll_blank parchment IS the modal surface (rounded card
-   over a dimmed page), matching the reader. Message in the scroll font, black
-   for legibility. Closes only via the explicit ✕ or Escape. */
+/* Compose modal — the scroll_blank parchment is shown in full (no cropping) with
+   content overlaid. Sender location is requested automatically; only the
+   destination is chosen, centred. */
 export default function ScrollComposeModal({ settings = {}, testMode = false, onSend, onSent, onClose }) {
   const [body, setBody] = useState('');
-  const [origin, setOrigin] = useState(null);
+  const [origin, setOrigin] = useState(null); // auto from geolocation
   const [dest, setDest] = useState(null);
   const [stamping, setStamping] = useState(false);
   const [sending, setSending] = useState(false);
@@ -127,6 +107,23 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
     const km = haversineKm(origin?.lat, origin?.lng, dest?.lat, dest?.lng);
     return { km, secs: flightSeconds(km, settings) };
   }, [origin, dest, settings]);
+
+  // Request the sender's location automatically (no field shown).
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const { latitude, longitude } = pos.coords;
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en' } },
+        );
+        const data = await res.json();
+        const lbl = data.display_name?.split(',').slice(0, 2).join(',').trim() || 'your location';
+        setOrigin({ label: lbl, lat: latitude, lng: longitude });
+      } catch { setOrigin({ label: 'your location', lat: pos.coords.latitude, lng: pos.coords.longitude }); }
+    }, () => { /* denied — origin stays unknown */ }, { timeout: 10000 });
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !sending) onClose(); };
@@ -154,74 +151,77 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
     }
   }
 
+  const previewText = origin && dest
+    ? `≈ ${Math.round(flight.km).toLocaleString()} km · arrives in ${humanizeSeconds(flight.secs)}`
+    : dest
+      ? 'Allow location to time the crow’s journey.'
+      : 'Choose a destination.';
+
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
-      <div
-        className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl px-6 py-6 shadow-2xl"
-        style={{ ...surfaceStyle(bgUrl), border: '1px solid rgba(90,60,20,0.4)' }}
-      >
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-3">
+      <div className="relative">
+        {/* Full scroll image (no crop). Fallback box if not yet supplied. */}
+        {bgUrl ? (
+          <img src={bgUrl} alt="" draggable={false} className="block max-h-[94vh] w-auto max-w-[94vw] select-none" />
+        ) : (
+          <div
+            className="max-h-[94vh] max-w-[94vw] rounded-2xl"
+            style={{ aspectRatio: `${SCROLL_W} / ${SCROLL_H}`, width: 420, background: PARCHMENT_FALLBACK }}
+          />
+        )}
+
         <button
           type="button"
           onClick={() => !sending && onClose()}
-          className="absolute right-3 top-2 text-3xl leading-none text-black/60 hover:text-black"
+          className="absolute right-[7%] top-[5%] text-3xl leading-none text-black/70 hover:text-black"
           aria-label="Close"
         >×</button>
 
-        <h2 className="mb-1 text-center text-2xl text-black" style={{ fontFamily: font, letterSpacing: '0.5px' }}>
-          A Scroll by Raven
-        </h2>
+        {/* Overlaid content, inset to the parchment's writable area. */}
+        <div className="absolute inset-0 flex flex-col items-center text-center" style={{ padding: '11% 14% 8%' }}>
+          <h2 className="text-2xl text-black" style={{ fontFamily: font, letterSpacing: '0.5px' }}>
+            Send a Sneaky Scroll
+          </h2>
 
-        {testMode && (
-          <p className="mx-auto mb-2 w-fit rounded-md bg-black/10 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-black/70">
-            Test · flies back to you only
-          </p>
-        )}
+          <textarea
+            autoFocus
+            value={body}
+            maxLength={maxChars}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Pen thy message…"
+            rows={4}
+            className="mt-2 w-full resize-none bg-transparent text-center text-xl leading-snug text-black placeholder-black/40 focus:outline-none"
+            style={{ fontFamily: font }}
+          />
+          <div className="w-full text-right text-[10px] text-black/50">{body.length}/{maxChars}</div>
 
-        <textarea
-          autoFocus
-          value={body}
-          maxLength={maxChars}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Pen thy message…"
-          rows={5}
-          className="w-full resize-none bg-transparent text-center text-xl leading-relaxed text-black placeholder-black/40 focus:outline-none"
-          style={{ fontFamily: font }}
-        />
-        <div className="mb-3 text-right text-[10px] text-black/50">{body.length}/{maxChars}</div>
+          <div className="flex-1" />
 
-        <div className="grid grid-cols-2 gap-3">
-          <PlacePicker label="From" value={origin} onPick={setOrigin} allowGps />
-          <PlacePicker label="To" value={dest} onPick={setDest} />
-        </div>
+          <DestinationPicker value={dest} onPick={setDest} font={font} />
+          <div className="mt-1 text-center text-xs text-black/70" style={{ fontFamily: font }}>
+            {previewText}
+          </div>
 
-        <div className="mt-3 text-center text-xs text-black/70" style={{ fontFamily: font }}>
-          {origin && dest
-            ? `≈ ${Math.round(flight.km).toLocaleString()} km · thy crow shall arrive in ${humanizeSeconds(flight.secs)}`
-            : 'Set a from & to, and the crow’s journey will be timed.'}
-        </div>
+          {error && <p className="mt-1 text-center text-xs text-red-700">{error}</p>}
 
-        {error && <p className="mt-2 text-center text-xs text-red-700">{error}</p>}
-
-        {/* Wax seal = send button */}
-        <div className="mt-4 flex justify-center">
+          {/* Wax seal = send button */}
           <button
             type="button"
             onClick={fireSend}
             disabled={!body.trim() || sending}
             title="Seal & send"
-            className="relative flex h-24 w-24 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40"
+            className="relative mt-2 flex h-20 w-20 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40"
           >
             <span
-              className="relative flex h-24 w-24 items-center justify-center"
+              className="relative flex h-20 w-20 items-center justify-center"
               style={{ animation: stamping ? 'scroll-seal-stamp 0.55s cubic-bezier(0.3,1.5,0.5,1) both' : undefined }}
             >
               {(() => {
                 const url = stamping ? (sealStamped || sealOpen) : sealOpen;
                 return url && !sealBroken
-                  ? <img src={url} alt="wax seal" onError={() => setSealBroken(true)} className="h-24 w-24 object-contain" draggable={false} />
-                  : <span className="h-20 w-20 rounded-full shadow-lg" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />;
+                  ? <img src={url} alt="wax seal" onError={() => setSealBroken(true)} className="h-20 w-20 object-contain" draggable={false} />
+                  : <span className="h-16 w-16 rounded-full shadow-lg" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />;
               })()}
-              {/* SEAL label over the sprite */}
               <span
                 className="pointer-events-none absolute inset-0 flex items-center justify-center text-base font-bold uppercase tracking-[0.15em]"
                 style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
@@ -231,9 +231,6 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             </span>
           </button>
         </div>
-        <p className="mt-1 text-center text-[10px] text-black/60" style={{ fontFamily: font }}>
-          {sending ? 'Dispatching the raven…' : 'Press the seal to send'}
-        </p>
       </div>
     </div>
   );
