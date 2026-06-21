@@ -228,7 +228,8 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
         <button
           type="button"
           onClick={() => !sending && onClose()}
-          className="absolute right-[7%] top-[5%] text-3xl leading-none text-black/70 hover:text-black"
+          className="absolute right-[7%] z-20 text-3xl leading-none text-black/70 hover:text-black"
+          style={{ top: 'calc(5% + 2px)' }}
           aria-label="Close"
         >×</button>
 
