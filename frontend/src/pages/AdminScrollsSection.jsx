@@ -9,7 +9,7 @@ const labelCls = 'mb-1 block text-xs font-medium uppercase tracking-wide text-ne
 const SETTINGS_FIELDS = [
   { key: 'frame_rate_fps', label: 'Frame rate (fps)', type: 'number', hint: 'Global default; per-frame duration overrides this.' },
   { key: 'crow_speed_kmh', label: 'Crow speed (km/h)', type: 'number', hint: 'A real raven ≈ 45.' },
-  { key: 'speed_multiplier', label: 'Time compression ×', type: 'number', hint: 'In-world seconds per real second. 1 = medieval, 60 = 1 raven-hr/real-min, 99999 ≈ instant.' },
+  { key: 'speed_multiplier', label: 'Speed multiplier (time compression ×)', type: 'number', hint: 'In-world seconds per real second. 1 = realistic/medieval (3km ≈ 4min), 60 = 1 raven-hr per real-min, 99999 ≈ instant. Lower = slower delivery.' },
   { key: 'min_flight_seconds', label: 'Min flight (s)', type: 'number' },
   { key: 'max_flight_seconds', label: 'Max flight (s)', type: 'number' },
   { key: 'max_chars', label: 'Max scroll characters', type: 'number' },
