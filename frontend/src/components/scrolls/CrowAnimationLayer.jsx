@@ -4,7 +4,7 @@ import { assetUrl } from './scrollAssets.js';
 /* A single crow frame: its sprite positioned on a 0..100 normalized stage.
    Falls back to a visible placeholder glyph if the sprite file isn't present
    yet, so the animation is fully testable before the real art lands. */
-function CrowFrame({ frame, baseSizePct }) {
+function CrowFrame({ frame, baseSizePct, position = 'fixed', zIndex }) {
   const [broken, setBroken] = useState(false);
   const url = assetUrl(frame.sprite_file);
   // Reset the broken flag whenever the sprite changes, so a single failed frame
@@ -12,13 +12,15 @@ function CrowFrame({ frame, baseSizePct }) {
   useEffect(() => { setBroken(false); }, [url]);
   const size = baseSizePct * (Number(frame.scale) || 1);
   const wrap = {
-    position: 'absolute',
+    position,
     left: `${frame.x}%`,
     top: `${frame.y}%`,
     width: `${size}vmin`,
     height: `${size}vmin`,
     transform: `translate(-50%, -50%) rotate(${Number(frame.rotation) || 0}deg)`,
     opacity: frame.opacity == null ? 1 : Number(frame.opacity),
+    zIndex,
+    pointerEvents: 'none',
     willChange: 'left, top, transform, opacity',
   };
   if (broken || !url) {
@@ -111,40 +113,31 @@ export default function CrowAnimationLayer({
   const frame = showPerched ? frames[frames.length - 1] : frames[idx];
   const tappable = showPerched && typeof onFinalTap === 'function';
 
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        overflow: 'hidden',
-        zIndex,
-        pointerEvents: tappable ? 'none' : 'none',
-      }}
-      aria-hidden={!tappable}
-    >
-      {tappable ? (
-        <button
-          type="button"
-          onClick={onFinalTap}
-          title="Read the scroll"
-          style={{
-            position: 'absolute',
-            left: `${frame.x}%`,
-            top: `${frame.y}%`,
-            width: `${baseSizePct * (Number(frame.scale) || 1) * 1.4}vmin`,
-            height: `${baseSizePct * (Number(frame.scale) || 1) * 1.4}vmin`,
-            transform: 'translate(-50%, -50%)',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            pointerEvents: 'auto',
-          }}
-        >
-          <CrowFrame frame={{ ...frame, x: 50, y: 50 }} baseSizePct={baseSizePct} />
-        </button>
-      ) : (
-        <CrowFrame frame={frame} baseSizePct={baseSizePct} />
-      )}
-    </div>
-  );
+  // Positioned `fixed` (like the branch) so `top: %` resolves against the
+  // viewport — an absolute child of a fixed stage doesn't, in Safari.
+  if (tappable) {
+    return (
+      <button
+        type="button"
+        onClick={onFinalTap}
+        title="Read the scroll"
+        style={{
+          position: 'fixed',
+          left: `${frame.x}%`,
+          top: `${frame.y}%`,
+          width: `${baseSizePct * (Number(frame.scale) || 1) * 1.4}vmin`,
+          height: `${baseSizePct * (Number(frame.scale) || 1) * 1.4}vmin`,
+          transform: 'translate(-50%, -50%)',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          zIndex,
+        }}
+      >
+        <CrowFrame frame={{ ...frame, x: 50, y: 50 }} baseSizePct={baseSizePct} position="absolute" />
+      </button>
+    );
+  }
+  return <CrowFrame frame={frame} baseSizePct={baseSizePct} position="fixed" zIndex={zIndex} />;
 }

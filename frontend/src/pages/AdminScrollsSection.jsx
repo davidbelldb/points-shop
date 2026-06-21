@@ -103,7 +103,7 @@ function LayerPreview({ frames, fps, branch }) {
 
   return (
     <div className="space-y-2">
-      <div className="relative w-full overflow-hidden rounded-lg border border-neutral-300 bg-gradient-to-b from-sky-100 to-amber-50" style={{ aspectRatio: '3 / 2' }}>
+      <div className="relative w-full overflow-hidden rounded-lg border border-neutral-300 bg-gradient-to-b from-sky-100 to-amber-50" style={{ paddingBottom: '66.67%' }}>
         {/* branch (behind the crow) */}
         {branch?.file && assetUrl(branch.file) && (
           <img

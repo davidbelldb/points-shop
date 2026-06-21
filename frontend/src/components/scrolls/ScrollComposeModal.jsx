@@ -284,7 +284,7 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             className="w-full resize-none bg-transparent text-center text-xl leading-snug text-black placeholder-black/40 focus:outline-none"
             style={{ fontFamily: font, whiteSpace: 'pre-wrap' }}
           />
-          <div className="w-full text-right text-[10px] text-black/50">{body.replace(/\n/g, '').length}/{MAX_TOTAL}</div>
+          <div className="w-full text-center text-[10px] text-black/50" style={{ marginTop: '-1.4rem' }}>{body.replace(/\n/g, '').length}/{MAX_TOTAL}</div>
 
           <div className="flex-1" />
 
