@@ -128,7 +128,7 @@ export async function createScroll({
         origin_label, origin_lat, origin_lng,
         dest_label, dest_lat, dest_lng,
         distance_km, flight_seconds, simulated, deliver_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, NOW() + ($11 * interval '1 second'))
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, NOW() + ($11::int * interval '1 second'))
      RETURNING *`,
     [
       senderId, recipientId, text,
