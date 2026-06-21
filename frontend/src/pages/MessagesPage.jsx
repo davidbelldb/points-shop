@@ -10,6 +10,12 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
 const LazyStoryViewer = lazy(() => import('../components/stories/StoryViewer.jsx'));
 import SliderSticker from '../components/stories/SliderSticker.jsx';
+import { useScrolls } from '../components/scrolls/useScrolls.js';
+import ScrollComposeModal from '../components/scrolls/ScrollComposeModal.jsx';
+import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
+import CrowAnimationLayer from '../components/scrolls/CrowAnimationLayer.jsx';
+import ScrollBranch from '../components/scrolls/ScrollBranch.jsx';
+import LandingPerch from '../components/scrolls/LandingPerch.jsx';
 
 const POLL_MS = 8000;
 const DOUBLE_TAP_MS = 240;
@@ -1405,6 +1411,32 @@ export default function MessagesPage() {
   const { user } = useAuth();
   const { refresh: refreshBasket } = useBasket();
   const { theme } = useTheme();
+
+  // ── Scrolls (raven messages) ──
+  const scrolls = useScrolls();
+  const [scrollComposeOpen, setScrollComposeOpen] = useState(false);
+  const [scrollListOpen, setScrollListOpen] = useState(false);
+  const [sendStage, setSendStage] = useState('idle'); // idle | intro | perched | flight
+  const [landFlight, setLandFlight] = useState(false);
+  const scrollIntroFrames = useMemo(() => (scrolls.config.send || []).slice(0, 3), [scrolls.config.send]);
+  const scrollFlyoffFrames = useMemo(() => (scrolls.config.send || []).slice(2), [scrolls.config.send]);
+  const landIntroPlayedRef = useRef(false);
+
+  // Deep-link from the arrival push (?scrolls=1) opens the list.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('scrolls') === '1') setScrollListOpen(true);
+  }, []);
+  // Fresh arrival while the chat is open → play the fly-in.
+  useEffect(() => { if (scrolls.arrivedTick > 0) setLandFlight(true); }, [scrolls.arrivedTick]);
+  // Opening the chat with unread scrolls waiting → play the fly-in once.
+  useEffect(() => {
+    if (!scrolls.loading && scrolls.unread > 0 && !landIntroPlayedRef.current) {
+      landIntroPlayedRef.current = true;
+      setLandFlight(true);
+    }
+  }, [scrolls.loading, scrolls.unread]);
+
   const [data, setData] = useState({ other: null, messages: [] });
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1917,8 +1949,77 @@ export default function MessagesPage() {
 
   let lastDay = null;
 
+  // Scroll config-derived values.
+  const scrollSettings = scrolls.config.settings || {};
+  const scrollFps = scrollSettings.frame_rate_fps || 12;
+  const scrollLandFrames = scrolls.config.land || [];
+  const scrollLandLast = scrollLandFrames[scrollLandFrames.length - 1];
+  const scrollLandCrowFile = scrollLandLast?.sprite_file || 'crow_land_10.png';
+  const scrollLandCrowX = scrollLandLast?.x ?? 88;
+  const scrollLandCrowY = scrollLandLast?.y ?? 50;
+  const scrollLandCrowScale = Number(scrollLandLast?.scale) || 1;
+
   return (
     <>
+      {/* ── Scrolls (raven messages) overlays ── */}
+      {scrollComposeOpen && (
+        <ScrollComposeModal
+          settings={scrollSettings}
+          onSend={(p) => scrolls.send(p)}
+          onSent={() => { setScrollComposeOpen(false); setTimeout(() => setSendStage('flight'), 500); }}
+          onClose={() => { setScrollComposeOpen(false); setSendStage('idle'); }}
+        />
+      )}
+      {scrollListOpen && (
+        <ScrollsListModal
+          scrolls={scrolls.scrolls}
+          settings={scrollSettings}
+          onRead={scrolls.markRead}
+          onClose={() => { setScrollListOpen(false); scrolls.refresh(); }}
+        />
+      )}
+      {sendStage !== 'idle' && (
+        <ScrollBranch
+          file={scrollSettings.send_branch_file}
+          x={scrollSettings.send_branch_x} y={scrollSettings.send_branch_y}
+          scale={scrollSettings.send_branch_scale} rotation={scrollSettings.send_branch_rotation}
+          opacity={scrollSettings.send_branch_opacity}
+        />
+      )}
+      {(sendStage === 'intro' || sendStage === 'perched') && (
+        <CrowAnimationLayer
+          frames={scrollIntroFrames} fps={scrollFps}
+          playing={sendStage === 'intro'} perchOnEnd
+          onComplete={() => setSendStage('perched')}
+          onFinalTap={() => setScrollComposeOpen(true)}
+        />
+      )}
+      {sendStage === 'flight' && (
+        <CrowAnimationLayer
+          frames={scrollFlyoffFrames} fps={scrollFps} playing
+          onComplete={() => setSendStage('idle')}
+        />
+      )}
+      {(scrolls.unread > 0 || landFlight) && (
+        <>
+          <LandingPerch
+            branchFile={scrollSettings.land_branch_file}
+            x={scrollSettings.land_branch_x} y={scrollSettings.land_branch_y}
+            scale={scrollSettings.land_branch_scale} rotation={scrollSettings.land_branch_rotation}
+            opacity={scrollSettings.land_branch_opacity}
+            crowFile={scrollLandCrowFile} crowX={scrollLandCrowX} crowY={scrollLandCrowY} crowScale={scrollLandCrowScale}
+            showCrow={!landFlight} count={scrolls.unread}
+            onTap={() => setScrollListOpen(true)}
+          />
+          {landFlight && (
+            <CrowAnimationLayer
+              frames={scrolls.config.land} fps={scrollFps} playing={landFlight}
+              onComplete={() => setLandFlight(false)}
+            />
+          )}
+        </>
+      )}
+
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -2234,6 +2335,18 @@ export default function MessagesPage() {
               ) : (
                 /* ── State 3: normal media picker ── */
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {/* Scroll (raven message) */}
+                  <button
+                    type="button"
+                    onClick={() => { setShowMedia(false); setSendStage('intro'); }}
+                    title="Send a scroll"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M7 4h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7" /><path d="M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2" />
+                      <line x1="9.5" y1="9" x2="15" y2="9" /><line x1="9.5" y1="13" x2="15" y2="13" />
+                    </svg>
+                  </button>
                   <GifButton onClick={() => { setGifOpen(true); setShowMedia(false); }} />
                   <PhotoButton onClick={() => { photoInputRef.current?.click(); setShowMedia(false); }} />
                   <MicButton recording={false} onClick={toggleRecording} />
