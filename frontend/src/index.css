@@ -578,6 +578,10 @@ html .ht-theme-main-dark .wtBorder.corner {
   0%, 100% { transform: translate(-50%, -50%) translateY(0); }
   50%      { transform: translate(-50%, -50%) translateY(-6px); }
 }
+@keyframes scroll-perch-bob-x {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-5px); }
+}
 
 /* Scroll display font. Referenced by scrolls_settings.scroll_font = 'ImperialBlack'. */
 @font-face {

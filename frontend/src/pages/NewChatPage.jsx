@@ -8,6 +8,7 @@ import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
 import ScrollReader from '../components/scrolls/ScrollReader.jsx';
 import CrowAnimationLayer from '../components/scrolls/CrowAnimationLayer.jsx';
 import ScrollBranch from '../components/scrolls/ScrollBranch.jsx';
+import LandingPerch from '../components/scrolls/LandingPerch.jsx';
 
 /* /new-chat — a PRIVATE, admin-only test harness for the scrolls (raven message)
    feature. Deliberately a blank sandbox: it does NOT import, read, or write the
@@ -25,7 +26,6 @@ export default function NewChatPage() {
   const [trayOpen, setTrayOpen] = useState(false);
   const [sendFlight, setSendFlight] = useState(false);
   const [landFlight, setLandFlight] = useState(false);
-  const [perched, setPerched] = useState(false);
   const [readerScroll, setReaderScroll] = useState(null);
 
   // Deep-link from the arrival push (/new-chat?scrolls=1) opens the list.
@@ -34,9 +34,10 @@ export default function NewChatPage() {
     if (p.get('scrolls') === '1') setListOpen(true);
   }, []);
 
-  // A freshly-arrived crow plays the landing sequence, then perches (tappable).
+  // A freshly-arrived crow plays the landing fly-in once; the persistent perch
+  // (driven by unread count) takes over when it finishes.
   useEffect(() => {
-    if (scrolls.arrivedTick > 0) { setLandFlight(true); setPerched(false); }
+    if (scrolls.arrivedTick > 0) setLandFlight(true);
   }, [scrolls.arrivedTick]);
 
   // Admin-only. actual_role survives impersonation, so it stays locked to you.
@@ -48,6 +49,22 @@ export default function NewChatPage() {
   const fps = settings.frame_rate_fps || 12;
   const dark = theme === 'dark';
   const card = dark ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-200';
+
+  // The perched crow uses the final landing frame's sprite.
+  const landFrames = scrolls.config.land || [];
+  const landCrowFile = landFrames[landFrames.length - 1]?.sprite_file || 'crow_land_11.png';
+
+  // Tapping the perched crow opens the newest unread scroll (which marks it read,
+  // removing it — so the perch clears once nothing is unread).
+  function openNewestScroll() {
+    const newest = scrolls.scrolls[0];
+    if (newest) {
+      setReaderScroll(newest);
+      if (!newest.read_at) scrolls.markRead(newest.id);
+    } else {
+      setListOpen(true);
+    }
+  }
 
   return (
     <>
@@ -66,7 +83,7 @@ export default function NewChatPage() {
           scrolls={scrolls.scrolls}
           settings={settings}
           onRead={scrolls.markRead}
-          onClose={() => { setListOpen(false); setPerched(false); scrolls.refresh(); }}
+          onClose={() => { setListOpen(false); scrolls.refresh(); }}
         />
       )}
       {readerScroll && (
@@ -83,27 +100,26 @@ export default function NewChatPage() {
         playing={sendFlight}
         onComplete={() => setSendFlight(false)}
       />
-      {(landFlight || perched) && (
+      {/* Landing: branch + crow. The branch shows whenever a crow is inbound or
+          perched; the perched crow (locked to the branch) persists while there's
+          an unread scroll, and the fly-in plays once on a fresh arrival. */}
+      {(scrolls.unread > 0 || landFlight) && (
         <>
-          <ScrollBranch file={settings.land_branch_file} side="right" />
-          <CrowAnimationLayer
-            frames={scrolls.config.land}
-            fps={fps}
-            playing={landFlight}
-            perchOnEnd
-            onComplete={() => { setLandFlight(false); setPerched(true); }}
-            onFinalTap={() => {
-              // Tapping the landed crow opens the newly-arrived scroll directly.
-              const newest = scrolls.scrolls[0];
-              setPerched(false);
-              if (newest) {
-                setReaderScroll(newest);
-                if (!newest.read_at) scrolls.markRead(newest.id);
-              } else {
-                setListOpen(true);
-              }
-            }}
+          <LandingPerch
+            branchFile={settings.land_branch_file}
+            crowFile={landCrowFile}
+            side="right"
+            showCrow={!landFlight}
+            onTap={openNewestScroll}
           />
+          {landFlight && (
+            <CrowAnimationLayer
+              frames={scrolls.config.land}
+              fps={fps}
+              playing={landFlight}
+              onComplete={() => setLandFlight(false)}
+            />
+          )}
         </>
       )}
 
