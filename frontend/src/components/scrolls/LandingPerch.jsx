@@ -43,7 +43,7 @@ export default function LandingPerch({
             alt=""
             draggable={false}
             onError={() => setBranchBroke(true)}
-            style={{ display: 'block', width: '100%', transform: side === 'right' ? 'scaleX(-1)' : 'none' }}
+            style={{ display: 'block', width: '100%' }}
           />
         ) : (
           <div style={{

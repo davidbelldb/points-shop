@@ -7,6 +7,9 @@ import { assetUrl } from './scrollAssets.js';
 function CrowFrame({ frame, baseSizePct }) {
   const [broken, setBroken] = useState(false);
   const url = assetUrl(frame.sprite_file);
+  // Reset the broken flag whenever the sprite changes, so a single failed frame
+  // doesn't fall back to the placeholder for the rest of the sequence.
+  useEffect(() => { setBroken(false); }, [url]);
   const size = baseSizePct * (Number(frame.scale) || 1);
   const wrap = {
     position: 'absolute',
