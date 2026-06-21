@@ -62,6 +62,26 @@ function wrapMessage(input) {
 /* Destination picker — Nominatim lookup limited to Cambridge, UK. Styled to sit
    on the parchment: ImperialBlack font, single centred field, dropdown in black
    on #d2a469. */
+// Curated destinations that OSM's bounded street search doesn't surface. They
+// appear in the dropdown when the query matches; precise coords are resolved in
+// the browser on selection (full-address lookup), with a fallback if that fails.
+const CUSTOM_PLACES = [
+  {
+    road: 'Bishops Court',
+    query: '49-54 Bishops Court, Cambridge, UK',
+    lat: 52.2053, lng: 0.1192, // Cambridge fallback; refined on select
+    aliases: ['bishop', 'bishops', "bishop's", 'bishops court', "bishop's court"],
+  },
+];
+
+function customMatches(query) {
+  const ql = query.trim().toLowerCase();
+  if (!ql) return [];
+  return CUSTOM_PLACES
+    .filter((p) => p.road.toLowerCase().includes(ql) || p.aliases.some((a) => a.startsWith(ql)))
+    .map((p) => ({ custom: true, road: p.road, query: p.query, lat: p.lat, lng: p.lng, place_id: `custom-${p.road}` }));
+}
+
 function DestinationPicker({ value, onPick, font }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
@@ -71,7 +91,9 @@ function DestinationPicker({ value, onPick, font }) {
 
   async function search(query) {
     if (!query.trim()) { setResults([]); setOpen(false); return; }
+    const customs = customMatches(query);
     setBusy(true);
+    let streets = [];
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`
@@ -81,17 +103,18 @@ function DestinationPicker({ value, onPick, font }) {
       const data = await res.json();
       // Street names only, de-duplicated.
       const seen = new Set();
-      const streets = [];
       for (const r of (Array.isArray(data) ? data : [])) {
         const road = r.address?.road;
         if (!road || seen.has(road)) continue;
         seen.add(road);
         streets.push({ ...r, road });
       }
-      setResults(streets);
-      setOpen(true);
-    } catch { setResults([]); }
-    finally { setBusy(false); }
+    } catch { /* fall back to customs only */ }
+    // Curated matches first (e.g. Bishop's Court), then OSM streets.
+    const existing = new Set(streets.map((s) => s.road));
+    setResults([...customs.filter((c) => !existing.has(c.road)), ...streets]);
+    setOpen(true);
+    setBusy(false);
   }
 
   function onInput(e) {
@@ -101,9 +124,22 @@ function DestinationPicker({ value, onPick, font }) {
     debounceRef.current = setTimeout(() => search(v), 400);
   }
 
-  function choose(r) {
+  async function choose(r) {
     const lbl = r.road || r.display_name?.split(',')[0].trim() || r.display_name;
-    onPick({ label: lbl, lat: Number(r.lat), lng: Number(r.lon) });
+    let lat = Number(r.lat);
+    let lng = Number(r.lon ?? r.lng);
+    if (r.custom) {
+      // Resolve precise coords for the curated address in the browser.
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(r.query)}&limit=1`,
+          { headers: { 'Accept-Language': 'en' } },
+        );
+        const d = await res.json();
+        if (Array.isArray(d) && d[0]) { lat = Number(d[0].lat); lng = Number(d[0].lon); }
+      } catch { /* keep fallback coords */ }
+    }
+    onPick({ label: lbl, lat, lng });
     setQ(lbl);
     setResults([]);
     setOpen(false);

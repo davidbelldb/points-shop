@@ -162,9 +162,12 @@ export default function NewChatPage() {
                 type="button"
                 onClick={() => { setTrayOpen(false); setComposeOpen(true); }}
                 title="Send a scroll"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white transition hover:border-amber-300 active:scale-95"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-amber-300 hover:text-amber-700 active:scale-95"
               >
-                <img src="/scrolls/crow_send_06.png" alt="crow" draggable={false} className="h-6 w-6 object-contain" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 4h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7" /><path d="M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2" />
+                  <line x1="9.5" y1="9" x2="15" y2="9" /><line x1="9.5" y1="13" x2="15" y2="13" />
+                </svg>
               </button>
               <span className="text-xs text-neutral-500">Scroll</span>
             </div>
