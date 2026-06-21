@@ -579,3 +579,12 @@ html .ht-theme-main-dark .wtBorder.corner {
   50%      { transform: translate(-50%, -50%) translateY(-6px); }
 }
 
+/* Scroll display font. Referenced by scrolls_settings.scroll_font = 'ImperialBlack'. */
+@font-face {
+  font-family: 'ImperialBlack';
+  src: url('/scrolls/fonts/ImperialBlack-zr5A0.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
