@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
@@ -54,6 +54,12 @@ export default function NewChatPage() {
   const landFrames = scrolls.config.land || [];
   const landCrowFile = landFrames[landFrames.length - 1]?.sprite_file || 'crow_land_11.png';
 
+  // Send crow is rendered 55% bigger than the base size. Memoise the frame
+  // slices so the animation layer doesn't restart on every re-render.
+  const SEND_CROW_SIZE = 16.3;
+  const introFrames = useMemo(() => (scrolls.config.send || []).slice(0, 3), [scrolls.config.send]);
+  const flyoffFrames = useMemo(() => (scrolls.config.send || []).slice(2), [scrolls.config.send]);
+
   // Tapping the perched crow opens the newest unread scroll (which marks it read,
   // removing it — so the perch clears once nothing is unread).
   function openNewestScroll() {
@@ -75,7 +81,7 @@ export default function NewChatPage() {
           testMode
           onSend={(p) => scrolls.send({ ...p, simulate: true })}
           onSent={() => { setComposeOpen(false); setTimeout(() => setSendStage('flight'), 500); }}
-          onClose={() => setComposeOpen(false)}
+          onClose={() => { setComposeOpen(false); setSendStage('idle'); }}
         />
       )}
       {listOpen && (
@@ -97,24 +103,27 @@ export default function NewChatPage() {
       {sendStage !== 'idle' && <ScrollBranch file={settings.send_branch_file} side="left" />}
 
       {/* Intro: crow flies in and perches on the send branch (frames 00–02),
-          pausing on 02; tapping it opens the compose modal. */}
+          pausing on 02; tapping it opens the compose modal. The perch stays
+          (behind the modal) so the fly-off can continue seamlessly from 02. */}
       {(sendStage === 'intro' || sendStage === 'perched') && (
         <CrowAnimationLayer
-          frames={(scrolls.config.send || []).slice(0, 3)}
+          frames={introFrames}
           fps={fps}
           playing={sendStage === 'intro'}
           perchOnEnd
+          baseSizePct={SEND_CROW_SIZE}
           onComplete={() => setSendStage('perched')}
-          onFinalTap={() => { setSendStage('idle'); setComposeOpen(true); }}
+          onFinalTap={() => setComposeOpen(true)}
         />
       )}
 
-      {/* Fly-off: full send sequence, 0.5s after SEAL. */}
+      {/* Fly-off: continues from frame 02 through 12, 0.5s after SEAL. */}
       {sendStage === 'flight' && (
         <CrowAnimationLayer
-          frames={scrolls.config.send}
+          frames={flyoffFrames}
           fps={fps}
           playing
+          baseSizePct={SEND_CROW_SIZE}
           onComplete={() => setSendStage('idle')}
         />
       )}
