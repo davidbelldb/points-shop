@@ -6,6 +6,7 @@ import { api } from './api.js';
 // handled by the service worker / Web Push (see PushToggle.jsx).
 
 let listenersWired = false;
+let registered = false;
 let lastToken = null;
 
 // Bring-up diagnostics: mirror the registration lifecycle to the backend logs,
@@ -20,7 +21,7 @@ function report(event, detail) {
  * the user taps a notification, with the deep-link path from its payload.
  */
 export async function initNativePush(onOpenUrl) {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform() || registered) return;
 
   if (!listenersWired) {
     listenersWired = true;
@@ -55,6 +56,7 @@ export async function initNativePush(onOpenUrl) {
     if (perm.receive !== 'granted') return;
 
     await PushNotifications.register();
+    registered = true; // stop the effect from re-registering on every re-render
     report('register-called', 'ok');
   } catch (e) {
     report('init-error', e?.message);
@@ -67,5 +69,6 @@ export async function initNativePush(onOpenUrl) {
  */
 export async function unregisterNativePush() {
   if (!Capacitor.isNativePlatform() || !lastToken) return;
+  registered = false; // allow re-registration on next login
   try { await api.unregisterApnsToken(lastToken); } catch { /* ignore */ }
 }

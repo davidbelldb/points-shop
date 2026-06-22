@@ -55,5 +55,7 @@
 	<string>Sneaky Social lets you attach photos to stories, chats and your profile.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Sneaky Social can save images you create or receive.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Sneaky Social uses your location for scroll flight times and location stickers.</string>
 </dict>
 </plist>
