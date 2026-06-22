@@ -6,10 +6,19 @@ import { useToast } from '../lib/ToastContext.jsx';
 // alert (game turn, order update, invites, etc.) while the app is foregrounded.
 // On the first poll it records whatever already exists as "seen" so it never
 // toasts history — only things that arrive after you opened the app.
-const POLL_MS = 12000;
+const POLL_MS = 6000;
 
 export default function InAppNotifier() {
   const { showToast } = useToast();
+  const partnerPhoto = useRef(null);
+
+  // Fetch the partner's photo once — in a 2-person app every incoming alert is
+  // from them, so we use it as the toast avatar.
+  useEffect(() => {
+    api.callsPlayers()
+      .then(({ other }) => { partnerPhoto.current = other?.photo_url ?? null; })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let stopped = false;
@@ -29,7 +38,12 @@ export default function InAppNotifier() {
           if (seen.has(n.id)) continue;
           seen.add(n.id);
           if (!n.read_at) {
-            showToast({ title: n.title || 'Sneaky Stuff', body: n.body, url: n.link_url || '/' });
+            showToast({
+              title: n.title || 'Sneaky Stuff',
+              body: n.body,
+              url: n.link_url || '/',
+              avatar: partnerPhoto.current,
+            });
           }
         }
       } catch { /* offline / transient — try again next tick */ }

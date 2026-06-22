@@ -15,6 +15,7 @@ import BasketDrawer from './components/BasketDrawer.jsx';
 import IncomingCallBanner from './components/IncomingCallBanner.jsx';
 import InAppNotifier from './components/InAppNotifier.jsx';
 import { countdownClock } from './lib/countdown.js';
+import { hapticTap } from './lib/haptics.js';
 
 function AvatarFallback() {
   return (
@@ -287,7 +288,7 @@ export default function App() {
               </svg>
             </button>
             {/* Logo/name — hidden on md+ normally; always shown on game route (no SideNav there) */}
-            <Link to="/" className={`flex min-w-0 items-center gap-2 ${isFullGame ? '' : 'md:hidden'}`}>
+            <Link to="/" onClick={() => hapticTap()} className={`flex min-w-0 items-center gap-2 ${isFullGame ? '' : 'md:hidden'}`}>
               {logoUrl ? (
                 <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
               ) : null}

@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { hapticTap } from '../../lib/haptics.js';
 
 const IS_TOUCH =
   typeof window !== 'undefined' &&
@@ -64,6 +65,7 @@ function TBtn({ action, label, style, inputRef, color = 'rgba(255,255,255,0.6)',
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     setActive(true);
+    hapticTap(); // tactile feedback on each on-screen gamepad press
     inputRef.current?.injectPress(action);
   }, [action, inputRef]);
 

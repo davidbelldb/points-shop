@@ -3,6 +3,7 @@ import { useToast } from '../lib/ToastContext.jsx';
 
 // Renders the active in-app toasts as small tappable cards at the top of the
 // screen. Tap → navigate to the toast's url; the ✕ dismisses without navigating.
+// Branded plum (#a04d89) with white text, and the sender's avatar.
 export default function ToastHost() {
   const { toasts, dismiss } = useToast();
   const navigate = useNavigate();
@@ -19,18 +20,23 @@ export default function ToastHost() {
           key={t.id}
           type="button"
           onClick={() => { if (t.url) navigate(t.url); dismiss(t.id); }}
-          className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl bg-neutral-900/95 px-4 py-3 text-left text-white shadow-2xl ring-1 ring-white/10 backdrop-blur transition active:scale-[0.98]"
-          style={{ animation: 'sneakyToastIn 220ms ease-out' }}
+          className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-2xl px-3.5 py-3 text-left shadow-2xl ring-1 ring-white/15 transition active:scale-[0.98]"
+          style={{ animation: 'sneakyToastIn 220ms ease-out', background: '#a04d89', color: '#ffffff' }}
         >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/25 text-sm font-bold text-white">
+            {t.avatar
+              ? <img src={t.avatar} alt="" className="h-full w-full object-cover" />
+              : (t.title?.trim()?.[0]?.toUpperCase() ?? '✦')}
+          </span>
           <div className="min-w-0 flex-1">
-            {t.title && <p className="truncate text-sm font-semibold">{t.title}</p>}
-            {t.body && <p className="line-clamp-2 text-xs text-white/70">{t.body}</p>}
+            {t.title && <p className="truncate text-sm font-semibold text-white">{t.title}</p>}
+            {t.body && <p className="line-clamp-2 text-xs text-white/85">{t.body}</p>}
           </div>
           <span
             role="button"
             aria-label="Dismiss"
             onClick={(e) => { e.stopPropagation(); dismiss(t.id); }}
-            className="-mr-1 -mt-0.5 shrink-0 px-1 text-lg leading-none text-white/50"
+            className="-mr-0.5 shrink-0 self-start px-1 text-lg leading-none text-white/70"
           >
             ✕
           </span>

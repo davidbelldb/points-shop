@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
+import { hapticSelect, hapticSuccess, hapticError, hapticTug } from '../lib/haptics.js';
 
 // ─── Word list ────────────────────────────────────────────────────────────────
 
@@ -708,12 +709,17 @@ export default function DirtyWordlePage() {
   const submitGuess = useCallback(() => {
     if (currentGuess.length !== WORD_LENGTH) {
       setShake(true);
+      hapticTug(); // gentle "not yet" for an incomplete word
       setTimeout(() => setShake(false), 500);
       return;
     }
     const newGuesses = [...guesses, currentGuess];
     const isWon      = currentGuess === target;
     const isOver     = isWon || newGuesses.length >= MAX_GUESSES;
+    // Win / lose / keep-going feedback as you enter a word.
+    if (isWon) hapticSuccess();
+    else if (isOver) hapticError();
+    else hapticTug();
 
     // Kick off the flip animation for the just-submitted row; clear after all tiles finish
     const rowIdx = guesses.length;
@@ -746,8 +752,8 @@ export default function DirtyWordlePage() {
   const onKey = useCallback((key) => {
     if (gameOver) return;
     if (key === 'ENTER')                    { submitGuess(); return; }
-    if (key === '⌫' || key === 'BACKSPACE') { setCurrentGuess(g => g.slice(0, -1)); return; }
-    if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) setCurrentGuess(g => g + key);
+    if (key === '⌫' || key === 'BACKSPACE') { setCurrentGuess(g => g.slice(0, -1)); hapticSelect(); return; }
+    if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) { setCurrentGuess(g => g + key); hapticSelect(); }
   }, [gameOver, submitGuess, currentGuess]);
 
   useEffect(() => {

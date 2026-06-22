@@ -16,9 +16,9 @@ export function ToastProvider({ children }) {
 
   // Show a toast. { title, body, url }. Auto-dismisses after ~5s. Keeps at most
   // 3 on screen so a burst can't bury the UI.
-  const showToast = useCallback(({ title, body, url }) => {
+  const showToast = useCallback(({ title, body, url, avatar }) => {
     const id = ++idRef.current;
-    setToasts((list) => [...list, { id, title, body, url }].slice(-3));
+    setToasts((list) => [...list, { id, title, body, url, avatar }].slice(-3));
     setTimeout(() => dismiss(id), 5000);
     return id;
   }, [dismiss]);
