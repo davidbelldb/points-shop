@@ -59,6 +59,7 @@ import { ThemeProvider } from './lib/ThemeContext.jsx';
 import { ToastProvider } from './lib/ToastContext.jsx';
 import ToastHost from './components/ToastHost.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import SkeletonPage from './components/Skeleton.jsx';
 import './index.css';
 
 // Vite fires this on the window when a lazily-imported chunk's <link rel=
@@ -121,11 +122,7 @@ function RequireAuth({ children }) {
   return children;
 }
 
-const lazyFallback = (
-  <div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">
-    Loading...
-  </div>
-);
+const lazyFallback = <SkeletonPage />;
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

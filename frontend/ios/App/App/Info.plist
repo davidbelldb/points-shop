@@ -59,5 +59,47 @@
 	<string>Sneaky Social uses your location for scroll flight times and location stickers.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.david.sneakystuff.message</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Send a Message</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeMessage</string>
+			<key>UIApplicationShortcutItemUserInfo</key>
+			<dict>
+				<key>url</key>
+				<string>/messages</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.david.sneakystuff.dirdle</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Open Dirdle</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCompose</string>
+			<key>UIApplicationShortcutItemUserInfo</key>
+			<dict>
+				<key>url</key>
+				<string>/dirty-wordle</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.david.sneakystuff.event</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Create Event</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeDate</string>
+			<key>UIApplicationShortcutItemUserInfo</key>
+			<dict>
+				<key>url</key>
+				<string>/calendar</string>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

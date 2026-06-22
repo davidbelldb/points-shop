@@ -14,6 +14,8 @@ import SideNav from './components/SideNav.jsx';
 import BasketDrawer from './components/BasketDrawer.jsx';
 import IncomingCallBanner from './components/IncomingCallBanner.jsx';
 import InAppNotifier from './components/InAppNotifier.jsx';
+import WelcomeOverlay from './components/WelcomeOverlay.jsx';
+import PullToRefresh from './components/PullToRefresh.jsx';
 import { countdownClock } from './lib/countdown.js';
 import { hapticTap } from './lib/haptics.js';
 
@@ -225,6 +227,12 @@ export default function App() {
     StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light }).catch(() => {});
   }, [theme]);
 
+  // Home-screen Quick Actions: the native AppDelegate calls this to deep-link.
+  useEffect(() => {
+    window.sneakyQuickAction = (url) => { if (url) navigate(url); };
+    return () => { window.sneakyQuickAction = undefined; };
+  }, [navigate]);
+
   return (
     <div className="min-h-screen min-h-[100dvh] bg-neutral-50 text-neutral-900 antialiased">
       {/* Persistent sidebar — hidden on the full-screen game route so it
@@ -288,7 +296,19 @@ export default function App() {
               </svg>
             </button>
             {/* Logo/name — hidden on md+ normally; always shown on game route (no SideNav there) */}
-            <Link to="/" onClick={() => hapticTap()} className={`flex min-w-0 items-center gap-2 ${isFullGame ? '' : 'md:hidden'}`}>
+            <Link
+              to="/"
+              onClick={(e) => {
+                hapticTap();
+                // On the homepage, scroll back to the top instead of re-navigating;
+                // from any other page, behave as a normal "home" link.
+                if (location.pathname === '/') {
+                  e.preventDefault();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              className={`flex min-w-0 items-center gap-2 ${isFullGame ? '' : 'md:hidden'}`}
+            >
               {logoUrl ? (
                 <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
               ) : null}
@@ -349,6 +369,9 @@ export default function App() {
       <IncomingCallBanner />
       {/* Polls for new alerts and raises in-app toasts (foreground only) */}
       <InAppNotifier />
+      {/* One-time welcome (continues the splash); native pull-to-refresh */}
+      <WelcomeOverlay />
+      <PullToRefresh />
       {isHome && bannerOn && (() => {
         const bannerLink = (settings.banner_link_url || '').trim();
         const inner = (

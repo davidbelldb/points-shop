@@ -8,10 +8,42 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // Privacy overlay shown over the app's content in the iOS app switcher so a
     // glance at the multitasking preview can't reveal a chat / photo.
     var privacyOverlay: UIView?
+    // A Home-screen Quick Action tapped on a cold launch, handled once the
+    // webview is ready (see applicationDidBecomeActive / routeToWebView).
+    var pendingShortcut: UIApplicationShortcutItem?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        if let shortcut = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
+            pendingShortcut = shortcut
+        }
         return true
+    }
+
+    // Warm launch — app already running when the Quick Action is tapped.
+    func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        routeShortcut(shortcutItem)
+        completionHandler(true)
+    }
+
+    private func routeShortcut(_ item: UIApplicationShortcutItem) {
+        guard let url = item.userInfo?["url"] as? String else { return }
+        routeToWebView(url, attempt: 0)
+    }
+
+    // Dispatch a 'sneakyQuickAction' into the web app, retrying until the JS
+    // handler exists (the webview may not have finished loading on cold launch).
+    private func routeToWebView(_ url: String, attempt: Int) {
+        guard attempt < 15 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard let vc = self.window?.rootViewController as? CAPBridgeViewController,
+                  let webView = vc.bridge?.webView else {
+                self.routeToWebView(url, attempt: attempt + 1); return
+            }
+            let js = "(function(){ if (window.sneakyQuickAction) { window.sneakyQuickAction('\(url)'); return 'ok'; } return 'wait'; })()"
+            webView.evaluateJavaScript(js) { result, _ in
+                if (result as? String) != "ok" { self.routeToWebView(url, attempt: attempt + 1) }
+            }
+        }
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -37,6 +69,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         privacyOverlay = nil
         // Clear the app-icon badge whenever the user opens the app.
         application.applicationIconBadgeNumber = 0
+        // Handle a Quick Action that launched the app from cold, now the
+        // webview has had a moment to come up.
+        if let shortcut = pendingShortcut {
+            pendingShortcut = nil
+            routeShortcut(shortcut)
+        }
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

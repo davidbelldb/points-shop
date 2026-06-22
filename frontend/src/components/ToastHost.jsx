@@ -21,7 +21,7 @@ export default function ToastHost() {
           type="button"
           onClick={() => { if (t.url) navigate(t.url); dismiss(t.id); }}
           className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-2xl px-3.5 py-3 text-left shadow-2xl ring-1 ring-white/15 transition active:scale-[0.98]"
-          style={{ animation: 'sneakyToastIn 220ms ease-out', background: '#a04d89', color: '#ffffff' }}
+          style={{ animation: 'sneakyToastIn 220ms ease-out', background: '#12302a', color: '#ffffff' }}
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/25 text-sm font-bold text-white">
             {t.avatar
