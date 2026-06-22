@@ -1,6 +1,7 @@
 import {
   listNotifications, unreadCount, markAllRead, deleteNotification, deleteAllNotifications,
   savePushSubscription, deletePushSubscription,
+  saveApnsToken, deleteApnsToken,
 } from './notifications.repo.js';
 import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
 import { sendPush } from './push.js';
@@ -48,6 +49,23 @@ export default async function notificationsRoutes(fastify) {
     return { ok: true };
   });
 
+  // --- Native iOS push (APNs) ---
+  fastify.post('/api/notifications/apns-register', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const token = req.body?.token;
+    if (!token || typeof token !== 'string') {
+      return reply.code(400).send({ error: 'token required' });
+    }
+    await saveApnsToken(accountId, token);
+    return { ok: true };
+  });
+
+  fastify.post('/api/notifications/apns-unregister', async (req) => {
+    const token = req.body?.token;
+    if (token) await deleteApnsToken(token);
+    return { ok: true };
+  });
+
   // ── Admin: broadcast push (immediate or scheduled) ────────────────────────
   fastify.post('/api/admin/push-broadcast', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Forbidden' });
@@ -68,10 +86,17 @@ export default async function notificationsRoutes(fastify) {
       return { scheduled: true, id: rows[0].id, scheduledFor: ts.toISOString() };
     }
 
-    // Immediate — single recipient or all
-    const { rows } = accountId
-      ? await query(`SELECT DISTINCT account_id FROM push_subscriptions WHERE account_id = $1`, [accountId])
-      : await query(`SELECT DISTINCT account_id FROM push_subscriptions`);
+    // Immediate — single recipient or all. sendPush fans out to both web-push
+    // and APNs, so we union recipients from both device tables.
+    if (accountId) {
+      await sendPush(accountId, { title, body, url: url || '/' });
+      return { sent: 1 };
+    }
+    const { rows } = await query(
+      `SELECT account_id FROM push_subscriptions
+       UNION
+       SELECT account_id FROM apns_tokens`,
+    );
     if (rows.length === 0) return { sent: 0 };
     await Promise.all(rows.map(r => sendPush(r.account_id, { title, body, url: url || '/' })));
     return { sent: rows.length };

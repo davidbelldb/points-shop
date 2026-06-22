@@ -48,3 +48,18 @@ export async function savePushSubscription(accountId, sub) {
 export async function deletePushSubscription(endpoint) {
   await query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
 }
+
+export async function saveApnsToken(accountId, token) {
+  await query(
+    `INSERT INTO apns_tokens (account_id, token)
+     VALUES ($1, $2)
+     ON CONFLICT (token) DO UPDATE
+       SET account_id = EXCLUDED.account_id,
+           updated_at = NOW()`,
+    [accountId, token],
+  );
+}
+
+export async function deleteApnsToken(token) {
+  await query(`DELETE FROM apns_tokens WHERE token = $1`, [token]);
+}

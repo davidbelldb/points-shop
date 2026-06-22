@@ -61,9 +61,15 @@ function registerScheduledPushPoller(fastify) {
           RETURNING id, title, body, url, account_id`,
       );
       for (const n of due) {
+        // sendPush fans out to both web-push and APNs, so union recipients
+        // from both device tables.
         const { rows: subs } = n.account_id
-          ? await query(`SELECT DISTINCT account_id FROM push_subscriptions WHERE account_id = $1`, [n.account_id])
-          : await query(`SELECT DISTINCT account_id FROM push_subscriptions`);
+          ? await query(`SELECT $1::uuid AS account_id`, [n.account_id])
+          : await query(
+              `SELECT account_id FROM push_subscriptions
+               UNION
+               SELECT account_id FROM apns_tokens`,
+            );
         await Promise.all(subs.map((r) => sendPush(r.account_id, { title: n.title, body: n.body, url: n.url })));
         fastify.log.info({ id: n.id }, 'Scheduled push fired');
       }

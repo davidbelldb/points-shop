@@ -312,6 +312,10 @@ export const api = {
   savePushSubscription: (sub) => request('/notifications/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
   removePushSubscription: (endpoint) =>
     request('/notifications/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) }),
+  registerApnsToken: (token) =>
+    request('/notifications/apns-register', { method: 'POST', body: JSON.stringify({ token }) }),
+  unregisterApnsToken: (token) =>
+    request('/notifications/apns-unregister', { method: 'POST', body: JSON.stringify({ token }) }),
   getActiveSurvey: () => request('/surveys/active'),
   submitSurveyResponse: (surveyId, answers) =>
     request(`/surveys/${surveyId}/responses`, { method: 'POST', body: JSON.stringify({ answers }) }),

@@ -41,6 +41,12 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@sneakypoints.com}
+      # Native iOS push (APNs) — token-based auth via .p8 key (base64-encoded)
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-com.david.sneakystuff}
+      APNS_AUTH_KEY_BASE64: ${APNS_AUTH_KEY_BASE64:-}
+      APNS_PRODUCTION: ${APNS_PRODUCTION:-true}
       LASTFM_API_KEY: ${LASTFM_API_KEY}
       FATSECRET_CLIENT_ID: ${FATSECRET_CLIENT_ID:-}
       FATSECRET_CLIENT_SECRET: ${FATSECRET_CLIENT_SECRET:-}

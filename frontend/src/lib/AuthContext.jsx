@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from './api.js';
 import { getBootstrap, clearBootstrap } from './bootstrap.js';
+import { unregisterNativePush } from './nativePush.js';
 
 const AuthContext = createContext(null);
 
@@ -41,6 +42,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // Drop this device's APNs token first so a logged-out device stops getting
+    // the previous user's push notifications (no-op on web).
+    await unregisterNativePush();
     try { await api.logout(); } catch {}
     clearBootstrap();
     setUser(null);

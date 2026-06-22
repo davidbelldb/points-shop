@@ -1,8 +1,9 @@
-import { StrictMode, Suspense, lazy } from 'react';
+import { StrictMode, Suspense, lazy, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import App from './App.jsx';
+import { initNativePush } from './lib/nativePush.js';
 
 // ── Eager — the core shell + everyday pages (kept small) ─────────────────────
 import HomePage from './pages/HomePage.jsx';
@@ -91,6 +92,17 @@ if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator) {
   });
 }
 
+// Registers the device for native iOS push once the user is logged in, and
+// deep-links into the app when a notification is tapped. No-op on web.
+function NativePush() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (user) initNativePush((url) => navigate(url));
+  }, [user, navigate]);
+  return null;
+}
+
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -118,6 +130,7 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
+          <NativePush />
           <SettingsProvider>
           <ErrorBoundary>
           <Suspense fallback={lazyFallback}>
