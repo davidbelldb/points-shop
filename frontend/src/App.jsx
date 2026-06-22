@@ -17,7 +17,11 @@ import InAppNotifier from './components/InAppNotifier.jsx';
 import WelcomeOverlay from './components/WelcomeOverlay.jsx';
 import PullToRefresh from './components/PullToRefresh.jsx';
 import { countdownClock } from './lib/countdown.js';
-import { hapticTap } from './lib/haptics.js';
+import { hapticTap, hapticParty } from './lib/haptics.js';
+
+// Fire a celebratory launch haptic exactly once per app session (module-level
+// guard survives App re-mounts on route changes; native shell only).
+let launchHapticDone = false;
 
 function AvatarFallback() {
   return (
@@ -50,6 +54,13 @@ export default function App() {
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [basketOpen, setBasketOpen] = useState(false);
   const headerRef = useRef(null);
+
+  // Welcome flourish on cold launch — a little party buzz as the app opens.
+  useEffect(() => {
+    if (launchHapticDone || !Capacitor.isNativePlatform()) return;
+    launchHapticDone = true;
+    hapticParty();
+  }, []);
 
   // Sync the theme from the currently-loaded account, so each user gets their own.
   useEffect(() => {

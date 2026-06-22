@@ -77,3 +77,58 @@ export async function hapticSelect() {
   if (!native()) return;
   try { await Haptics.selectionChanged(); } catch { /* ignore */ }
 }
+
+/**
+ * Three sharp taps in quick succession — fired per letter as a Wordle/Dirdle
+ * tile flips over on a guess. Heavy is the punchiest impact iOS exposes, so a
+ * tight burst of three reads as a crisp "clack-clack-clack" on each reveal.
+ */
+export async function hapticSharpTriple() {
+  if (!native()) return;
+  try {
+    for (let i = 0; i < 3; i++) {
+      await Haptics.impact({ style: ImpactStyle.Heavy });
+      if (i < 2) await wait(45);
+    }
+  } catch { /* ignore */ }
+}
+
+/**
+ * Wrong-guess "shudder" — emulates the iOS lockscreen wrong-passcode shake: a
+ * rapid back-and-forth rumble of heavy impacts, topped with an error
+ * notification so it lands as an unmistakable "nope".
+ */
+export async function hapticShudder() {
+  if (!native()) return;
+  try {
+    for (let i = 0; i < 6; i++) {
+      await Haptics.impact({ style: ImpactStyle.Heavy });
+      await wait(50);
+    }
+    await Haptics.notification({ type: NotificationType.Error });
+  } catch { /* ignore */ }
+}
+
+/**
+ * Celebration "party" — a Candy-Crush-style flourish for a winning guess: a
+ * quick rising drumroll (light → medium → heavy) that crescendos into a
+ * success notification, then a couple of triumphant after-pops.
+ */
+export async function hapticParty() {
+  if (!native()) return;
+  try {
+    const roll = [
+      ImpactStyle.Light, ImpactStyle.Light, ImpactStyle.Medium,
+      ImpactStyle.Medium, ImpactStyle.Heavy, ImpactStyle.Heavy,
+    ];
+    for (const style of roll) {
+      await Haptics.impact({ style });
+      await wait(40);
+    }
+    await Haptics.notification({ type: NotificationType.Success });
+    await wait(120);
+    await Haptics.impact({ style: ImpactStyle.Heavy });
+    await wait(90);
+    await Haptics.impact({ style: ImpactStyle.Heavy });
+  } catch { /* ignore */ }
+}

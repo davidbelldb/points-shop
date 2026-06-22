@@ -18,6 +18,7 @@ import { useEffect } from 'react';
    on the last close. */
 
 let lockCount = 0;
+let savedScrollY = 0;
 
 function isInsideScrollable(target) {
   let el = target;
@@ -37,6 +38,11 @@ function onTouchMove(e) {
 
 function applyLock() {
   if (lockCount === 0) {
+    // Remember where the page was scrolled to. On iOS WebKit, setting
+    // body { overflow:hidden } can clamp the document's scroll offset back to 0
+    // (most visible in the chat thread, which sits scrolled to the bottom) — so
+    // we restore this exact position when the last lock releases.
+    savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     // IMPORTANT: do NOT set overflow:hidden on <html>. On iOS WebKit that
     // shrinks the viewport that fixed / 100dvh elements resolve against, which
     // left a grey strip below the drawers (they stopped short of the real
@@ -53,6 +59,11 @@ function releaseLock() {
   if (lockCount === 0) {
     document.body.style.overflow = '';
     document.removeEventListener('touchmove', onTouchMove, { passive: false });
+    // Restore the pre-lock scroll position if the overflow lock reset it, so
+    // closing a drawer/modal never yanks the page (e.g. chat) to the top.
+    if (savedScrollY > 0 && Math.abs(window.scrollY - savedScrollY) > 1) {
+      window.scrollTo(0, savedScrollY);
+    }
   }
 }
 

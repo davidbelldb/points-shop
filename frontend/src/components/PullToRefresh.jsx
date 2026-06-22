@@ -10,20 +10,40 @@ export default function PullToRefresh() {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const start = useRef(0);
+  const startX = useRef(0);
   const active = useRef(false);
+  const decided = useRef(false); // have we locked this gesture as a vertical pull?
+
+  // Horizontal swipes near the screen edges open the menu drawer (left) and the
+  // account panel (right). Ignore gestures that start in those zones so the
+  // refresh spinner never flashes while pulling the drawer out.
+  const EDGE_ZONE = 32;
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return undefined;
     const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
 
     const onStart = (e) => {
-      if (refreshing || !atTop()) { active.current = false; return; }
+      const x = e.touches[0].clientX;
+      if (refreshing || !atTop() || x <= EDGE_ZONE || x >= window.innerWidth - EDGE_ZONE) {
+        active.current = false; return;
+      }
       start.current = e.touches[0].clientY;
+      startX.current = x;
       active.current = true;
+      decided.current = false;
     };
     const onMove = (e) => {
       if (!active.current || refreshing) return;
       const dy = e.touches[0].clientY - start.current;
+      const dx = e.touches[0].clientX - startX.current;
+      // Lock the gesture's axis once it has moved a meaningful amount. If it's
+      // mostly horizontal (a drawer pull), abandon — don't show the spinner.
+      if (!decided.current) {
+        if (Math.abs(dx) <= 8 && Math.abs(dy) <= 8) return; // wait for a clear direction
+        if (Math.abs(dx) > Math.abs(dy)) { active.current = false; setPull(0); return; }
+        decided.current = true;
+      }
       setPull(dy > 0 && atTop() ? Math.min(110, dy * 0.5) : 0);
     };
     const onEnd = () => {
@@ -56,17 +76,18 @@ export default function PullToRefresh() {
       className="pointer-events-none fixed inset-x-0 top-0 z-[150] flex justify-center"
       style={{ transform: `translateY(${pull}px)`, transition: active.current ? 'none' : 'transform 0.2s ease', paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="mt-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#a04d89] text-white shadow-lg">
-        <svg
-          className={refreshing ? 'animate-spin' : ''}
-          width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          style={{ transform: refreshing ? undefined : `rotate(${pull * 3}deg)` }}
-        >
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-          <path d="M21 3v6h-6" />
-        </svg>
-      </div>
+      <img
+        src="/refresh.svg"
+        alt=""
+        width="40"
+        height="40"
+        className={`mt-2 drop-shadow-lg ${refreshing ? 'animate-spin' : ''}`}
+        style={{
+          // While being pulled, do a fast ±22.5° shaky jiggle; while refreshing,
+          // fall back to a steady spin (animate-spin above).
+          animation: refreshing ? undefined : 'ptr-jiggle 0.18s ease-in-out infinite',
+        }}
+      />
     </div>
   );
 }

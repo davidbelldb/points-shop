@@ -1,7 +1,11 @@
 sneakypoints.com {
     encode gzip zstd
 
-    @admin path /admin /admin/* /api/admin/* /journal /journal/*
+    # Edge basicauth guards the admin SPA *pages* only. The /api/admin/* API is
+    # now enforced by session-based admin auth in the backend (see the onRequest
+    # admin gate in backend/src/index.js) so the native app and browsers without
+    # cached basic-auth creds can use admin features over the normal login.
+    @admin path /admin /admin/* /journal /journal/*
     basicauth @admin {
         david $2a$14$vkQtJbp5G0/mcBzV8TYteOtnAMFisDOcttjVAoHRbjXRPmSYBvfee
     }

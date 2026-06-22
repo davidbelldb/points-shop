@@ -46,6 +46,23 @@ fastify.addHook('onRequest', async (req) => {
     fastify.log.error({ err: e }, 'auth hook error');
   }
 });
+
+// Global admin gate for every /api/admin/* route. Admin auth used to be enforced
+// ONLY by Caddy basicauth at the edge, which the native iOS app (and any browser
+// without the cached basic-auth creds, e.g. Edge on Windows) can't satisfy —
+// producing 401s on admin features like the timeline/journal editor. Enforcing
+// admin here, off the normal session cookie, makes admin work everywhere and
+// lets us drop the edge basicauth on /api/admin/* without exposing any endpoint
+// (several admin modules have no per-route admin check of their own).
+fastify.addHook('onRequest', async (req, reply) => {
+  if (req.method === 'OPTIONS') return; // let CORS preflight through
+  const path = req.url.split('?')[0];
+  if (path === '/api/admin' || path.startsWith('/api/admin/')) {
+    if (req.user?.actualRole !== 'admin') {
+      return reply.code(req.user ? 403 : 401).send({ error: 'admin only' });
+    }
+  }
+});
 await fastify.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
 await fastify.register(fastifyStatic, {
   root: MEDIA_DIR,

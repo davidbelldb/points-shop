@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
-import { hapticSelect, hapticSuccess, hapticError, hapticTug } from '../lib/haptics.js';
+import { hapticTap, hapticTug, hapticSharpTriple, hapticParty, hapticShudder } from '../lib/haptics.js';
 
 // ─── Word list ────────────────────────────────────────────────────────────────
 
@@ -716,15 +716,24 @@ export default function DirtyWordlePage() {
     const newGuesses = [...guesses, currentGuess];
     const isWon      = currentGuess === target;
     const isOver     = isWon || newGuesses.length >= MAX_GUESSES;
-    // Win / lose / keep-going feedback as you enter a word.
-    if (isWon) hapticSuccess();
-    else if (isOver) hapticError();
-    else hapticTug();
 
     // Kick off the flip animation for the just-submitted row; clear after all tiles finish
     const rowIdx = guesses.length;
     setRevealingRow(rowIdx);
     setTimeout(() => setRevealingRow(null), 1400);
+
+    // Haptics timed to the tile reveal: three sharp taps per letter as each
+    // tile flips over (the flip stagger is colIdx*100ms with a ~650ms flip, so
+    // each tile turns edge-on and reveals its colour ~230ms into its own
+    // animation). Once the last tile has flipped, finish with a Candy-Crush
+    // party flourish on a win, or the wrong-passcode shudder on any miss.
+    const FLIP_STAGGER = 100; // must match Tile's `colIdx * 100`
+    const FLIP_OVER_MS = 230; // when a tile reveals mid-flip
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      setTimeout(hapticSharpTriple, c * FLIP_STAGGER + FLIP_OVER_MS);
+    }
+    const lastRevealMs = (WORD_LENGTH - 1) * FLIP_STAGGER + FLIP_OVER_MS;
+    setTimeout(() => { if (isWon) hapticParty(); else hapticShudder(); }, lastRevealMs + 360);
 
     setGuesses(newGuesses);
     setCurrentGuess('');
@@ -752,8 +761,8 @@ export default function DirtyWordlePage() {
   const onKey = useCallback((key) => {
     if (gameOver) return;
     if (key === 'ENTER')                    { submitGuess(); return; }
-    if (key === '⌫' || key === 'BACKSPACE') { setCurrentGuess(g => g.slice(0, -1)); hapticSelect(); return; }
-    if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) { setCurrentGuess(g => g + key); hapticSelect(); }
+    if (key === '⌫' || key === 'BACKSPACE') { setCurrentGuess(g => g.slice(0, -1)); hapticTap(); return; }
+    if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) { setCurrentGuess(g => g + key); hapticTap(); }
   }, [gameOver, submitGuess, currentGuess]);
 
   useEffect(() => {
