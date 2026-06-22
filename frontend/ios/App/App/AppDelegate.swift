@@ -35,6 +35,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Reveal the content again once the app is back in the foreground.
         privacyOverlay?.removeFromSuperview()
         privacyOverlay = nil
+        // Clear the app-icon badge whenever the user opens the app.
+        application.applicationIconBadgeNumber = 0
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

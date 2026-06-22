@@ -61,18 +61,18 @@ function providerToken() {
   return cachedJwt;
 }
 
-function buildPayload(payload) {
+function buildPayload(payload, badge) {
   // 'clear' is a web-only action (closing a shown notification via the service
   // worker). APNs has no equivalent, so skip those — nothing to deliver.
   if (payload.action === 'clear') return null;
-  return JSON.stringify({
-    aps: {
-      alert: { title: payload.title || 'Sneaky Stuff', body: payload.body || '' },
-      sound: 'default',
-      'thread-id': payload.tag || 'sneaky',
-    },
-    url: payload.url || '/',
-  });
+  const aps = {
+    alert: { title: payload.title || 'Sneaky Stuff', body: payload.body || '' },
+    sound: 'default',
+    'thread-id': payload.tag || 'sneaky',
+  };
+  // App-icon badge = the recipient's unread notification count.
+  if (Number.isFinite(badge)) aps.badge = badge;
+  return JSON.stringify({ aps, url: payload.url || '/' });
 }
 
 /**
@@ -81,7 +81,18 @@ function buildPayload(payload) {
  */
 export async function sendApns(accountId, payload) {
   if (!enabled || !accountId) return;
-  const body = buildPayload(payload);
+
+  // Badge = how many unread notifications this account has right now.
+  let badge;
+  try {
+    const { rows } = await query(
+      `SELECT COUNT(*)::int AS c FROM notifications WHERE account_id = $1 AND read_at IS NULL`,
+      [accountId],
+    );
+    badge = rows[0]?.c;
+  } catch { /* badge is best-effort */ }
+
+  const body = buildPayload(payload, badge);
   if (!body) return;
 
   let tokens;
