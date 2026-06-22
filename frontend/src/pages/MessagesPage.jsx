@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { api } from '../lib/api.js';
 import { hapticNudge, hapticTap } from '../lib/haptics.js';
 
@@ -1475,6 +1476,7 @@ export default function MessagesPage() {
   const secretSendTimerRef = useRef(null);
   const seenMessageIdsRef = useRef(new Set());
   const [composerHeight, setComposerHeight] = useState(80);
+  const [kbHeight, setKbHeight] = useState(0);
 
   async function openStoryById(storyId) {
     if (!storyId) return;
@@ -1655,6 +1657,24 @@ export default function MessagesPage() {
       window.removeEventListener('scroll', onWindowScroll);
       el.style.bottom = '';
     };
+  }, []);
+
+  // Native keyboard glide: drive the composer from the Keyboard plugin's
+  // will-show/hide events, which fire at the START of the keyboard animation,
+  // so the input bar rises and falls in lockstep with the keyboard (the
+  // WhatsApp feel). Pairs with Keyboard resize:none in capacitor.config.json —
+  // the composer is translated up by the keyboard height with a matched
+  // transition, and the message spacer grows so the latest line stays visible.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let showSub, hideSub;
+    Keyboard.addListener('keyboardWillShow', (info) => {
+      setKbHeight(info?.keyboardHeight || 0);
+      requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
+    }).then((h) => { showSub = h; }).catch(() => {});
+    Keyboard.addListener('keyboardWillHide', () => setKbHeight(0))
+      .then((h) => { hideSub = h; }).catch(() => {});
+    return () => { showSub?.remove?.(); hideSub?.remove?.(); };
   }, []);
 
   async function sendRain(kind) {
@@ -2236,11 +2256,11 @@ export default function MessagesPage() {
       })()}
 
       {/* Spacer — matches live composer bar height + safe area so last message is never hidden */}
-      <div style={{ height: composerHeight + 16 }} aria-hidden />
+      <div style={{ height: composerHeight + 16 + kbHeight, transition: 'height 0.25s ease-out' }} aria-hidden />
       <div ref={bottomRef} aria-hidden />
 
       {/* Composer bar */}
-      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]" style={{ pointerEvents: 'none' }}>
+      <div ref={composerRef} className="fixed bottom-0 left-0 md:left-56 right-0 z-20 border-t border-neutral-200 bg-neutral-50/95 backdrop-blur pb-[10px]" style={{ pointerEvents: 'none', transform: kbHeight ? `translateY(-${kbHeight}px)` : undefined, transition: 'transform 0.25s ease-out' }}>
         <div className="px-5 lg:px-8" style={{ pointerEvents: 'auto' }}>
           {/* Media tray — slides in above the input row */}
           {showMedia && (

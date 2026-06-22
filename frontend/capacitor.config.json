@@ -14,7 +14,7 @@
       "enabled": true
     },
     "Keyboard": {
-      "resize": "native"
+      "resize": "none"
     },
     "SplashScreen": {
       "launchShowDuration": 500,

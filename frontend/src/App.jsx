@@ -149,10 +149,11 @@ export default function App() {
     const isStandalone =
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
       window.navigator.standalone === true;
-    // The native shell resizes the webview for the keyboard (Capacitor Keyboard
-    // resize: native), so the fixed header already stays put — running the
-    // visualViewport-follow transform there just adds lag/jitter on focus.
-    if (isStandalone || Capacitor.isNativePlatform()) { el.style.transform = ''; return undefined; }
+    // Installed PWAs resize the webview themselves, so the fixed header already
+    // stays put there. The native shell uses Keyboard resize:none (the composer
+    // is lifted manually for a smooth glide), so the header DOES need the
+    // visualViewport-follow to stay pinned during keyboard scroll.
+    if (isStandalone) { el.style.transform = ''; return undefined; }
     let raf = 0;
     let maxH = vv.height;
     const follow = () => {
