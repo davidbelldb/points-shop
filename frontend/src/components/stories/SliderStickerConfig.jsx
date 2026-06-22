@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import SliderSticker from './SliderSticker.jsx';
+import { useKeyboardHeight } from '../../lib/useKeyboardHeight.js';
 
 /* Bottom-sheet modal that walks the poster through the slider sticker
    settings: prompt, the two endpoint labels (text OR emoji), and an
@@ -30,9 +31,15 @@ export default function SliderStickerConfig({ initial, onCancel, onSave, onDelet
     ...draft,
     prompt: draft.prompt || 'How was it?',
   };
+  // Native: lift this bottom-anchored sheet above the keyboard so its fields
+  // stay visible while typing.
+  const kbHeight = useKeyboardHeight();
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+      style={kbHeight ? { paddingBottom: kbHeight } : undefined}
+    >
       <div className="w-full max-w-md rounded-t-2xl bg-white sm:rounded-2xl">
         <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <button onClick={onCancel} className="text-sm text-neutral-500">Cancel</button>
@@ -45,7 +52,10 @@ export default function SliderStickerConfig({ initial, onCancel, onSave, onDelet
           </button>
         </header>
 
-        <div className="max-h-[72vh] space-y-4 overflow-y-auto p-4">
+        <div
+          className="max-h-[72vh] space-y-4 overflow-y-auto p-4"
+          style={kbHeight ? { maxHeight: `calc(100vh - ${kbHeight + 110}px)` } : undefined}
+        >
           {/* Live preview — uses the same component the canvas / viewer will. */}
           <div className="rounded-2xl bg-neutral-100 p-4">
             <div className="mx-auto" style={{ width: 220 }}>

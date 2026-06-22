@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import StickerContent from './StickerContent.jsx';
+import { useKeyboardHeight } from '../../lib/useKeyboardHeight.js';
 
 /* Shared bottom-sheet config for the two "pill" sticker types:
    - Location: typed place name + GPS snap + Nominatim search autocomplete.
@@ -54,6 +55,9 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
   const preset = PRESETS[kind] ?? PRESETS.location;
   const [draft, setDraft] = useState(() => ({ ...preset.empty, ...(initial ?? {}) }));
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  // Native: lift this bottom-anchored sheet above the keyboard so the place /
+  // song fields stay visible while typing.
+  const kbHeight = useKeyboardHeight();
 
   /* ── Location search state ──────────────────────────────────────── */
   const [locationResults, setLocationResults] = useState([]);
@@ -176,7 +180,10 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
   const canSave = kind === 'location' ? !!draft.text?.trim() : !!draft.title?.trim();
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+      style={kbHeight ? { paddingBottom: kbHeight } : undefined}
+    >
       <div className="w-full max-w-md rounded-t-2xl bg-white sm:rounded-2xl">
         <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <button onClick={onCancel} className="text-sm text-neutral-500">Cancel</button>
@@ -190,7 +197,10 @@ export default function PillStickerConfig({ kind, initial, onCancel, onSave, onD
           </button>
         </header>
 
-        <div className="max-h-[72vh] space-y-4 overflow-y-auto p-4">
+        <div
+          className="max-h-[72vh] space-y-4 overflow-y-auto p-4"
+          style={kbHeight ? { maxHeight: `calc(100vh - ${kbHeight + 110}px)` } : undefined}
+        >
           {/* Live preview */}
           <div className="flex min-h-[80px] items-center justify-center rounded-2xl bg-gradient-to-br from-neutral-700 to-neutral-900 p-4">
             <StickerContent sticker={draft} />

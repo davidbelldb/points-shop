@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import TextSticker from './TextSticker.jsx';
+import { useKeyboardHeight } from '../../lib/useKeyboardHeight.js';
 
 /* Bottom-sheet modal for composing a floating text sticker: the text itself,
    a colour from a fixed palette, a size, and an optional translucent
@@ -14,9 +15,15 @@ const EMPTY = { type: 'text', text: '', color: '#ffffff', size: 'm', bg: true, b
 export default function TextStickerConfig({ initial, onCancel, onSave, onDelete }) {
   const [draft, setDraft] = useState(() => ({ ...EMPTY, ...(initial ?? {}) }));
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  // Native: this sheet is anchored to the bottom, so lift it above the
+  // keyboard by padding the backdrop — otherwise the keyboard hides the field.
+  const kbHeight = useKeyboardHeight();
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+      style={kbHeight ? { paddingBottom: kbHeight } : undefined}
+    >
       <div className="w-full max-w-md rounded-t-2xl bg-white sm:rounded-2xl">
         <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <button onClick={onCancel} className="text-sm text-neutral-500">Cancel</button>
@@ -30,7 +37,10 @@ export default function TextStickerConfig({ initial, onCancel, onSave, onDelete 
           </button>
         </header>
 
-        <div className="max-h-[72vh] space-y-4 overflow-y-auto p-4">
+        <div
+          className="max-h-[72vh] space-y-4 overflow-y-auto p-4"
+          style={kbHeight ? { maxHeight: `calc(100vh - ${kbHeight + 110}px)` } : undefined}
+        >
           {/* Live preview on a checkerboard-ish neutral so colour + pill read clearly. */}
           <div className="flex min-h-[88px] items-center justify-center rounded-2xl bg-gradient-to-br from-neutral-700 to-neutral-900 p-4">
             <TextSticker sticker={{ ...draft, text: draft.text || 'Your text' }} />

@@ -84,7 +84,7 @@
 			<key>UIApplicationShortcutItemUserInfo</key>
 			<dict>
 				<key>url</key>
-				<string>/dirty-wordle</string>
+				<string>/games/dirty-wordle</string>
 			</dict>
 		</dict>
 		<dict>

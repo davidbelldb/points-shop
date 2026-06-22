@@ -53,6 +53,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let overlay = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
         overlay.frame = window.bounds
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+        // Cheeky label on the frosted screen.
+        let label = UILabel()
+        label.text = "Sneaky Mode, innit."
+        label.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        label.textColor = .white
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        overlay.contentView.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: overlay.contentView.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: overlay.contentView.centerYAnchor),
+        ])
+
         window.addSubview(overlay)
         privacyOverlay = overlay
     }

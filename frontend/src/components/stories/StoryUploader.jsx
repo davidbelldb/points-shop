@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useBodyScrollLock } from '../../lib/useBodyScrollLock.js';
+import { useKeyboardHeight } from '../../lib/useKeyboardHeight.js';
 import SliderSticker from './SliderSticker.jsx';
 import SliderStickerConfig from './SliderStickerConfig.jsx';
 import StickerDrawer from './StickerDrawer.jsx';
@@ -22,6 +23,11 @@ const MAX_SECONDS = 60;
 export default function StoryUploader({ onClose, onPosted }) {
   // Lock the feed behind this full-screen sheet so scroll gestures stay inside it.
   useBodyScrollLock();
+  // Native: pad the scroll area by the keyboard height so the caption ("Say
+  // something…") and any other field near the bottom can scroll clear of the
+  // keyboard instead of sitting hidden behind it.
+  const kbHeight = useKeyboardHeight();
+  const captionRef = useRef(null);
   const fileRef = useRef(null);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -195,7 +201,11 @@ export default function StoryUploader({ onClose, onPosted }) {
           </button>
         </header>
 
-        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y p-4">
+        <div
+          data-modal-scroll
+          className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y p-4"
+          style={kbHeight ? { paddingBottom: kbHeight + 16, scrollPaddingBottom: kbHeight + 16 } : undefined}
+        >
           {!file ? (
             <label className="flex aspect-[9/12] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 text-amber-700">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -348,8 +358,16 @@ export default function StoryUploader({ onClose, onPosted }) {
           <div>
             <label className="text-xs font-semibold text-neutral-500">Caption (optional)</label>
             <input
+              ref={captionRef}
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
+              onFocus={() => {
+                // Wait for the keyboard-height padding to apply, then bring the
+                // caption fully into the space above the keyboard.
+                setTimeout(() => {
+                  captionRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }, 250);
+              }}
               maxLength={140}
               placeholder="Say something…"
               className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"

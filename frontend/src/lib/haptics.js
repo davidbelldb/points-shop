@@ -1,9 +1,27 @@
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { api } from './api.js';
 
 // Per-event haptic patterns. All no-ops on the web build.
 const native = () => Capacitor.isNativePlatform();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// One-shot bring-up diagnostic: reports to the backend logs whether the Haptics
+// plugin is actually registered at runtime and whether an impact call throws.
+// Remove once haptics are confirmed working.
+let diagDone = false;
+function reportHapticDiag(impactResult) {
+  if (diagDone) return;
+  diagDone = true;
+  let available = 'unknown';
+  try { available = String(Capacitor.isPluginAvailable('Haptics')); } catch { /* ignore */ }
+  try {
+    api.apnsDebug(
+      'haptic',
+      `platform=${Capacitor.getPlatform()} native=${Capacitor.isNativePlatform()} pluginAvailable=${available} impact=${impactResult}`,
+    );
+  } catch { /* ignore */ }
+}
 
 /**
  * Nudge — a deliberately attention-grabbing "jiggle": a rapid burst of heavy
@@ -36,7 +54,10 @@ export async function hapticTug() {
 /** Single light tap — for momentary feedback (button press, send). */
 export async function hapticTap(style = ImpactStyle.Light) {
   if (!native()) return;
-  try { await Haptics.impact({ style }); } catch { /* ignore */ }
+  let result = 'ok';
+  try { await Haptics.impact({ style }); }
+  catch (e) { result = 'error:' + (e?.message || e); }
+  reportHapticDiag(result);
 }
 
 /** Celebration — for wins / point rewards. */

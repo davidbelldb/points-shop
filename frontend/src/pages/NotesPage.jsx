@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
 import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
@@ -686,6 +687,7 @@ function NoteToolbar({ editor }) {
 // ─── Note Editor ──────────────────────────────────────────────────────────────
 
 function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
+  const kbHeight   = useKeyboardHeight();
   const titleRef   = useRef(null);
   const saveTimer  = useRef(null);
   const latestHtml = useRef('');
@@ -777,7 +779,10 @@ function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-5 py-4 md:px-8 md:py-6">
+      <div
+        className="flex-1 overflow-y-auto px-5 py-4 md:px-8 md:py-6"
+        style={{ paddingBottom: kbHeight ? kbHeight + 56 : undefined, transition: 'padding 0.25s ease-out' }}
+      >
         {/* Desktop save status */}
         {!readOnly && (
           <div className="hidden md:flex justify-end mb-3 h-4">
@@ -862,8 +867,13 @@ function NoteEditor({ note, onBack, onSaved, onTypeChanged, readOnly }) {
         )}
       </div>
 
-      {/* Apple Notes-style format toolbar — only when editing */}
-      {!readOnly && <NoteToolbar editor={editor} />}
+      {/* Apple Notes-style format toolbar — only when editing. Lifts above the
+          keyboard so the format buttons stay usable while typing. */}
+      {!readOnly && (
+        <div style={{ transform: kbHeight ? `translateY(-${kbHeight}px)` : undefined, transition: 'transform 0.25s ease-out' }}>
+          <NoteToolbar editor={editor} />
+        </div>
+      )}
     </div>
   );
 }
