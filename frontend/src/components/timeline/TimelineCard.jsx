@@ -106,7 +106,7 @@ const TimelineCard = forwardRef(function TimelineCard(
           {media?.url && (
             <button
               type="button"
-              onClick={() => onOpenLightbox?.(media)}
+              onClick={() => setShowDetail(true)}
               className={`mt-3 block overflow-hidden rounded-xl border border-[var(--tl-card-border)] ${mediaSizeClass} group`}
             >
               <img
@@ -123,9 +123,9 @@ const TimelineCard = forwardRef(function TimelineCard(
       {/* Spacer that pushes the card to the opposite half on desktop */}
       {side === 'left' && <div className="hidden md:block md:w-1/2" />}
 
-      {hasLongDescription && (
-        <MilestoneDetailModal milestone={showDetail ? milestone : null} onClose={() => setShowDetail(false)} />
-      )}
+      {/* Opened by the title (when there's a longer description) or by tapping
+          the photo. Renders the photo under the title, above the text. */}
+      <MilestoneDetailModal milestone={showDetail ? milestone : null} onClose={() => setShowDetail(false)} />
     </div>
   );
 });

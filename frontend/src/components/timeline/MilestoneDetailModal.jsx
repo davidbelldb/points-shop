@@ -14,6 +14,10 @@ import { getMilestoneIcon } from './icons';
 export default function MilestoneDetailModal({ milestone, onClose }) {
   useEffect(() => {
     if (!milestone) return;
+    // Remember where the timeline was scrolled. iOS WebKit resets the document
+    // scroll to the top when body overflow toggles, which made closing the modal
+    // jump back to the top — restoring the position on close keeps the page put.
+    const scrollY = window.scrollY;
     const onKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
     };
@@ -22,6 +26,7 @@ export default function MilestoneDetailModal({ milestone, onClose }) {
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = '';
+      window.scrollTo(0, scrollY);
     };
   }, [milestone, onClose]);
 
@@ -75,8 +80,16 @@ export default function MilestoneDetailModal({ milestone, onClose }) {
               className="text-xl sm:text-2xl font-bold text-[var(--tl-title)] mb-3"
             />
 
+            {milestone.media?.url && (
+              <img
+                src={milestone.media.url}
+                alt={milestone.media.alt || milestone.title}
+                className="mb-3 w-full rounded-xl border border-[var(--tl-card-border)] object-cover"
+              />
+            )}
+
             <RichText
-              text={milestone.longDescription}
+              text={milestone.longDescription || milestone.description}
               className="text-sm sm:text-[0.95rem] text-[var(--tl-body)] text-justify"
             />
           </motion.div>

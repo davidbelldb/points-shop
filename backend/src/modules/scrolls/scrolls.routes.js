@@ -3,6 +3,7 @@ import {
   createScroll, listReceived, unreadCount, markRead, resolveDueScrolls,
 } from './scrolls.repo.js';
 import { findOtherUser } from '../chat/chat.repo.js';
+import { buildFlightPath } from './flightPath.js';
 import { getEffectiveAccountId, getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
 // Background delivery resolver. A scroll only "arrives" once its crow has flown
@@ -96,5 +97,21 @@ export default async function scrollRoutes(fastify) {
   fastify.post('/api/scrolls/:id/read', async (req) => {
     const accountId = getEffectiveAccountId(req);
     return markRead(req.params.id, accountId);
+  });
+
+  // Crow flight path — plots a road-following route between sender and recipient
+  // for the in-app map / Live Activity to animate the crow along. Self-contained
+  // (no push needed): the client polls/animates against flight_seconds itself.
+  fastify.post('/api/scrolls/flight-path', async (req, reply) => {
+    getEffectiveAccountId(req); // require an authenticated session
+    const { origin, dest } = req.body ?? {};
+    if (origin?.lat == null || origin?.lng == null || dest?.lat == null || dest?.lng == null) {
+      return reply.code(400).send({ error: 'origin and dest {lat,lng} required' });
+    }
+    const path = await buildFlightPath({
+      originLat: origin.lat, originLng: origin.lng,
+      destLat: dest.lat, destLng: dest.lng,
+    });
+    return { ...path, origin_label: origin.label ?? null, dest_label: dest.label ?? null };
   });
 }

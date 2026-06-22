@@ -13,6 +13,13 @@ function HomeIcon() {
     </svg>
   );
 }
+function TimelineIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8z" />
+    </svg>
+  );
+}
 function GameIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -178,7 +185,6 @@ export default function MenuDrawer({ open, onClose }) {
             taller than the drawer. */}
         <nav data-modal-scroll className="flex-1 space-y-1 overflow-y-auto overscroll-contain p-2 pt-3">
           <Item to="/" label="Sneaky Home" icon={<HomeIcon />} onClose={onClose} />
-          <Item to="/store" label="Sneaky Store" icon={<StoreIcon />} onClose={onClose} />
           <Item to="/notes" label="Sneaky Notes" icon={<NotesIcon />} onClose={onClose} />
           <Item to="/stories" label="Sneaky Stories" icon={<FeedIcon />} onClose={onClose} />
           <Item to="/games" label="Sneaky Games" icon={<GameIcon />} onClose={onClose} />
@@ -186,6 +192,7 @@ export default function MenuDrawer({ open, onClose }) {
           <Item to="/calendar" label="Sneaky Calendar" icon={<CalendarIcon />} onClose={onClose} />
           <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
           <Item to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} onClose={onClose} />
+          <Item to="/timeline" label="Sneaky Timeline" icon={<TimelineIcon />} onClose={onClose} />
           <Item to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} onClose={onClose} />
         </nav>
         {/* Pinned footer — always anchored to the bottom of the visible drawer. */}

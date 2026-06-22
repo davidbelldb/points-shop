@@ -56,6 +56,8 @@ import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
 import { ThemeProvider } from './lib/ThemeContext.jsx';
+import { ToastProvider } from './lib/ToastContext.jsx';
+import ToastHost from './components/ToastHost.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './index.css';
 
@@ -128,6 +130,8 @@ const lazyFallback = (
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
+      <ToastProvider>
+      <ToastHost />
       <ThemeProvider>
         <AuthProvider>
           <NativePush />
@@ -197,6 +201,7 @@ createRoot(document.getElementById('root')).render(
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>
+      </ToastProvider>
     </BrowserRouter>
   </StrictMode>
 );

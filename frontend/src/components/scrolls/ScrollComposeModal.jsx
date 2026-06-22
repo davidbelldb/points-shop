@@ -10,17 +10,29 @@ const DROPDOWN_BG = '#d2a469';
 // Cambridge, UK bounding box for the destination lookup.
 const CAMBRIDGE_VIEWBOX = '0.02,52.27,0.25,52.12';
 
-// Message constraints: 20 chars per line, max 4 lines (=> 80 chars total).
-const MAX_LINE = 25;
-const MAX_LINES = 4;
-const MAX_TOTAL = MAX_LINE * MAX_LINES;
+// Message constraints. Up to SHRINK_AT chars render at full size; beyond that
+// the text drops to half size so up to MAX_TOTAL chars still fit the parchment.
+const MAX_TOTAL = 200;
+const SHRINK_AT = 70;
+const FULL_WRAP = { line: 25, lines: 4 };
+const SMALL_WRAP = { line: 50, lines: 8 };
 
 /* Wrap raw input into at most MAX_LINES lines of at most MAX_LINE chars. A word
    that would overflow the current line moves to the next line, and each new line
    starts its 20-char count fresh (no carry-over). Words longer than 20 chars are
    hard-broken. Explicit newlines are honoured. Anything past 4 lines is dropped. */
 function wrapMessage(input) {
-  const src = String(input).replace(/\r\n?/g, '\n');
+  let src = String(input).replace(/\r\n?/g, '\n');
+  // Hard-cap the total typed characters (newlines don't count toward the limit).
+  let count = 0; let capped = '';
+  for (const ch of src) {
+    if (ch === '\n') { capped += ch; continue; }
+    if (count >= MAX_TOTAL) break;
+    capped += ch; count += 1;
+  }
+  src = capped;
+  // Past SHRINK_AT chars the text is half size, so more/longer lines fit.
+  const { line: MAX_LINE, lines: MAX_LINES } = count > SHRINK_AT ? SMALL_WRAP : FULL_WRAP;
   // Preserve an in-progress trailing space so the user can actually type spaces
   // (re-wrapping on every keystroke would otherwise strip it instantly).
   const endsWithSpace = / $/.test(src);
@@ -280,9 +292,14 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             value={body}
             onChange={(e) => setBody(wrapMessage(e.target.value))}
             placeholder="Pen thy message…"
-            rows={MAX_LINES}
-            className="w-full resize-none bg-transparent text-center text-xl leading-snug text-black placeholder-black/40 focus:outline-none"
-            style={{ fontFamily: font, whiteSpace: 'pre-wrap' }}
+            rows={body.replace(/\n/g, '').length > SHRINK_AT ? SMALL_WRAP.lines : FULL_WRAP.lines}
+            className="w-full resize-none bg-transparent text-center leading-snug text-black placeholder-black/40 focus:outline-none"
+            style={{
+              fontFamily: font,
+              whiteSpace: 'pre-wrap',
+              // Half size once the message runs long, so up to 200 chars fit.
+              fontSize: body.replace(/\n/g, '').length > SHRINK_AT ? '0.625rem' : '1.25rem',
+            }}
           />
           <div className="w-full text-center text-[11px] text-black/50" style={{ fontFamily: font }}>{body.replace(/\n/g, '').length}/{MAX_TOTAL}</div>
 

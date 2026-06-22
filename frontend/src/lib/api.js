@@ -129,6 +129,9 @@ export const api = {
     config:   () => request('/scrolls/config'),
     saveSettings: (patch) => request('/scrolls/config/settings', { method: 'PUT', body: JSON.stringify(patch) }),
     saveFrames:   (layer, frames) => request(`/scrolls/config/frames/${layer}`, { method: 'PUT', body: JSON.stringify({ frames }) }),
+    // Crow flight path between two points (road-following route + street names)
+    // for the in-app map / Live Activity. origin/dest: { lat, lng, label? }.
+    flightPath:   (origin, dest) => request('/scrolls/flight-path', { method: 'POST', body: JSON.stringify({ origin, dest }) }),
   },
   getMessages: () => request('/messages'),
   sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>

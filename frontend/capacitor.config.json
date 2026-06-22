@@ -15,6 +15,12 @@
     },
     "Keyboard": {
       "resize": "native"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 500,
+      "launchAutoHide": true,
+      "backgroundColor": "#a04d89",
+      "showSpinner": false
     }
   }
 }

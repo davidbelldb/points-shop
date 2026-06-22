@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { useBasket } from './lib/BasketContext.jsx';
 import { useAuth } from './lib/AuthContext.jsx';
 import { api } from './lib/api.js';
@@ -10,6 +13,7 @@ import MenuDrawer from './components/MenuDrawer.jsx';
 import SideNav from './components/SideNav.jsx';
 import BasketDrawer from './components/BasketDrawer.jsx';
 import IncomingCallBanner from './components/IncomingCallBanner.jsx';
+import InAppNotifier from './components/InAppNotifier.jsx';
 import { countdownClock } from './lib/countdown.js';
 
 function AvatarFallback() {
@@ -35,8 +39,9 @@ function CountdownClock({ date, time }) {
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const showFloater = !location.pathname.startsWith('/admin');
-  const { account, basket, notifications } = useBasket();
+  const { account, basket, notifications, refresh: refreshBasket } = useBasket();
   const { user, refresh: refreshAuth } = useAuth();
   const { theme, setTheme } = useTheme();
   const [menuOpen,   setMenuOpen]   = useState(false);
@@ -144,7 +149,10 @@ export default function App() {
     const isStandalone =
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
       window.navigator.standalone === true;
-    if (isStandalone) { el.style.transform = ''; return undefined; }
+    // The native shell resizes the webview for the keyboard (Capacitor Keyboard
+    // resize: native), so the fixed header already stays put — running the
+    // visualViewport-follow transform there just adds lag/jitter on focus.
+    if (isStandalone || Capacitor.isNativePlatform()) { el.style.transform = ''; return undefined; }
     let raf = 0;
     let maxH = vv.height;
     const follow = () => {
@@ -165,6 +173,55 @@ export default function App() {
       el.style.transform = '';
     };
   }, [hideHeader]);
+
+  // Native edge swipes: drag in from the LEFT screen edge → open the menu;
+  // from the RIGHT edge → go to /account. Native shell only, so it doesn't
+  // clash with the browser's own back/forward edge-swipe on the web.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    const EDGE = 24, THRESH = 55, MAX_OFF_AXIS = 70, MAX_MS = 600;
+    let x0 = 0, y0 = 0, t0 = 0, fromLeft = false, fromRight = false, tracking = false;
+    const onStart = (e) => {
+      const t = e.touches[0];
+      x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
+      fromLeft = x0 <= EDGE;
+      fromRight = x0 >= window.innerWidth - EDGE;
+      tracking = fromLeft || fromRight;
+    };
+    const onEnd = (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - x0, dy = t.clientY - y0;
+      if (Date.now() - t0 > MAX_MS || Math.abs(dy) > MAX_OFF_AXIS) return;
+      if (fromLeft && dx > THRESH) setMenuOpen(true);
+      else if (fromRight && dx < -THRESH) navigate('/account');
+    };
+    window.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', onStart);
+      window.removeEventListener('touchend', onEnd);
+    };
+  }, [navigate]);
+
+  // Refresh account/basket/notifications when the app returns to the foreground,
+  // so reopening never shows stale points or a missed alert. Native only.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let handle;
+    CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) refreshBasket?.();
+    }).then((h) => { handle = h; }).catch(() => {});
+    return () => { handle?.remove?.(); };
+  }, [refreshBasket]);
+
+  // Match the native status bar to the current theme (light text on the dark
+  // theme, dark text on the light theme).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light }).catch(() => {});
+  }, [theme]);
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-neutral-50 text-neutral-900 antialiased">
@@ -288,6 +345,8 @@ export default function App() {
       <BasketDrawer open={basketOpen} onClose={() => setBasketOpen(false)} />
       {/* Incoming SneakyTime call — rings on every page */}
       <IncomingCallBanner />
+      {/* Polls for new alerts and raises in-app toasts (foreground only) */}
+      <InAppNotifier />
       {isHome && bannerOn && (() => {
         const bannerLink = (settings.banner_link_url || '').trim();
         const inner = (

@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { api } from '../lib/api.js';
+import { hapticNudge, hapticTap } from '../lib/haptics.js';
 
 // Lazy-load the entire Three.js / R3F bundle — only fetched when first needed
 const LazyRainTray    = lazy(() => import('./ChatRain.jsx').then(m => ({ default: m.RainTrayButtons })));
@@ -1491,7 +1492,7 @@ export default function MessagesPage() {
       const hasUnreadNudge = result.messages.some(
         (m) => m.body === NUDGE_BODY && !m.read_at && m.sender_id !== user?.id,
       );
-      if (hasUnreadNudge) triggerShake();
+      if (hasUnreadNudge) { triggerShake(); hapticNudge(); }
       // Trigger rain if the other person sent an unread rain message.
       const unreadRain = result.messages.find(
         (m) => RAIN_BODIES.has(m.body) && !m.read_at && m.sender_id !== user?.id,
@@ -1677,6 +1678,7 @@ export default function MessagesPage() {
     setError(null);
     try {
       await api.sendMessage(NUDGE_BODY, null, null);
+      hapticTap(); // sender confirmation; the receiver gets the jiggle on arrival
       await refresh(false);
     } catch (e) {
       setError(e.message);
@@ -2144,7 +2146,7 @@ export default function MessagesPage() {
                     <div className="my-1 flex justify-center">
                       <span
                         className="select-none rounded-full px-3 py-1 text-[11px]"
-                        style={{ background: theme === 'dark' ? '#262626' : '#f0f0f0', color: theme === 'dark' ? '#6b6b6b' : '#a3a3a0' }}
+                        style={{ background: theme === 'dark' ? '#3a2f38' : '#f3e3ef', color: theme === 'dark' ? '#e6b8da' : '#a23f80' }}
                       >
                         {mine ? 'You' : (data.other?.name ?? 'They')} nudged{mine ? '' : ' you'}{countLabel ? ` ${countLabel}` : ''} · {timeLabel(m.created_at)}
                       </span>
@@ -2153,7 +2155,7 @@ export default function MessagesPage() {
                     <div className="my-1 flex justify-center">
                       <span
                         className="select-none rounded-full px-3 py-1 text-[11px]"
-                        style={{ background: theme === 'dark' ? '#262626' : '#f0f0f0', color: theme === 'dark' ? '#6b6b6b' : '#a3a3a0' }}
+                        style={{ background: theme === 'dark' ? '#3a2f38' : '#f3e3ef', color: theme === 'dark' ? '#e6b8da' : '#a23f80' }}
                       >
                         {mine ? 'You' : (data.other?.name ?? 'They')} made it rain {rainKind}s{countLabel ? ` ${countLabel}` : ''} · {timeLabel(m.created_at)}
                       </span>
@@ -2446,7 +2448,7 @@ export default function MessagesPage() {
               }}
               placeholder={replyTo ? `Reply to ${replyTo.senderName}…` : 'Say something...'}
               autoComplete="off"
-              className="block flex-1 rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm leading-5 focus:border-amber-500 focus:outline-none resize-none overflow-hidden"
+              className="block flex-1 rounded-[20px] border border-neutral-200 bg-white px-4 py-2.5 text-sm leading-5 focus:border-amber-500 focus:outline-none resize-none overflow-hidden"
               style={{ minHeight: 40, maxHeight: 120 }}
             />
 

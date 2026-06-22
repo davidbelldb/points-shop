@@ -35,6 +35,13 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
     ? `${scroll.dest_label || 'parts unknown'}${scroll.distance_km ? ` · ${Math.round(scroll.distance_km).toLocaleString()} km` : ''}`
     : null;
 
+  // Mirror the composer: longer messages render at (roughly) half size so up to
+  // 200 characters still fit inside the parchment frame.
+  const bodyLen = (scroll.body || '').replace(/\n/g, '').length;
+  const bodyFontSize = bodyLen > 70
+    ? 'clamp(0.7rem, 2.3vw, 1.15rem)'
+    : 'clamp(1.3rem, 4.5vw, 2.2rem)';
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-3" onClick={onClose}>
       <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -63,7 +70,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
           <div className="flex flex-1 flex-col items-center justify-center">
             <p
               className="text-black"
-              style={{ fontFamily: font, fontSize: 'clamp(1.3rem, 4.5vw, 2.2rem)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}
+              style={{ fontFamily: font, fontSize: bodyFontSize, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}
             >
               {scroll.body}
             </p>

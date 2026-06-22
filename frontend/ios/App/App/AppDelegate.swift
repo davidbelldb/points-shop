@@ -5,6 +5,9 @@ import Capacitor
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    // Privacy overlay shown over the app's content in the iOS app switcher so a
+    // glance at the multitasking preview can't reveal a chat / photo.
+    var privacyOverlay: UIView?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
@@ -12,21 +15,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
+        // Cover the screen with a blur while inactive, so the app-switcher
+        // snapshot doesn't expose the content underneath.
+        guard let window = self.window else { return }
+        let overlay = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+        overlay.frame = window.bounds
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        window.addSubview(overlay)
+        privacyOverlay = overlay
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        // Reveal the content again once the app is back in the foreground.
+        privacyOverlay?.removeFromSuperview()
+        privacyOverlay = nil
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
