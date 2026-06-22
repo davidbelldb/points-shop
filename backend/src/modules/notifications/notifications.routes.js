@@ -54,15 +54,26 @@ export default async function notificationsRoutes(fastify) {
     const accountId = getEffectiveAccountId(req);
     const token = req.body?.token;
     if (!token || typeof token !== 'string') {
+      req.log.warn({ accountId }, 'apns-register: missing token');
       return reply.code(400).send({ error: 'token required' });
     }
     await saveApnsToken(accountId, token);
+    req.log.info({ accountId, tokenPrefix: token.slice(0, 12) }, 'apns-register: token saved');
     return { ok: true };
   });
 
   fastify.post('/api/notifications/apns-unregister', async (req) => {
     const token = req.body?.token;
     if (token) await deleteApnsToken(token);
+    return { ok: true };
+  });
+
+  // Device-side diagnostics — the native app reports its push registration
+  // lifecycle here so failures (which are otherwise silent on-device) show up
+  // in the backend logs. Temporary aid for bring-up.
+  fastify.post('/api/notifications/apns-debug', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    req.log.info({ accountId, event: req.body?.event, detail: req.body?.detail }, 'apns-debug');
     return { ok: true };
   });
 

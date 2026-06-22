@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { api } from '../lib/api.js';
 
 function urlBase64ToUint8Array(base64String) {
@@ -76,6 +77,11 @@ export default function PushToggle() {
       setBusy(false);
     }
   }
+
+  // In the native iOS app, notifications are APNs (registered automatically on
+  // login, managed in iOS Settings) — not web push. Hide this web-only toggle
+  // so it doesn't show a misleading "not supported on this device".
+  if (Capacitor.isNativePlatform()) return null;
 
   if (state === 'checking') return null;
 

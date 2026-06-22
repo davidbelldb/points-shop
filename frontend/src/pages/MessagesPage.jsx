@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { api } from '../lib/api.js';
 
 // Lazy-load the entire Three.js / R3F bundle — only fetched when first needed
@@ -1596,6 +1597,13 @@ export default function MessagesPage() {
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
       window.navigator.standalone === true;
 
+    // In the native iOS app, the Capacitor Keyboard plugin (resize: 'native')
+    // shrinks the whole webview to sit above the keyboard, so a fixed bottom:0
+    // composer already lands flush on top of the keyboard. Doing the JS lift on
+    // top of that floats the composer mid-screen with the thread bleeding under
+    // the keyboard — so on native we do NOTHING and let the OS resize handle it.
+    const isNative = Capacitor.isNativePlatform();
+
     let maxVvHeight = vv ? vv.height : 0;
     const atBottom = { current: true };
 
@@ -1605,7 +1613,7 @@ export default function MessagesPage() {
     }
 
     function applyKeyboardInset() {
-      if (!vv || isStandalone) { el.style.bottom = ''; return; }
+      if (!vv || isStandalone || isNative) { el.style.bottom = ''; return; }
       maxVvHeight = Math.max(maxVvHeight, vv.height);
       const kb = Math.max(0, Math.round(maxVvHeight - vv.height));
       // >80px ⇒ the keyboard is up (ignores tiny address-bar wobble). Lift the

@@ -8,6 +8,12 @@ import { api } from './api.js';
 let listenersWired = false;
 let lastToken = null;
 
+// Bring-up diagnostics: mirror the registration lifecycle to the backend logs,
+// since these events are otherwise invisible on a TestFlight device.
+function report(event, detail) {
+  try { api.apnsDebug(event, detail == null ? null : String(detail)); } catch { /* ignore */ }
+}
+
 /**
  * Ask for permission, register with APNs, and ship the device token to the
  * backend. Safe to call repeatedly (idempotent). `onOpenUrl` is invoked when
@@ -21,11 +27,14 @@ export async function initNativePush(onOpenUrl) {
 
     PushNotifications.addListener('registration', (token) => {
       lastToken = token.value;
-      api.registerApnsToken(token.value).catch(() => {});
+      report('registration', `token len ${token.value?.length}`);
+      api.registerApnsToken(token.value)
+        .then(() => report('register-saved', 'ok'))
+        .catch((e) => report('register-save-failed', e?.message));
     });
 
-    PushNotifications.addListener('registrationError', () => {
-      // Leave it — the user can retry by reopening; nothing actionable here.
+    PushNotifications.addListener('registrationError', (err) => {
+      report('registrationError', err?.error || JSON.stringify(err));
     });
 
     // Tap on a notification (foreground or background) → deep-link in the app.
@@ -35,13 +44,21 @@ export async function initNativePush(onOpenUrl) {
     });
   }
 
-  let perm = await PushNotifications.checkPermissions();
-  if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-    perm = await PushNotifications.requestPermissions();
-  }
-  if (perm.receive !== 'granted') return;
+  report('init', `platform ${Capacitor.getPlatform()}`);
+  try {
+    let perm = await PushNotifications.checkPermissions();
+    report('permission', perm.receive);
+    if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+      perm = await PushNotifications.requestPermissions();
+      report('permission-after-prompt', perm.receive);
+    }
+    if (perm.receive !== 'granted') return;
 
-  await PushNotifications.register();
+    await PushNotifications.register();
+    report('register-called', 'ok');
+  } catch (e) {
+    report('init-error', e?.message);
+  }
 }
 
 /**

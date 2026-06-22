@@ -316,6 +316,8 @@ export const api = {
     request('/notifications/apns-register', { method: 'POST', body: JSON.stringify({ token }) }),
   unregisterApnsToken: (token) =>
     request('/notifications/apns-unregister', { method: 'POST', body: JSON.stringify({ token }) }),
+  apnsDebug: (event, detail) =>
+    request('/notifications/apns-debug', { method: 'POST', body: JSON.stringify({ event, detail }) }),
   getActiveSurvey: () => request('/surveys/active'),
   submitSurveyResponse: (surveyId, answers) =>
     request(`/surveys/${surveyId}/responses`, { method: 'POST', body: JSON.stringify({ answers }) }),

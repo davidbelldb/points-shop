@@ -118,6 +118,11 @@ export async function sendApns(accountId, payload) {
       req.on('data', (chunk) => { data += chunk; });
       req.on('error', () => resolve());
       req.on('end', async () => {
+        if (status !== 200) {
+          // Surface Apple's rejection reason (InvalidProviderToken, TopicDisallowed,
+          // BadDeviceToken, etc.) — invaluable during bring-up.
+          console.error(`[apns] send failed: ${status} ${data}`);
+        }
         // 410 = device unregistered; 400 BadDeviceToken = stale. Drop either.
         if (status === 410 || (status === 400 && data.includes('BadDeviceToken'))) {
           await query(`DELETE FROM apns_tokens WHERE token = $1`, [t.token]).catch(() => {});
