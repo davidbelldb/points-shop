@@ -79,8 +79,8 @@ export default function PullToRefresh() {
       <img
         src="/refresh.svg"
         alt=""
-        width="40"
-        height="40"
+        width="140"
+        height="140"
         className={`mt-2 drop-shadow-lg ${refreshing ? 'animate-spin' : ''}`}
         style={{
           // While being pulled, do a fast ±22.5° shaky jiggle; while refreshing,
