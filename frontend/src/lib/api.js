@@ -1,4 +1,40 @@
-const BASE = '/api';
+import { Capacitor } from '@capacitor/core';
+
+// Production origin of the Node/Postgres backend (behind Caddy on the VPS).
+const PROD_ORIGIN = 'https://sneakypoints.com';
+
+// In the native shell the web bundle is served from https://localhost, so
+// root-relative paths ('/api', '/media') never reach the server. Point them at
+// the production origin. On the web build they stay relative so the Vite dev
+// proxy and the Caddy reverse-proxy keep working unchanged.
+//
+// Cross-site cookies (session auth) are handled by Capacitor's native HTTP
+// layer — see CapacitorHttp in capacitor.config.ts — which uses the native
+// cookie jar instead of the WKWebView one that ITP would otherwise partition.
+const NATIVE = Capacitor.isNativePlatform();
+const BASE = NATIVE ? `${PROD_ORIGIN}/api` : '/api';
+
+// Backend payloads embed uploaded media as root-relative paths ('/media/...').
+// Those 404 in the native shell (they'd resolve to https://localhost/media/...
+// and hit the bundled assets, not the server). Rewrite them to absolute
+// production URLs. This is the single choke point: every response and upload
+// result passes through here. <img>/<audio> src therefore resolve correctly
+// without touching dozens of components. No-op on the web build.
+function absolutizeMedia(value) {
+  if (!NATIVE || value == null) return value;
+  if (typeof value === 'string') {
+    return value.startsWith('/media/') ? `${PROD_ORIGIN}${value}` : value;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) value[i] = absolutizeMedia(value[i]);
+    return value;
+  }
+  if (typeof value === 'object') {
+    for (const k in value) value[k] = absolutizeMedia(value[k]);
+    return value;
+  }
+  return value;
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -34,7 +70,7 @@ async function request(path, options = {}) {
         } catch {}
         throw new Error(message || `API ${res.status}`);
       }
-      return res.json();
+      return absolutizeMedia(await res.json());
     } catch (err) {
       lastErr = err;
       // fetch() rejects with a TypeError on network failure (Safari: "Load
@@ -59,7 +95,7 @@ async function uploadFile(file) {
     try { const b = await res.json(); if (b?.error) message = b.error; } catch {}
     throw new Error(message || `Upload ${res.status}`);
   }
-  return res.json();
+  return absolutizeMedia(await res.json());
 }
 
 // Non-admin upload — same response shape, but on /api/upload so it bypasses
@@ -74,7 +110,7 @@ async function uploadFilePublic(file) {
     try { const b = await res.json(); if (b?.error) message = b.error; } catch {}
     throw new Error(message || `Upload ${res.status}`);
   }
-  return res.json();
+  return absolutizeMedia(await res.json());
 }
 
 export const api = {

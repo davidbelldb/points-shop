@@ -1,0 +1,17 @@
+{
+  "appId": "com.david.sneakystuff",
+  "appName": "Sneaky Social",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#1f1f1e"
+  },
+  "server": {
+    "iosScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

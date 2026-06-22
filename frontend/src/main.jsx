@@ -1,6 +1,7 @@
 import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import App from './App.jsx';
 
 // ── Eager — the core shell + everyday pages (kept small) ─────────────────────
@@ -74,7 +75,12 @@ window.addEventListener('vite:preloadError', (event) => {
 // Register the service worker (needed for web push notifications + offline
 // shell). Check for a newer worker on load and whenever the tab is refocused,
 // so a deployed update is picked up promptly instead of lingering for days.
-if ('serviceWorker' in navigator) {
+//
+// Skip entirely in the native shell: the bundle is already on-device (no
+// offline shell needed) and a SW intercepting https://localhost requests
+// fights with Capacitor's asset server. Native push will use APNs via
+// @capacitor/push-notifications (phase 2), not the web-push SW.
+if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((reg) => {
       reg.update().catch(() => {});
