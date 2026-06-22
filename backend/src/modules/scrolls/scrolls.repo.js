@@ -192,7 +192,7 @@ export async function resolveDueScrolls() {
       await sendPush(s.recipient_id, {
         title: 'A crow has arrived',
         body: `Important news from ${s.origin_label || 'afar'}`,
-        url: '/new-chat?scrolls=1',
+        url: '/messages?scrolls=1',
         tag: 'scroll-arrival',
       });
     } catch { /* push is best-effort */ }
