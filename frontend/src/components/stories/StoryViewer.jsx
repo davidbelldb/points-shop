@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { api } from '../../lib/api.js';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import { useTheme } from '../../lib/ThemeContext.jsx';
@@ -55,6 +57,20 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const replyInputRef = useRef(null);
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Native: lift the reply controls above the keyboard (same glide as chat) so
+  // you can see what you're typing. resize:none means the keyboard would
+  // otherwise cover this full-screen viewer's bottom strip.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let showSub, hideSub;
+    Keyboard.addListener('keyboardWillShow', (info) => setKbHeight(info?.keyboardHeight || 0))
+      .then((h) => { showSub = h; }).catch(() => {});
+    Keyboard.addListener('keyboardWillHide', () => setKbHeight(0))
+      .then((h) => { hideSub = h; }).catch(() => {});
+    return () => { showSub?.remove?.(); hideSub?.remove?.(); };
+  }, []);
   const mediaZoneRef = useRef(null);
   const startedAtRef = useRef(Date.now());
   const pausedAccumRef = useRef(0);
@@ -713,6 +729,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       <div
         data-story-controls
         className="space-y-2 px-3 pt-2 pb-3 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+        style={{ transform: kbHeight ? `translateY(-${kbHeight}px)` : undefined, transition: 'transform 0.25s ease-out' }}
       >
         {isMine ? (
           <StorySeenBy story={story} isDark={isDark} />

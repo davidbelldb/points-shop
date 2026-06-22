@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { assetUrl, haversineKm, flightSeconds, humanizeSeconds } from './scrollAssets.js';
 
 // scroll_blank.png is 1360 x 1542.
@@ -10,63 +12,22 @@ const DROPDOWN_BG = '#d2a469';
 // Cambridge, UK bounding box for the destination lookup.
 const CAMBRIDGE_VIEWBOX = '0.02,52.27,0.25,52.12';
 
-// Message constraints. Up to SHRINK_AT chars render at full size; beyond that
-// the text drops to half size so up to MAX_TOTAL chars still fit the parchment.
+// Message constraints. Up to SHRINK_AT characters render at full size; beyond
+// that the text steps down to a medium size so up to MAX_TOTAL chars still fit
+// the parchment. The text wraps NATURALLY (CSS), so it always reflows to fill
+// each line — no manual line management, no half-empty upper lines.
 const MAX_TOTAL = 200;
 const SHRINK_AT = 70;
-const FULL_WRAP = { line: 25, lines: 4 };
-const SMALL_WRAP = { line: 50, lines: 8 };
+const FULL_ROWS = 4;
+const SMALL_ROWS = 9;
 
-/* Wrap raw input into at most MAX_LINES lines of at most MAX_LINE chars. A word
-   that would overflow the current line moves to the next line, and each new line
-   starts its 20-char count fresh (no carry-over). Words longer than 20 chars are
-   hard-broken. Explicit newlines are honoured. Anything past 4 lines is dropped. */
-function wrapMessage(input) {
-  let src = String(input).replace(/\r\n?/g, '\n');
-  // Hard-cap the total typed characters (newlines don't count toward the limit).
-  let count = 0; let capped = '';
-  for (const ch of src) {
-    if (ch === '\n') { capped += ch; continue; }
+// Cap the message at MAX_TOTAL characters (manual newlines allowed, not counted).
+function capMessage(input) {
+  let count = 0; let out = '';
+  for (const ch of String(input).replace(/\r\n?/g, '\n')) {
+    if (ch === '\n') { out += ch; continue; }
     if (count >= MAX_TOTAL) break;
-    capped += ch; count += 1;
-  }
-  src = capped;
-  // Past SHRINK_AT chars the text is half size, so more/longer lines fit.
-  const { line: MAX_LINE, lines: MAX_LINES } = count > SHRINK_AT ? SMALL_WRAP : FULL_WRAP;
-  // Preserve an in-progress trailing space so the user can actually type spaces
-  // (re-wrapping on every keystroke would otherwise strip it instantly).
-  const endsWithSpace = / $/.test(src);
-  const segments = src.split('\n');
-  const lines = [];
-  for (let si = 0; si < segments.length && lines.length < MAX_LINES; si++) {
-    const words = segments[si].split(' ');
-    let cur = '';
-    for (let wi = 0; wi < words.length && lines.length < MAX_LINES; wi++) {
-      let w = words[wi];
-      while (w.length > MAX_LINE && lines.length < MAX_LINES) {
-        if (cur) { lines.push(cur); cur = ''; if (lines.length >= MAX_LINES) break; }
-        lines.push(w.slice(0, MAX_LINE));
-        w = w.slice(MAX_LINE);
-      }
-      if (lines.length >= MAX_LINES) break;
-      if (w === '') continue;
-      if (cur === '') cur = w;
-      else if ((cur + ' ' + w).length <= MAX_LINE) cur += ' ' + w;
-      else { lines.push(cur); cur = (lines.length < MAX_LINES) ? w : ''; }
-    }
-    if (cur !== '' && lines.length < MAX_LINES) lines.push(cur);
-    // Honour explicit newlines (incl. a trailing one) so the user can add their
-    // own carriage returns — an empty segment becomes an empty line.
-    else if (cur === '' && segments[si] === '' && lines.length < MAX_LINES) lines.push('');
-  }
-  let out = lines.slice(0, MAX_LINES).join('\n');
-  if (endsWithSpace) {
-    const parts = out.split('\n');
-    const last = parts.length - 1;
-    if (parts[last].length > 0 && parts[last].length < MAX_LINE) {
-      parts[last] += ' ';
-      out = parts.join('\n');
-    }
+    out += ch; count += 1;
   }
   return out;
 }
@@ -202,6 +163,7 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [sealBroken, setSealBroken] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
 
   const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
   const bgUrl = assetUrl(settings.scroll_bg_file);
@@ -236,6 +198,20 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, sending]);
 
+  // Native: the scroll is vertically centred, so the keyboard would cover its
+  // writable half. Lift it into the centre of the space ABOVE the keyboard
+  // (translate up by half the keyboard height) so the message area + destination
+  // stay visible while typing.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let showSub, hideSub;
+    Keyboard.addListener('keyboardWillShow', (info) => setKbHeight(info?.keyboardHeight || 0))
+      .then((h) => { showSub = h; }).catch(() => {});
+    Keyboard.addListener('keyboardWillHide', () => setKbHeight(0))
+      .then((h) => { hideSub = h; }).catch(() => {});
+    return () => { showSub?.remove?.(); hideSub?.remove?.(); };
+  }, []);
+
   async function fireSend() {
     if (!body.trim() || sending) return;
     setError(null);
@@ -267,7 +243,14 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-3"
       onClick={() => !sending && onClose()}
     >
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="relative"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          transform: kbHeight ? `translateY(-${Math.round(kbHeight / 2)}px)` : undefined,
+          transition: 'transform 0.25s ease-out',
+        }}
+      >
         {/* Full scroll image (no crop). Fallback box if not yet supplied. */}
         {bgUrl ? (
           <img src={bgUrl} alt="" draggable={false} className="block max-h-[94vh] w-auto max-w-[94vw] select-none" />
@@ -290,15 +273,16 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
           <textarea
             autoFocus
             value={body}
-            onChange={(e) => setBody(wrapMessage(e.target.value))}
+            onChange={(e) => setBody(capMessage(e.target.value))}
             placeholder="Pen thy message…"
-            rows={body.replace(/\n/g, '').length > SHRINK_AT ? SMALL_WRAP.lines : FULL_WRAP.lines}
+            rows={body.replace(/\n/g, '').length > SHRINK_AT ? SMALL_ROWS : FULL_ROWS}
             className="w-full resize-none bg-transparent text-center leading-snug text-black placeholder-black/40 focus:outline-none"
             style={{
               fontFamily: font,
               whiteSpace: 'pre-wrap',
-              // Half size once the message runs long, so up to 200 chars fit.
-              fontSize: body.replace(/\n/g, '').length > SHRINK_AT ? '0.625rem' : '1.25rem',
+              // Medium size once the message runs long, so up to 200 chars fit
+              // while staying readable.
+              fontSize: body.replace(/\n/g, '').length > SHRINK_AT ? '0.95rem' : '1.25rem',
             }}
           />
           <div className="w-full text-center text-[11px] text-black/50" style={{ fontFamily: font }}>{body.replace(/\n/g, '').length}/{MAX_TOTAL}</div>

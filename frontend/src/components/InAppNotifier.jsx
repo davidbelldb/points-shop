@@ -6,7 +6,7 @@ import { useToast } from '../lib/ToastContext.jsx';
 // alert (game turn, order update, invites, etc.) while the app is foregrounded.
 // On the first poll it records whatever already exists as "seen" so it never
 // toasts history — only things that arrive after you opened the app.
-const POLL_MS = 25000;
+const POLL_MS = 12000;
 
 export default function InAppNotifier() {
   const { showToast } = useToast();

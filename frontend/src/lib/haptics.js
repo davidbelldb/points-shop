@@ -44,3 +44,15 @@ export async function hapticSuccess() {
   if (!native()) return;
   try { await Haptics.notification({ type: NotificationType.Success }); } catch { /* ignore */ }
 }
+
+/** Failure — for losses / invalid actions. */
+export async function hapticError() {
+  if (!native()) return;
+  try { await Haptics.notification({ type: NotificationType.Error }); } catch { /* ignore */ }
+}
+
+/** Lightest possible tick — for rapid taps like on-screen keys / gamepad. */
+export async function hapticSelect() {
+  if (!native()) return;
+  try { await Haptics.selectionChanged(); } catch { /* ignore */ }
+}

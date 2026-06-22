@@ -99,17 +99,24 @@ export default async function notificationsRoutes(fastify) {
 
     // Immediate — single recipient or all. sendPush fans out to both web-push
     // and APNs, so we union recipients from both device tables.
+    const insertNotif = (acctId) => query(
+      `INSERT INTO notifications (account_id, type, title, body, link_url)
+       VALUES ($1, 'broadcast', $2, $3, $4)`,
+      [acctId, title, body, url || '/'],
+    );
+
     if (accountId) {
+      await insertNotif(accountId); // in-app record (shows in the bell + toasts)
       await sendPush(accountId, { title, body, url: url || '/' });
       return { sent: 1 };
     }
-    const { rows } = await query(
-      `SELECT account_id FROM push_subscriptions
-       UNION
-       SELECT account_id FROM apns_tokens`,
-    );
+    // Broadcast to everyone (any account, not just those with push devices).
+    const { rows } = await query(`SELECT id AS account_id FROM accounts`);
     if (rows.length === 0) return { sent: 0 };
-    await Promise.all(rows.map(r => sendPush(r.account_id, { title, body, url: url || '/' })));
+    await Promise.all(rows.map(async (r) => {
+      await insertNotif(r.account_id);
+      await sendPush(r.account_id, { title, body, url: url || '/' });
+    }));
     return { sent: rows.length };
   });
 

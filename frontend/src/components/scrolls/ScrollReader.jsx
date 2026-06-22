@@ -39,7 +39,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
   // 200 characters still fit inside the parchment frame.
   const bodyLen = (scroll.body || '').replace(/\n/g, '').length;
   const bodyFontSize = bodyLen > 70
-    ? 'clamp(0.7rem, 2.3vw, 1.15rem)'
+    ? 'clamp(1.0rem, 3.2vw, 1.6rem)'
     : 'clamp(1.3rem, 4.5vw, 2.2rem)';
 
   return (

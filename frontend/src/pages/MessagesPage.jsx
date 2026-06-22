@@ -1698,7 +1698,8 @@ export default function MessagesPage() {
     setError(null);
     try {
       await api.sendMessage(NUDGE_BODY, null, null);
-      hapticTap(); // sender confirmation; the receiver gets the jiggle on arrival
+      triggerShake();  // shake your own screen as you send (MSN-style)
+      hapticNudge();   // and the strong jiggle haptic
       await refresh(false);
     } catch (e) {
       setError(e.message);
