@@ -1,5 +1,5 @@
 -- Manually-curated titles for the "Wheel of Entertainment" — admin-managed
--- extras that sit alongside the invited (invite_david) rewatch-list titles on
+-- extras that sit alongside the invited (invite_partner) rewatch-list titles on
 -- the wheel. The "Bum Show" no-prize segment is synthesised at read time and
 -- isn't stored here.
 CREATE TABLE IF NOT EXISTS entertainment_titles (

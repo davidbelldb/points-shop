@@ -9,7 +9,7 @@ export default async function entertainmentRoutes(fastify) {
     const { rows: invited } = await query(
       `SELECT DISTINCT ON (lower(title)) title
          FROM rewatch_items
-        WHERE invite_david = TRUE AND watched = FALSE
+        WHERE invite_partner = TRUE AND watched = FALSE
           AND title IS NOT NULL AND length(trim(title)) > 0
         ORDER BY lower(title)`,
     );
