@@ -62,11 +62,6 @@ function formatUKDate() {
   return `${p.day}/${p.month}/${p.year}`;
 }
 
-function getDailyWord() {
-  const [yyyy, mm, dd] = getTodayDate().split('-').map(Number);
-  const epoch = Math.floor(Date.UTC(yyyy, mm - 1, dd) / 86_400_000);
-  return WORDS[epoch % WORDS.length];
-}
 
 function evaluateGuess(guess, target) {
   const result    = Array(WORD_LENGTH).fill('absent');
@@ -631,8 +626,11 @@ export default function DirtyWordlePage() {
   const { user }   = useAuth();
   const { theme }  = useTheme();
   const today      = getTodayDate();
-  const target     = getDailyWord();
   const storageKey = `dirty-wordle-${user?.id ?? 'guest'}-${today}`;
+
+  // Word is fetched from server to guarantee the same word for all players
+  // and to enforce non-repeating cycle logic.
+  const [target, setTarget] = useState(null);
 
   const loadSaved = () => {
     try { return JSON.parse(localStorage.getItem(storageKey)) ?? {}; } catch { return {}; }
@@ -653,18 +651,22 @@ export default function DirtyWordlePage() {
   const [showLeaderboard,  setShowLeaderboard]  = useState(false);
   const [progressLoaded, setProgressLoaded] = useState(false);
 
-  // On mount: always sync from server so any device picks up current state.
+  // On mount: fetch today's word + sync progress from server.
   useEffect(() => {
     async function syncFromServer() {
       try {
-        // 1. Try in-progress guesses first
+        // 1. Fetch today's assigned word from server
+        const { word } = await api.dirtyWordleWord(today);
+        setTarget(word);
+
+        // 2. Try in-progress guesses
         const { guesses: serverGuesses } = await api.dirtyWordleProgress(today);
         // Always apply server state — even empty — to prevent bleed from another user's localStorage.
         setGuesses(serverGuesses ?? []);
         if (serverGuesses && serverGuesses.length > 0) {
           // Recompute derived state from loaded guesses
           const lastGuess = serverGuesses[serverGuesses.length - 1];
-          const isWon  = lastGuess === target;
+          const isWon  = lastGuess === word;
           const isOver = isWon || serverGuesses.length >= MAX_GUESSES;
           if (isWon)  setWon(true);
           if (isOver) setGameOver(true);
@@ -678,7 +680,10 @@ export default function DirtyWordlePage() {
           setResultSaved(false);
         }
       } catch {
-        // Server unreachable — fall back to whatever localStorage had
+        // Server unreachable — fall back to client-side word derivation
+        const [yyyy, mm, dd] = today.split('-').map(Number);
+        const epoch = Math.floor(Date.UTC(yyyy, mm - 1, dd) / 86_400_000);
+        setTarget(WORDS[epoch % WORDS.length]);
       } finally {
         setProgressLoaded(true);
       }
@@ -694,6 +699,7 @@ export default function DirtyWordlePage() {
   }, [guesses, gameOver, won, ptsEarned, modalDismissed, resultSaved, storageKey]);
 
   const letterStates = useMemo(() => {
+    if (!target) return {};
     const s = {};
     for (const guess of guesses) {
       const result = evaluateGuess(guess, target);
@@ -707,6 +713,7 @@ export default function DirtyWordlePage() {
   }, [guesses, target]);
 
   const submitGuess = useCallback(() => {
+    if (!target) return;
     if (currentGuess.length !== WORD_LENGTH) {
       setShake(true);
       hapticTug(); // gentle "not yet" for an incomplete word
@@ -759,7 +766,7 @@ export default function DirtyWordlePage() {
   }, [currentGuess, guesses, target, today]);
 
   const onKey = useCallback((key) => {
-    if (gameOver) return;
+    if (!target || gameOver) return;
     if (key === 'ENTER')                    { submitGuess(); return; }
     if (key === '⌫' || key === 'BACKSPACE') { setCurrentGuess(g => g.slice(0, -1)); hapticTap(); return; }
     if (/^[A-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) { setCurrentGuess(g => g + key); hapticTap(); }
@@ -807,8 +814,8 @@ export default function DirtyWordlePage() {
     return 'Close call — but you did it!';
   };
 
-  const showModal  = gameOver && !modalDismissed;
-  const resultGrid = guesses.map(g => evaluateGuess(g, target));
+  const showModal  = gameOver && !modalDismissed && !!target;
+  const resultGrid = target ? guesses.map(g => evaluateGuess(g, target)) : [];
 
   const isDark = theme === 'dark';
 
@@ -838,7 +845,7 @@ export default function DirtyWordlePage() {
           const submitted = rowIdx < guesses.length;
           const isCurrent = rowIdx === guesses.length && !gameOver;
           const word      = submitted ? guesses[rowIdx] : isCurrent ? currentGuess : '';
-          const result    = submitted ? evaluateGuess(word, target) : null;
+          const result    = submitted && target ? evaluateGuess(word, target) : null;
           return (
             <div
               key={rowIdx}

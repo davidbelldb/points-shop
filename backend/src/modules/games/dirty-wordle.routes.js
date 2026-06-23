@@ -1,6 +1,10 @@
 /**
  * Dirty Wordle — backend routes
  *
+ * GET  /api/games/dirty-wordle/word?date=YYYY-MM-DD
+ *   Returns the word assigned to that date, assigning one on first call.
+ *   Words cycle through the full list in random order before any repeats.
+ *
  * POST /api/games/dirty-wordle/result
  *   Body: { date, won, guesses_taken, guess_grid }
  *   Saves result + credits points on win (idempotent per account+date).
@@ -17,7 +21,82 @@ import { query }                 from '../../db.js';
 
 const PTS_BY_GUESS = [44, 36, 28, 16, 8, 4];
 
+// Master word list — must match the frontend WORDS array
+const WORDS = [
+  'FILTH','SLUTS','SLAGS','WHORE','WANKY','BOOBS','TITTY','BUTTS','WILLY','BITCH',
+  'STIFF','COCKS','PUSSY','CUNTS','TWATS','NECKS','PLUGS','KATIE','DAVID',
+  'STUFF','CREAM','KNEES','DOGGY','BRACE','SLAPS','CHOKE',
+  'HORNY','DIRTY','SPANK','LUSTY','KINKY','NAKED','BOOTY','ERECT','LOVER','COCKY',
+  'BALLS','BONER','PERVY','RANDY','JUICY','NUDES','PANTY','THONG','GROAN','MOANS',
+  'LICKS','TEASE','FLIRT','STRIP','NASTY','NYMPH','TABOO','SHAFT','GRIND','STRAP',
+  'TOUCH','TWERK','VULVA','DICKS','PRICK','TAINT','SPUNK','SAUCY','FLESH','FANNY',
+  'MOIST','GROPE','THROB','PORNO','CRUDE','SEXTS','TRYST','DADDY','THIGH','VIXEN',
+  'BAWDY','STUDS','WENCH','TRAMP','SMUTS','LETCH','KNOBS','WANKS','SHAGS','BONKS',
+  'HUMPS','ROMPS','LOINS','GROIN','BUSTY','BUXOM','TARTS','HUSSY','KINKS','ARSES',
+  'MILFS','MUFFS','BOUND','ROUGH','DILDO','FUCKS','SUCKS','BLOWS',
+];
+
+/**
+ * Returns the word for `date` (YYYY-MM-DD), assigning one if not yet set.
+ * Words are drawn from WORDS in a non-repeating cycle: every word appears
+ * exactly once per cycle before any word is reused. Within each cycle the
+ * order is random (shuffled fresh each time a new cycle starts).
+ *
+ * Race-safe: uses INSERT … ON CONFLICT DO NOTHING so concurrent requests
+ * for the same date always converge on a single word.
+ */
+async function getOrAssignWord(date) {
+  // 1. Return early if already assigned
+  const { rows: existing } = await query(
+    `SELECT word FROM dirty_wordle_schedule WHERE date = $1`,
+    [date],
+  );
+  if (existing[0]) return existing[0].word;
+
+  // 2. Determine current cycle and which words it has already used
+  const { rows: allRows } = await query(
+    `SELECT word, cycle FROM dirty_wordle_schedule ORDER BY date ASC`,
+  );
+
+  const totalUsed  = allRows.length;
+  const cycle      = Math.floor(totalUsed / WORDS.length) + 1;
+  const cycleStart = (cycle - 1) * WORDS.length;
+  const usedInCycle = new Set(allRows.slice(cycleStart).map(r => r.word));
+
+  // 3. Build candidate pool and pick a random one
+  const candidates = WORDS.filter(w => !usedInCycle.has(w));
+  if (candidates.length === 0) {
+    // Shouldn't happen (cycle boundary handled above), but fall back safely
+    return WORDS[Math.floor(Math.random() * WORDS.length)];
+  }
+  const word = candidates[Math.floor(Math.random() * candidates.length)];
+
+  // 4. Insert — if another request beat us to it, silently ignore and re-read
+  await query(
+    `INSERT INTO dirty_wordle_schedule (date, word, cycle)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (date) DO NOTHING`,
+    [date, word, cycle],
+  );
+
+  const { rows: final } = await query(
+    `SELECT word FROM dirty_wordle_schedule WHERE date = $1`,
+    [date],
+  );
+  return final[0].word;
+}
+
 export default async function dirtyWordleRoutes(fastify) {
+
+  // ── Daily word ────────────────────────────────────────────────────────────
+  fastify.get('/api/games/dirty-wordle/word', async (req, reply) => {
+    const date = req.query.date ?? new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return reply.code(400).send({ error: 'date must be YYYY-MM-DD' });
+    }
+    const word = await getOrAssignWord(date);
+    return { date, word };
+  });
 
   // ── Save result (win or loss) + credit points on win ──────────────────────
   fastify.post('/api/games/dirty-wordle/result', async (req, reply) => {
