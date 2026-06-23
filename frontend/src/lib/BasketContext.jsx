@@ -40,10 +40,13 @@ export function BasketProvider({ children }) {
     })();
   }, [refresh, refreshScrollUnread]);
 
-  // Keep the scroll count fresh so the bubble updates as crows land.
+  // Keep the scroll count fresh so the bubble updates as crows land. Also listen
+  // for an explicit refresh (the incoming-crow toast fires this the moment a
+  // crow lands) so the bubble updates instantly rather than on the next poll.
   useEffect(() => {
     const id = setInterval(refreshScrollUnread, 20000);
-    return () => clearInterval(id);
+    window.addEventListener('scrolls:refresh', refreshScrollUnread);
+    return () => { clearInterval(id); window.removeEventListener('scrolls:refresh', refreshScrollUnread); };
   }, [refreshScrollUnread]);
 
   // Single combined badge total for the header + side menu.

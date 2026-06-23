@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api.js';
 
@@ -32,6 +32,7 @@ export default function CrowIncomingToast() {
   const [startAt, setStartAt] = useState(null);   // ms timestamp the crow set off
   const [origin, setOrigin] = useState('afar');
   const [now, setNow] = useState(Date.now());
+  const firedForRef = useRef(null); // arriveAt we've already announced as landed
 
   const fetchIncoming = useCallback(async () => {
     try {
@@ -61,13 +62,19 @@ export default function CrowIncomingToast() {
     return () => clearInterval(id);
   }, [arriveAt]);
 
-  // Once it lands, refetch shortly after so the delivered crow drops out and
-  // the "News from …" title doesn't linger.
+  // The moment it lands, tell the rest of the app to refresh its scroll unread
+  // count (bubble + chat update instantly), then refetch so the delivered crow
+  // drops out and the "News from …" title doesn't linger.
   useEffect(() => {
     if (arriveAt == null) return undefined;
-    const t = setTimeout(fetchIncoming, Math.max(0, arriveAt - Date.now()) + 2500);
-    return () => clearTimeout(t);
-  }, [arriveAt, fetchIncoming]);
+    if (now >= arriveAt && firedForRef.current !== arriveAt) {
+      firedForRef.current = arriveAt;
+      window.dispatchEvent(new Event('scrolls:refresh'));
+      const t = setTimeout(fetchIncoming, 2500);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [arriveAt, now, fetchIncoming]);
 
   if (arriveAt == null) return null;
 

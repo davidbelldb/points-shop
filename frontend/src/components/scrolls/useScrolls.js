@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 
-const UNREAD_POLL_MS = 12000;
+const UNREAD_POLL_MS = 5000;
 
 /* Central state for the scroll feature: received scrolls, unread count, and the
    admin-tuned config (settings + send/land frame sequences). Polls the unread
@@ -44,7 +44,10 @@ export function useScrolls() {
     loadConfig();
     refresh();
     const id = setInterval(refreshUnread, UNREAD_POLL_MS);
-    return () => clearInterval(id);
+    // Let other parts of the app (e.g. the incoming-crow toast on landing) force
+    // an immediate unread check instead of waiting for the next poll.
+    window.addEventListener('scrolls:refresh', refreshUnread);
+    return () => { clearInterval(id); window.removeEventListener('scrolls:refresh', refreshUnread); };
   }, [loadConfig, refresh, refreshUnread]);
 
   const send = useCallback(async (payload) => {
