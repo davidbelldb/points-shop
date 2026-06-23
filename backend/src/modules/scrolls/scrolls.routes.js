@@ -1,6 +1,6 @@
 import {
   getSettings, getFrames, updateSettings, replaceFrames,
-  createScroll, listReceived, unreadCount, markRead, resolveDueScrolls,
+  createScroll, listReceived, listIncoming, unreadCount, markRead, resolveDueScrolls,
 } from './scrolls.repo.js';
 import { findOtherUser } from '../chat/chat.repo.js';
 import { buildFlightPath } from './flightPath.js';
@@ -59,6 +59,12 @@ export default async function scrollRoutes(fastify) {
   fastify.get('/api/scrolls/unread', async (req) => {
     const accountId = getEffectiveAccountId(req);
     return { unread: await unreadCount(accountId) };
+  });
+
+  // In-flight scrolls heading to you — for the "crow incoming" countdown.
+  fastify.get('/api/scrolls/incoming', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    return { incoming: await listIncoming(accountId) };
   });
 
   fastify.post('/api/scrolls', async (req, reply) => {

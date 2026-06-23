@@ -157,6 +157,22 @@ export async function listReceived(recipientId) {
   return rows;
 }
 
+// Recipient's IN-FLIGHT scrolls (crow still on its way). Drives the "crow
+// incoming" countdown toast — earliest arrival first.
+export async function listIncoming(recipientId) {
+  const { rows } = await query(
+    `SELECT s.id, s.origin_label, s.dest_label, s.deliver_at, s.flight_seconds,
+            a.name AS sender_name
+       FROM scrolls s
+       JOIN accounts a ON a.id = s.sender_id
+      WHERE s.recipient_id = $1
+        AND s.deliver_at > NOW()
+      ORDER BY s.deliver_at ASC`,
+    [recipientId],
+  );
+  return rows;
+}
+
 // Count of arrived-but-unread scrolls (drives the "crow has arrived" badge).
 export async function unreadCount(recipientId) {
   const { rows } = await query(

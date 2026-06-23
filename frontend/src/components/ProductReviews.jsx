@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
 
 function Avatar({ url, name, size = 'sm' }) {
   const cls = size === 'lg' ? 'h-16 w-16' : 'h-8 w-8';
@@ -46,6 +47,9 @@ export default function ProductReviews({ productId }) {
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState('');
+  // Native: keep the review field above the on-screen keyboard.
+  const kbHeight = useKeyboardHeight();
+  const composerRef = useRef(null);
 
   async function load() {
     try {
@@ -181,12 +185,20 @@ export default function ProductReviews({ productId }) {
         )
       )}
 
-      <div className="space-y-2">
+      <div
+        ref={composerRef}
+        className="space-y-2"
+        style={kbHeight ? { paddingBottom: kbHeight, scrollMarginBottom: kbHeight } : undefined}
+      >
         <div className="flex gap-2">
           <Avatar url={user?.photo_url} name={user?.name} size="lg" />
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onFocus={() => {
+              // Wait for the keyboard padding to apply, then lift the field into view.
+              setTimeout(() => composerRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }), 250);
+            }}
             placeholder="Tell him how you really feel..."
             rows={2}
             className="block h-16 flex-1 resize-none rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"

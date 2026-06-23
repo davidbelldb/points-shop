@@ -126,10 +126,10 @@ function NavItem({ to, label, icon }) {
 /* ── Persistent sidebar — hidden on mobile, shown on md+ ────────────────── */
 export default function SideNav() {
   const { settings } = useSettings();
-  const { notifications } = useBasket();
+  const { badgeCount } = useBasket();
   const logoUrl  = settings.logo_url;
   const shopName = settings.shop_name ?? 'Sneaky Points';
-  const unread   = notifications?.unread_count ?? 0;
+  const unread   = badgeCount ?? 0;
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 z-20 h-[100dvh] w-56 flex-col bg-white">

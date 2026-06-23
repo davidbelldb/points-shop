@@ -66,6 +66,15 @@ body { -webkit-tap-highlight-color: transparent; }
   100% { transform: rotate(22.5deg); }
 }
 
+/* Splash fireworks: each splash.png copy bursts from tiny to a larger size and
+   fades, like a firework. Per-particle start/end scale + rotation come from CSS
+   custom properties set inline. */
+@keyframes splash-pop {
+  0%   { transform: translate(-50%, -50%) scale(var(--s0)) rotate(var(--r0)); opacity: 0; }
+  18%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(var(--s1)) rotate(var(--r1)); opacity: 0; }
+}
+
 /* ── Kill text selection + the iOS long-press callout app-wide ───────────────
    This is a native-feeling app, not a document: a long-press (intentional or
    accidental) should never highlight text or pop the "Copy / Look Up / Share"

@@ -16,8 +16,10 @@ import IncomingCallBanner from './components/IncomingCallBanner.jsx';
 import InAppNotifier from './components/InAppNotifier.jsx';
 import WelcomeOverlay from './components/WelcomeOverlay.jsx';
 import PullToRefresh from './components/PullToRefresh.jsx';
+import SplashFireworks from './components/SplashFireworks.jsx';
+import CrowIncomingToast from './components/scrolls/CrowIncomingToast.jsx';
 import { countdownClock } from './lib/countdown.js';
-import { hapticTap, hapticParty } from './lib/haptics.js';
+import { hapticTap, hapticFireworks } from './lib/haptics.js';
 
 // Fire a celebratory launch haptic exactly once per app session (module-level
 // guard survives App re-mounts on route changes; native shell only).
@@ -48,18 +50,18 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const showFloater = !location.pathname.startsWith('/admin');
-  const { account, basket, notifications, refresh: refreshBasket } = useBasket();
+  const { account, basket, notifications, badgeCount, refresh: refreshBasket } = useBasket();
   const { user, refresh: refreshAuth } = useAuth();
   const { theme, setTheme } = useTheme();
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [basketOpen, setBasketOpen] = useState(false);
   const headerRef = useRef(null);
 
-  // Welcome flourish on cold launch — a little party buzz as the app opens.
+  // Welcome flourish on cold launch — a short, punchy fireworks crackle.
   useEffect(() => {
     if (launchHapticDone || !Capacitor.isNativePlatform()) return;
     launchHapticDone = true;
-    hapticParty();
+    hapticFireworks();
   }, []);
 
   // Sync the theme from the currently-loaded account, so each user gets their own.
@@ -75,7 +77,7 @@ export default function App() {
   const { settings } = useSettings();
   const points = account?.points_balance ?? 0;
   const itemCount = basket?.item_count ?? 0;
-  const unreadCount = notifications?.unread_count ?? 0;
+  const unreadCount = badgeCount ?? (notifications?.unread_count ?? 0);
   const shopName = settings.shop_name ?? 'Sneaky Points';
   const logoUrl  = settings.logo_url;
 
@@ -380,8 +382,11 @@ export default function App() {
       <IncomingCallBanner />
       {/* Polls for new alerts and raises in-app toasts (foreground only) */}
       <InAppNotifier />
+      {/* In-app "live activity": counts down an in-flight crow's arrival */}
+      {user && <CrowIncomingToast />}
       {/* One-time welcome (continues the splash); native pull-to-refresh */}
       <WelcomeOverlay />
+      <SplashFireworks />
       <PullToRefresh />
       {isHome && bannerOn && (() => {
         const bannerLink = (settings.banner_link_url || '').trim();

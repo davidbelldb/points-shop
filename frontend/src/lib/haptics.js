@@ -110,6 +110,31 @@ export async function hapticShudder() {
 }
 
 /**
+ * Fireworks — the app-launch flourish. Short, punchy pops at tight, slightly
+ * irregular intervals with a couple of heavier "booms" thrown in, so it crackles
+ * like a fireworks finale rather than a smooth buzz. Deliberately brief.
+ */
+export async function hapticFireworks() {
+  if (!native()) return;
+  // [impact style, gap-after-ms] — uneven gaps give it that crackle.
+  const burst = [
+    [ImpactStyle.Light, 35],
+    [ImpactStyle.Light, 55],
+    [ImpactStyle.Heavy, 30],   // boom
+    [ImpactStyle.Medium, 45],
+    [ImpactStyle.Light, 30],
+    [ImpactStyle.Light, 60],
+    [ImpactStyle.Heavy, 0],    // finale boom
+  ];
+  try {
+    for (const [style, gap] of burst) {
+      await Haptics.impact({ style });
+      if (gap) await wait(gap);
+    }
+  } catch { /* ignore */ }
+}
+
+/**
  * Celebration "party" — a Candy-Crush-style flourish for a winning guess: a
  * quick rising drumroll (light → medium → heavy) that crescendos into a
  * success notification, then a couple of triumphant after-pops.

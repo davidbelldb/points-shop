@@ -124,6 +124,7 @@ export const api = {
   scrolls: {
     list:     () => request('/scrolls'),
     unread:   () => request('/scrolls/unread'),
+    incoming: () => request('/scrolls/incoming'),
     send:     (payload) => request('/scrolls', { method: 'POST', body: JSON.stringify(payload) }),
     markRead: (id) => request(`/scrolls/${id}/read`, { method: 'POST' }),
     config:   () => request('/scrolls/config'),

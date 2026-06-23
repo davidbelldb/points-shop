@@ -19,11 +19,13 @@ import { backfillEventSnackSync } from '../modules/shopping/shopping.routes.js';
 
 const PUSH_POLL_MS = 60_000;
 const SESSION_CLEANUP_MS = 60 * 60_000; // hourly
+const WORDLE_REMINDER_MS = 10 * 60_000; // check every 10 min (gated to >= 7pm)
 
 export function registerBackgroundJobs(fastify) {
   registerOneShotBackfills(fastify);
   registerScheduledPushPoller(fastify);
   registerSessionCleanup(fastify);
+  registerWordleReminder(fastify);
 }
 
 // One-shot backfills for legacy media that predates the optimized
@@ -104,4 +106,42 @@ function registerSessionCleanup(fastify) {
   }
   cleanupExpiredSessions();
   setInterval(cleanupExpiredSessions, SESSION_CLEANUP_MS);
+}
+
+// After 7pm (Europe/London), nudge anyone who hasn't played today's Dirdle.
+// The reminder is an ordinary notification (so it feeds the unread bubble) plus
+// a push. Idempotent: a 12h window stops repeat fires the same evening while
+// still allowing the next day's reminder.
+function registerWordleReminder(fastify) {
+  async function check() {
+    try {
+      const london = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/London' }));
+      if (london.getHours() < 19) return; // only after 7pm London
+      const dateStr = `${london.getFullYear()}-${String(london.getMonth() + 1).padStart(2, '0')}-${String(london.getDate()).padStart(2, '0')}`;
+
+      const { rows } = await query(
+        `SELECT a.id FROM accounts a
+          WHERE NOT EXISTS (
+                  SELECT 1 FROM dirty_wordle_results r
+                   WHERE r.account_id = a.id AND r.date = $1)
+            AND NOT EXISTS (
+                  SELECT 1 FROM notifications n
+                   WHERE n.account_id = a.id AND n.type = 'wordle_reminder'
+                     AND n.created_at > NOW() - INTERVAL '12 hours')`,
+        [dateStr],
+      );
+      for (const { id } of rows) {
+        await query(
+          `INSERT INTO notifications (account_id, type, title, body, link_url)
+           VALUES ($1, 'wordle_reminder', $2, $3, '/games/dirty-wordle')`,
+          [id, 'Dirdle awaits 🦅', "You haven't played today's Dirdle yet — get on it before midnight!"],
+        );
+        sendPush(id, { title: 'Dirdle awaits 🦅', body: "You haven't played today's Dirdle yet!", url: '/games/dirty-wordle' });
+      }
+      if (rows.length) fastify.log.info({ count: rows.length }, 'Wordle reminders sent');
+    } catch (e) {
+      fastify.log.error({ err: e }, 'Wordle reminder error');
+    }
+  }
+  setInterval(check, WORDLE_REMINDER_MS);
 }

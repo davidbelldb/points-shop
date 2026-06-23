@@ -8,13 +8,23 @@ export function BasketProvider({ children }) {
   const [basket, setBasket] = useState(null);
   const [account, setAccount] = useState(null);
   const [notifications, setNotifications] = useState({ items: [], unread_count: 0 });
+  // Unread scrolls live in a separate system; we surface their count here so the
+  // header/menu bubble can show a single combined total (chat messages + game
+  // turns already arrive as notifications, so they're in unread_count already).
+  const [scrollUnread, setScrollUnread] = useState(0);
+
+  const refreshScrollUnread = useCallback(async () => {
+    try { const { unread } = await api.scrolls.unread(); setScrollUnread(unread ?? 0); }
+    catch { /* logged out / transient */ }
+  }, []);
 
   const refresh = useCallback(async () => {
     const [b, a, n] = await Promise.all([api.getBasket(), api.getAccount(), api.getNotifications()]);
     setBasket(b);
     setAccount(a);
     setNotifications(n);
-  }, []);
+    refreshScrollUnread();
+  }, [refreshScrollUnread]);
 
   useEffect(() => {
     (async () => {
@@ -23,11 +33,21 @@ export function BasketProvider({ children }) {
         setBasket(boot.basket);
         setAccount(boot.account);
         setNotifications(boot.notifications ?? { items: [], unread_count: 0 });
+        refreshScrollUnread();
       } else {
         refresh().catch(console.error);
       }
     })();
-  }, [refresh]);
+  }, [refresh, refreshScrollUnread]);
+
+  // Keep the scroll count fresh so the bubble updates as crows land.
+  useEffect(() => {
+    const id = setInterval(refreshScrollUnread, 20000);
+    return () => clearInterval(id);
+  }, [refreshScrollUnread]);
+
+  // Single combined badge total for the header + side menu.
+  const badgeCount = (notifications?.unread_count ?? 0) + scrollUnread;
 
   const addItem      = useCallback(async (id, qty = 1) => { const b = await api.addToBasket(id, qty); setBasket(b); return b; }, []);
   const setItemQty   = useCallback(async (id, qty)     => { const b = await api.setBasketItemQty(id, qty); setBasket(b); return b; }, []);
@@ -68,7 +88,7 @@ export function BasketProvider({ children }) {
 
   return (
     <BasketContext.Provider
-      value={{ basket, account, notifications, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder, markNotificationsRead, dismissNotification, clearAllNotifications }}
+      value={{ basket, account, notifications, scrollUnread, badgeCount, refreshScrollUnread, refresh, addItem, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder, markNotificationsRead, dismissNotification, clearAllNotifications }}
     >
       {children}
     </BasketContext.Provider>

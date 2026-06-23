@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { api } from '../lib/api.js';
 import { hapticNudge, hapticTap } from '../lib/haptics.js';
+import { playCaw } from '../lib/sounds.js';
 
 // Lazy-load the entire Three.js / R3F bundle — only fetched when first needed
 const LazyRainTray    = lazy(() => import('./ChatRain.jsx').then(m => ({ default: m.RainTrayButtons })));
@@ -1432,6 +1433,9 @@ export default function MessagesPage() {
   }, []);
   // Fresh arrival while the chat is open → play the fly-in.
   useEffect(() => { if (scrolls.arrivedTick > 0) setLandFlight(true); }, [scrolls.arrivedTick]);
+  // Caw when the send crow takes off (crow_send_02) and when one lands (crow_land_10).
+  useEffect(() => { if (sendStage === 'intro') playCaw(); }, [sendStage]);
+  useEffect(() => { if (landFlight) playCaw(); }, [landFlight]);
   // Opening the chat with unread scrolls waiting → play the fly-in once.
   useEffect(() => {
     if (!scrolls.loading && scrolls.unread > 0 && !landIntroPlayedRef.current) {
