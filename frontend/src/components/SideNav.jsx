@@ -162,7 +162,6 @@ export default function SideNav() {
           <NavItem to="/rewatch"  label="Watch list" icon={<TvIcon />} />
           <NavItem to="/calendar" label="Calendar"   icon={<CalendarIcon />} />
           <NavItem to="/messages" label="Chat"       icon={<ChatIcon />} />
-          <NavItem to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} />
           <NavItem to="/sneakyspreadsheets" label="Sheets" icon={<SheetIcon />} />
         </div>
 

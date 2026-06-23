@@ -192,7 +192,6 @@ export default function MenuDrawer({ open, onClose }) {
           <Item to="/rewatch" label="Sneaky Watchlist" icon={<TvIcon />} onClose={onClose} />
           <Item to="/calendar" label="Sneaky Calendar" icon={<CalendarIcon />} onClose={onClose} />
           <Item to="/messages" label="Sneaky Chat" icon={<ChatIcon />} onClose={onClose} />
-          <Item to="/sneakytime" label="Sneaky Time" icon={<VideoCallIcon />} onClose={onClose} />
           <Item to="/timeline" label="Sneaky Timeline" icon={<TimelineIcon />} onClose={onClose} />
           <Item to="/sneakyspreadsheets" label="Sneaky Sheets" icon={<SheetIcon />} onClose={onClose} />
         </nav>

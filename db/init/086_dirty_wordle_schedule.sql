@@ -8,3 +8,9 @@ CREATE TABLE IF NOT EXISTS dirty_wordle_schedule (
   word  TEXT NOT NULL,
   cycle INT  NOT NULL DEFAULT 1   -- which pass through the word list this belongs to
 );
+
+-- Pre-seed today so the transition from the old epoch formula is seamless.
+-- COCKY is the word the client-side formula produced for 2026-06-23.
+INSERT INTO dirty_wordle_schedule (date, word, cycle)
+VALUES ('2026-06-23', 'COCKY', 1)
+ON CONFLICT (date) DO NOTHING;
