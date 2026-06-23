@@ -6,6 +6,7 @@ import { useSettings } from '../lib/SettingsContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
 import WheelHomeSection from '../components/WheelHomeSection.jsx';
+import EntertainmentWheelHomeSection from '../components/EntertainmentWheelHomeSection.jsx';
 import ShutTheBox15HomeSection from '../components/ShutTheBox15HomeSection.jsx';
 import SneakyButtonHomeSection from '../components/SneakyButtonHomeSection.jsx';
 import Magic8BallHomeSection from '../components/Magic8BallHomeSection.jsx';
@@ -130,6 +131,7 @@ export default function HomePage() {
           )}
 
           <WheelHomeSection />
+          <EntertainmentWheelHomeSection />
           <ShutTheBox15HomeSection />
           <Magic8BallHomeSection />
         </div>

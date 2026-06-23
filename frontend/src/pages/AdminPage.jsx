@@ -9,6 +9,7 @@ import AdminAudioSection from './AdminAudioSection.jsx';
 import AdminGamesSection from './AdminGamesSection.jsx';
 import AdminMagic8BallSection from './AdminMagic8BallSection.jsx';
 import AdminWheelSection from './AdminWheelSection.jsx';
+import AdminEntertainmentSection from './AdminEntertainmentSection.jsx';
 import AdminShutTheBox15Section from './AdminShutTheBox15Section.jsx';
 import AdminSneakyButtonSection from './AdminSneakyButtonSection.jsx';
 import AdminDuckySection from './AdminDuckySection.jsx';
@@ -158,6 +159,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Wheel of Misfortune" storageKey="admin::wheel">
         <AdminWheelSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Wheel of Entertainment" storageKey="admin::entertainment">
+        <AdminEntertainmentSection bare />
       </AdminCollapsible>
 
       <AdminCollapsible title="Shut the Box 15" storageKey="admin::stb15">

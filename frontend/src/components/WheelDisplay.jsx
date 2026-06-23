@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
+import { hapticTap } from '../lib/haptics.js';
 
 const TEAL_BTN = "inline-flex items-center justify-center rounded-xl bg-teal-300 px-5 py-2 text-sm font-semibold text-teal-900 transition hover:bg-teal-400 active:scale-95 disabled:opacity-40";
 const INITIAL_OFFSET = -7; // small rest rotation so the pointer sits between two pegs
@@ -15,7 +16,7 @@ function paramsForCount(n) {
   return { fontSize: 2.4 };
 }
 
-function WheelSvg({ segments, pegColor, textColor, textOpacity }) {
+export function WheelSvg({ segments, pegColor, textColor, textOpacity }) {
   if (!segments || segments.length < 2) return null;
   const size = 100;
   const cx = size / 2, cy = size / 2;
@@ -141,6 +142,7 @@ export default function WheelDisplay({ wheel, segments, maxWidth = 340 }) {
       if (newCrossings > crossings) {
         crossings = newCrossings;
         triggerFlap();
+        hapticTap(); // tick as each peg/segment passes the pointer
       }
       raf = requestAnimationFrame(tick);
     }

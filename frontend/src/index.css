@@ -58,6 +58,11 @@ body { min-height: -webkit-fill-available; min-height: 100dvh; min-height: 100sv
 
 body { -webkit-tap-highlight-color: transparent; }
 
+/* Hide the horizontal scrollbar on carousels (e.g. the stories strip) while
+   keeping the element scrollable. */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Pull-to-refresh icon: a quick shaky jiggle (±22.5°) while the user drags the
    page down, rather than a full rotation. */
 @keyframes ptr-jiggle {

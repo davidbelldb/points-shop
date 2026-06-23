@@ -278,6 +278,9 @@ export const api = {
 
   rewatchList: () => request('/rewatch'),
   rewatchPartner: () => request('/rewatch/partner'),
+
+  // Wheel of Entertainment — titles for the "what shall we watch?" spinner.
+  entertainmentWheel: () => request('/entertainment/wheel'),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
   rewatchGet: (id) => request(`/rewatch/${id}`),
   rewatchSeason: (id, n) => request(`/rewatch/${id}/season/${n}`),
@@ -493,6 +496,9 @@ export const api = {
       request('/admin/storage/reels/cleanup', { method: 'POST', body: JSON.stringify({ ids }) }),
 
     // Relationship Timeline
+    listEntertainmentTitles: () => request('/admin/entertainment/titles'),
+    addEntertainmentTitle: (label) => request('/admin/entertainment/titles', { method: 'POST', body: JSON.stringify({ label }) }),
+    deleteEntertainmentTitle: (id) => request(`/admin/entertainment/titles/${id}`, { method: 'DELETE' }),
     listTimelineMilestones: () => request('/admin/timeline/milestones'),
     createTimelineMilestone: (data) =>
       request('/admin/timeline/milestones', { method: 'POST', body: JSON.stringify(data) }),

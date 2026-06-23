@@ -9,7 +9,7 @@ const Magic8BallGame = lazy(() =>
 );
 
 const GameSkeleton = () => (
-  <div className="flex aspect-[4/3] w-full animate-pulse items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-100 text-sm text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600">
+  <div className="flex aspect-[4/3] w-full items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-50 text-sm text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600">
     Loading Magic 8-Ball…
   </div>
 );

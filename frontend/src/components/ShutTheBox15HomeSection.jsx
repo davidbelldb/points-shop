@@ -16,7 +16,7 @@ const ShutTheBox15Game = lazy(() =>
 // Skeleton shown while the game chunk downloads — sized to roughly match the
 // board so the home page doesn't jump when it swaps in.
 const GameSkeleton = () => (
-  <div className="flex aspect-[4/3] w-full animate-pulse items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-100 text-sm text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600">
+  <div className="flex aspect-[4/3] w-full items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-50 text-sm text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600">
     Loading game…
   </div>
 );

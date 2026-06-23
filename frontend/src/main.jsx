@@ -27,6 +27,7 @@ const TruthOrDarePage      = lazy(() => import('./pages/TruthOrDarePage.jsx'));
 const TicTacFacePage       = lazy(() => import('./pages/TicTacFacePage.jsx'));
 const GiftsweeperPage      = lazy(() => import('./pages/GiftsweeperPage.jsx'));
 const WheelOfMisfortunePage = lazy(() => import('./pages/WheelOfMisfortunePage.jsx'));
+const WheelOfEntertainmentPage = lazy(() => import('./pages/WheelOfEntertainmentPage.jsx'));
 const ShutTheBox15Page     = lazy(() => import('./pages/ShutTheBox15Page.jsx'));
 const Magic8BallPage       = lazy(() => import('./pages/Magic8BallPage.jsx'));
 const DuckyDerbyPage       = lazy(() => import('./pages/DuckyDerbyPage.jsx'));
@@ -59,7 +60,6 @@ import { ThemeProvider } from './lib/ThemeContext.jsx';
 import { ToastProvider } from './lib/ToastContext.jsx';
 import ToastHost from './components/ToastHost.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import SkeletonPage from './components/Skeleton.jsx';
 import './index.css';
 
 // Vite fires this on the window when a lazily-imported chunk's <link rel=
@@ -122,7 +122,10 @@ function RequireAuth({ children }) {
   return children;
 }
 
-const lazyFallback = <SkeletonPage />;
+// Minimal, unobtrusive loader for lazily-loaded routes (no skeleton screens).
+const lazyFallback = (
+  <div className="flex min-h-[50vh] items-center justify-center text-sm text-neutral-400">Loading…</div>
+);
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -162,6 +165,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />
               <Route path="games/giftsweeper" element={<GiftsweeperPage />} />
               <Route path="games/wheel-of-misfortune" element={<WheelOfMisfortunePage />} />
+              <Route path="games/wheel-of-entertainment" element={<WheelOfEntertainmentPage />} />
               <Route path="games/shut-the-box-15" element={<ShutTheBox15Page />} />
               <Route path="magic-8-ball" element={<Magic8BallPage />} />
               <Route path="games/ducky" element={<DuckyDerbyPage />} />
