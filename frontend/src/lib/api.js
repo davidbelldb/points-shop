@@ -497,7 +497,9 @@ export const api = {
 
     // Relationship Timeline
     listEntertainmentTitles: () => request('/admin/entertainment/titles'),
-    addEntertainmentTitle: (label) => request('/admin/entertainment/titles', { method: 'POST', body: JSON.stringify({ label }) }),
+    listEntertainmentWatchlistTitles: () => request('/admin/entertainment/watchlist-titles'),
+    addEntertainmentTitle: (label, color) => request('/admin/entertainment/titles', { method: 'POST', body: JSON.stringify({ label, color }) }),
+    updateEntertainmentTitle: (id, patch) => request(`/admin/entertainment/titles/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     deleteEntertainmentTitle: (id) => request(`/admin/entertainment/titles/${id}`, { method: 'DELETE' }),
     listTimelineMilestones: () => request('/admin/timeline/milestones'),
     createTimelineMilestone: (data) =>

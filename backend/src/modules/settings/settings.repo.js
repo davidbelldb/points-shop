@@ -28,6 +28,9 @@ const ALLOWED = [
   'magic8ball_glass_depth', 'magic8ball_glass_glare_opacity', 'magic8ball_glass_glare_color',
   'magic8ball_rear_title_text', 'magic8ball_rear_title_color', 'magic8ball_rear_title_font_size',
   'magic8ball_rear_title_y', 'magic8ball_rear_title_depth',
+  'entertainment_home_enabled', 'entertainment_home_days',
+  'entertainment_home_start', 'entertainment_home_end',
+  'entertainment_home_title', 'entertainment_home_subtitle',
 ];
 
 export async function getAllSettings() {

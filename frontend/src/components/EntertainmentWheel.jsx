@@ -135,12 +135,16 @@ export default function EntertainmentWheel({ segments, maxWidth = 340 }) {
   );
 }
 
-// Build wheel segments (with the app palette + a Bum Show segment) from titles.
+// Build wheel segments from titles + a Bum Show segment. `titles` is an array
+// of { label, color } objects (admin-set colour), but plain strings are also
+// accepted (falls back to a cycling palette).
 const PALETTE = ['#14b8a6', '#ed70bd', '#5fc4b1', '#f299d8', '#1f7a66', '#c4529a', '#7adfcf', '#f7c2e9'];
 export function buildEntertainmentSegments(titles, bumShowLabel = 'Bum Show') {
-  const segs = (titles ?? []).map((label, i) => ({
-    id: `t${i}`, label, color: PALETTE[i % PALETTE.length], isBum: false,
-  }));
+  const segs = (titles ?? []).map((t, i) => {
+    const label = typeof t === 'string' ? t : t.label;
+    const color = (typeof t === 'object' && t.color) ? t.color : PALETTE[i % PALETTE.length];
+    return { id: `t${i}`, label, color, isBum: false };
+  });
   segs.push({ id: 'bum', label: bumShowLabel, color: '#525252', isBum: true });
   return segs;
 }

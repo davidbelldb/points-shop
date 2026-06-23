@@ -1,18 +1,17 @@
 import { useEffect } from 'react';
 
-/* Lock background scrolling while a modal / drawer is open — WITHOUT moving the
-   document.
+/* Lock background scrolling while a modal / drawer is open.
 
-   An earlier version pinned <body> with position:fixed. That reliably stops
-   scrolling, but it also yanks the sticky app header off-screen, which is the
-   opposite of what we want: the nav bar must stay visible above the modal.
+   We pin <body> with position:fixed at a negative top offset equal to the
+   current scroll position. This freezes the page EXACTLY where it was — so the
+   content visible behind a drawer's tinted backdrop stays put (an earlier
+   overflow:hidden approach let iOS visually clamp the page to the top while the
+   drawer was open, even though it was restored on close). The app header is
+   position:fixed to the viewport with no transformed ancestor, so pinning the
+   body does not move it.
 
-   Instead we:
-   1. set overflow:hidden on <html>/<body> (handles desktop wheel + keeps the
-      sticky header exactly where it is), and
-   2. swallow touchmove on iOS — where overflow:hidden alone is ignored — for
-      every touch EXCEPT those inside an element marked [data-modal-scroll]
-      (the modal's own scroll region), so the modal still scrolls internally.
+   The touchmove handler still runs so a modal's own [data-modal-scroll] region
+   keeps scrolling internally while the background is frozen.
 
    A shared counter supports stacked modals: locked on the first open, released
    on the last close. */
@@ -38,17 +37,16 @@ function onTouchMove(e) {
 
 function applyLock() {
   if (lockCount === 0) {
-    // Remember where the page was scrolled to. On iOS WebKit, setting
-    // body { overflow:hidden } can clamp the document's scroll offset back to 0
-    // (most visible in the chat thread, which sits scrolled to the bottom) — so
-    // we restore this exact position when the last lock releases.
     savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-    // IMPORTANT: do NOT set overflow:hidden on <html>. On iOS WebKit that
-    // shrinks the viewport that fixed / 100dvh elements resolve against, which
-    // left a grey strip below the drawers (they stopped short of the real
-    // bottom). The non-passive touchmove blocker is what actually locks iOS
-    // scrolling; body overflow:hidden covers desktop wheel scrolling.
-    document.body.style.overflow = 'hidden';
+    // Freeze the page in place: pin body at -scrollY so the frozen content
+    // shows the same position the user was at (visible behind a drawer's tint).
+    const b = document.body.style;
+    b.position = 'fixed';
+    b.top = `-${savedScrollY}px`;
+    b.left = '0';
+    b.right = '0';
+    b.width = '100%';
+    b.overflow = 'hidden'; // desktop wheel
     document.addEventListener('touchmove', onTouchMove, { passive: false });
   }
   lockCount += 1;
@@ -57,13 +55,16 @@ function applyLock() {
 function releaseLock() {
   lockCount = Math.max(0, lockCount - 1);
   if (lockCount === 0) {
-    document.body.style.overflow = '';
+    const b = document.body.style;
+    b.position = '';
+    b.top = '';
+    b.left = '';
+    b.right = '';
+    b.width = '';
+    b.overflow = '';
     document.removeEventListener('touchmove', onTouchMove, { passive: false });
-    // Restore the pre-lock scroll position if the overflow lock reset it, so
-    // closing a drawer/modal never yanks the page (e.g. chat) to the top.
-    if (savedScrollY > 0 && Math.abs(window.scrollY - savedScrollY) > 1) {
-      window.scrollTo(0, savedScrollY);
-    }
+    // Restore the exact scroll position the page was frozen at.
+    window.scrollTo(0, savedScrollY);
   }
 }
 
