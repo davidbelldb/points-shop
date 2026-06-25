@@ -63,7 +63,9 @@ fastify.addHook('onRequest', async (req, reply) => {
     }
   }
 });
-await fastify.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
+// No upload size cap (@fastify/multipart defaults to 1MB if unset, so we set an
+// effectively-unlimited ceiling). Sneaky stories can be long videos/voice notes.
+await fastify.register(multipart, { limits: { fileSize: Number.MAX_SAFE_INTEGER } });
 await fastify.register(fastifyStatic, {
   root: MEDIA_DIR,
   prefix: '/media/',

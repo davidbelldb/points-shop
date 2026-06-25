@@ -125,11 +125,12 @@ export async function createStory(authorId, { media_url, media_type, caption, du
   if (!['image', 'video', 'audio'].includes(media_type)) {
     throw httpError(400, 'media_type must be image, video, or audio');
   }
-  // Clamp duration to 1..60s; null means "use the client default".
+  // Image display duration (seconds). No upper cap; floor of 1s. null means
+  // "use the client default".
   let dur = null;
   if (duration_seconds != null) {
     const n = Number(duration_seconds);
-    if (Number.isFinite(n)) dur = Math.max(1, Math.min(60, Math.round(n)));
+    if (Number.isFinite(n)) dur = Math.max(1, Math.round(n));
   }
   // Cap stickers payload — we only render a handful and the JSONB column
   // shouldn't be a soft DOS vector. 6 max sticker objects, each must look

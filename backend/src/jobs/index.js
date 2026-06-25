@@ -134,9 +134,9 @@ function registerWordleReminder(fastify) {
         await query(
           `INSERT INTO notifications (account_id, type, title, body, link_url)
            VALUES ($1, 'wordle_reminder', $2, $3, '/games/dirty-wordle')`,
-          [id, 'Dirdle awaits 🦅', "You haven't played today's Dirdle yet — get on it before midnight!"],
+          [id, 'Dirdle awaits', "You haven't played today's Dirdle yet — get on it before midnight!"],
         );
-        sendPush(id, { title: 'Dirdle awaits 🦅', body: "You haven't played today's Dirdle yet!", url: '/games/dirty-wordle' });
+        sendPush(id, { title: 'Dirdle awaits', body: "You haven't played today's Dirdle yet!", url: '/games/dirty-wordle' });
       }
       if (rows.length) fastify.log.info({ count: rows.length }, 'Wordle reminders sent');
     } catch (e) {

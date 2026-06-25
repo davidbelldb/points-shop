@@ -18,7 +18,7 @@ import DraggableSticker from './DraggableSticker.jsx';
    lets the poster control how long an IMAGE story stays on screen in the
    viewer (1–60s). For video/audio we use the file's natural duration. */
 const DEFAULT_IMAGE_SECONDS = 5;
-const MAX_SECONDS = 60;
+const MAX_SECONDS = 600; // image display-duration slider ceiling (no hard cap server-side)
 
 export default function StoryUploader({ onClose, onPosted }) {
   // Lock the feed behind this full-screen sheet so scroll gestures stay inside it.
@@ -214,7 +214,7 @@ export default function StoryUploader({ onClose, onPosted }) {
                 <path d="M8 6l1.5-2h5L16 6" />
               </svg>
               <span className="text-sm font-semibold">Photo, video, or voice note</span>
-              <span className="text-xs text-neutral-500">Up to 50MB · 24 hours live</span>
+              <span className="text-xs text-neutral-500">24 hours live</span>
               {/* iOS Files greys out audio with only `audio/*`, and HEIC/MOV
                   with only `image/*` and `video/*`. Spelling out the explicit
                   mimetypes AND extensions covers all the iOS file-pickers. */}
