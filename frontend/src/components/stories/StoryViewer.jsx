@@ -511,7 +511,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             ref={videoRef}
             key={story.id}
             src={story.media_url}
-            className="absolute inset-0 h-full w-full object-contain"
+            className="absolute inset-0 h-full w-full object-cover"
             autoPlay
             playsInline
             controls={false}
@@ -541,7 +541,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           <img
             src={story.media_url}
             alt=""
-            className="absolute inset-0 h-full w-full object-contain"
+            className="absolute inset-0 h-full w-full object-cover"
             decoding="async"
             fetchPriority="high"
           />

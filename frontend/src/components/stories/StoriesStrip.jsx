@@ -217,12 +217,9 @@ export default function StoriesStrip() {
 
   return (
     <>
-      {/* Mobile: single-row horizontal scroll, full-bleed edge to edge. The
-          negative -mx-4 cancels the page's px-4 so the scroll track spans the
-          whole device width; the inner px-4 keeps the first/last rings aligned
-          with the rest of the page content. */}
-      <div className="lg:hidden -mx-4">
-        <div className="no-scrollbar flex items-start gap-3 overflow-x-auto px-4 pb-2">
+      {/* Mobile: single-row horizontal scroll with right bleed (unchanged). */}
+      <div className="lg:hidden -mr-4">
+        <div className="no-scrollbar flex items-start gap-3 overflow-x-auto pb-2">
           {activeGroups.map((g, idx) => {
             const isYou = g.authorId === user?.id;
             const allSeenByMe = !isYou && g.all.every((s) => s.viewed_by_me);
