@@ -488,7 +488,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       </div>
 
       {/* Media */}
-      <div ref={mediaZoneRef} className="relative flex-1 select-none">
+      <div ref={mediaZoneRef} className="relative flex-1 select-none flex items-center justify-center overflow-hidden">
         <div
           className="absolute inset-y-0 left-0 z-10 w-1/3"
           onClick={(e) => onTapZone(e, 'prev')}
@@ -511,7 +511,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
             ref={videoRef}
             key={story.id}
             src={story.media_url}
-            className="absolute inset-0 h-full w-full object-cover"
+            className="w-full h-auto max-h-none"
             autoPlay
             playsInline
             controls={false}
@@ -541,7 +541,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
           <img
             src={story.media_url}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            className="w-full h-auto max-h-none"
             decoding="async"
             fetchPriority="high"
           />
