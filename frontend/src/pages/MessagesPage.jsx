@@ -1426,10 +1426,12 @@ export default function MessagesPage() {
   const scrollFlyoffFrames = useMemo(() => (scrolls.config.send || []).slice(2), [scrolls.config.send]);
   const landIntroPlayedRef = useRef(false);
 
-  // Deep-link from the arrival push (?scrolls=1) opens the list.
+  // Deep-link from the arrival push (?scrolls=1) opens the list; the
+  // "Send Scroll" home-screen quick action (?compose=scroll) opens the composer.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('scrolls') === '1') setScrollListOpen(true);
+    if (p.get('compose') === 'scroll') setScrollComposeOpen(true);
   }, []);
   // Fresh arrival while the chat is open → play the fly-in.
   useEffect(() => { if (scrolls.arrivedTick > 0) setLandFlight(true); }, [scrolls.arrivedTick]);

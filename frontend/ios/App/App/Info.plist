@@ -100,6 +100,19 @@
 				<string>/calendar</string>
 			</dict>
 		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.david.sneakystuff.scroll</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Send Scroll</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeShare</string>
+			<key>UIApplicationShortcutItemUserInfo</key>
+			<dict>
+				<key>url</key>
+				<string>/messages?compose=scroll</string>
+			</dict>
+		</dict>
 	</array>
 </dict>
 </plist>

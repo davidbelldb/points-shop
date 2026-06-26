@@ -16,6 +16,7 @@ import CalendarUpcomingSection from '../components/CalendarUpcomingSection.jsx';
 import StoriesStrip from '../components/stories/StoriesStrip.jsx';
 import FeaturedStory from '../components/stories/FeaturedStory.jsx';
 import { daysUntil, countdownClock } from '../lib/countdown.js';
+import { useTilt } from '../lib/useTilt.js';
 
 // Replace the {name} token with the account's name so the admin can write e.g.
 // "Welcome back {name}" and it follows a rename from Katie -> Kate automatically.
@@ -27,6 +28,7 @@ function applyNameToken(text, name) {
 export default function HomePage() {
   const { settings } = useSettings();
   const { account } = useBasket();
+  const tilt = useTilt();
   const [products, setProducts] = useState(null);
   const [topSlides, setTopSlides] = useState([]);
   const [gameSlides, setGameSlides] = useState([]);
@@ -83,7 +85,10 @@ export default function HomePage() {
 
       {/* \u2500\u2500 Full-width top strip (unchanged on all viewports) \u2500\u2500 */}
       <AudioNotesSection />
-      <div className="text-center">
+      <div
+        className="text-center"
+        style={{ transform: `translate3d(${tilt.x * 9}px, ${tilt.y * 9}px, 0)`, transition: 'transform 120ms ease-out', willChange: 'transform' }}
+      >
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
           {applyNameToken(settings.hero_title ?? 'Welcome to Sneaky Points', account?.name)}
         </h1>
@@ -92,7 +97,9 @@ export default function HomePage() {
         </p>
       </div>
 
-      <StoriesStrip />
+      <div style={{ transform: `translate3d(${tilt.x * -4}px, ${tilt.y * -4}px, 0)`, transition: 'transform 120ms ease-out' }}>
+        <StoriesStrip />
+      </div>
 
       {showFeatured && <FeaturedStory stories={featuredPool} variant="home" />}
 
