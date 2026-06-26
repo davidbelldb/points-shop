@@ -96,6 +96,13 @@ input, textarea, [contenteditable], [contenteditable] * {
   -webkit-user-select: text;
   user-select: text;
 }
+/* Stop iOS lifting/previewing images on long-press (it pulled story thumbnails
+   out of their circles). Combined with pointer-events:none on the ring visuals,
+   long-press belongs to our own handlers. */
+img, video {
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
 /* Contain horizontal overflow at every level. `clip` (not `hidden`) is used so
    it never turns these elements into scroll containers — that would break
    position:sticky on the header. This stops a swiped chat bubble (or any

@@ -97,9 +97,11 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div style={{ transform: `translate3d(${tilt.x * -4}px, ${tilt.y * -4}px, 0)`, transition: 'transform 120ms ease-out' }}>
-        <StoriesStrip />
-      </div>
+      {/* NB: do NOT wrap StoriesStrip in a CSS transform — it renders the
+          full-screen StoryViewer (position:fixed), and an ancestor transform
+          would re-anchor that overlay and break it. Parallax stays on the hero
+          text only. */}
+      <StoriesStrip />
 
       {showFeatured && <FeaturedStory stories={featuredPool} variant="home" />}
 
