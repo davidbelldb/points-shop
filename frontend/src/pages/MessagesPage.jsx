@@ -709,15 +709,7 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
   const rxEmoji     = reactionEmoji(m.reaction);
 
   // Long-press context-menu actions (shown under the reaction row).
-  function copyBody() { try { navigator.clipboard?.writeText(m.body); } catch { /* noop */ } }
-  async function saveMedia() {
-    try { if (navigator.share) { await navigator.share({ url: m.body }); return; } } catch { /* fall through */ }
-    try { window.open(m.body, '_blank'); } catch { /* noop */ }
-  }
-  const bubbleActions = [];
-  if (!bodyIsMedia && !bodyIsPoll) bubbleActions.push({ label: 'Copy', icon: '⧉', run: copyBody });
-  if (bodyIsGif || bodyIsPhoto) bubbleActions.push({ label: 'Save', icon: '⬇', run: saveMedia });
-  bubbleActions.push({ label: 'Reply', icon: '↩', run: () => onSwipeReply?.(m) });
+  const bubbleActions = [{ label: 'Reply', icon: '↩', run: () => onSwipeReply?.(m) }];
   if (mine) bubbleActions.push({ label: 'Delete', icon: '🗑', run: () => onForceDelete?.(), destructive: true });
 
   return (
