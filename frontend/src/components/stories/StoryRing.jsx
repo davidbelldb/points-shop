@@ -51,12 +51,12 @@ export default function StoryRing({
       aria-label={label}
     >
       <span
-        className={`flex items-center justify-center rounded-full p-[3.5px] ${
+        className={`pointer-events-none select-none flex items-center justify-center rounded-full p-[3.5px] ${
           glow
             ? 'bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400'
             : 'bg-neutral-300'
         }`}
-        style={{ width: size, height: size }}
+        style={{ width: size, height: size, WebkitTouchCallout: 'none' }}
       >
         <span className="flex h-full w-full items-center justify-center rounded-full bg-white p-[2.5px]">
           <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-neutral-100">
