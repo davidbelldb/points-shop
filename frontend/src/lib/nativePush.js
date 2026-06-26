@@ -40,6 +40,14 @@ export async function initNativePush(onOpenUrl) {
 
     // Tap on a notification (foreground or background) → deep-link in the app.
     PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      // Inline "Reply" from a chat banner: send the typed text straight away
+      // (reuses the logged-in session), no need to open the conversation.
+      const reply = action?.inputValue?.trim?.();
+      if (action?.actionId === 'REPLY' && reply) {
+        report('reply-from-banner', `len ${reply.length}`);
+        api.sendMessage(reply).catch((e) => report('reply-from-banner-failed', e?.message));
+        return;
+      }
       const url = action?.notification?.data?.url;
       if (url && typeof onOpenUrl === 'function') onOpenUrl(url);
     });

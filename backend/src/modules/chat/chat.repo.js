@@ -249,7 +249,8 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
      VALUES ($1, 'message', $2, $3, '/messages')`,
     [recipientId, title, preview],
   );
-  sendPush(recipientId, { title, body: preview, url: '/messages' });
+  // category drives the iOS "Reply" text-input action on the banner.
+  sendPush(recipientId, { title, body: preview, url: '/messages', category: 'CHAT_REPLY' });
 
   return rows[0];
 }

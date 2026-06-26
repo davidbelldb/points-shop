@@ -72,6 +72,9 @@ function buildPayload(payload, badge) {
   };
   // App-icon badge = the recipient's unread notification count.
   if (Number.isFinite(badge)) aps.badge = badge;
+  // Category ties the push to a registered set of actions (e.g. the chat
+  // "Reply" text-input action defined in AppDelegate).
+  if (payload.category) aps.category = payload.category;
   // Rich push: when an image URL is supplied, flag the payload mutable so the
   // Notification Service Extension can download + attach it (e.g. a story
   // thumbnail shown in the expanded banner).

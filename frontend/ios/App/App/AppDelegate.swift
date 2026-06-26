@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import UserNotifications
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,7 +17,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         if let shortcut = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
             pendingShortcut = shortcut
         }
+        registerChatReplyCategory()
         return true
+    }
+
+    // Defines the "Reply" text-input action shown on chat-message push banners.
+    // Pushes carrying `"category": "CHAT_REPLY"` get a Reply box; the typed text
+    // is forwarded by the Capacitor push plugin to the web layer (nativePush.js),
+    // which sends it using the logged-in session.
+    private func registerChatReplyCategory() {
+        let reply = UNTextInputNotificationAction(
+            identifier: "REPLY",
+            title: "Reply",
+            options: [],
+            textInputButtonTitle: "Send",
+            textInputPlaceholder: "Message…")
+        let category = UNNotificationCategory(
+            identifier: "CHAT_REPLY",
+            actions: [reply],
+            intentIdentifiers: [],
+            options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([category])
     }
 
     // Warm launch — app already running when the Quick Action is tapped.
