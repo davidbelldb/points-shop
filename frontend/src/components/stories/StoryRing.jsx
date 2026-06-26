@@ -4,8 +4,6 @@
                                  the ring and the thumbnail
    3. clipped image / icon     — the actual content
    The default `size` was 64; bumped to 74 (+15%) for the home strip. */
-import { useRef } from 'react';
-
 export default function StoryRing({
   thumbnailUrl,
   posterUrl,
@@ -14,37 +12,12 @@ export default function StoryRing({
   label,
   sublabel,
   onClick,
-  onLongPress,
   plus = false,
   size = 74,
 }) {
-  const holdRef = useRef(null);
-  const firedRef = useRef(false);
-
-  function down() {
-    if (!onLongPress) return;
-    firedRef.current = false;
-    holdRef.current = setTimeout(() => {
-      holdRef.current = null;
-      firedRef.current = true;
-      try { navigator.vibrate?.(30); } catch { /* noop */ }
-      onLongPress();
-    }, 450);
-  }
-  function cancel() { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } }
-  function handleClick(e) {
-    if (firedRef.current) { firedRef.current = false; e.preventDefault(); e.stopPropagation(); return; }
-    onClick?.(e);
-  }
-
   return (
     <button
-      onClick={handleClick}
-      onPointerDown={down}
-      onPointerUp={cancel}
-      onPointerMove={cancel}
-      onPointerLeave={cancel}
-      onPointerCancel={cancel}
+      onClick={onClick}
       onContextMenu={(e) => e.preventDefault()}
       className="flex shrink-0 flex-col items-center gap-1 focus:outline-none"
       style={{ width: size }}
