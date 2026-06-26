@@ -32,6 +32,12 @@ const ANIMAL_KINDS = ['cat', 'duck'];
 // modest rate limits; an optional CAT_API_KEY env var (sent as x-api-key)
 // raises that limit if Katie wants more headroom later. random-d.uk needs no
 // key at all.
+// iOS App Transport Security blocks plain-http image loads, so always hand back
+// an https URL.
+function httpsUrl(u) {
+  return typeof u === 'string' ? u.replace(/^http:\/\//i, 'https://') : u;
+}
+
 async function fetchAnimalImage(kind) {
   if (kind === 'duck') {
     try {
@@ -40,7 +46,7 @@ async function fetchAnimalImage(kind) {
       const data = await res.json();
       if (!data?.url) return null;
       return {
-        url: data.url,
+        url: httpsUrl(data.url),
         kind,
         is_gif: true,
       };
@@ -60,7 +66,7 @@ async function fetchAnimalImage(kind) {
     const item = Array.isArray(data) ? data[0] : null;
     if (!item?.url) return null;
     return {
-      url: item.url,
+      url: httpsUrl(item.url),
       kind,
       is_gif: true,
     };

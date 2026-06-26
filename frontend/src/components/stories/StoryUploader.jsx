@@ -333,8 +333,26 @@ export default function StoryUploader({ onClose, onPosted }) {
             </div>
           )}
 
-          {/* Sticker drawer entry — sits between the duration setter and the
-              caption, deliberately as a wide button bar so it reads as a
+          <div>
+            <label className="text-xs font-semibold text-neutral-500">Caption (optional)</label>
+            <input
+              ref={captionRef}
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              onFocus={() => {
+                // Wait for the keyboard-height padding to apply, then bring the
+                // caption fully into the space above the keyboard.
+                setTimeout(() => {
+                  captionRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }, 250);
+              }}
+              maxLength={140}
+              placeholder="Say something…"
+              className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Sticker drawer entry — a wide button bar so it reads as a
               first-class action rather than a secondary pill. */}
           {file && (
             <button
@@ -354,25 +372,6 @@ export default function StoryUploader({ onClose, onPosted }) {
               )}
             </button>
           )}
-
-          <div>
-            <label className="text-xs font-semibold text-neutral-500">Caption (optional)</label>
-            <input
-              ref={captionRef}
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              onFocus={() => {
-                // Wait for the keyboard-height padding to apply, then bring the
-                // caption fully into the space above the keyboard.
-                setTimeout(() => {
-                  captionRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                }, 250);
-              }}
-              maxLength={140}
-              placeholder="Say something…"
-              className="mt-1 block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
-            />
-          </div>
 
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>

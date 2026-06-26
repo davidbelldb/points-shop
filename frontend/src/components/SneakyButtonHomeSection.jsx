@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 
 /**
@@ -11,6 +11,7 @@ export default function SneakyButtonHomeSection() {
   const [media, setMedia] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const retriesRef = useRef(0);
 
   useEffect(() => {
     api.getSneakyButtonConfig().then(setConfig).catch(() => {});
@@ -22,8 +23,9 @@ export default function SneakyButtonHomeSection() {
   const days = Array.isArray(config.homepage_days) ? config.homepage_days : [0, 1, 2, 3, 4, 5, 6];
   if (days.length > 0 && !days.includes(today)) return null;
 
-  async function fetchAnimal() {
+  async function fetchAnimal(isRetry = false) {
     setLoading(true); setError(null);
+    if (!isRetry) retriesRef.current = 0;
     try {
       const result = await api.getSneakyRandomAnimal();
       setMedia(result);
@@ -31,6 +33,19 @@ export default function SneakyButtonHomeSection() {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Some gifs occasionally fail to load/decode in the iOS WebView. Rather than
+  // showing the broken-image square, silently fetch another (a few attempts).
+  function handleImgError() {
+    if (retriesRef.current < 3) {
+      retriesRef.current += 1;
+      setMedia(null);
+      fetchAnimal(true);
+    } else {
+      setMedia(null);
+      setError("That one wouldn't load — tap again for another.");
     }
   }
 
@@ -54,6 +69,7 @@ export default function SneakyButtonHomeSection() {
             alt={`A surprise ${media.kind}`}
             className="max-h-80 w-full object-contain"
             loading="lazy"
+            onError={handleImgError}
           />
         </div>
       )}
