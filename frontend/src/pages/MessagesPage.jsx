@@ -708,6 +708,18 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
   const bodyIsMedia = bodyIsGif || bodyIsPhoto || bodyIsAudio;
   const rxEmoji     = reactionEmoji(m.reaction);
 
+  // Long-press context-menu actions (shown under the reaction row).
+  function copyBody() { try { navigator.clipboard?.writeText(m.body); } catch { /* noop */ } }
+  async function saveMedia() {
+    try { if (navigator.share) { await navigator.share({ url: m.body }); return; } } catch { /* fall through */ }
+    try { window.open(m.body, '_blank'); } catch { /* noop */ }
+  }
+  const bubbleActions = [];
+  if (!bodyIsMedia && !bodyIsPoll) bubbleActions.push({ label: 'Copy', icon: '⧉', run: copyBody });
+  if (bodyIsGif || bodyIsPhoto) bubbleActions.push({ label: 'Save', icon: '⬇', run: saveMedia });
+  bubbleActions.push({ label: 'Reply', icon: '↩', run: () => onSwipeReply?.(m) });
+  if (mine) bubbleActions.push({ label: 'Delete', icon: '🗑', run: () => onForceDelete?.(), destructive: true });
+
   return (
     <div
       onClick={handleClick}
@@ -723,7 +735,7 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
       }}
       className={`group relative max-w-[78%] cursor-pointer select-none${isHeld ? ' bubble-held' : ''}${isSecretMsg && isRevealed ? ' secret-pop' : ''} ${bodyIsMedia || bodyIsPoll ? 'overflow-visible rounded-2xl' : `rounded-2xl px-3 py-2 ${tone}`}`}
     >
-      {/* Emoji picker — floats above bubble on long-press */}
+      {/* Long-press context menu — reaction row on top, action list below (iOS-style) */}
       {showPicker && (
         <>
           {/* Transparent backdrop — covers everything including nav/composer */}
@@ -733,21 +745,47 @@ function MessageBubble({ m, mine, myId, clusterPos = 'solo', isEditing, onStartE
           />
           <div
             data-bubble-action
-            style={{ background: theme === 'dark' ? '#1f1f1f' : '#fafafa', whiteSpace: 'nowrap' }}
-            className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-0.5 rounded-full shadow-xl px-2 py-1.5"
+            className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-1.5"
           >
-            {EMOJI_REACTIONS.map(emoji => (
-              <button
-                key={emoji}
-                type="button"
-                data-bubble-action
-                onClick={(e) => { e.stopPropagation(); onSetReaction(m.reaction === emoji ? null : emoji); setShowPicker(false); }}
-                className="text-xl leading-none px-1.5 py-0.5 rounded-full transition-transform hover:scale-125 active:scale-110"
-                style={{ background: m.reaction === emoji ? (theme === 'dark' ? '#1f1f1f' : '#f3f4f6') : 'transparent', transform: m.reaction === emoji ? 'scale(1.2)' : undefined }}
-              >
-                {emoji}
-              </button>
-            ))}
+            {/* Reactions */}
+            <div
+              data-bubble-action
+              style={{ background: theme === 'dark' ? '#1f1f1f' : '#fafafa', whiteSpace: 'nowrap' }}
+              className="flex items-center gap-0.5 rounded-full shadow-xl px-2 py-1.5"
+            >
+              {EMOJI_REACTIONS.map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  data-bubble-action
+                  onClick={(e) => { e.stopPropagation(); onSetReaction(m.reaction === emoji ? null : emoji); setShowPicker(false); }}
+                  className="text-xl leading-none px-1.5 py-0.5 rounded-full transition-transform hover:scale-125 active:scale-110"
+                  style={{ background: m.reaction === emoji ? (theme === 'dark' ? '#1f1f1f' : '#f3f4f6') : 'transparent', transform: m.reaction === emoji ? 'scale(1.2)' : undefined }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            {/* Actions */}
+            <div
+              data-bubble-action
+              style={{ background: theme === 'dark' ? '#2a2a2a' : '#ffffff', minWidth: 170 }}
+              className="overflow-hidden rounded-xl shadow-xl text-sm"
+            >
+              {bubbleActions.map((a, i) => (
+                <button
+                  key={a.label}
+                  type="button"
+                  data-bubble-action
+                  onClick={(e) => { e.stopPropagation(); setShowPicker(false); a.run(); }}
+                  className={`flex w-full items-center justify-between gap-6 px-3.5 py-2.5 ${i > 0 ? 'border-t' : ''} ${a.destructive ? 'text-red-500' : (theme === 'dark' ? 'text-neutral-100' : 'text-neutral-800')}`}
+                  style={{ borderColor: theme === 'dark' ? '#3a3a3a' : '#ececec' }}
+                >
+                  <span>{a.label}</span>
+                  <span aria-hidden="true">{a.icon}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </>
       )}
