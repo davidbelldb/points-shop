@@ -149,13 +149,13 @@ export async function createStory(authorId, { media_url, media_type, caption, du
   const story = rows[0];
   // Let the other person know a sneaky story just dropped. Fire-and-forget so
   // a notification hiccup can never fail the story upload itself.
-  notifyStoryPosted(authorId).catch(() => {});
+  notifyStoryPosted(authorId, story.thumbnail_url || story.media_url).catch(() => {});
   return story;
 }
 
 /* Drops an in-app notification + web push to the OTHER account (the app only
    has two) whenever someone posts a story. Never throws. */
-async function notifyStoryPosted(authorId) {
+async function notifyStoryPosted(authorId, imagePath) {
   const { rows } = await query(
     `SELECT id AS other_id,
             (SELECT name FROM accounts WHERE id = $1) AS author_name
@@ -173,7 +173,12 @@ async function notifyStoryPosted(authorId) {
      VALUES ($1, 'story', $2, $3, '/')`,
     [other.other_id, title, body],
   );
-  sendPush(other.other_id, { title, body, url: '/' });
+  // Absolute https URL so the iOS Notification Service Extension can fetch the
+  // thumbnail and show it in the expanded push.
+  const image = imagePath
+    ? (/^https?:\/\//i.test(imagePath) ? imagePath : `https://sneakypoints.com${imagePath}`)
+    : null;
+  sendPush(other.other_id, { title, body, url: '/', image });
 }
 
 /* Smart delete: if the story is currently linked from any highlight reel
