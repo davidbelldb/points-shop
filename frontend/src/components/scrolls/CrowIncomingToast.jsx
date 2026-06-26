@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api.js';
+import { startCrowActivity, landCrowActivity } from '../../lib/crowActivity.js';
 
 /* In-app "Live Activity": while a crow is in flight to you, a pill sits under
    the header showing how far along its journey it is. The crow walks/flies a
@@ -31,8 +32,10 @@ export default function CrowIncomingToast() {
   const [arriveAt, setArriveAt] = useState(null); // ms timestamp of arrival
   const [startAt, setStartAt] = useState(null);   // ms timestamp the crow set off
   const [origin, setOrigin] = useState('afar');
+  const [dest, setDest] = useState('');
   const [now, setNow] = useState(Date.now());
-  const firedForRef = useRef(null); // arriveAt we've already announced as landed
+  const firedForRef = useRef(null);   // arriveAt we've already announced as landed
+  const activityForRef = useRef(null); // arriveAt we've already started a Live Activity for
 
   const fetchIncoming = useCallback(async () => {
     try {
@@ -43,11 +46,22 @@ export default function CrowIncomingToast() {
         setArriveAt(arrive);
         setStartAt(arrive - (Number(soonest.flight_seconds) || 0) * 1000);
         setOrigin(soonest.origin_label || 'afar');
+        setDest(soonest.dest_label || '');
       } else {
         setArriveAt(null);
       }
     } catch { /* transient */ }
   }, []);
+
+  // Kick off the native Live Activity once per inbound crow (foreground start).
+  useEffect(() => {
+    if (arriveAt == null) return;
+    if (activityForRef.current === arriveAt) return;
+    const remainingSec = (arriveAt - Date.now()) / 1000;
+    if (remainingSec <= 1) return; // already (almost) here — no point
+    activityForRef.current = arriveAt;
+    startCrowActivity({ seconds: remainingSec, origin, dest });
+  }, [arriveAt, origin, dest]);
 
   useEffect(() => {
     fetchIncoming();
@@ -70,6 +84,7 @@ export default function CrowIncomingToast() {
     if (now >= arriveAt && firedForRef.current !== arriveAt) {
       firedForRef.current = arriveAt;
       window.dispatchEvent(new Event('scrolls:refresh'));
+      landCrowActivity(); // flip the Live Activity to "arrived", then it dismisses
       const t = setTimeout(fetchIncoming, 2500);
       return () => clearTimeout(t);
     }
