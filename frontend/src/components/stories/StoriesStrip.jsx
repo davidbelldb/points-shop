@@ -4,6 +4,8 @@ import { getCached, setCached } from '../../lib/swrCache.js';
 import { useAuth } from '../../lib/AuthContext.jsx';
 import StoryRing from './StoryRing.jsx';
 import StoryViewer from './StoryViewer.jsx';
+import StoryUploader from './StoryUploader.jsx';
+import AddToReelModal from './AddToReelModal.jsx';
 
 /* Home-page strip — three sections, vertical dividers between them:
    1. ACTIVE stories (24h live) — at most two circles since the app only has
@@ -41,6 +43,9 @@ export default function StoriesStrip() {
   const [reels, setReels]     = useState([]);
   const [archive, setArchive] = useState([]);
   const [viewer, setViewer]   = useState(null); // { stories, index } | null
+  const [ringMenu, setRingMenu] = useState(null); // { storyId } | null — long-press menu
+  const [uploaderOpen, setUploaderOpen] = useState(false);
+  const [addToReelStoryId, setAddToReelStoryId] = useState(null);
 
   // Active stories + reels change frequently (new posts, views) and are
   // cheap to fetch — keep polling these every 30s.
@@ -186,6 +191,7 @@ export default function StoriesStrip() {
           label={isYou ? 'Your story' : g.authorName}
           sublabel={g.all.length > 1 ? `${g.all.length} new` : null}
           onClick={() => openActive(idx)}
+          onLongPress={() => setRingMenu({ storyId: g.latest?.id ?? g.all[0]?.id })}
         />
       );
     }),
@@ -232,6 +238,7 @@ export default function StoriesStrip() {
                 label={isYou ? 'Your story' : g.authorName}
                 sublabel={g.all.length > 1 ? `${g.all.length} new` : null}
                 onClick={() => openActive(idx)}
+                onLongPress={() => setRingMenu({ storyId: g.latest?.id ?? g.all[0]?.id })}
               />
             );
           })}
@@ -277,6 +284,47 @@ export default function StoriesStrip() {
           initialIndex={viewer.index}
           onClose={() => { setViewer(null); refresh(); }}
           onStoryDeleted={refresh}
+        />
+      )}
+
+      {/* Long-press context menu on a story ring. */}
+      {ringMenu && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-6" onClick={() => setRingMenu(null)}>
+          <div
+            className="w-full max-w-xs overflow-hidden rounded-2xl bg-white text-sm shadow-xl dark:bg-neutral-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => { setAddToReelStoryId(ringMenu.storyId); setRingMenu(null); }}
+              disabled={!ringMenu.storyId}
+              className="flex w-full items-center justify-between px-4 py-3 text-neutral-800 disabled:opacity-40 dark:text-neutral-100"
+            >
+              <span>Add to highlight reel</span><span aria-hidden="true">✦</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setUploaderOpen(true); setRingMenu(null); }}
+              className="flex w-full items-center justify-between border-t border-neutral-100 px-4 py-3 text-neutral-800 dark:border-neutral-700 dark:text-neutral-100"
+            >
+              <span>Add another story</span><span aria-hidden="true">＋</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {addToReelStoryId && (
+        <AddToReelModal
+          storyId={addToReelStoryId}
+          onClose={() => setAddToReelStoryId(null)}
+          onDone={() => { setAddToReelStoryId(null); refresh(); }}
+        />
+      )}
+
+      {uploaderOpen && (
+        <StoryUploader
+          onClose={() => setUploaderOpen(false)}
+          onPosted={() => { setUploaderOpen(false); refresh(); }}
         />
       )}
     </>
