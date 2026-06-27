@@ -18,6 +18,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             pendingShortcut = shortcut
         }
         registerChatReplyCategory()
+        // Force the custom Capacitor plugin to load so its @objc class is
+        // registered with the Objective-C runtime and Capacitor's auto-discovery
+        // finds it. Without this reference, an app-target plugin that's only
+        // reached via the JS bridge can be missed ("plugin is not implemented").
+        _ = CrowActivityPlugin.self
         return true
     }
 

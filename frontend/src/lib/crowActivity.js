@@ -18,9 +18,8 @@ function report(event, detail) {
 /** Begin a flight: `seconds` until arrival, plus origin/dest labels. */
 export async function startCrowActivity({ seconds, origin, dest }) {
   if (!native()) return;
-  const available = Capacitor.isPluginAvailable('CrowActivity');
-  report('start-call', `${Math.round(seconds || 0)}s · plugin=${available}`);
-  if (!available) return; // plugin not registered — nothing to call
+  // NB: do NOT gate on isPluginAvailable — it gives false negatives for custom
+  // app plugins. Just attempt the call and report the real outcome/error.
   try {
     const r = await Native.start({ seconds: Math.max(0, seconds || 0), origin: origin || '', dest: dest || '' });
     report('start-ok', `id=${r?.id ?? '?'}`);
