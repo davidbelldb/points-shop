@@ -252,7 +252,24 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
   // category drives the iOS "Reply" text-input action on the banner.
   sendPush(recipientId, { title, body: preview, url: '/messages', category: 'CHAT_REPLY' });
 
-  return rows[0];
+  const message = rows[0];
+  // Hydrate the story-reply quote fields so the thumbnail shows immediately on
+  // the optimistic append, matching what listMessages returns (otherwise the
+  // preview renders empty until the next full refetch).
+  if (replyToStoryId) {
+    const st = await query(
+      `SELECT st.media_url AS story_media_url, st.media_type AS story_media_type,
+              st.caption AS story_caption, st.author_id AS story_author_id,
+              st.stickers AS story_stickers, sta.name AS story_author_name
+         FROM sneaky_stories st
+         LEFT JOIN accounts sta ON sta.id = st.author_id
+        WHERE st.id = $1`,
+      [replyToStoryId],
+    );
+    if (st.rows[0]) Object.assign(message, st.rows[0]);
+  }
+
+  return message;
 }
 
 export async function markAllRead(accountId, fromUserId) {

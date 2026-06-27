@@ -743,7 +743,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               onFocus={() => { setPausedByReply(true); setReactionsVisible(false); }}
-              onBlur={() => { setPausedByReply(false); setReactionsVisible(true); }}
+              onBlur={() => { setPausedByReply(false); }}
               placeholder={`Reply to ${story.author_name}…`}
               className="h-10 flex-1 rounded-full px-4 text-sm font-medium text-white placeholder:text-[#8e8e88] outline-none ring-1 ring-transparent focus:ring-[#61dbbb] transition-shadow"
               style={{ background: '#2a2927' }}
