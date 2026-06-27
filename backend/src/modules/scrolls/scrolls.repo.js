@@ -184,15 +184,15 @@ function routeStreet(scroll, frac) {
 const PHASE_FRAC = { 1: WAYPOINT_FRACS[0], 2: WAYPOINT_FRACS[1], 3: WAYPOINT_FRACS[2] };
 
 function streetMessage(phase, scroll) {
-  if (phase === 4) return `coming into land at ${scroll.dest_label || 'its destination'}`;
+  if (phase === 4) return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
   // 1) real reverse-geocoded street on the path, 2) nearest curated street,
   // 3) deterministic Cambridge fallback.
   const routed = Array.isArray(scroll.route_streets) ? scroll.route_streets[phase - 1] : null;
   const street = routed || routeStreet(scroll, PHASE_FRAC[phase]) || pickStreets(scroll.id)[phase - 1];
   switch (phase) {
-    case 1: return `somewhere near ${street}..`;
-    case 2: return `soaring over ${street}`;
-    case 3: return `spotted over ${street}`;
+    case 1: return `Probably somewhere over ${street}`;
+    case 2: return `Likely soaring over ${street}`;
+    case 3: return `Last spotted over ${street}`;
     default: return '';
   }
 }
