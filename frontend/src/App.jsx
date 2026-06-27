@@ -17,7 +17,6 @@ import InAppNotifier from './components/InAppNotifier.jsx';
 import WelcomeOverlay from './components/WelcomeOverlay.jsx';
 import PullToRefresh from './components/PullToRefresh.jsx';
 import SplashFireworks from './components/SplashFireworks.jsx';
-import CrowIncomingToast from './components/scrolls/CrowIncomingToast.jsx';
 import { countdownClock } from './lib/countdown.js';
 import { hapticTap, hapticFireworks } from './lib/haptics.js';
 
@@ -382,8 +381,6 @@ export default function App() {
       <IncomingCallBanner />
       {/* Polls for new alerts and raises in-app toasts (foreground only) */}
       <InAppNotifier />
-      {/* In-app "live activity": counts down an in-flight crow's arrival */}
-      {user && <CrowIncomingToast />}
       {/* One-time welcome (continues the splash); native pull-to-refresh */}
       <WelcomeOverlay />
       <SplashFireworks />
