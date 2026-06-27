@@ -14,7 +14,7 @@ let resolverStarted = false;
 function startResolver() {
   if (resolverStarted) return;
   resolverStarted = true;
-  setInterval(() => { resolveDueScrolls().catch(() => {}); }, 15_000);
+  setInterval(() => { resolveDueScrolls().catch(() => {}); }, 5_000);
 }
 
 export default async function scrollRoutes(fastify) {

@@ -9,7 +9,7 @@ import { useToast } from '../../lib/ToastContext.jsx';
    start→end line, cycling through the send + land sprite frames, with a
    countdown to arrival. Tapping it jumps to chat. */
 
-const POLL_MS = 15000;
+const POLL_MS = 6000;
 
 // Crow flight sprite sequence: send_03 → send_12, then land_00 → land_10.
 const FRAMES = [
@@ -44,14 +44,25 @@ export default function CrowIncomingToast() {
   const [origin, setOrigin] = useState('afar');
   const [dest, setDest] = useState('');
   const [now, setNow] = useState(Date.now());
-  const firedForRef = useRef(null);   // arriveAt we've already announced as landed
   const activityForRef = useRef(null); // arriveAt we've already started a Live Activity for
+  const trackedIdRef = useRef(null);   // id of the crow currently in flight to us
 
   const fetchIncoming = useCallback(async () => {
     try {
       const { incoming } = await api.scrolls.incoming();
-      const soonest = (incoming ?? [])[0];
+      const list = incoming ?? [];
+      // Delivery detection: a crow we were tracking has dropped out of the
+      // in-flight list → the server actually delivered it. Flip the Live
+      // Activity to "arrived" NOW (on real delivery), not when the client
+      // countdown hit 0:00 (which can be ~15s early).
+      if (trackedIdRef.current && !list.some((s) => s.id === trackedIdRef.current)) {
+        trackedIdRef.current = null;
+        landCrowActivity();
+        window.dispatchEvent(new Event('scrolls:refresh'));
+      }
+      const soonest = list[0];
       if (soonest?.deliver_at) {
+        trackedIdRef.current = soonest.id;
         const arrive = new Date(soonest.deliver_at).getTime();
         setArriveAt(arrive);
         setStartAt(arrive - (Number(soonest.flight_seconds) || 0) * 1000);
@@ -85,21 +96,6 @@ export default function CrowIncomingToast() {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [arriveAt]);
-
-  // The moment it lands, tell the rest of the app to refresh its scroll unread
-  // count (bubble + chat update instantly), then refetch so the delivered crow
-  // drops out and the "News from …" title doesn't linger.
-  useEffect(() => {
-    if (arriveAt == null) return undefined;
-    if (now >= arriveAt && firedForRef.current !== arriveAt) {
-      firedForRef.current = arriveAt;
-      window.dispatchEvent(new Event('scrolls:refresh'));
-      landCrowActivity(); // flip the Live Activity to "arrived", then it dismisses
-      const t = setTimeout(fetchIncoming, 2500);
-      return () => clearTimeout(t);
-    }
-    return undefined;
-  }, [arriveAt, now, fetchIncoming]);
 
   if (arriveAt == null) return null;
 
