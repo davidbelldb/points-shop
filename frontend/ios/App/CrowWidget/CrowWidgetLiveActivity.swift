@@ -85,6 +85,34 @@ struct DashedLine: View {
     }
 }
 
+// Three black waypoint nodes at 25 / 50 / 75% of the trail. A node enlarges
+// (springs) once `reached` includes it — iOS animates the change as the crow's
+// progress arrives at that point.
+struct WaypointNodes: View {
+    var reached: Int   // how many nodes have been passed (0–3)
+    private let fracs: [CGFloat] = [0.25, 0.5, 0.75]
+    var body: some View {
+        GeometryReader { geo in
+            ForEach(Array(fracs.enumerated()), id: \.offset) { idx, frac in
+                let isOn = reached >= idx + 1
+                ZStack {
+                    // Soft translucent halo appears once the crow reaches the node.
+                    Circle()
+                        .fill(Color.black.opacity(0.22))
+                        .frame(width: 20, height: 20)
+                        .scaleEffect(isOn ? 1 : 0.3)
+                        .opacity(isOn ? 1 : 0)
+                    // Inner dot — same size whether reached or not.
+                    Circle().fill(Color.black).frame(width: 8, height: 8)
+                }
+                .position(x: geo.size.width * frac, y: geo.size.height / 2)
+            }
+        }
+        .frame(height: 20)
+        .animation(.spring(response: 0.35, dampingFraction: 0.45), value: reached)
+    }
+}
+
 // Lock-screen / banner: tile.png background, black text, a crow at each end of a
 // dashed flight trail.
 struct CrowLockScreenView: View {
@@ -122,6 +150,9 @@ struct CrowLockScreenView: View {
                                          countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
                                 .tint(.black)
                         }
+                        // Three evenly-spaced waypoint nodes (centre + one either
+                        // side). Each "pops" as the crow's progress reaches it.
+                        WaypointNodes(reached: context.state.landed ? 3 : context.state.phase)
                     }
                     .frame(height: 12)
                     Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)

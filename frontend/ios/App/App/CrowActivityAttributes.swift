@@ -18,6 +18,9 @@ struct CrowActivityAttributes: ActivityAttributes {
         /// Server-driven subtitle (street-name progress updates). The backend
         /// always sends this; "" means "use the default subtitle".
         var message: String = ""
+        /// How many of the 3 waypoint nodes the crow has passed (0–3; 4 = landed).
+        /// Drives the node "pop" on the timeline. Always sent by the backend.
+        var phase: Int = 0
     }
 
     /// Static info — fixed for the life of one flight.

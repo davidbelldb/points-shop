@@ -94,12 +94,13 @@ function toRefDate(ms) { return Math.round((ms / 1000 - REF_DATE) * 1000) / 1000
 
 /** Build the crow activity's ContentState in Swift-Codable form. `message` is
  *  always included (Swift requires the key) — "" means "use the default subtitle". */
-export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '' }) {
+export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '', phase = 0 }) {
   return {
     startedAt: toRefDate(startedAtMs),
     arrivesAt: toRefDate(arrivesAtMs),
     landed: !!landed,
     message: message || '',
+    phase: Number(phase) || 0,
   };
 }
 
