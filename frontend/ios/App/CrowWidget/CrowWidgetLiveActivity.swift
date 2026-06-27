@@ -2,85 +2,85 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
-// Colours
 private let teal = Color(red: 0.086, green: 0.557, blue: 0.467)   // #168e77 timeline
 private let plum = Color(red: 0.63, green: 0.30, blue: 0.54)       // #a04d89 fallback bg
 
-// Crow sprite name for the current state. NOTE: Live Activities can't animate
-// frame-by-frame (no per-200ms timer in a widget), so this is a single static
-// frame — a flying pose in flight, the perched crow once delivered.
-private func crowImage(_ landed: Bool) -> String { landed ? "crow_land_10" : "crow_land_01" }
+// A crow at each end of the journey: crow_land_00 departs on the left,
+// crow_land_10 waits (perched) on the right. Both are shown at all times.
+private let crowLeft = "crow_land_00"
+private let crowRight = "crow_land_10"
+
+private func title(_ landed: Bool) -> String {
+    landed ? "A crow has arrived" : "A crow has been dispatched"
+}
 
 struct CrowWidgetLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: CrowActivityAttributes.self) { context in
             CrowLockScreenView(context: context)
-                .activityBackgroundTint(plum)            // shows if tile image is missing
+                .activityBackgroundTint(plum)            // shows if tile image missing
                 .activitySystemActionForegroundColor(.black)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(crowImage(context.state.landed))
-                        .resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    if !context.state.landed {
-                        Text(timerInterval: context.state.startedAt...context.state.arrivesAt, countsDown: true)
-                            .monospacedDigit().frame(maxWidth: 64).multilineTextAlignment(.trailing)
-                    }
+                    Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.state.landed ? "A crow has arrived" : "A crow has been dispatched")
-                        .font(.headline)
+                    VStack(spacing: 4) {
+                        Text(title(context.state.landed)).font(.headline)
+                        if !context.state.landed {
+                            ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
+                                         countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                                .tint(teal)
+                        }
+                    }
                 }
             } compactLeading: {
-                Image(crowImage(context.state.landed)).resizable().scaledToFit()
+                Image(crowLeft).resizable().scaledToFit()
             } compactTrailing: {
-                if context.state.landed {
-                    Image("crow_land_10").resizable().scaledToFit()
-                } else {
-                    Text(timerInterval: context.state.startedAt...context.state.arrivesAt, countsDown: true)
-                        .monospacedDigit().frame(maxWidth: 44)
-                }
+                Image(crowRight).resizable().scaledToFit()
             } minimal: {
-                Image(crowImage(context.state.landed)).resizable().scaledToFit()
+                Image(crowRight).resizable().scaledToFit()
             }
         }
     }
 }
 
-// Lock-screen / banner presentation: tile.png background, black text, and a
-// timeline bar that auto-fills as the crow flies.
+// Lock-screen / banner: tile.png background, black text, a crow at each end of a
+// timeline bar that auto-fills as the flight progresses.
 struct CrowLockScreenView: View {
     let context: ActivityViewContext<CrowActivityAttributes>
+
+    private var subtitle: String {
+        context.state.landed
+            ? "Important news from \(context.attributes.originLabel)"
+            : "Important news will be arriving shortly"
+    }
 
     var body: some View {
         ZStack {
             Image("tile").resizable().scaledToFill()
-            VStack(spacing: 10) {
-                Text(context.state.landed ? "A crow has arrived" : "A crow has been dispatched")
+            VStack(spacing: 8) {
+                Text(title(context.state.landed))
                     .font(.custom("ImperialBlack", size: 22))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
 
-                if context.state.landed {
-                    Text("Important news from \(context.attributes.originLabel)")
-                        .font(.custom("ImperialBlack", size: 13))
-                        .foregroundColor(.black)
-                        .multilineTextAlignment(.center)
-                } else {
-                    HStack(spacing: 10) {
-                        Image(crowImage(false))
-                            .resizable().scaledToFit().frame(width: 34, height: 34)
-                        ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
-                                     countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
-                            .tint(teal)
-                        Text(timerInterval: context.state.startedAt...context.state.arrivesAt, countsDown: true)
-                            .font(.custom("ImperialBlack", size: 13))
-                            .foregroundColor(.black)
-                            .monospacedDigit()
-                            .frame(width: 52)
-                    }
+                Text(subtitle)
+                    .font(.custom("ImperialBlack", size: 12))
+                    .foregroundColor(.black)
+                    .opacity(0.85)
+                    .multilineTextAlignment(.center)
+
+                HStack(spacing: 10) {
+                    Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
+                    ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
+                                 countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                        .tint(teal)
+                    Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
                 }
             }
             .padding(.horizontal, 18)
