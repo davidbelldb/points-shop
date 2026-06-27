@@ -108,8 +108,11 @@ export async function sendApns(accountId, payload) {
 
   let tokens;
   try {
+    // Only the most-recently-registered device token. TestFlight reinstalls
+    // leave older (still briefly valid) tokens behind, which caused duplicate
+    // banners — send to just the newest so each device gets exactly one.
     const { rows } = await query(
-      `SELECT token FROM apns_tokens WHERE account_id = $1`,
+      `SELECT token FROM apns_tokens WHERE account_id = $1 ORDER BY updated_at DESC LIMIT 1`,
       [accountId],
     );
     tokens = rows;

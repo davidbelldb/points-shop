@@ -2,8 +2,7 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
-private let teal = Color(red: 0.086, green: 0.557, blue: 0.467)   // #168e77 timeline
-private let plum = Color(red: 0.63, green: 0.30, blue: 0.54)       // #a04d89 fallback bg
+private let bg = Color(red: 0.122, green: 0.122, blue: 0.118)      // #1f1f1e background
 
 // A crow at each end of the journey: crow_land_00 departs on the left,
 // crow_land_10 waits (perched) on the right. Both are shown at all times.
@@ -11,14 +10,14 @@ private let crowLeft = "crow_land_00"
 private let crowRight = "crow_land_10"
 
 private func title(_ landed: Bool) -> String {
-    landed ? "A crow has arrived" : "A crow has been dispatched"
+    landed ? "A crow has arrived." : "A crow has been dispatched."
 }
 
 struct CrowWidgetLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: CrowActivityAttributes.self) { context in
             CrowLockScreenView(context: context)
-                .activityBackgroundTint(plum)            // shows if tile image missing
+                .activityBackgroundTint(bg)              // #1f1f1e, shows if tile missing
                 .activitySystemActionForegroundColor(.black)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -34,7 +33,7 @@ struct CrowWidgetLiveActivity: Widget {
                         if !context.state.landed {
                             ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
                                          countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
-                                .tint(teal)
+                                .tint(.black)
                         }
                     }
                 }
@@ -79,7 +78,7 @@ struct CrowLockScreenView: View {
                     Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
                     ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
                                  countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
-                        .tint(teal)
+                        .tint(.black)
                     Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
                 }
             }
