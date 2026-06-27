@@ -52,7 +52,7 @@ async function startLiveActivityFor(scroll) {
         scrollId: scroll.id,
       },
       alert: {
-        title: 'Important news will be arriving shortly.',
+        title: 'A scroll will be arriving shortly.',
         body: `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
       },
     });
@@ -105,6 +105,46 @@ function pickStreets(scrollId) {
   return picks;
 }
 
+// Reverse-geocode a single point to its street name (Nominatim, same source the
+// client uses to pick origin/destination). Returns null on any failure.
+async function reverseStreet(lat, lng) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=17&addressdetails=1`
+      + `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'SneakyStuff/1.0 (crow flight narration)', 'Accept-Language': 'en-GB' },
+    });
+    if (!res.ok) return null;
+    const a = (await res.json())?.address ?? {};
+    return a.road || a.pedestrian || a.footway || a.neighbourhood || a.suburb || null;
+  } catch { return null; }
+}
+
+// Sample three points along the origin→dest line and reverse-geocode each, so
+// the narrated streets genuinely lie between the two addresses. Stored once on
+// the scroll row; the scheduler reads them. Best-effort — never throws.
+async function computeRouteStreets(scroll) {
+  const aLat = Number(scroll.origin_lat); const aLng = Number(scroll.origin_lng);
+  const bLat = Number(scroll.dest_lat); const bLng = Number(scroll.dest_lng);
+  if (![aLat, aLng, bLat, bLng].every(Number.isFinite)) return;
+  const fracs = [0.30, 0.55, 0.80];
+  const out = [];
+  for (const t of fracs) {
+    const lat = aLat + (bLat - aLat) * t;
+    const lng = aLng + (bLng - aLng) * t;
+    /* eslint-disable no-await-in-loop */
+    const name = await reverseStreet(lat, lng);
+    // Avoid repeating the previous street back-to-back.
+    out.push(name && name !== out[out.length - 1] ? name : null);
+    await new Promise((r) => setTimeout(r, 1100)); // honour Nominatim's 1 req/s
+    /* eslint-enable no-await-in-loop */
+  }
+  if (out.some(Boolean)) {
+    await query(`UPDATE scrolls SET route_streets = $1 WHERE id = $2`,
+      [JSON.stringify(out), scroll.id]).catch(() => {});
+  }
+}
+
 // The street that best sits at `frac` of the way along the origin→dest line.
 // Projects each street onto the segment (lng scaled by cos(lat) so degrees are
 // roughly isotropic) and scores by closeness to the target fraction plus how
@@ -135,7 +175,10 @@ const PHASE_FRAC = { 1: 0.30, 2: 0.55, 3: 0.80 };
 
 function streetMessage(phase, scroll) {
   if (phase === 4) return `coming into land at ${scroll.dest_label || 'its destination'}`;
-  const street = routeStreet(scroll, PHASE_FRAC[phase]) || pickStreets(scroll.id)[phase - 1];
+  // 1) real reverse-geocoded street on the path, 2) nearest curated street,
+  // 3) deterministic Cambridge fallback.
+  const routed = Array.isArray(scroll.route_streets) ? scroll.route_streets[phase - 1] : null;
+  const street = routed || routeStreet(scroll, PHASE_FRAC[phase]) || pickStreets(scroll.id)[phase - 1];
   switch (phase) {
     case 1: return `somewhere near ${street}..`;
     case 2: return `passing over ${street}`;
@@ -159,7 +202,7 @@ function phaseForProgress(p) {
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
     `SELECT s.id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
-            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
         AND EXISTS (
@@ -328,6 +371,8 @@ export async function createScroll({
     ],
   );
   const scroll = rows[0];
+  // Reverse-geocode the streets the crow will pass over (best-effort, async).
+  computeRouteStreets(scroll).catch(() => {});
   // Fire the crow Live Activity on the recipient's device (push-to-start).
   startLiveActivityFor(scroll).catch(() => {});
   return scroll;
@@ -416,13 +461,13 @@ export async function resolveDueScrolls() {
           await sendLiveActivityPush(token, {
             event: 'update',
             contentState: state,
-            alert: { title: `Important news from ${origin}.`, body: preview || 'A crow has arrived' },
+            alert: { title: `News from ${origin}.`, body: preview || 'A crow has arrived' },
           });
         }
       } else {
         // No Live Activity running — fall back to the classic alert push.
         await sendPush(s.recipient_id, {
-          title: `Important news from ${origin}.`,
+          title: `News from ${origin}.`,
           body: preview || 'A crow has arrived',
           url: '/messages?scrolls=1',
           tag: 'scroll-arrival',

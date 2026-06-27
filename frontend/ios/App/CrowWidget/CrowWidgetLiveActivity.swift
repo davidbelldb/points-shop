@@ -12,8 +12,8 @@ private let crowRight = "crow_land_10"
 
 private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     s.landed
-        ? "Important news from \(a.originLabel)."
-        : "Important news will be arriving shortly."
+        ? "News from \(a.originLabel)."
+        : "A scroll will be arriving shortly."
 }
 
 // Subtitle: in flight → "dispatched from …" (or the live street narration in
@@ -45,9 +45,11 @@ struct CrowWidgetLiveActivity: Widget {
                             .font(.headline).foregroundColor(.white)
                         if !context.state.landed {
                             // White so it's visible on the black Dynamic Island.
+                            // Constrained width so it isn't clipped at the edges.
                             ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
                                          countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
                                 .tint(.white)
+                                .frame(maxWidth: 150)
                         }
                     }
                 }
@@ -63,8 +65,24 @@ struct CrowWidgetLiveActivity: Widget {
     }
 }
 
+// A dashed horizontal "flight trail" drawn between the two crows.
+struct DashedLine: View {
+    var color: Color
+    var body: some View {
+        GeometryReader { geo in
+            Path { p in
+                let y = geo.size.height / 2
+                p.move(to: CGPoint(x: 0, y: y))
+                p.addLine(to: CGPoint(x: geo.size.width, y: y))
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 5]))
+        }
+        .frame(height: 12)
+    }
+}
+
 // Lock-screen / banner: tile.png background, black text, a crow at each end of a
-// timeline bar that auto-fills as the flight progresses.
+// dashed flight trail.
 struct CrowLockScreenView: View {
     let context: ActivityViewContext<CrowActivityAttributes>
 
@@ -87,9 +105,7 @@ struct CrowLockScreenView: View {
 
                 HStack(spacing: 10) {
                     Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
-                    ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
-                                 countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
-                        .tint(.black)
+                    DashedLine(color: .black)
                     Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
                 }
             }
