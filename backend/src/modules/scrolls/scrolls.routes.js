@@ -16,8 +16,9 @@ function startResolver() {
   if (resolverStarted) return;
   resolverStarted = true;
   setInterval(() => { resolveDueScrolls().catch(() => {}); }, 5_000);
-  // Narrate each in-flight crow past Cambridge streets as it travels.
-  setInterval(() => { pushStreetSubtitleUpdates().catch(() => {}); }, 5_000);
+  // Narrate each in-flight crow past Cambridge streets as it travels. Polled
+  // tightly so node updates land close to when the progress bar reaches them.
+  setInterval(() => { pushStreetSubtitleUpdates().catch(() => {}); }, 2_000);
 }
 
 export default async function scrollRoutes(fastify) {

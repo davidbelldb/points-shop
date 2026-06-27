@@ -120,16 +120,26 @@ async function reverseStreet(lat, lng) {
   } catch { return null; }
 }
 
-// Sample three points along the origin→dest line and reverse-geocode each, so
-// the narrated streets genuinely lie between the two addresses. Stored once on
-// the scroll row; the scheduler reads them. Best-effort — never throws.
+// Single source of truth: the three waypoint nodes sit at these fractions of the
+// journey. The widget draws nodes here, the geocoder samples streets here, and
+// the scheduler fires each node's update as the progress bar reaches it.
+const WAYPOINT_FRACS = [0.25, 0.50, 0.75];
+// A final "coming into land" beat just before arrival (no node, text only).
+const LANDING_FRAC = 0.92;
+// Fire each update this far ahead of the bar reaching the mark, to absorb poll +
+// push-delivery latency so the node pops exactly as the fill arrives (capped at
+// 10% of the flight so short hops don't fire too early).
+const LEAD_MS = 1800;
+
+// Sample each waypoint along the origin→dest line and reverse-geocode it, so the
+// narrated streets genuinely lie between the two addresses. Stored once on the
+// scroll row; the scheduler reads them. Best-effort — never throws.
 async function computeRouteStreets(scroll) {
   const aLat = Number(scroll.origin_lat); const aLng = Number(scroll.origin_lng);
   const bLat = Number(scroll.dest_lat); const bLng = Number(scroll.dest_lng);
   if (![aLat, aLng, bLat, bLng].every(Number.isFinite)) return;
-  const fracs = [0.30, 0.55, 0.80];
   const out = [];
-  for (const t of fracs) {
+  for (const t of WAYPOINT_FRACS) {
     const lat = aLat + (bLat - aLat) * t;
     const lng = aLng + (bLng - aLng) * t;
     /* eslint-disable no-await-in-loop */
@@ -170,8 +180,8 @@ function routeStreet(scroll, frac) {
   return best?.name ?? null;
 }
 
-// Phases 1–3 narrate streets ~30/55/80% along the route; phase 4 = landing.
-const PHASE_FRAC = { 1: 0.30, 2: 0.55, 3: 0.80 };
+// Phases 1–3 narrate the three waypoint streets; phase 4 = landing approach.
+const PHASE_FRAC = { 1: WAYPOINT_FRACS[0], 2: WAYPOINT_FRACS[1], 3: WAYPOINT_FRACS[2] };
 
 function streetMessage(phase, scroll) {
   if (phase === 4) return `coming into land at ${scroll.dest_label || 'its destination'}`;
@@ -187,14 +197,19 @@ function streetMessage(phase, scroll) {
   }
 }
 
-// Map flight progress (0–1) to a phase. Phases fire at 30/55/80/95% so they're
-// spread across the journey with a clear "landing" beat at the end.
-function phaseForProgress(p) {
-  if (p >= 0.95) return 4;
-  if (p >= 0.80) return 3;
-  if (p >= 0.55) return 2;
-  if (p >= 0.30) return 1;
-  return 0;
+// Highest phase the crow has "reached" right now, fired LEAD_MS early so the
+// node pops as the progress bar's leading edge arrives (not after it passes).
+// Marks: the three waypoint nodes, then the landing-approach beat.
+function reachedPhase(startedAtMs, arrivesAtMs) {
+  const total = Math.max(1, arrivesAtMs - startedAtMs);
+  const lead = Math.min(LEAD_MS, total * 0.1);
+  const at = Date.now() + lead;
+  const marks = [...WAYPOINT_FRACS, LANDING_FRAC];
+  let phase = 0;
+  for (let i = 0; i < marks.length; i += 1) {
+    if (at >= startedAtMs + marks[i] * total) phase = i + 1;
+  }
+  return phase;
 }
 
 // Called on the resolver tick: nudge each in-flight crow's subtitle forward when
@@ -213,9 +228,7 @@ export async function pushStreetSubtitleUpdates() {
     try {
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
-      const total = arrivesAtMs - startedAtMs;
-      const progress = total > 0 ? (Date.now() - startedAtMs) / total : 1;
-      const target = phaseForProgress(progress);
+      const target = reachedPhase(startedAtMs, arrivesAtMs);
       if (target <= (Number(s.la_phase) || 0)) continue;
 
       const state = crowContentState({
