@@ -18,7 +18,47 @@ public class CrowActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "land", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enablePush", returnType: CAPPluginReturnPromise),
     ]
+
+    // Start observing the push-to-start token and every activity's update token,
+    // emitting them to the web layer (see crowActivity.js) which posts them to
+    // the backend. This is what lets the server start/update the crow activity
+    // while the app is closed.
+    @objc func enablePush(_ call: CAPPluginCall) {
+        if #available(iOS 17.2, *) {
+            Task {
+                for await data in Activity<CrowActivityAttributes>.pushToStartTokenUpdates {
+                    let hex = data.map { String(format: "%02x", $0) }.joined()
+                    self.notifyListeners("ptsToken", data: ["token": hex])
+                }
+            }
+        }
+        if #available(iOS 16.2, *) {
+            // Update tokens for activities already running + any started later
+            // (including ones started via push-to-start).
+            Task {
+                for activity in Activity<CrowActivityAttributes>.activities {
+                    self.trackUpdateToken(activity)
+                }
+                for await activity in Activity<CrowActivityAttributes>.activityUpdates {
+                    self.trackUpdateToken(activity)
+                }
+            }
+        }
+        call.resolve()
+    }
+
+    @available(iOS 16.2, *)
+    private func trackUpdateToken(_ activity: Activity<CrowActivityAttributes>) {
+        let scrollId = activity.attributes.scrollId
+        Task {
+            for await tokenData in activity.pushTokenUpdates {
+                let hex = tokenData.map { String(format: "%02x", $0) }.joined()
+                self.notifyListeners("updateToken", data: ["scrollId": scrollId, "token": hex])
+            }
+        }
+    }
 
     @objc func start(_ call: CAPPluginCall) {
         guard #available(iOS 16.1, *) else { call.resolve(); return }

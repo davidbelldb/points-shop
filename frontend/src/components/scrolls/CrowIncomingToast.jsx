@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api.js';
-import { startCrowActivity, landCrowActivity } from '../../lib/crowActivity.js';
-import { useToast } from '../../lib/ToastContext.jsx';
 
 /* In-app "Live Activity": while a crow is in flight to you, a pill sits under
    the header showing how far along its journey it is. The crow walks/flies a
@@ -30,21 +28,11 @@ function fmt(secs) {
 
 export default function CrowIncomingToast() {
   const navigate = useNavigate();
-  const { showToast } = useToast();
-
-  // TEMP diagnostics: surface the Live Activity outcome on-screen.
-  useEffect(() => {
-    const onDebug = (e) => showToast({ title: 'Live Activity', body: String(e.detail || '') });
-    window.addEventListener('crow-activity-debug', onDebug);
-    return () => window.removeEventListener('crow-activity-debug', onDebug);
-  }, [showToast]);
 
   const [arriveAt, setArriveAt] = useState(null); // ms timestamp of arrival
   const [startAt, setStartAt] = useState(null);   // ms timestamp the crow set off
   const [origin, setOrigin] = useState('afar');
-  const [dest, setDest] = useState('');
   const [now, setNow] = useState(Date.now());
-  const activityForRef = useRef(null); // arriveAt we've already started a Live Activity for
   const trackedIdRef = useRef(null);   // id of the crow currently in flight to us
 
   const fetchIncoming = useCallback(async () => {
@@ -57,7 +45,6 @@ export default function CrowIncomingToast() {
       // countdown hit 0:00 (which can be ~15s early).
       if (trackedIdRef.current && !list.some((s) => s.id === trackedIdRef.current)) {
         trackedIdRef.current = null;
-        landCrowActivity();
         window.dispatchEvent(new Event('scrolls:refresh'));
       }
       const soonest = list[0];
@@ -67,22 +54,11 @@ export default function CrowIncomingToast() {
         setArriveAt(arrive);
         setStartAt(arrive - (Number(soonest.flight_seconds) || 0) * 1000);
         setOrigin(soonest.origin_label || 'afar');
-        setDest(soonest.dest_label || '');
       } else {
         setArriveAt(null);
       }
     } catch { /* transient */ }
   }, []);
-
-  // Kick off the native Live Activity once per inbound crow (foreground start).
-  useEffect(() => {
-    if (arriveAt == null) return;
-    if (activityForRef.current === arriveAt) return;
-    const remainingSec = (arriveAt - Date.now()) / 1000;
-    if (remainingSec <= 1) return; // already (almost) here — no point
-    activityForRef.current = arriveAt;
-    startCrowActivity({ seconds: remainingSec, origin, dest });
-  }, [arriveAt, origin, dest]);
 
   useEffect(() => {
     fetchIncoming();

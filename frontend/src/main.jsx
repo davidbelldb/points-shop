@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { Capacitor } from '@capacitor/core';
 import App from './App.jsx';
 import { initNativePush } from './lib/nativePush.js';
+import { enableCrowPush } from './lib/crowActivity.js';
 
 // ── Eager — the core shell + everyday pages (kept small) ─────────────────────
 import HomePage from './pages/HomePage.jsx';
@@ -101,7 +102,7 @@ function NativePush() {
   const { user } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
-    if (user) initNativePush((url) => navigate(url));
+    if (user) { initNativePush((url) => navigate(url)); enableCrowPush(); }
   }, [user, navigate]);
   return null;
 }

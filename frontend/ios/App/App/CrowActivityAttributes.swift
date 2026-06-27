@@ -20,4 +20,5 @@ struct CrowActivityAttributes: ActivityAttributes {
     /// Static info — fixed for the life of one flight.
     var originLabel: String   // road name the crow left from
     var destLabel: String     // road name the crow is heading to
+    var scrollId: String = "" // maps a per-activity update token back to the scroll
 }

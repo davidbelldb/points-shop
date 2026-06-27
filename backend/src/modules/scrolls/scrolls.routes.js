@@ -1,6 +1,7 @@
 import {
   getSettings, getFrames, updateSettings, replaceFrames,
   createScroll, listReceived, listIncoming, unreadCount, markRead, resolveDueScrolls,
+  saveLiveActivityToken,
 } from './scrolls.repo.js';
 import { findOtherUser } from '../chat/chat.repo.js';
 import { buildFlightPath } from './flightPath.js';
@@ -65,6 +66,18 @@ export default async function scrollRoutes(fastify) {
   fastify.get('/api/scrolls/incoming', async (req) => {
     const accountId = getEffectiveAccountId(req);
     return { incoming: await listIncoming(accountId) };
+  });
+
+  // Register a Live Activity push token (push-to-start or per-scroll update).
+  // body: { kind: 'pts' | 'update', token, scrollId? }
+  fastify.post('/api/scrolls/live-activity-token', async (req, reply) => {
+    const accountId = getActualAccountId(req);
+    const { kind, token, scrollId } = req.body ?? {};
+    if ((kind !== 'pts' && kind !== 'update') || !token) {
+      return reply.code(400).send({ error: 'kind (pts|update) and token required' });
+    }
+    await saveLiveActivityToken({ accountId, kind, scrollId: scrollId || null, token });
+    return { ok: true };
   });
 
   fastify.post('/api/scrolls', async (req, reply) => {

@@ -281,6 +281,10 @@ export const api = {
 
   // Wheel of Entertainment — titles for the "what shall we watch?" spinner.
   entertainmentWheel: () => request('/entertainment/wheel'),
+
+  // Crow Live Activity push tokens (push-to-start / per-scroll update).
+  registerLiveActivityToken: (kind, token, scrollId) =>
+    request('/scrolls/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, scrollId }) }),
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
   rewatchGet: (id) => request(`/rewatch/${id}`),
   rewatchSeason: (id, n) => request(`/rewatch/${id}/season/${n}`),

@@ -86,6 +86,79 @@ function buildPayload(payload, badge) {
   return JSON.stringify({ aps, url: payload.url || '/', ...extra });
 }
 
+// Swift encodes Date in Codable as seconds since the reference date
+// 2001-01-01 UTC (unix 978307200). The Live Activity content-state JSON we push
+// must use the same base so `startedAt`/`arrivesAt` decode correctly.
+const REF_DATE = 978307200;
+function toRefDate(ms) { return Math.round((ms / 1000 - REF_DATE) * 1000) / 1000; }
+
+/** Build the crow activity's ContentState in Swift-Codable form. */
+export function crowContentState({ startedAtMs, arrivesAtMs, landed }) {
+  return {
+    startedAt: toRefDate(startedAtMs),
+    arrivesAt: toRefDate(arrivesAtMs),
+    landed: !!landed,
+  };
+}
+
+/**
+ * Send an ActivityKit Live Activity push to a single token.
+ *  - event 'start'  → push-to-start (token is the account's pts token); needs attributes
+ *  - event 'update' → token is the activity's update token; needs content-state
+ *  - event 'end'    → dismiss the activity
+ * Returns the HTTP status (0 on transport failure). Never throws.
+ */
+export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs } = {}) {
+  if (!enabled || !token) return 0;
+  const aps = {
+    timestamp: Math.floor(Date.now() / 1000),
+    event,
+    'content-state': contentState || {},
+  };
+  if (event === 'start') {
+    aps['attributes-type'] = 'CrowActivityAttributes';
+    aps.attributes = attributes || {};
+  }
+  if (alert) aps.alert = alert;
+  if (event === 'end' && dismissalMs) aps['dismissal-date'] = Math.floor(dismissalMs / 1000);
+  const body = JSON.stringify({ aps });
+
+  return new Promise((resolve) => {
+    let client;
+    try {
+      client = http2.connect(HOST);
+      client.on('error', () => resolve(0));
+      const jwt = providerToken();
+      let status = 0;
+      let data = '';
+      const req = client.request({
+        ':method': 'POST',
+        ':path': `/3/device/${token}`,
+        authorization: `bearer ${jwt}`,
+        'apns-topic': `${config.apns.bundleId}.push-type.liveactivity`,
+        'apns-push-type': 'liveactivity',
+        'apns-priority': '10',
+      });
+      req.setEncoding('utf8');
+      req.on('response', (h) => { status = h[':status']; });
+      req.on('data', (c) => { data += c; });
+      req.on('error', () => { try { client.close(); } catch { /* ignore */ } resolve(0); });
+      req.on('end', async () => {
+        if (status !== 200) console.error(`[apns-la] ${event} failed: ${status} ${data}`);
+        if (status === 410 || (status === 400 && /BadDeviceToken/.test(data))) {
+          await query(`DELETE FROM live_activity_tokens WHERE token = $1`, [token]).catch(() => {});
+        }
+        try { client.close(); } catch { /* ignore */ }
+        resolve(status);
+      });
+      req.end(body);
+    } catch {
+      try { if (client) client.close(); } catch { /* ignore */ }
+      resolve(0);
+    }
+  });
+}
+
 /**
  * Send a push to every iOS device an account has registered.
  * Dead tokens (410 / BadDeviceToken) are pruned automatically.

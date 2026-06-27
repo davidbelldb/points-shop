@@ -1,5 +1,60 @@
 import { query, pool } from '../../db.js';
 import { sendPush } from '../notifications/push.js';
+import { sendLiveActivityPush, crowContentState } from '../notifications/apns.js';
+
+// ---------------------------------------------------------------------------
+// Live Activity (crow) push helpers
+// ---------------------------------------------------------------------------
+
+/** Upsert a Live Activity token (push-to-start, or per-scroll update). */
+export async function saveLiveActivityToken({ accountId, kind, scrollId = null, token }) {
+  if (!token) return;
+  await query(
+    `INSERT INTO live_activity_tokens (account_id, kind, scroll_id, token)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (token) DO UPDATE
+       SET account_id = EXCLUDED.account_id, kind = EXCLUDED.kind,
+           scroll_id = EXCLUDED.scroll_id, updated_at = NOW()`,
+    [accountId, kind, scrollId, token],
+  );
+}
+
+async function ptsTokenFor(accountId) {
+  const { rows } = await query(
+    `SELECT token FROM live_activity_tokens
+      WHERE account_id = $1 AND kind = 'pts' ORDER BY updated_at DESC LIMIT 1`,
+    [accountId],
+  );
+  return rows[0]?.token || null;
+}
+
+async function updateTokensFor(scrollId) {
+  const { rows } = await query(
+    `SELECT token FROM live_activity_tokens WHERE scroll_id = $1 AND kind = 'update'`,
+    [scrollId],
+  );
+  return rows.map((r) => r.token);
+}
+
+// Push-to-start the crow activity on the recipient's device (works app-closed).
+async function startLiveActivityFor(scroll) {
+  try {
+    const token = await ptsTokenFor(scroll.recipient_id);
+    if (!token) return;
+    const arrivesAtMs = new Date(scroll.deliver_at).getTime();
+    const startedAtMs = arrivesAtMs - (Number(scroll.flight_seconds) || 0) * 1000;
+    await sendLiveActivityPush(token, {
+      event: 'start',
+      contentState: crowContentState({ startedAtMs, arrivesAtMs, landed: false }),
+      attributes: {
+        originLabel: scroll.origin_label || 'afar',
+        destLabel: scroll.dest_label || '',
+        scrollId: scroll.id,
+      },
+      alert: { title: 'A crow has been dispatched.', body: 'Important news will be arriving shortly' },
+    });
+  } catch { /* best effort */ }
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -140,7 +195,10 @@ export async function createScroll({
       distanceKm, secs, !!simulated,
     ],
   );
-  return rows[0];
+  const scroll = rows[0];
+  // Fire the crow Live Activity on the recipient's device (push-to-start).
+  startLiveActivityFor(scroll).catch(() => {});
+  return scroll;
 }
 
 // Recipient's received scrolls (only those whose crow has actually arrived).
@@ -184,8 +242,16 @@ export async function unreadCount(recipientId) {
   return rows[0]?.n ?? 0;
 }
 
-// Reading a scroll removes it (ephemeral — gone once read).
+// Reading a scroll removes it (ephemeral — gone once read). End any Live
+// Activity for it first so the crow banner dismisses when you open the scroll.
 export async function markRead(scrollId, accountId) {
+  try {
+    const tokens = await updateTokensFor(scrollId);
+    const state = crowContentState({ startedAtMs: Date.now() - 1000, arrivesAtMs: Date.now(), landed: true });
+    for (const token of tokens) {
+      sendLiveActivityPush(token, { event: 'end', contentState: state, dismissalMs: Date.now() }).catch(() => {});
+    }
+  } catch { /* best effort */ }
   await query(
     `DELETE FROM scrolls WHERE id = $1 AND recipient_id = $2`,
     [scrollId, accountId],
@@ -193,24 +259,40 @@ export async function markRead(scrollId, accountId) {
   return { ok: true };
 }
 
-// Delivery resolver: atomically claim scrolls whose crow has just arrived,
-// flip them to delivered, and fire the arrival push. The UPDATE ... RETURNING
-// guarantees each scroll is claimed once even if two timers overlap.
+// Delivery resolver: atomically claim scrolls whose crow has just arrived, flip
+// them to delivered, and announce the arrival. The Live Activity (push-update)
+// is the primary arrival signal now; the classic alert push is only a fallback
+// for recipients with no running activity (e.g. app never registered a token).
 export async function resolveDueScrolls() {
   const { rows } = await query(
     `UPDATE scrolls
         SET delivered = TRUE, delivered_at = NOW(), status = 'delivered'
       WHERE delivered = FALSE AND deliver_at <= NOW()
-      RETURNING id, recipient_id, origin_label`,
+      RETURNING id, recipient_id, origin_label, flight_seconds`,
   );
   for (const s of rows) {
     try {
-      await sendPush(s.recipient_id, {
-        title: 'A crow has arrived',
-        body: `Important news from ${s.origin_label || 'afar'}`,
-        url: '/messages?scrolls=1',
-        tag: 'scroll-arrival',
-      });
+      const tokens = await updateTokensFor(s.id);
+      if (tokens.length) {
+        const arrivesAtMs = Date.now();
+        const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
+        const state = crowContentState({ startedAtMs, arrivesAtMs, landed: true });
+        for (const token of tokens) {
+          await sendLiveActivityPush(token, {
+            event: 'update',
+            contentState: state,
+            alert: { title: 'A crow has arrived.', body: `Important news from ${s.origin_label || 'afar'}` },
+          });
+        }
+      } else {
+        // No Live Activity running — fall back to the classic alert push.
+        await sendPush(s.recipient_id, {
+          title: 'A crow has arrived',
+          body: `Important news from ${s.origin_label || 'afar'}`,
+          url: '/messages?scrolls=1',
+          tag: 'scroll-arrival',
+        });
+      }
     } catch { /* push is best-effort */ }
   }
   return rows.length;
