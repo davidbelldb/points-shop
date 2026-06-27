@@ -52,7 +52,7 @@ async function startLiveActivityFor(scroll) {
         scrollId: scroll.id,
       },
       alert: {
-        title: 'A scroll will be arriving shortly.',
+        title: 'A scroll will shortly be arriving.',
         body: `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
       },
     });
