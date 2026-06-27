@@ -174,7 +174,7 @@ function routeStreet(scroll, frac) {
 const PHASE_FRAC = { 1: 0.30, 2: 0.55, 3: 0.80 };
 
 function streetMessage(phase, scroll) {
-  if (phase === 4) return `coming into land on ${scroll.dest_label || 'its destination'}`;
+  if (phase === 4) return `coming into land at ${scroll.dest_label || 'its destination'}`;
   // 1) real reverse-geocoded street on the path, 2) nearest curated street,
   // 3) deterministic Cambridge fallback.
   const routed = Array.isArray(scroll.route_streets) ? scroll.route_streets[phase - 1] : null;
