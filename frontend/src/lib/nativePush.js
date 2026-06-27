@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { App as CapApp } from '@capacitor/app';
 import { api } from './api.js';
 
 // Native iOS push (APNs) registration. No-op on the web build, where push is
@@ -50,6 +51,17 @@ export async function initNativePush(onOpenUrl) {
       }
       const url = action?.notification?.data?.url;
       if (url && typeof onOpenUrl === 'function') onOpenUrl(url);
+    });
+
+    // Custom-scheme deep links (e.g. tapping the crow Live Activity, which
+    // opens sneakystuff://messages). Strip the scheme/host → in-app path.
+    CapApp.addListener('appUrlOpen', ({ url }) => {
+      if (!url || typeof onOpenUrl !== 'function') return;
+      report('app-url-open', url);
+      try {
+        const path = url.replace(/^sneakystuff:\/\//, '/').replace(/^\/+/, '/');
+        onOpenUrl(path.startsWith('/') ? path : `/${path}`);
+      } catch { /* ignore malformed url */ }
     });
   }
 

@@ -57,6 +57,90 @@ async function startLiveActivityFor(scroll) {
 }
 
 // ---------------------------------------------------------------------------
+// In-flight subtitle updates — the crow is narrated past Cambridge streets as
+// it flies, then "coming into land" near the end. Each scroll advances through
+// four phases; `scrolls.la_phase` records the highest phase already pushed so
+// we never repeat or go backwards.
+// ---------------------------------------------------------------------------
+
+const CAMBRIDGE_STREETS = [
+  'Mill Road', 'Trumpington Street', "King's Parade", 'Hills Road', 'Petty Cury',
+  'Regent Street', 'Castle Street', 'Newmarket Road', 'Chesterton Road', 'Grange Road',
+  'Silver Street', 'Sidney Street', 'Bridge Street', 'Magdalene Street', 'Jesus Lane',
+  'Trumpington Road', 'Madingley Road', 'East Road', 'Burleigh Street', 'Maids Causeway',
+];
+
+// Deterministically pick three distinct streets for a scroll, so the same crow
+// always narrates the same route (no flicker between polls).
+function pickStreets(scrollId) {
+  let h = 0;
+  for (const ch of String(scrollId)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const pool = [...CAMBRIDGE_STREETS];
+  const picks = [];
+  for (let i = 0; i < 3 && pool.length; i += 1) {
+    const idx = h % pool.length;
+    picks.push(pool.splice(idx, 1)[0]);
+    h = (h * 31 + 17) >>> 0;
+  }
+  return picks;
+}
+
+function streetMessage(phase, scroll) {
+  const [a, b, c] = pickStreets(scroll.id);
+  const dest = scroll.dest_label || 'its destination';
+  switch (phase) {
+    case 1: return `somewhere near ${a}..`;
+    case 2: return `passing over ${b}`;
+    case 3: return `spotted over ${c}`;
+    case 4: return `coming into land at ${dest}`;
+    default: return '';
+  }
+}
+
+// Map flight progress (0–1) to a phase. Phases fire at 30/55/80/95% so they're
+// spread across the journey with a clear "landing" beat at the end.
+function phaseForProgress(p) {
+  if (p >= 0.95) return 4;
+  if (p >= 0.80) return 3;
+  if (p >= 0.55) return 2;
+  if (p >= 0.30) return 1;
+  return 0;
+}
+
+// Called on the resolver tick: nudge each in-flight crow's subtitle forward when
+// it crosses into a new phase. Only touches scrolls with a live update token.
+export async function pushStreetSubtitleUpdates() {
+  const { rows } = await query(
+    `SELECT s.id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase
+       FROM scrolls s
+      WHERE s.delivered = FALSE AND s.deliver_at > NOW()
+        AND EXISTS (
+          SELECT 1 FROM live_activity_tokens t
+           WHERE t.scroll_id = s.id AND t.kind = 'update')`,
+  );
+  for (const s of rows) {
+    try {
+      const arrivesAtMs = new Date(s.deliver_at).getTime();
+      const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
+      const total = arrivesAtMs - startedAtMs;
+      const progress = total > 0 ? (Date.now() - startedAtMs) / total : 1;
+      const target = phaseForProgress(progress);
+      if (target <= (Number(s.la_phase) || 0)) continue;
+
+      const state = crowContentState({
+        startedAtMs, arrivesAtMs, landed: false, message: streetMessage(target, s),
+      });
+      const tokens = await updateTokensFor(s.id);
+      for (const token of tokens) {
+        await sendLiveActivityPush(token, { event: 'update', contentState: state });
+      }
+      await query(`UPDATE scrolls SET la_phase = $1 WHERE id = $2`, [target, s.id]);
+    } catch { /* best effort per scroll */ }
+  }
+  return rows.length;
+}
+
+// ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 

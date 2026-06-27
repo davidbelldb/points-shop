@@ -1,7 +1,7 @@
 import {
   getSettings, getFrames, updateSettings, replaceFrames,
   createScroll, listReceived, listIncoming, unreadCount, markRead, resolveDueScrolls,
-  saveLiveActivityToken,
+  pushStreetSubtitleUpdates, saveLiveActivityToken,
 } from './scrolls.repo.js';
 import { findOtherUser } from '../chat/chat.repo.js';
 import { buildFlightPath } from './flightPath.js';
@@ -16,6 +16,8 @@ function startResolver() {
   if (resolverStarted) return;
   resolverStarted = true;
   setInterval(() => { resolveDueScrolls().catch(() => {}); }, 5_000);
+  // Narrate each in-flight crow past Cambridge streets as it travels.
+  setInterval(() => { pushStreetSubtitleUpdates().catch(() => {}); }, 5_000);
 }
 
 export default async function scrollRoutes(fastify) {

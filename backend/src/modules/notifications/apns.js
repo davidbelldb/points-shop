@@ -92,12 +92,14 @@ function buildPayload(payload, badge) {
 const REF_DATE = 978307200;
 function toRefDate(ms) { return Math.round((ms / 1000 - REF_DATE) * 1000) / 1000; }
 
-/** Build the crow activity's ContentState in Swift-Codable form. */
-export function crowContentState({ startedAtMs, arrivesAtMs, landed }) {
+/** Build the crow activity's ContentState in Swift-Codable form. `message` is
+ *  always included (Swift requires the key) — "" means "use the default subtitle". */
+export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '' }) {
   return {
     startedAt: toRefDate(startedAtMs),
     arrivesAt: toRefDate(arrivesAtMs),
     landed: !!landed,
+    message: message || '',
   };
 }
 

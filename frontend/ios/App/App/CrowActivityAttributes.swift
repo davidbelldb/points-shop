@@ -15,6 +15,9 @@ struct CrowActivityAttributes: ActivityAttributes {
         var arrivesAt: Date
         /// Flips true once the scroll has been delivered.
         var landed: Bool
+        /// Server-driven subtitle (street-name progress updates). The backend
+        /// always sends this; "" means "use the default subtitle".
+        var message: String = ""
     }
 
     /// Static info — fixed for the life of one flight.
