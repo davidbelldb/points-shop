@@ -38,12 +38,11 @@ const WORDS = [
 
 /**
  * Returns the word for `date` (YYYY-MM-DD), assigning one if not yet set.
- * Words are drawn from WORDS in a non-repeating cycle: every word appears
- * exactly once per cycle before any word is reused. Within each cycle the
- * order is random (shuffled fresh each time a new cycle starts).
  *
- * Race-safe: uses INSERT … ON CONFLICT DO NOTHING so concurrent requests
- * for the same date always converge on a single word.
+ * Words are drawn from dirty_wordle_word_bank. Every word is used exactly
+ * once before any repeats — when the bank is exhausted it resets and a new
+ * cycle begins. Selection is atomic in the DB via FOR UPDATE SKIP LOCKED,
+ * so concurrent requests for different dates can never claim the same word.
  */
 async function getOrAssignWord(date) {
   // 1. Return early if already assigned
@@ -53,25 +52,38 @@ async function getOrAssignWord(date) {
   );
   if (existing[0]) return existing[0].word;
 
-  // 2. Determine current cycle and which words it has already used
-  const { rows: allRows } = await query(
-    `SELECT word, cycle FROM dirty_wordle_schedule ORDER BY date ASC`,
-  );
-
-  const totalUsed  = allRows.length;
-  const cycle      = Math.floor(totalUsed / WORDS.length) + 1;
-  const cycleStart = (cycle - 1) * WORDS.length;
-  const usedInCycle = new Set(allRows.slice(cycleStart).map(r => r.word));
-
-  // 3. Build candidate pool and pick a random one
-  const candidates = WORDS.filter(w => !usedInCycle.has(w));
-  if (candidates.length === 0) {
-    // Shouldn't happen (cycle boundary handled above), but fall back safely
-    return WORDS[Math.floor(Math.random() * WORDS.length)];
+  // 2. Atomically claim a random available word from the bank
+  async function claimWord() {
+    const { rows } = await query(
+      `UPDATE dirty_wordle_word_bank
+       SET used_on = $1
+       WHERE word = (
+         SELECT word FROM dirty_wordle_word_bank
+         WHERE used_on IS NULL
+         ORDER BY random()
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING word`,
+      [date],
+    );
+    return rows[0]?.word ?? null;
   }
-  const word = candidates[Math.floor(Math.random() * candidates.length)];
 
-  // 4. Insert — if another request beat us to it, silently ignore and re-read
+  let word = await claimWord();
+
+  // 3. Bank exhausted — reset for a new cycle and try once more
+  if (!word) {
+    await query(`UPDATE dirty_wordle_word_bank SET used_on = NULL`);
+    word = await claimWord();
+  }
+
+  if (!word) throw new Error('dirty-wordle: word bank empty after reset');
+
+  // 4. Determine cycle number and record in schedule
+  const { rows: totalRows } = await query(`SELECT COUNT(*) AS n FROM dirty_wordle_schedule`);
+  const cycle = Math.floor(Number(totalRows[0].n) / WORDS.length) + 1;
+
   await query(
     `INSERT INTO dirty_wordle_schedule (date, word, cycle)
      VALUES ($1, $2, $3)
@@ -79,10 +91,19 @@ async function getOrAssignWord(date) {
     [date, word, cycle],
   );
 
+  // 5. Re-read in case two requests raced on the same date — release our
+  //    bank claim if another request's word won the schedule slot.
   const { rows: final } = await query(
     `SELECT word FROM dirty_wordle_schedule WHERE date = $1`,
     [date],
   );
+  if (final[0].word !== word) {
+    await query(
+      `UPDATE dirty_wordle_word_bank SET used_on = NULL WHERE word = $1`,
+      [word],
+    );
+  }
+
   return final[0].word;
 }
 
