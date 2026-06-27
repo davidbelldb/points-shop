@@ -13,7 +13,7 @@ private let crowRight = "crow_land_10"
 private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     s.landed
         ? "News from \(a.originLabel)."
-        : "A scroll will be arriving shortly."
+        : "A scroll will shortly be arriving."
 }
 
 // Subtitle: in flight → "dispatched from …" (or the live street narration in
@@ -79,7 +79,7 @@ struct DashedLine: View {
                 p.move(to: CGPoint(x: 0, y: y))
                 p.addLine(to: CGPoint(x: geo.size.width, y: y))
             }
-            .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [4, 7]))
+            .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 7]))
         }
         .frame(height: 12)
     }
@@ -116,7 +116,7 @@ struct CrowLockScreenView: View {
                     ZStack {
                         DashedLine(color: .black)
                         if context.state.landed {
-                            Capsule().fill(Color.black).frame(height: 4)   // arrived → full solid
+                            Capsule().fill(Color.black).frame(height: 3)   // arrived → full solid
                         } else {
                             ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
                                          countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
