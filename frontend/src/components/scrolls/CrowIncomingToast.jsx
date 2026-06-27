@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api.js';
 import { startCrowActivity, landCrowActivity } from '../../lib/crowActivity.js';
+import { useToast } from '../../lib/ToastContext.jsx';
 
 /* In-app "Live Activity": while a crow is in flight to you, a pill sits under
    the header showing how far along its journey it is. The crow walks/flies a
@@ -29,6 +30,15 @@ function fmt(secs) {
 
 export default function CrowIncomingToast() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  // TEMP diagnostics: surface the Live Activity outcome on-screen.
+  useEffect(() => {
+    const onDebug = (e) => showToast({ title: 'Live Activity', body: String(e.detail || '') });
+    window.addEventListener('crow-activity-debug', onDebug);
+    return () => window.removeEventListener('crow-activity-debug', onDebug);
+  }, [showToast]);
+
   const [arriveAt, setArriveAt] = useState(null); // ms timestamp of arrival
   const [startAt, setStartAt] = useState(null);   // ms timestamp the crow set off
   const [origin, setOrigin] = useState('afar');

@@ -7,21 +7,25 @@ const Native = registerPlugin('CrowActivity');
 
 const native = () => Capacitor.isNativePlatform();
 
-// Temporary diagnostics — mirror the outcome to the backend logs so we can see
-// whether the native plugin is reached and whether iOS accepted the activity.
+// Temporary diagnostics — mirror the outcome to the backend logs AND broadcast
+// an on-screen message (see the listener in CrowIncomingToast) so we can see
+// exactly what happens without reading server logs.
 function report(event, detail) {
   try { api.apnsDebug(event, detail == null ? null : String(detail)); } catch { /* ignore */ }
+  try { window.dispatchEvent(new CustomEvent('crow-activity-debug', { detail: `${event}${detail ? ': ' + detail : ''}` })); } catch { /* ignore */ }
 }
 
 /** Begin a flight: `seconds` until arrival, plus origin/dest labels. */
 export async function startCrowActivity({ seconds, origin, dest }) {
   if (!native()) return;
-  report('crow-activity-start-call', `seconds=${Math.round(seconds || 0)} plugin=${Capacitor.isPluginAvailable('CrowActivity')}`);
+  const available = Capacitor.isPluginAvailable('CrowActivity');
+  report('start-call', `${Math.round(seconds || 0)}s · plugin=${available}`);
+  if (!available) return; // plugin not registered — nothing to call
   try {
     const r = await Native.start({ seconds: Math.max(0, seconds || 0), origin: origin || '', dest: dest || '' });
-    report('crow-activity-start-ok', `id=${r?.id ?? '?'}`);
+    report('start-ok', `id=${r?.id ?? '?'}`);
   } catch (e) {
-    report('crow-activity-start-failed', e?.message || String(e));
+    report('start-failed', e?.message || String(e));
   }
 }
 
