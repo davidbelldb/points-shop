@@ -67,7 +67,7 @@ export default function SneakyButtonHomeSection() {
           <img
             src={media.url}
             alt={`A surprise ${media.kind}`}
-            className="max-h-80 w-full object-contain"
+            className="max-h-80 w-full object-contain grayscale"
             loading="lazy"
             onError={handleImgError}
           />
