@@ -7,5 +7,9 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>ImperialBlack-zr5A0.ttf</string>
+	</array>
 </dict>
 </plist>
