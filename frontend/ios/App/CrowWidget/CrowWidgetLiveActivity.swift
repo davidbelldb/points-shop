@@ -79,7 +79,7 @@ struct DashedLine: View {
                 p.move(to: CGPoint(x: 0, y: y))
                 p.addLine(to: CGPoint(x: geo.size.width, y: y))
             }
-            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 5]))
+            .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [4, 7]))
         }
         .frame(height: 12)
     }
@@ -116,7 +116,7 @@ struct CrowLockScreenView: View {
                     ZStack {
                         DashedLine(color: .black)
                         if context.state.landed {
-                            Capsule().fill(Color.black).frame(height: 2)   // arrived → full solid
+                            Capsule().fill(Color.black).frame(height: 4)   // arrived → full solid
                         } else {
                             ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
                                          countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
