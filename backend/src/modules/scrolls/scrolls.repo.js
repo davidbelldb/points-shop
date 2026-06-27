@@ -51,7 +51,10 @@ async function startLiveActivityFor(scroll) {
         destLabel: scroll.dest_label || '',
         scrollId: scroll.id,
       },
-      alert: { title: 'A crow has been dispatched.', body: 'Important news will be arriving shortly' },
+      alert: {
+        title: 'Important news will be arriving shortly.',
+        body: `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
+      },
     });
   } catch { /* best effort */ }
 }
@@ -63,36 +66,80 @@ async function startLiveActivityFor(scroll) {
 // we never repeat or go backwards.
 // ---------------------------------------------------------------------------
 
+// Cambridge streets with approximate centre coordinates, so the crow can be
+// narrated past places that genuinely lie between origin and destination.
 const CAMBRIDGE_STREETS = [
-  'Mill Road', 'Trumpington Street', "King's Parade", 'Hills Road', 'Petty Cury',
-  'Regent Street', 'Castle Street', 'Newmarket Road', 'Chesterton Road', 'Grange Road',
-  'Silver Street', 'Sidney Street', 'Bridge Street', 'Magdalene Street', 'Jesus Lane',
-  'Trumpington Road', 'Madingley Road', 'East Road', 'Burleigh Street', 'Maids Causeway',
+  { name: 'Mill Road',           lat: 52.1985, lng: 0.1390 },
+  { name: 'Trumpington Street',  lat: 52.2010, lng: 0.1180 },
+  { name: "King's Parade",       lat: 52.2042, lng: 0.1175 },
+  { name: 'Hills Road',          lat: 52.1930, lng: 0.1370 },
+  { name: 'Petty Cury',          lat: 52.2055, lng: 0.1205 },
+  { name: 'Regent Street',       lat: 52.2010, lng: 0.1270 },
+  { name: 'Castle Street',       lat: 52.2110, lng: 0.1140 },
+  { name: 'Newmarket Road',      lat: 52.2120, lng: 0.1500 },
+  { name: 'Chesterton Road',     lat: 52.2130, lng: 0.1280 },
+  { name: 'Grange Road',         lat: 52.2040, lng: 0.1010 },
+  { name: 'Silver Street',       lat: 52.2020, lng: 0.1150 },
+  { name: 'Sidney Street',       lat: 52.2070, lng: 0.1210 },
+  { name: 'Bridge Street',       lat: 52.2090, lng: 0.1180 },
+  { name: 'Magdalene Street',    lat: 52.2095, lng: 0.1160 },
+  { name: 'Jesus Lane',          lat: 52.2080, lng: 0.1240 },
+  { name: 'Trumpington Road',    lat: 52.1900, lng: 0.1230 },
+  { name: 'Madingley Road',      lat: 52.2130, lng: 0.0950 },
+  { name: 'East Road',           lat: 52.2055, lng: 0.1340 },
+  { name: 'Burleigh Street',     lat: 52.2060, lng: 0.1320 },
+  { name: 'Maids Causeway',      lat: 52.2085, lng: 0.1290 },
 ];
 
-// Deterministically pick three distinct streets for a scroll, so the same crow
-// always narrates the same route (no flicker between polls).
+// Deterministic fallback when the scroll has no usable coordinates: three
+// distinct streets, stable for the life of one crow.
 function pickStreets(scrollId) {
   let h = 0;
   for (const ch of String(scrollId)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const pool = [...CAMBRIDGE_STREETS];
+  const pool = CAMBRIDGE_STREETS.map((s) => s.name);
   const picks = [];
   for (let i = 0; i < 3 && pool.length; i += 1) {
-    const idx = h % pool.length;
-    picks.push(pool.splice(idx, 1)[0]);
+    picks.push(pool.splice(h % pool.length, 1)[0]);
     h = (h * 31 + 17) >>> 0;
   }
   return picks;
 }
 
+// The street that best sits at `frac` of the way along the origin→dest line.
+// Projects each street onto the segment (lng scaled by cos(lat) so degrees are
+// roughly isotropic) and scores by closeness to the target fraction plus how
+// far it strays from the flight path. Returns null if coords are unusable.
+function routeStreet(scroll, frac) {
+  const aLat = Number(scroll.origin_lat); const aLng = Number(scroll.origin_lng);
+  const bLat = Number(scroll.dest_lat); const bLng = Number(scroll.dest_lng);
+  if (![aLat, aLng, bLat, bLng].every(Number.isFinite)) return null;
+  const k = Math.cos((aLat * Math.PI) / 180) || 1;
+  const ax = aLng * k; const ay = aLat;
+  const dx = bLng * k - ax; const dy = bLat - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return null;
+  let best = null;
+  for (const s of CAMBRIDGE_STREETS) {
+    const px = s.lng * k; const py = s.lat;
+    const t = ((px - ax) * dx + (py - ay) * dy) / len2;
+    if (t < 0.05 || t > 0.95) continue;            // must be genuinely en route
+    const dist = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+    const cost = Math.abs(t - frac) + dist * 4;     // path-proximity weighted
+    if (!best || cost < best.cost) best = { name: s.name, cost };
+  }
+  return best?.name ?? null;
+}
+
+// Phases 1–3 narrate streets ~30/55/80% along the route; phase 4 = landing.
+const PHASE_FRAC = { 1: 0.30, 2: 0.55, 3: 0.80 };
+
 function streetMessage(phase, scroll) {
-  const [a, b, c] = pickStreets(scroll.id);
-  const dest = scroll.dest_label || 'its destination';
+  if (phase === 4) return `coming into land at ${scroll.dest_label || 'its destination'}`;
+  const street = routeStreet(scroll, PHASE_FRAC[phase]) || pickStreets(scroll.id)[phase - 1];
   switch (phase) {
-    case 1: return `somewhere near ${a}..`;
-    case 2: return `passing over ${b}`;
-    case 3: return `spotted over ${c}`;
-    case 4: return `coming into land at ${dest}`;
+    case 1: return `somewhere near ${street}..`;
+    case 2: return `passing over ${street}`;
+    case 3: return `spotted over ${street}`;
     default: return '';
   }
 }
@@ -111,7 +158,8 @@ function phaseForProgress(p) {
 // it crosses into a new phase. Only touches scrolls with a live update token.
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
-    `SELECT s.id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase
+    `SELECT s.id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
         AND EXISTS (
@@ -352,27 +400,30 @@ export async function resolveDueScrolls() {
     `UPDATE scrolls
         SET delivered = TRUE, delivered_at = NOW(), status = 'delivered'
       WHERE delivered = FALSE AND deliver_at <= NOW()
-      RETURNING id, recipient_id, origin_label, flight_seconds`,
+      RETURNING id, recipient_id, origin_label, flight_seconds, body`,
   );
   for (const s of rows) {
     try {
+      const origin = s.origin_label || 'afar';
+      // The scroll's own text becomes the landed subtitle (widget truncates).
+      const preview = (s.body || '').replace(/\s+/g, ' ').trim().slice(0, 140);
       const tokens = await updateTokensFor(s.id);
       if (tokens.length) {
         const arrivesAtMs = Date.now();
         const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
-        const state = crowContentState({ startedAtMs, arrivesAtMs, landed: true });
+        const state = crowContentState({ startedAtMs, arrivesAtMs, landed: true, message: preview });
         for (const token of tokens) {
           await sendLiveActivityPush(token, {
             event: 'update',
             contentState: state,
-            alert: { title: 'A crow has arrived.', body: `Important news from ${s.origin_label || 'afar'}` },
+            alert: { title: `Important news from ${origin}.`, body: preview || 'A crow has arrived' },
           });
         }
       } else {
         // No Live Activity running — fall back to the classic alert push.
         await sendPush(s.recipient_id, {
-          title: 'A crow has arrived',
-          body: `Important news from ${s.origin_label || 'afar'}`,
+          title: `Important news from ${origin}.`,
+          body: preview || 'A crow has arrived',
           url: '/messages?scrolls=1',
           tag: 'scroll-arrival',
         });

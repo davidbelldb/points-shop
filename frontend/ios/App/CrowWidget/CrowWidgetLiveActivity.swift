@@ -10,14 +10,19 @@ private let deepLink = URL(string: "sneakystuff://messages")
 private let crowLeft = "crow_land_00"
 private let crowRight = "crow_land_10"
 
-private func title(_ landed: Bool) -> String {
-    landed ? "A crow has arrived." : "A crow has been dispatched."
+private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
+    s.landed
+        ? "Important news from \(a.originLabel)."
+        : "Important news will be arriving shortly."
 }
 
-// Subtitle: server-driven (street-name updates) when present, else a sensible default.
+// Subtitle: in flight → "dispatched from …" (or the live street narration in
+// `message`); landed → the scroll's text (passed in `message`).
 private func subtitle(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
-    if !s.message.isEmpty { return s.message }
-    return s.landed ? "Important news from \(a.originLabel)" : "Important news will be arriving shortly"
+    if s.landed {
+        return s.message.isEmpty ? "A crow has arrived" : s.message
+    }
+    return s.message.isEmpty ? "A crow has been dispatched from \(a.originLabel)" : s.message
 }
 
 struct CrowWidgetLiveActivity: Widget {
@@ -36,7 +41,7 @@ struct CrowWidgetLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 6) {
-                        Text(title(context.state.landed))
+                        Text(title(context.state, context.attributes))
                             .font(.headline).foregroundColor(.white)
                         if !context.state.landed {
                             // White so it's visible on the black Dynamic Island.
@@ -67,7 +72,7 @@ struct CrowLockScreenView: View {
         ZStack {
             Image("tile").resizable().scaledToFill()
             VStack(spacing: 8) {
-                Text(title(context.state.landed))
+                Text(title(context.state, context.attributes))
                     .font(.custom("ImperialBlack", size: 22))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
@@ -77,6 +82,8 @@ struct CrowLockScreenView: View {
                     .foregroundColor(.black)
                     .opacity(0.85)
                     .multilineTextAlignment(.center)
+                    .lineLimit(1)                 // landed scroll text → one line…
+                    .truncationMode(.tail)        // …with a trailing ellipsis
 
                 HStack(spacing: 10) {
                     Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
