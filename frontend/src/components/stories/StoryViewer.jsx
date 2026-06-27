@@ -728,7 +728,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
       {/* Footer — author sees "Seen by …", recipient gets reply controls. */}
       <div
         data-story-controls
-        className="space-y-2 px-3 pt-2 pb-3 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+        className="relative z-30 space-y-2 px-3 pt-2 pb-3 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
         style={{ transform: kbHeight ? `translateY(-${kbHeight}px)` : undefined, transition: 'transform 0.25s ease-out' }}
       >
         {isMine ? (
