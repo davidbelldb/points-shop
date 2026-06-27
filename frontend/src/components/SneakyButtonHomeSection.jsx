@@ -63,7 +63,7 @@ export default function SneakyButtonHomeSection() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {media && (
-        <div className="overflow-hidden rounded-2xl bg-neutral-100 dark:bg-neutral-900">
+        <div className="overflow-hidden rounded-2xl bg-[#1f1f1e]">
           <img
             src={media.url}
             alt={`A surprise ${media.kind}`}
