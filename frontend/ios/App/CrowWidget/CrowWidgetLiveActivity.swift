@@ -43,14 +43,18 @@ struct CrowWidgetLiveActivity: Widget {
                     VStack(spacing: 6) {
                         Text(title(context.state, context.attributes))
                             .font(.headline).foregroundColor(.white)
-                        if !context.state.landed {
-                            // White so it's visible on the black Dynamic Island.
-                            // Constrained width so it isn't clipped at the edges.
-                            ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
-                                         countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
-                                .tint(.white)
-                                .frame(maxWidth: 150)
+                        // White so it's visible on the black Dynamic Island.
+                        // Stays put once landed (shown full), just no longer animates.
+                        Group {
+                            if context.state.landed {
+                                Capsule().fill(Color.white).frame(height: 4)
+                            } else {
+                                ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
+                                             countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                                    .tint(.white)
+                            }
                         }
+                        .frame(maxWidth: 195)
                     }
                 }
             } compactLeading: {
@@ -102,10 +106,24 @@ struct CrowLockScreenView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(1)                 // landed scroll text → one line…
                     .truncationMode(.tail)        // …with a trailing ellipsis
+                    .padding(.horizontal, 20)     // truncate ~6 chars sooner, off the edge
 
                 HStack(spacing: 10) {
                     Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
-                    DashedLine(color: .black)
+                    // Dashed trail that fills in solid black, left → right, as the
+                    // crow flies. The auto-advancing ProgressView draws the solid
+                    // fill; the dashes show ahead of it.
+                    ZStack {
+                        DashedLine(color: .black)
+                        if context.state.landed {
+                            Capsule().fill(Color.black).frame(height: 2)   // arrived → full solid
+                        } else {
+                            ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
+                                         countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+                                .tint(.black)
+                        }
+                    }
+                    .frame(height: 12)
                     Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
                 }
             }
