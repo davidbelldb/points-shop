@@ -11,6 +11,7 @@
 		3334C95E2FEEDC15002EBBE0 /* SneakyNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3334C9572FEEDC15002EBBE0 /* SneakyNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		33634C8A2FEEE8B100071ADD /* CrowActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */; };
 		33634C8B2FEEE97D00071ADD /* CrowActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */; };
+		33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C922FEFF90F00071ADD /* MainViewController.swift */; };
 		33FD33FF2FEEE5D50008C86C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */; };
 		33FD34012FEEE5D50008C86C /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD34002FEEE5D50008C86C /* SwiftUI.framework */; };
 		33FD34122FEEE5D60008C86C /* CrowWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -61,6 +62,7 @@
 		3310DE832FE9277900A380A3 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		3334C9572FEEDC15002EBBE0 /* SneakyNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SneakyNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrowActivityAttributes.swift; sourceTree = "<group>"; };
+		33634C922FEFF90F00071ADD /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrowWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		33FD34002FEEE5D50008C86C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -160,6 +162,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				33634C922FEFF90F00071ADD /* MainViewController.swift */,
 				33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */,
 				33FD34172FEEE6180008C86C /* CrowActivityPlugin.swift */,
 				3310DE832FE9277900A380A3 /* App.entitlements */,
@@ -343,6 +346,7 @@
 				33FD34182FEEE6180008C86C /* CrowActivityPlugin.swift in Sources */,
 				33634C8A2FEEE8B100071ADD /* CrowActivityAttributes.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -391,7 +395,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -432,7 +436,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -473,7 +477,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -481,7 +485,7 @@
 				INFOPLIST_FILE = CrowWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CrowWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -516,7 +520,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -524,7 +528,7 @@
 				INFOPLIST_FILE = CrowWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CrowWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -661,7 +665,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -685,7 +689,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;

@@ -11,8 +11,8 @@ import SwiftUI
 @main
 struct CrowWidgetBundle: WidgetBundle {
     var body: some Widget {
-        CrowWidget()
-        CrowWidgetControl()
+        // Only the Live Activity — the template's static + control widgets were
+        // removed to rule them out as a cause of the activity not rendering.
         CrowWidgetLiveActivity()
     }
 }
