@@ -73,23 +73,28 @@ function parseResult(SDK, result, displaySyllables, floor) {
       }
     }
   } catch { /* fall back to overall */ }
-  const syllables = displaySyllables.map((text, i) => ({
-    text, score: stretch(azure.length === displaySyllables.length ? azure[i] : overall, floor),
-  }));
+  // Map each of our display syllables to Azure's nearest syllable by position,
+  // so counts needn't match exactly — avoids the whole word collapsing to one
+  // colour ("all green or all red") when the segmentation differs.
+  const n = displaySyllables.length;
+  const raw = azure.length
+    ? displaySyllables.map((_, i) => azure[Math.min(azure.length - 1, Math.floor((i * azure.length) / n))])
+    : displaySyllables.map(() => overall);
+  const syllables = displaySyllables.map((text, i) => ({ text, score: stretch(raw[i], floor) }));
   // Word score = average of the syllables actually shown, so number and colour agree.
-  const score = Math.round(syllables.reduce((a, s) => a + s.score, 0) / syllables.length);
+  const score = Math.round(syllables.reduce((a, s) => a + s.score, 0) / n);
   return { score, syllables };
 }
 
-// Assess one word with its own fresh recognizer (proven to make the real Azure
-// round-trip and score; a reused recognizer silently returns NoMatch). Always
-// resolves — auto-submits whatever was heard (nothing → 0).
-async function assessWord(word, displaySyllables, floor, windowMs) {
+// Assess one word with its own fresh recognizer (a reused recognizer silently
+// returns NoMatch). Reuses a shared auth token. Returns `heard:false` when Azure
+// didn't actually recognise speech, so the caller can retry rather than burn a 0.
+async function assessWord(word, displaySyllables, floor, token) {
+  const miss = { score: 0, syllables: displaySyllables.map((t) => ({ text: t, score: 0 })), heard: false };
   try {
     const mod = await loadSdk();
     const SDK = mod.SpeechConfig ? mod : (mod.default ?? mod); // CJS/ESM interop
-    const { token, region } = await api.jstwSpeechToken();
-    const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region);
+    const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token.token, token.region);
     speechConfig.speechRecognitionLanguage = 'en-GB';
     const audioConfig = SDK.AudioConfig.fromDefaultMicrophoneInput();
     // enableMiscue OFF — on single words it wrongly marks them "omitted" (→ 0).
@@ -104,13 +109,14 @@ async function assessWord(word, displaySyllables, floor, windowMs) {
     const result = await new Promise((resolve) => {
       let done = false;
       const finish = (r) => { if (done) return; done = true; clearTimeout(t); resolve(r); };
-      // Backstop so a hung recognition can't freeze the game.
-      const t = setTimeout(() => finish(null), Math.max(8000, windowMs + 8000));
+      const t = setTimeout(() => finish(null), 15000);
       recognizer.recognizeOnceAsync((r) => finish(r), () => finish(null));
     }).finally(() => { try { recognizer.close(); } catch { /* ignore */ } });
-    return parseResult(SDK, result, displaySyllables, floor);
+    const heard = !!(result && result.reason === SDK.ResultReason.RecognizedSpeech);
+    if (!heard) return miss;
+    return { ...parseResult(SDK, result, displaySyllables, floor), heard: true };
   } catch {
-    return { score: 0, syllables: displaySyllables.map((t) => ({ text: t, score: 0 })) };
+    return miss;
   }
 }
 
@@ -315,6 +321,7 @@ export default function JustSayTheWordPage() {
   const floorRef = useRef(0);
   const tickRef = useRef(null);
   const cancelledRef = useRef(false);
+  const tokenRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -372,15 +379,27 @@ export default function JustSayTheWordPage() {
     if (cancelledRef.current || !words) return;
     const next = words.find((w) => !doneIdxRef.current.has(w.word_index));
     if (!next) { setPhase('finished'); return; }
-    const windowMs = countdownSecs * 1000;
     setActive(null); setRevealed(0); setError(null);
-    setCountdown(countdownSecs);
-    if (tickRef.current) clearInterval(tickRef.current);
-    tickRef.current = setInterval(() => setCountdown((c) => (c == null ? c : Math.max(0, c - 1))), 1000);
 
-    const res = await assessWord(next.word, next.syllables, floorRef.current, windowMs);
-    if (cancelledRef.current) return;
-    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+    // Up to 3 goes if Azure doesn't actually hear it (mic warm-up / hiccup) —
+    // a genuine miss shouldn't be scored 0 just because of a flaky recognition.
+    let res = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      setCountdown(countdownSecs);
+      if (tickRef.current) clearInterval(tickRef.current);
+      tickRef.current = setInterval(() => setCountdown((c) => (c == null ? c : Math.max(0, c - 1))), 1000);
+      res = await assessWord(next.word, next.syllables, floorRef.current, tokenRef.current);
+      if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+      if (cancelledRef.current) return;
+      if (res.heard) break;
+      // Didn't catch it — refresh the token (in case it lapsed) and let them retry.
+      setCountdown(null);
+      setError('Didn’t catch that — go again');
+      try { tokenRef.current = await api.jstwSpeechToken(); } catch { /* keep old */ }
+      await new Promise((r) => setTimeout(r, 600));
+      if (cancelledRef.current) return;
+      setError(null);
+    }
     setCountdown(null);
     await revealSyllables(res);
 
@@ -395,13 +414,19 @@ export default function JustSayTheWordPage() {
     runNext();
   }, [words, countdownSecs, revealSyllables, today]);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     if (phase === 'running') return;
     setError(null);
     hapticTap();
-    cancelledRef.current = false;
     setPhase('running');
-    runNext();
+    try {
+      tokenRef.current = await api.jstwSpeechToken();   // one token for the whole game
+      cancelledRef.current = false;
+      runNext();
+    } catch (e) {
+      setPhase('idle');
+      setError(/not configured|503/i.test(e?.message) ? 'Speech scoring isn’t switched on yet.' : 'Couldn’t reach the speech service — try again.');
+    }
   }, [phase, runNext]);
 
   const totalToday = done.reduce((a, d) => a + Number(d.points), 0);
