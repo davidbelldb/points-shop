@@ -27,6 +27,16 @@ const PTS = [[100, 16], [80, 12], [60, 8], [40, 4], [0, 0]];
 function pointsForScore(s) { for (const [t, p] of PTS) if (s >= t) return p; return 0; }
 function colourForScore(s) { return s >= 80 ? GOOD : s >= 60 ? OK : BAD; }
 
+// Azure's en-GB grading is top-heavy — even sloppy attempts cluster at 95–100.
+// Stretch maps [floor,100] → [0,100] so mistakes actually drop the score. A
+// higher floor = stricter. `floor` is admin-tunable (jstw_config.score_floor).
+function stretch(raw, floor) {
+  const s = Math.max(0, Math.min(100, Number(raw) || 0));
+  const f = Math.max(0, Math.min(95, Number(floor) || 0));
+  if (s <= f) return 0;
+  return Math.max(0, Math.min(100, Math.round(((s - f) / (100 - f)) * 100)));
+}
+
 function getTodayDate() {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -47,54 +57,68 @@ function loadSdk() {
   return _sdkPromise;
 }
 
-async function assessPronunciation(word, displaySyllables) {
+// Open one mic session (reused across every word so the mic stays live — no
+// per-word open/close flakiness). `windowMs` is the per-word countdown; Azure's
+// initial-silence timeout enforces it (don't speak in time → auto-submitted).
+async function createSession(windowMs) {
   const mod = await loadSdk();
   const SDK = mod.SpeechConfig ? mod : (mod.default ?? mod); // CJS/ESM interop
   const { token, region } = await api.jstwSpeechToken();
-
   const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region);
   speechConfig.speechRecognitionLanguage = 'en-GB';
+  speechConfig.setProperty(SDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, String(Math.max(1000, windowMs)));
+  speechConfig.setProperty(SDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, '600');
   const audioConfig = SDK.AudioConfig.fromDefaultMicrophoneInput();
+  const recognizer = new SDK.SpeechRecognizer(speechConfig, audioConfig);
+  return { SDK, recognizer };
+}
+
+function parseResult(SDK, result, displaySyllables, floor) {
+  if (!result || result.reason === SDK.ResultReason.NoMatch) {
+    return { score: 0, syllables: displaySyllables.map((t) => ({ text: t, score: 0 })) };
+  }
+  let overall = 0;
+  const azure = [];
+  try {
+    const pa = SDK.PronunciationAssessmentResult.fromResult(result);
+    overall = Math.round(pa?.accuracyScore ?? pa?.pronunciationScore ?? 0);
+    const json = JSON.parse(result.properties.getProperty(SDK.PropertyId.SpeechServiceResponse_JsonResult));
+    for (const w of (json?.NBest?.[0]?.Words ?? [])) {
+      // Whole word flagged (omission/mispronunciation via miscue) → floor it so
+      // a fluffed word ("SIM-" for "STIM-") can't sneak a high score.
+      const err = w.PronunciationAssessment?.ErrorType;
+      const flagged = err && err !== 'None';
+      for (const sy of (w.Syllables ?? [])) {
+        const sc = sy.PronunciationAssessment?.AccuracyScore ?? overall;
+        azure.push(Math.round(flagged ? Math.min(sc, 20) : sc));
+      }
+    }
+  } catch { /* fall back to overall */ }
+  const syllables = displaySyllables.map((text, i) => ({
+    text, score: stretch(azure.length === displaySyllables.length ? azure[i] : overall, floor),
+  }));
+  // Word score = average of the syllables actually shown, so number and colour agree.
+  const score = Math.round(syllables.reduce((a, s) => a + s.score, 0) / syllables.length);
+  return { score, syllables };
+}
+
+// Assess one word on the open session; always resolves (auto-submits) within the
+// window even if nothing/garbled was heard.
+function assessWord(session, word, displaySyllables, floor, windowMs) {
+  const { SDK, recognizer } = session;
   const paConfig = new SDK.PronunciationAssessmentConfig(
     word,
     SDK.PronunciationAssessmentGradingSystem.HundredMark,
     SDK.PronunciationAssessmentGranularity.Phoneme,
-    false,
+    true, // enableMiscue
   );
-  const recognizer = new SDK.SpeechRecognizer(speechConfig, audioConfig);
   paConfig.applyTo(recognizer);
-
-  const result = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timeout')), 12000);
-    recognizer.recognizeOnceAsync(
-      (r) => { clearTimeout(timer); resolve(r); },
-      (e) => { clearTimeout(timer); reject(e); },
-    );
-  }).finally(() => { try { recognizer.close(); } catch { /* ignore */ } });
-
-  const pa = SDK.PronunciationAssessmentResult.fromResult(result);
-  const overall = Math.round(pa?.accuracyScore ?? pa?.pronunciationScore ?? 0);
-
-  // Pull Azure's per-syllable accuracy from the raw JSON and align to ours.
-  let azure = [];
-  try {
-    const json = JSON.parse(result.properties.getProperty(SDK.PropertyId.SpeechServiceResponse_JsonResult));
-    for (const w of (json?.NBest?.[0]?.Words ?? [])) {
-      for (const sy of (w.Syllables ?? [])) {
-        azure.push(Math.round(sy.PronunciationAssessment?.AccuracyScore ?? overall));
-      }
-    }
-  } catch { /* fall back to overall */ }
-
-  const syllables = displaySyllables.map((text, i) => ({
-    text,
-    score: azure.length === displaySyllables.length ? azure[i] : overall,
-  }));
-  // Word score = the average of the syllables actually shown, so the number and
-  // the green/amber/red colouring always agree (Azure's word-level score can
-  // otherwise sit lower than every individual syllable).
-  const score = Math.round(syllables.reduce((a, s) => a + s.score, 0) / syllables.length);
-  return { score, syllables };
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (result) => { if (done) return; done = true; clearTimeout(backstop); resolve(parseResult(SDK, result, displaySyllables, floor)); };
+    const backstop = setTimeout(() => finish(null), windowMs + 4000);
+    recognizer.recognizeOnceAsync((r) => finish(r), () => finish(null));
+  });
 }
 
 // ── Syllable word display ────────────────────────────────────────────────────
@@ -285,19 +309,29 @@ export default function JustSayTheWordPage() {
   const [words, setWords] = useState(null);     // [{ word_index, word, syllables }]
   const [done, setDone] = useState([]);         // [{ word_index, word, score, points, syllables }]
   const [loadErr, setLoadErr] = useState(null);
-  const [listening, setListening] = useState(false);
   const [error, setError] = useState(null);
   const [active, setActive] = useState(null);   // { syllables:[{text,score}], score } while revealing
   const [revealed, setRevealed] = useState(0);
   const [showBoard, setShowBoard] = useState(false);
+  const [phase, setPhase] = useState('idle');   // idle | running | finished
+  const [countdown, setCountdown] = useState(null);
+  const [countdownSecs, setCountdownSecs] = useState(4);
+
   const jingleRef = useRef(null);
+  const sessionRef = useRef(null);
+  const doneIdxRef = useRef(new Set());
+  const floorRef = useRef(0);
+  const tickRef = useRef(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [{ words: w }, { results }] = await Promise.all([api.jstwWords(today), api.jstwProgress(today)]);
-        setWords(w);
-        setDone(results ?? []);
+        const [cfg, prog] = await Promise.all([api.jstwWords(today), api.jstwProgress(today)]);
+        setWords(cfg.words);
+        setDone(prog.results ?? []);
+        doneIdxRef.current = new Set((prog.results ?? []).map((r) => r.word_index));
+        floorRef.current = Number(cfg.score_floor) || 0;
+        setCountdownSecs(Math.max(2, Number(cfg.countdown_seconds) || 4));
       } catch (e) {
         setLoadErr(e.message || 'Could not load today’s words.');
       }
@@ -307,6 +341,10 @@ export default function JustSayTheWordPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     try { jingleRef.current = new Audio('/word-jingle.mp3'); } catch { /* optional */ }
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+      if (sessionRef.current) { try { sessionRef.current.recognizer.close(); } catch { /* ignore */ } }
+    };
   }, []);
 
   const doneIdx = new Set(done.map((d) => d.word_index));
@@ -315,8 +353,7 @@ export default function JustSayTheWordPage() {
 
   const playJingle = () => { try { const a = jingleRef.current; if (a) { a.currentTime = 0; a.play().catch(() => {}); } } catch { /* ignore */ } };
 
-  // Staggered reveal: colour each syllable in turn with a haptic, like the word
-  // is being "filled in" as it's spoken.
+  // Staggered reveal: colour each syllable in turn with a haptic.
   const revealSyllables = useCallback((res) => new Promise((resolve) => {
     setActive(res);
     setRevealed(0);
@@ -328,7 +365,7 @@ export default function JustSayTheWordPage() {
       if (i < res.syllables.length) setTimeout(step, 320);
       else {
         setTimeout(() => {
-          if (res.score >= 100) { playJingle(); hapticParty(); }   // perfect — full marks fanfare
+          if (res.score >= 100) { playJingle(); hapticParty(); }
           else (res.score >= 60 ? hapticParty : hapticShudder)();
           resolve();
         }, 360);
@@ -337,36 +374,56 @@ export default function JustSayTheWordPage() {
     setTimeout(step, 250);
   }), []);
 
-  const listen = useCallback(async () => {
-    if (!current || listening) return;
-    setError(null);
-    setListening(true);
-    hapticTap();
-    try {
-      const displaySyll = current.syllables;
-      const res = await assessPronunciation(current.word, displaySyll);
-      setListening(false);
-      await revealSyllables(res);
-      // Persist
-      let points = pointsForScore(res.score);
-      try {
-        const r = await api.jstwResult({ date: today, word_index: current.word_index, word: current.word, score: res.score, syllables: res.syllables });
-        points = r.points ?? points;
-      } catch { /* keep local */ }
-      // Move the spoken word into the list above and advance.
-      setDone((d) => [...d, { word_index: current.word_index, word: current.word, score: res.score, points, syllables: res.syllables }]);
-      setActive(null);
-      setRevealed(0);
-    } catch (e) {
-      setListening(false);
-      setActive(null);
-      const msg = /not configured/i.test(e?.message) ? 'Speech scoring isn’t switched on yet.' : 'Speak up, buddy - didn’t catch that.';
-      setError(msg);
-      hapticShudder();
+  // Process the next un-said word on the open session, then recurse.
+  const runNext = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session || !words) return;
+    const next = words.find((w) => !doneIdxRef.current.has(w.word_index));
+    if (!next) {
+      try { session.recognizer.close(); } catch { /* ignore */ }
+      sessionRef.current = null;
+      setPhase('finished');
+      return;
     }
-  }, [current, listening, revealSyllables, today]);
+    const windowMs = countdownSecs * 1000;
+    setActive(null); setRevealed(0); setError(null);
+    setCountdown(countdownSecs);
+    if (tickRef.current) clearInterval(tickRef.current);
+    tickRef.current = setInterval(() => setCountdown((c) => (c == null ? c : Math.max(0, c - 1))), 1000);
+
+    const res = await assessWord(session, next.word, next.syllables, floorRef.current, windowMs);
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+    setCountdown(null);
+    await revealSyllables(res);
+
+    let points = pointsForScore(res.score);
+    try {
+      const r = await api.jstwResult({ date: today, word_index: next.word_index, word: next.word, score: res.score, syllables: res.syllables });
+      points = r.points ?? points;
+    } catch { /* keep local */ }
+    doneIdxRef.current.add(next.word_index);
+    setDone((d) => [...d, { word_index: next.word_index, word: next.word, score: res.score, points, syllables: res.syllables }]);
+    setActive(null); setRevealed(0);
+    runNext();
+  }, [words, countdownSecs, revealSyllables, today]);
+
+  const start = useCallback(async () => {
+    if (sessionRef.current || phase === 'running') return;
+    setError(null);
+    hapticTap();
+    setPhase('running');
+    try {
+      sessionRef.current = await createSession(countdownSecs * 1000);
+      runNext();
+    } catch (e) {
+      sessionRef.current = null;
+      setPhase('idle');
+      setError(/not configured/i.test(e?.message) ? 'Speech scoring isn’t switched on yet.' : 'Couldn’t start the mic — allow microphone access and try again.');
+    }
+  }, [phase, countdownSecs, runNext]);
 
   const totalToday = done.reduce((a, d) => a + Number(d.points), 0);
+  const revealing = phase === 'running' && countdown == null;
 
   return (
     <div className="flex flex-col items-center gap-4 py-2">
@@ -380,7 +437,7 @@ export default function JustSayTheWordPage() {
 
       {loadErr && <p className="text-sm text-red-500">{loadErr}</p>}
 
-      {/* Spoken-word list (above active area) */}
+      {/* Spoken-word list */}
       {done.length > 0 && (
         <div className="w-full max-w-sm flex flex-col gap-2">
           {done.map((d) => (
@@ -412,14 +469,27 @@ export default function JustSayTheWordPage() {
             />
           </div>
           {error && <p className="text-sm font-semibold" style={{ color: PINK }}>{error}</p>}
-          <button onClick={listen} disabled={listening} className={`${TEAL_BTN} w-44 disabled:opacity-60`}>
-            {listening ? 'Listening…' : "Let's hear it, then"}
-          </button>
+
+          {phase === 'idle' && (
+            <button onClick={start} className={`${TEAL_BTN} w-44`}>Let's hear it, then</button>
+          )}
+          {phase === 'running' && countdown != null && (
+            <div className="flex flex-col items-center gap-1">
+              <div style={{
+                width: 56, height: 56, borderRadius: 9999, border: `3px solid ${countdown <= 1 ? BAD : PINK}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 800,
+                color: countdown <= 1 ? BAD : PINK, transition: 'border-color 0.2s, color 0.2s',
+              }}>{countdown}</div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Say it now</p>
+            </div>
+          )}
+          {revealing && <div style={{ height: 56 }} />}
+
           <p className="text-[11px] text-neutral-400">Today: {totalToday} pts</p>
         </div>
       )}
 
-      {/* Summary when all 5 done */}
+      {/* Summary */}
       {allDone && (
         <div className="w-full max-w-sm rounded-2xl p-6 text-center space-y-3 mt-2" style={{ background: isDark ? '#252523' : '#f5f5f4' }}>
           <h2 className="text-xl font-bold" style={{ color: GOOD }}>All said and done, {user?.name ?? 'you'}!</h2>

@@ -95,7 +95,12 @@ export default function AdminJustSayWordSection({ bare = false }) {
         <NumberField label="Min syllables" value={cfg.min_syllables} onCommit={(n) => save({ min_syllables: n })} busy={busy} />
         <NumberField label="Max syllables" value={cfg.max_syllables} onCommit={(n) => save({ max_syllables: n })} busy={busy} />
         <NumberField label="Words per day" value={cfg.words_per_day} onCommit={(n) => save({ words_per_day: n })} busy={busy} />
+        <NumberField label="Countdown (secs)" value={cfg.countdown_seconds} onCommit={(n) => save({ countdown_seconds: n })} busy={busy} />
+        <NumberField label="Strictness floor (0–95)" value={cfg.score_floor} onCommit={(n) => save({ score_floor: n })} busy={busy} />
       </div>
+      <p className="text-[11px] text-neutral-400 -mt-2">
+        Strictness floor stretches Azure’s scores: higher = harsher (try 60–80 if it’s too easy). 0 = raw Azure score.
+      </p>
 
       <div>
         <p className="text-xs font-medium text-neutral-600 mb-1">Add a word (syllables split by hyphen)</p>

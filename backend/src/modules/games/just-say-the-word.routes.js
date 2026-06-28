@@ -147,7 +147,13 @@ export default async function justSayTheWordRoutes(fastify) {
     const date = req.query.date ?? todayUK();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return reply.code(400).send({ error: 'date must be YYYY-MM-DD' });
     const words = await getOrAssignWords(date, cfg);
-    return { date, words_per_day: cfg.words_per_day, words };
+    return {
+      date,
+      words_per_day: cfg.words_per_day,
+      score_floor: cfg.score_floor ?? 0,
+      countdown_seconds: cfg.countdown_seconds ?? 4,
+      words,
+    };
   });
 
   // ── This player's progress today (words already attempted) ─────────────────
@@ -267,7 +273,7 @@ export default async function justSayTheWordRoutes(fastify) {
   });
 
   // ── Admin: config ──────────────────────────────────────────────────────────
-  const CFG_COLS = new Set(['enabled', 'min_len', 'max_len', 'min_syllables', 'max_syllables', 'words_per_day']);
+  const CFG_COLS = new Set(['enabled', 'min_len', 'max_len', 'min_syllables', 'max_syllables', 'words_per_day', 'score_floor', 'countdown_seconds']);
   fastify.get('/api/games/just-say-the-word/config', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
     return getConfig();
