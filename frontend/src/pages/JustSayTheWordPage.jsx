@@ -84,13 +84,8 @@ function parseResult(SDK, result, displaySyllables, floor) {
     overall = Math.round(pa?.accuracyScore ?? pa?.pronunciationScore ?? 0);
     const json = JSON.parse(result.properties.getProperty(SDK.PropertyId.SpeechServiceResponse_JsonResult));
     for (const w of (json?.NBest?.[0]?.Words ?? [])) {
-      // Whole word flagged (omission/mispronunciation via miscue) → floor it so
-      // a fluffed word ("SIM-" for "STIM-") can't sneak a high score.
-      const err = w.PronunciationAssessment?.ErrorType;
-      const flagged = err && err !== 'None';
       for (const sy of (w.Syllables ?? [])) {
-        const sc = sy.PronunciationAssessment?.AccuracyScore ?? overall;
-        azure.push(Math.round(flagged ? Math.min(sc, 20) : sc));
+        azure.push(Math.round(sy.PronunciationAssessment?.AccuracyScore ?? overall));
       }
     }
   } catch { /* fall back to overall */ }
@@ -106,11 +101,13 @@ function parseResult(SDK, result, displaySyllables, floor) {
 // window even if nothing/garbled was heard.
 function assessWord(session, word, displaySyllables, floor, windowMs) {
   const { SDK, recognizer } = session;
+  // enableMiscue OFF — on single words it wrongly marks them "omitted" (→ 0).
+  // Strictness comes from the admin score-floor stretch instead.
   const paConfig = new SDK.PronunciationAssessmentConfig(
     word,
     SDK.PronunciationAssessmentGradingSystem.HundredMark,
     SDK.PronunciationAssessmentGranularity.Phoneme,
-    true, // enableMiscue
+    false,
   );
   paConfig.applyTo(recognizer);
   return new Promise((resolve) => {
