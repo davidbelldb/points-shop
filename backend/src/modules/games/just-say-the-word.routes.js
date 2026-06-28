@@ -320,6 +320,62 @@ export default async function justSayTheWordRoutes(fastify) {
     return { ok: true, date };
   });
 
+  // ── Admin: auto-syllabify via Azure (TTS the word → assess it → read back
+  //          Azure's own syllable graphemes). Free under the F0 tier. ──────────
+  fastify.post('/api/games/just-say-the-word/syllabify', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    if (!AZURE_KEY || !AZURE_REGION) return reply.code(503).send({ error: 'Azure speech not configured.' });
+    const word = String(req.body?.word ?? '').trim();
+    if (!word || !/^[a-zA-Z'-]+$/.test(word)) return reply.code(400).send({ error: 'A single word (letters only) is required.' });
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    try {
+      // 1) Synthesize the word to 16k mono PCM WAV.
+      const ttsRes = await fetch(`https://${AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': AZURE_KEY,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'riff-16khz-16bit-mono-pcm',
+          'User-Agent': 'SneakyStuff',
+        },
+        body: `<speak version='1.0' xml:lang='en-GB'><voice name='en-GB-SoniaNeural'>${esc(word)}</voice></speak>`,
+      });
+      if (!ttsRes.ok) return reply.code(502).send({ error: 'Could not synthesize the word.' });
+      const wav = Buffer.from(await ttsRes.arrayBuffer());
+
+      // 2) Pronunciation-assess that audio to get the syllable breakdown.
+      const pa = Buffer.from(JSON.stringify({
+        referenceText: word, gradingSystem: 'HundredMark', granularity: 'Phoneme', dimension: 'Comprehensive',
+      })).toString('base64');
+      const sttRes = await fetch(
+        `https://${AZURE_REGION}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-GB&format=detailed`,
+        {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': AZURE_KEY,
+            'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
+            'Pronunciation-Assessment': pa,
+            Accept: 'application/json',
+          },
+          body: wav,
+        },
+      );
+      if (!sttRes.ok) return reply.code(502).send({ error: 'Could not analyse the word.' });
+      const json = await sttRes.json();
+      const syllables = [];
+      for (const w of (json?.NBest?.[0]?.Words ?? [])) {
+        for (const sy of (w.Syllables ?? [])) {
+          const g = String(sy.Grapheme || sy.Syllable || '').trim().toLowerCase();
+          if (g) syllables.push(g);
+        }
+      }
+      if (syllables.length === 0) return reply.code(422).send({ error: 'Azure returned no syllables — enter them manually.' });
+      return { word: word.toUpperCase(), syllables };
+    } catch {
+      return reply.code(502).send({ error: 'Auto-syllabify failed — try again or enter manually.' });
+    }
+  });
+
   // ── Admin: word bank ────────────────────────────────────────────────────────
   fastify.get('/api/games/just-say-the-word/words-bank', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });

@@ -41,6 +41,17 @@ export default function AdminJustSayWordSection({ bare = false }) {
     catch (e) { setError(e.message); } finally { setBusy(false); }
   }
 
+  const [syllabifying, setSyllabifying] = useState(false);
+  async function autoSyllabify() {
+    const word = newWord.trim();
+    if (!word) { setError('Enter a word first.'); return; }
+    setSyllabifying(true); setError(null);
+    try {
+      const r = await api.jstwSyllabify(word);
+      setNewSyll((r.syllables ?? []).join('-'));
+    } catch (e) { setError(e.message); } finally { setSyllabifying(false); }
+  }
+
   async function addWord() {
     const word = newWord.trim().toUpperCase();
     const syllables = newSyll.split(/[-·,\s]+/).map((s) => s.trim()).filter(Boolean);
@@ -107,8 +118,12 @@ export default function AdminJustSayWordSection({ bare = false }) {
         <div className="flex gap-2">
           <input className={inputCls} placeholder="ENTREPRENEUR" value={newWord} onChange={(e) => setNewWord(e.target.value)} />
           <input className={inputCls} placeholder="en-tre-pre-neur" value={newSyll} onChange={(e) => setNewSyll(e.target.value)} />
+          <button onClick={autoSyllabify} disabled={busy || syllabifying} className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" title="Fill syllables from Azure">
+            {syllabifying ? '…' : 'Auto'}
+          </button>
           <button onClick={addWord} disabled={busy} className="shrink-0 rounded-md bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-white">Add</button>
         </div>
+        <p className="mt-1 text-[11px] text-neutral-400">“Auto” asks Azure for the syllable split (review it, then Add). Free.</p>
       </div>
 
       <div>
