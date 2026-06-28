@@ -57,22 +57,6 @@ function loadSdk() {
   return _sdkPromise;
 }
 
-// Open one mic session (reused across every word so the mic stays live — no
-// per-word open/close flakiness). `windowMs` is the per-word countdown; Azure's
-// initial-silence timeout enforces it (don't speak in time → auto-submitted).
-async function createSession(windowMs) {
-  const mod = await loadSdk();
-  const SDK = mod.SpeechConfig ? mod : (mod.default ?? mod); // CJS/ESM interop
-  const { token, region } = await api.jstwSpeechToken();
-  const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region);
-  speechConfig.speechRecognitionLanguage = 'en-GB';
-  speechConfig.setProperty(SDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, String(Math.max(1000, windowMs)));
-  speechConfig.setProperty(SDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, '600');
-  const audioConfig = SDK.AudioConfig.fromDefaultMicrophoneInput();
-  const recognizer = new SDK.SpeechRecognizer(speechConfig, audioConfig);
-  return { SDK, recognizer };
-}
-
 function parseResult(SDK, result, displaySyllables, floor) {
   if (!result || result.reason === SDK.ResultReason.NoMatch) {
     return { score: 0, syllables: displaySyllables.map((t) => ({ text: t, score: 0 })) };
@@ -97,25 +81,37 @@ function parseResult(SDK, result, displaySyllables, floor) {
   return { score, syllables };
 }
 
-// Assess one word on the open session; always resolves (auto-submits) within the
-// window even if nothing/garbled was heard.
-function assessWord(session, word, displaySyllables, floor, windowMs) {
-  const { SDK, recognizer } = session;
-  // enableMiscue OFF — on single words it wrongly marks them "omitted" (→ 0).
-  // Strictness comes from the admin score-floor stretch instead.
-  const paConfig = new SDK.PronunciationAssessmentConfig(
-    word,
-    SDK.PronunciationAssessmentGradingSystem.HundredMark,
-    SDK.PronunciationAssessmentGranularity.Phoneme,
-    false,
-  );
-  paConfig.applyTo(recognizer);
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = (result) => { if (done) return; done = true; clearTimeout(backstop); resolve(parseResult(SDK, result, displaySyllables, floor)); };
-    const backstop = setTimeout(() => finish(null), windowMs + 4000);
-    recognizer.recognizeOnceAsync((r) => finish(r), () => finish(null));
-  });
+// Assess one word with its own fresh recognizer (proven to make the real Azure
+// round-trip and score; a reused recognizer silently returns NoMatch). Always
+// resolves — auto-submits whatever was heard (nothing → 0).
+async function assessWord(word, displaySyllables, floor, windowMs) {
+  try {
+    const mod = await loadSdk();
+    const SDK = mod.SpeechConfig ? mod : (mod.default ?? mod); // CJS/ESM interop
+    const { token, region } = await api.jstwSpeechToken();
+    const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region);
+    speechConfig.speechRecognitionLanguage = 'en-GB';
+    const audioConfig = SDK.AudioConfig.fromDefaultMicrophoneInput();
+    // enableMiscue OFF — on single words it wrongly marks them "omitted" (→ 0).
+    const paConfig = new SDK.PronunciationAssessmentConfig(
+      word,
+      SDK.PronunciationAssessmentGradingSystem.HundredMark,
+      SDK.PronunciationAssessmentGranularity.Phoneme,
+      false,
+    );
+    const recognizer = new SDK.SpeechRecognizer(speechConfig, audioConfig);
+    paConfig.applyTo(recognizer);
+    const result = await new Promise((resolve) => {
+      let done = false;
+      const finish = (r) => { if (done) return; done = true; clearTimeout(t); resolve(r); };
+      // Backstop so a hung recognition can't freeze the game.
+      const t = setTimeout(() => finish(null), Math.max(8000, windowMs + 8000));
+      recognizer.recognizeOnceAsync((r) => finish(r), () => finish(null));
+    }).finally(() => { try { recognizer.close(); } catch { /* ignore */ } });
+    return parseResult(SDK, result, displaySyllables, floor);
+  } catch {
+    return { score: 0, syllables: displaySyllables.map((t) => ({ text: t, score: 0 })) };
+  }
 }
 
 // ── Syllable word display ────────────────────────────────────────────────────
@@ -315,10 +311,10 @@ export default function JustSayTheWordPage() {
   const [countdownSecs, setCountdownSecs] = useState(4);
 
   const jingleRef = useRef(null);
-  const sessionRef = useRef(null);
   const doneIdxRef = useRef(new Set());
   const floorRef = useRef(0);
   const tickRef = useRef(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -339,8 +335,8 @@ export default function JustSayTheWordPage() {
     window.scrollTo({ top: 0, behavior: 'instant' });
     try { jingleRef.current = new Audio('/word-jingle.mp3'); } catch { /* optional */ }
     return () => {
+      cancelledRef.current = true;
       if (tickRef.current) clearInterval(tickRef.current);
-      if (sessionRef.current) { try { sessionRef.current.recognizer.close(); } catch { /* ignore */ } }
     };
   }, []);
 
@@ -371,24 +367,19 @@ export default function JustSayTheWordPage() {
     setTimeout(step, 250);
   }), []);
 
-  // Process the next un-said word on the open session, then recurse.
+  // Process the next un-said word, then recurse.
   const runNext = useCallback(async () => {
-    const session = sessionRef.current;
-    if (!session || !words) return;
+    if (cancelledRef.current || !words) return;
     const next = words.find((w) => !doneIdxRef.current.has(w.word_index));
-    if (!next) {
-      try { session.recognizer.close(); } catch { /* ignore */ }
-      sessionRef.current = null;
-      setPhase('finished');
-      return;
-    }
+    if (!next) { setPhase('finished'); return; }
     const windowMs = countdownSecs * 1000;
     setActive(null); setRevealed(0); setError(null);
     setCountdown(countdownSecs);
     if (tickRef.current) clearInterval(tickRef.current);
     tickRef.current = setInterval(() => setCountdown((c) => (c == null ? c : Math.max(0, c - 1))), 1000);
 
-    const res = await assessWord(session, next.word, next.syllables, floorRef.current, windowMs);
+    const res = await assessWord(next.word, next.syllables, floorRef.current, windowMs);
+    if (cancelledRef.current) return;
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     setCountdown(null);
     await revealSyllables(res);
@@ -404,20 +395,14 @@ export default function JustSayTheWordPage() {
     runNext();
   }, [words, countdownSecs, revealSyllables, today]);
 
-  const start = useCallback(async () => {
-    if (sessionRef.current || phase === 'running') return;
+  const start = useCallback(() => {
+    if (phase === 'running') return;
     setError(null);
     hapticTap();
+    cancelledRef.current = false;
     setPhase('running');
-    try {
-      sessionRef.current = await createSession(countdownSecs * 1000);
-      runNext();
-    } catch (e) {
-      sessionRef.current = null;
-      setPhase('idle');
-      setError(/not configured/i.test(e?.message) ? 'Speech scoring isn’t switched on yet.' : 'Couldn’t start the mic — allow microphone access and try again.');
-    }
-  }, [phase, countdownSecs, runNext]);
+    runNext();
+  }, [phase, runNext]);
 
   const totalToday = done.reduce((a, d) => a + Number(d.points), 0);
   const revealing = phase === 'running' && countdown == null;
