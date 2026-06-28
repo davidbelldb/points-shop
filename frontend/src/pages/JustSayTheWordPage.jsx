@@ -276,14 +276,19 @@ export default function JustSayTheWordPage() {
   const revealSyllables = useCallback((res) => new Promise((resolve) => {
     setActive(res);
     setRevealed(0);
-    playJingle();
     let i = 0;
     const step = () => {
       i += 1;
       setRevealed(i);
       hapticSharpTriple();
       if (i < res.syllables.length) setTimeout(step, 320);
-      else { setTimeout(() => { (res.score >= 60 ? hapticParty : hapticShudder)(); resolve(); }, 360); }
+      else {
+        setTimeout(() => {
+          if (res.score >= 100) { playJingle(); hapticParty(); }   // perfect — full marks fanfare
+          else (res.score >= 60 ? hapticParty : hapticShudder)();
+          resolve();
+        }, 360);
+      }
     };
     setTimeout(step, 250);
   }), []);
