@@ -187,7 +187,7 @@ export default function AdminPage() {
         <AdminForecastSection bare />
       </AdminCollapsible>
 
-      <AdminCollapsible title="Just Say The Word" storageKey="admin::jstw">
+      <AdminCollapsible title="Dirty Talk" storageKey="admin::jstw">
         <AdminJustSayWordSection bare />
       </AdminCollapsible>
 

@@ -98,7 +98,7 @@ export default function AccountPage() {
           {user?.role === 'admin' && (
             <Link to="/justsaytheword"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm font-medium text-amber-700">
-              <span>Just Say The Word</span>
+              <span>Dirty Talk</span>
               <span aria-hidden>&rarr;</span>
             </Link>
           )}

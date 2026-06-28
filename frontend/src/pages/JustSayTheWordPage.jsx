@@ -101,8 +101,12 @@ function SyllableWord({ syllables, scored, revealed, isDark, big = false }) {
   const greyBord = isDark ? '#3a3a38' : '#d4d4d0';
   const cell = big ? 40 : 24;
   const font = big ? 20 : 13;
+  const letterGap = big ? 3 : 2;
+  // Letters sit flush as one word until it's scored; then each syllable slides
+  // apart via an animated left-margin (gap itself isn't animatable in WebKit).
+  const splitGap = big ? 10 : 6;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: big ? 10 : 6, justifyContent: 'center' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: letterGap, justifyContent: 'center' }}>
       {syllables.map((syl, si) => {
         const text = typeof syl === 'string' ? syl : syl.text;
         const score = typeof syl === 'string' ? null : syl.score;
@@ -110,7 +114,7 @@ function SyllableWord({ syllables, scored, revealed, isDark, big = false }) {
         const bg = isOn ? colourForScore(score) : grey;
         const fg = isOn ? '#0d3d2e' : (isDark ? '#fff' : '#171717');
         return (
-          <div key={si} style={{ display: 'flex', gap: big ? 3 : 2 }}>
+          <div key={si} style={{ display: 'flex', gap: letterGap, marginLeft: scored && si > 0 ? splitGap : 0, transition: 'margin-left 0.35s cubic-bezier(0.34,1.3,0.64,1)' }}>
             {text.toUpperCase().split('').map((ch, ci) => (
               <div
                 key={ci}
@@ -158,7 +162,7 @@ function LeaderboardModal({ onClose, today }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: modalBg }}>
         <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-          <h2 className="font-bold text-lg tracking-tight" style={{ color: PINK }}>Just Say The Word</h2>
+          <h2 className="font-bold text-lg tracking-tight" style={{ color: PINK }}>Dirty Talk</h2>
           <button onClick={onClose} aria-label="Close" style={{ color: textSec, background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, padding: '0 0 0 8px' }}>✕</button>
         </div>
         <div className="px-5 pb-5 space-y-6 max-h-[80vh] overflow-y-auto">
@@ -329,7 +333,7 @@ export default function JustSayTheWordPage() {
       {/* Header */}
       <div className="w-full max-w-sm flex items-center justify-between px-2">
         <Link to="/games" className="w-20 text-sm text-neutral-500">← Games</Link>
-        <h1 className="font-bold text-lg tracking-wide text-center">Just Say The Word</h1>
+        <h1 className="font-bold text-lg tracking-wide text-center">Dirty Talk</h1>
         <button onClick={() => setShowBoard(true)} className="w-20 text-right text-sm font-medium text-neutral-500">Scores</button>
       </div>
       <p className="text-xs text-neutral-400">{formatUKDate()} — say it like you mean it.</p>
@@ -369,7 +373,7 @@ export default function JustSayTheWordPage() {
           </div>
           {error && <p className="text-sm" style={{ color: BAD }}>{error}</p>}
           <button onClick={listen} disabled={listening} className={`${TEAL_BTN} w-44 disabled:opacity-60`}>
-            {listening ? 'Listening…' : '🎙 Say the word'}
+            {listening ? 'Listening…' : 'Say the word'}
           </button>
           <p className="text-[11px] text-neutral-400">Today: {totalToday} pts</p>
         </div>

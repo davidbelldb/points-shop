@@ -278,6 +278,7 @@ export const api = {
   jstwBank:        () => request('/games/just-say-the-word/words-bank'),
   jstwBankAdd:     (word, syllables) => request('/games/just-say-the-word/words-bank', { method: 'POST', body: JSON.stringify({ word, syllables }) }),
   jstwBankDelete:  (word) => request(`/games/just-say-the-word/words-bank/${encodeURIComponent(word)}`, { method: 'DELETE' }),
+  jstwReroll:      () => request('/games/just-say-the-word/reroll', { method: 'POST' }),
   // Games play list (IGDB-backed replica of rewatch)
   playlistList: () => request('/playlist'),
   playlistPartner: () => request('/playlist/partner'),

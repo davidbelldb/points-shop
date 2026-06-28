@@ -56,6 +56,13 @@ export default function AdminJustSayWordSection({ bare = false }) {
     catch (e) { setError(e.message); } finally { setBusy(false); }
   }
 
+  const [rerolled, setRerolled] = useState(false);
+  async function reroll() {
+    setBusy(true); setError(null); setRerolled(false);
+    try { await api.jstwReroll(); setRerolled(true); setTimeout(() => setRerolled(false), 2000); }
+    catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
   if (!cfg) return error ? <p className="text-sm text-red-600">{error}</p> : <p className="text-sm text-neutral-500">Loading…</p>;
 
   const body = (
@@ -71,6 +78,15 @@ export default function AdminJustSayWordSection({ bare = false }) {
           className={`rounded-full px-3 py-1 text-xs font-semibold ${cfg.enabled ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}>
           {cfg.enabled ? 'On' : 'Off (testing)'}
         </button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button onClick={reroll} disabled={busy}
+          className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">
+          Re-roll today’s words
+        </button>
+        {rerolled && <span className="text-xs text-emerald-600">Re-rolled ✓ reload the game</span>}
+        <span className="text-[11px] text-neutral-400">(clears today’s words + scores)</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

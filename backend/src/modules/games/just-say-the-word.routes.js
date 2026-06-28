@@ -284,6 +284,34 @@ export default async function justSayTheWordRoutes(fastify) {
     return getConfig();
   });
 
+  // ── Admin: re-roll today's words (testing) ──────────────────────────────────
+  // Clears today's schedule + everyone's results for today, frees the words back
+  // to the bank, and claws back any points credited today — a clean re-test.
+  fastify.post('/api/games/just-say-the-word/reroll', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    const date = todayUK();
+    await query(
+      `UPDATE jstw_word_bank SET used_on = NULL
+        WHERE word IN (SELECT word FROM jstw_schedule WHERE date = $1)`,
+      [date],
+    );
+    await query(`DELETE FROM jstw_schedule WHERE date = $1`, [date]);
+    await query(`DELETE FROM jstw_results WHERE date = $1`, [date]);
+    // Reverse today's points so repeated testing doesn't inflate balances.
+    const { rows } = await query(
+      `SELECT account_id, COALESCE(SUM(delta), 0) AS pts
+         FROM points_ledger WHERE reason LIKE $1 GROUP BY account_id`,
+      [`jstw:${date}%`],
+    );
+    for (const r of rows) {
+      if (Number(r.pts) !== 0) {
+        await query(`UPDATE accounts SET points_balance = points_balance - $1 WHERE id = $2`, [Number(r.pts), r.account_id]);
+      }
+    }
+    await query(`DELETE FROM points_ledger WHERE reason LIKE $1`, [`jstw:${date}%`]);
+    return { ok: true, date };
+  });
+
   // ── Admin: word bank ────────────────────────────────────────────────────────
   fastify.get('/api/games/just-say-the-word/words-bank', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
