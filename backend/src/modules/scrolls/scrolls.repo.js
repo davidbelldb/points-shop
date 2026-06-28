@@ -1,6 +1,8 @@
 import { query, pool } from '../../db.js';
-import { sendPush } from '../notifications/push.js';
+import { sendPush, isMuted } from '../notifications/push.js';
 import { sendLiveActivityPush, crowContentState } from '../notifications/apns.js';
+import { findOtherUser } from '../chat/chat.repo.js';
+import { fetchForecastBody } from './forecast.js';
 
 // ---------------------------------------------------------------------------
 // Live Activity (crow) push helpers
@@ -39,6 +41,8 @@ async function updateTokensFor(scrollId) {
 // Push-to-start the crow activity on the recipient's device (works app-closed).
 async function startLiveActivityFor(scroll) {
   try {
+    // Respect the recipient's mute window — no new Live Activity while muted.
+    if (await isMuted(scroll.recipient_id)) return;
     const token = await ptsTokenFor(scroll.recipient_id);
     if (!token) return;
     const arrivesAtMs = new Date(scroll.deliver_at).getTime();
@@ -47,7 +51,7 @@ async function startLiveActivityFor(scroll) {
       event: 'start',
       contentState: crowContentState({ startedAtMs, arrivesAtMs, landed: false }),
       attributes: {
-        originLabel: scroll.origin_label || 'afar',
+        originLabel: scroll.from_label || scroll.origin_label || 'afar',
         destLabel: scroll.dest_label || '',
         scrollId: scroll.id,
       },
@@ -216,7 +220,7 @@ function reachedPhase(startedAtMs, arrivesAtMs) {
 // it crosses into a new phase. Only touches scrolls with a live update token.
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
-    `SELECT s.id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
+    `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
             s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
@@ -226,6 +230,7 @@ export async function pushStreetSubtitleUpdates() {
   );
   for (const s of rows) {
     try {
+      if (await isMuted(s.recipient_id)) continue; // muted → no live narration
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const target = reachedPhase(startedAtMs, arrivesAtMs);
@@ -242,6 +247,130 @@ export async function pushStreetSubtitleUpdates() {
     } catch { /* best effort per scroll */ }
   }
   return rows.length;
+}
+
+// ---------------------------------------------------------------------------
+// Daily weather forecast scroll
+// ---------------------------------------------------------------------------
+
+// The flight always lands at the configured forecast location; it sets off from
+// this fixed Cambridge point so the crow has a real journey to narrate.
+const FORECAST_ORIGIN = { lat: 52.2230, lng: 0.0960 }; // ~Grange Road / west Cambridge
+const FORECAST_FROM_LABEL = 'the Three-Eyed Crow';
+
+export async function getForecastSettings() {
+  const { rows } = await query(`SELECT * FROM forecast_settings WHERE id = 1`);
+  return rows[0] ?? null;
+}
+
+const FORECAST_COLS = new Set(['enabled', 'send_days', 'send_times', 'recipient', 'location_label', 'location_lat', 'location_lng']);
+
+export async function updateForecastSettings(patch = {}) {
+  const sets = [];
+  const vals = [];
+  let i = 1;
+  for (const [k, v] of Object.entries(patch)) {
+    if (!FORECAST_COLS.has(k)) continue;
+    // send_times is JSONB — store as JSON text.
+    sets.push(`${k} = $${i++}${k === 'send_times' ? '::jsonb' : ''}`);
+    vals.push(k === 'send_times' ? JSON.stringify(v) : v);
+  }
+  if (!sets.length) return getForecastSettings();
+  sets.push(`updated_at = NOW()`);
+  await query(`UPDATE forecast_settings SET ${sets.join(', ')} WHERE id = 1`, vals);
+  return getForecastSettings();
+}
+
+// Current Europe/London wall-clock, used to match configured send slots.
+function londonNow() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit',
+      hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date()).map((p) => [p.type, p.value]),
+  );
+  const hour = parts.hour === '24' ? '00' : parts.hour;
+  return {
+    hhmm: `${hour}:${parts.minute}`,
+    dateKey: `${parts.year}-${parts.month}-${parts.day}`,
+    dayIdx: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday),
+  };
+}
+
+// Send today's forecast as a scroll from the admin (David). `recipient` controls
+// who receives it: 'partner' (Katie), 'me' (David only, for testing — never
+// notifies the partner), or 'both'.
+async function sendForecastScroll(cfg) {
+  const adminRes = await query(`SELECT id FROM accounts WHERE role = 'admin' ORDER BY created_at LIMIT 1`);
+  const adminId = adminRes.rows[0]?.id;
+  if (!adminId) return false;
+  const other = await findOtherUser(adminId);
+
+  const body = await fetchForecastBody(cfg.location_lat, cfg.location_lng);
+  if (!body) return false; // weather lookup failed — skip this slot, try next time
+
+  // Resolve the recipient list. 'me' loops back to the admin's own account, so a
+  // test can never land on the partner.
+  const mode = cfg.recipient || 'partner';
+  const recipients = [];
+  if (mode === 'me') recipients.push(adminId);
+  else if (mode === 'both') { recipients.push(adminId); if (other) recipients.push(other.id); }
+  else if (other) recipients.push(other.id); // 'partner'
+  if (recipients.length === 0) return false;
+
+  for (const recipientId of recipients) {
+    /* eslint-disable no-await-in-loop */
+    await createScroll({
+      senderId: adminId,
+      recipientId,
+      body,
+      origin: { label: cfg.location_label, lat: FORECAST_ORIGIN.lat, lng: FORECAST_ORIGIN.lng },
+      dest: { label: cfg.location_label, lat: cfg.location_lat, lng: cfg.location_lng },
+      fromLabel: FORECAST_FROM_LABEL,
+      skipMaxChars: true,
+      // Loop-to-self test scrolls are flagged simulated for consistency with the
+      // /new-chat harness (keeps them out of any partner-facing aggregates).
+      simulated: recipientId === adminId,
+    });
+    /* eslint-enable no-await-in-loop */
+  }
+  return true;
+}
+
+// Resolver tick: if we're inside a configured send slot and haven't already
+// fired it, send the forecast. Idempotent via last_sent_slot.
+export async function runForecastScheduler() {
+  const cfg = await getForecastSettings();
+  if (!cfg || !cfg.enabled) return;
+  const { hhmm, dateKey, dayIdx } = londonNow();
+  const days = Array.isArray(cfg.send_days) ? cfg.send_days : [];
+  const times = Array.isArray(cfg.send_times) ? cfg.send_times : [];
+  if (!days.includes(dayIdx) || !times.includes(hhmm)) return;
+
+  const slot = `${dateKey}T${hhmm}`;
+  if (cfg.last_sent_slot === slot) return;
+  // Claim the slot first (atomic-ish) so a second tick can't double-send.
+  const claim = await query(
+    `UPDATE forecast_settings SET last_sent_slot = $1
+      WHERE id = 1 AND (last_sent_slot IS DISTINCT FROM $1)
+      RETURNING id`,
+    [slot],
+  );
+  if (claim.rowCount === 0) return;
+  try {
+    const ok = await sendForecastScroll(cfg);
+    // If the weather lookup failed, release the slot so the next tick retries.
+    if (!ok) await query(`UPDATE forecast_settings SET last_sent_slot = NULL WHERE id = 1 AND last_sent_slot = $1`, [slot]);
+  } catch {
+    await query(`UPDATE forecast_settings SET last_sent_slot = NULL WHERE id = 1 AND last_sent_slot = $1`, [slot]).catch(() => {});
+  }
+}
+
+// Admin "send a test forecast now" — bypasses the schedule.
+export async function sendForecastNow() {
+  const cfg = await getForecastSettings();
+  if (!cfg) return false;
+  return sendForecastScroll(cfg);
 }
 
 // ---------------------------------------------------------------------------
@@ -355,12 +484,13 @@ export function flightSeconds(distanceKm, settings) {
 export async function createScroll({
   senderId, recipientId, body,
   origin = {}, dest = {}, simulated = false,
+  fromLabel = null, skipMaxChars = false,
 }) {
   const text = (body ?? '').trim();
   if (!text) { const e = new Error('Scroll body required'); e.statusCode = 400; throw e; }
 
   const settings = await getSettings();
-  if (settings?.max_chars && text.length > settings.max_chars) {
+  if (!skipMaxChars && settings?.max_chars && text.length > settings.max_chars) {
     const e = new Error(`Scroll exceeds ${settings.max_chars} characters`);
     e.statusCode = 400; throw e;
   }
@@ -373,14 +503,14 @@ export async function createScroll({
        (sender_id, recipient_id, body,
         origin_label, origin_lat, origin_lng,
         dest_label, dest_lat, dest_lng,
-        distance_km, flight_seconds, simulated, deliver_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, NOW() + ($11::int * interval '1 second'))
+        distance_km, flight_seconds, simulated, from_label, deliver_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NOW() + ($11::int * interval '1 second'))
      RETURNING *`,
     [
       senderId, recipientId, text,
       origin.label ?? null, origin.lat ?? null, origin.lng ?? null,
       dest.label ?? null, dest.lat ?? null, dest.lng ?? null,
-      distanceKm, secs, !!simulated,
+      distanceKm, secs, !!simulated, fromLabel,
     ],
   );
   const scroll = rows[0];
@@ -458,13 +588,16 @@ export async function resolveDueScrolls() {
     `UPDATE scrolls
         SET delivered = TRUE, delivered_at = NOW(), status = 'delivered'
       WHERE delivered = FALSE AND deliver_at <= NOW()
-      RETURNING id, recipient_id, origin_label, flight_seconds, body`,
+      RETURNING id, recipient_id, origin_label, from_label, flight_seconds, body`,
   );
   for (const s of rows) {
     try {
-      const origin = s.origin_label || 'afar';
+      const origin = s.from_label || s.origin_label || 'afar';
       // The scroll's own text becomes the landed subtitle (widget truncates).
       const preview = (s.body || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+      // While muted, finalise any running activity silently (no alert) and never
+      // raise the fallback banner.
+      const muted = await isMuted(s.recipient_id);
       const tokens = await updateTokensFor(s.id);
       if (tokens.length) {
         const arrivesAtMs = Date.now();
@@ -474,7 +607,7 @@ export async function resolveDueScrolls() {
           await sendLiveActivityPush(token, {
             event: 'update',
             contentState: state,
-            alert: { title: `News from ${origin}.`, body: preview || 'A crow has arrived' },
+            alert: muted ? undefined : { title: `News from ${origin}.`, body: preview || 'A crow has arrived' },
           });
         }
       } else {

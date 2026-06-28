@@ -56,8 +56,8 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
 
         {/* Origin address + sent date — both at the top of the scroll roll */}
         <div className="absolute inset-x-0 text-center" style={{ top: '5.5%', fontFamily: font }}>
-          {scroll.origin_label && (
-            <p className="text-[11px] italic text-black/60">from {scroll.origin_label}</p>
+          {(scroll.from_label || scroll.origin_label) && (
+            <p className="text-[11px] italic text-black/60">from {scroll.from_label || scroll.origin_label}</p>
           )}
           <p className="text-[11px] italic text-black/55">Sent {formatSent(scroll.sent_at)}</p>
         </div>

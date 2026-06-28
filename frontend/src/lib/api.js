@@ -133,6 +133,10 @@ export const api = {
     // Crow flight path between two points (road-following route + street names)
     // for the in-app map / Live Activity. origin/dest: { lat, lng, label? }.
     flightPath:   (origin, dest) => request('/scrolls/flight-path', { method: 'POST', body: JSON.stringify({ origin, dest }) }),
+    // Daily weather forecast scroll (admin).
+    getForecastConfig:    () => request('/scrolls/forecast-config'),
+    updateForecastConfig: (patch) => request('/scrolls/forecast-config', { method: 'PUT', body: JSON.stringify(patch) }),
+    sendForecastTest:     () => request('/scrolls/forecast-test', { method: 'POST' }),
   },
   getMessages: () => request('/messages'),
   sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>

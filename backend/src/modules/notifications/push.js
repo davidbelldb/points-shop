@@ -12,7 +12,7 @@ export function pushEnabled() {
   return enabled || apnsEnabled();
 }
 
-async function isMuted(accountId) {
+export async function isMuted(accountId) {
   const muted = await query(
     `SELECT 1 FROM accounts
       WHERE id = $1 AND notifications_muted_until IS NOT NULL AND notifications_muted_until > NOW()`,

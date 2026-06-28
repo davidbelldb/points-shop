@@ -17,6 +17,7 @@ import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
 import AdminScrollsSection from './AdminScrollsSection.jsx';
+import AdminForecastSection from './AdminForecastSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
 const inputCls =
@@ -179,6 +180,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Scrolls (raven messages)" storageKey="admin::scrolls">
         <AdminScrollsSection />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Daily Forecast Scroll" storageKey="admin::forecast">
+        <AdminForecastSection bare />
       </AdminCollapsible>
 
       <AdminCollapsible title="Relationship Timeline" storageKey="admin::timeline">

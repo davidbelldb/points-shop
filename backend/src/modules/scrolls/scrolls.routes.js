@@ -2,6 +2,7 @@ import {
   getSettings, getFrames, updateSettings, replaceFrames,
   createScroll, listReceived, listIncoming, unreadCount, markRead, resolveDueScrolls,
   pushStreetSubtitleUpdates, saveLiveActivityToken,
+  getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
 import { findOtherUser } from '../chat/chat.repo.js';
 import { buildFlightPath } from './flightPath.js';
@@ -19,6 +20,8 @@ function startResolver() {
   // Narrate each in-flight crow past Cambridge streets as it travels. Polled
   // tightly so node updates land close to when the progress bar reaches them.
   setInterval(() => { pushStreetSubtitleUpdates().catch(() => {}); }, 2_000);
+  // Daily weather forecast scroll — checked once a minute against the schedule.
+  setInterval(() => { runForecastScheduler().catch(() => {}); }, 60_000);
 }
 
 export default async function scrollRoutes(fastify) {
@@ -47,6 +50,25 @@ export default async function scrollRoutes(fastify) {
     }
     const frames = Array.isArray(req.body?.frames) ? req.body.frames : [];
     return replaceFrames(layer, frames);
+  });
+
+  // ----- Daily weather forecast scroll (admin-only config) -----
+  fastify.get('/api/scrolls/forecast-config', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return getForecastSettings();
+  });
+
+  fastify.put('/api/scrolls/forecast-config', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return updateForecastSettings(req.body ?? {});
+  });
+
+  // Send a test forecast immediately (admin), bypassing the schedule.
+  fastify.post('/api/scrolls/forecast-test', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    const ok = await sendForecastNow();
+    if (!ok) return reply.code(502).send({ error: 'Could not fetch the forecast just now — try again shortly.' });
+    return { ok: true };
   });
 
   // ----- Scrolls -----
