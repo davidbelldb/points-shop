@@ -34,6 +34,7 @@ const Magic8BallPage       = lazy(() => import('./pages/Magic8BallPage.jsx'));
 const DuckyDerbyPage       = lazy(() => import('./pages/DuckyDerbyPage.jsx'));
 const GameContainer        = lazy(() => import('./game/GameContainer.jsx'));
 const DirtyWordlePage      = lazy(() => import('./pages/DirtyWordlePage.jsx'));
+const JustSayTheWordPage   = lazy(() => import('./pages/JustSayTheWordPage.jsx'));
 const RewatchListPage      = lazy(() => import('./pages/RewatchListPage.jsx'));
 const RewatchDetailPage    = lazy(() => import('./pages/RewatchDetailPage.jsx'));
 const PlaylistPage         = lazy(() => import('./pages/PlaylistPage.jsx'));
@@ -171,6 +172,8 @@ createRoot(document.getElementById('root')).render(
               <Route path="magic-8-ball" element={<Magic8BallPage />} />
               <Route path="games/ducky" element={<DuckyDerbyPage />} />
               <Route path="games/dirty-wordle" element={<DirtyWordlePage />} />
+              {/* Hidden / URL-only while in test — not linked in any menu. */}
+              <Route path="justsaytheword" element={<JustSayTheWordPage />} />
               <Route path="games/streets-of-cambs-rage" element={<GameContainer />} />
               <Route path="games/beat-me-up" element={<Navigate to="/games/streets-of-cambs-rage" replace />} />
               <Route path="account/orders" element={<OrdersListPage />} />

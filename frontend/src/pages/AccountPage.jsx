@@ -95,6 +95,14 @@ export default function AccountPage() {
             </Link>
           )}
 
+          {user?.role === 'admin' && (
+            <Link to="/justsaytheword"
+              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm font-medium text-amber-700">
+              <span>Just Say The Word</span>
+              <span aria-hidden>&rarr;</span>
+            </Link>
+          )}
+
           <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center gap-3">
               <label className="relative cursor-pointer">

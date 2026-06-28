@@ -53,6 +53,9 @@ services:
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      # Azure Speech (Just Say The Word pronunciation scoring)
+      AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
+      AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-}
       TURN_SECRET: ${TURN_SECRET:-}
       TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
       TURN_REALM: ${TURN_REALM:-sneakypoints.com}

@@ -27,6 +27,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@react-three/rapier": "^2.0.1",
+    "microsoft-cognitiveservices-speech-sdk": "^1.40.0",
     "@handsontable/react-wrapper": "^15.0.0",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",

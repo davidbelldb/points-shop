@@ -267,6 +267,17 @@ export const api = {
     request(`/games/dirty-wordle/progress?date=${date}`),
   dirtyWordleSaveProgress: (payload) =>
     request('/games/dirty-wordle/progress', { method: 'POST', body: JSON.stringify(payload) }),
+  // Just Say The Word
+  jstwWords:       (date) => request(`/games/just-say-the-word/words?date=${date}`),
+  jstwProgress:    (date) => request(`/games/just-say-the-word/progress?date=${date}`),
+  jstwResult:      (payload) => request('/games/just-say-the-word/result', { method: 'POST', body: JSON.stringify(payload) }),
+  jstwLeaderboard: (date) => request(`/games/just-say-the-word/leaderboard?date=${date}`),
+  jstwSpeechToken: () => request('/games/just-say-the-word/speech-token'),
+  jstwGetConfig:   () => request('/games/just-say-the-word/config'),
+  jstwSetConfig:   (patch) => request('/games/just-say-the-word/config', { method: 'PUT', body: JSON.stringify(patch) }),
+  jstwBank:        () => request('/games/just-say-the-word/words-bank'),
+  jstwBankAdd:     (word, syllables) => request('/games/just-say-the-word/words-bank', { method: 'POST', body: JSON.stringify({ word, syllables }) }),
+  jstwBankDelete:  (word) => request(`/games/just-say-the-word/words-bank/${encodeURIComponent(word)}`, { method: 'DELETE' }),
   // Games play list (IGDB-backed replica of rewatch)
   playlistList: () => request('/playlist'),
   playlistPartner: () => request('/playlist/partner'),
