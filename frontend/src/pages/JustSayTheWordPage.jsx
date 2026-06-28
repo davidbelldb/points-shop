@@ -90,7 +90,11 @@ async function assessPronunciation(word, displaySyllables) {
     text,
     score: azure.length === displaySyllables.length ? azure[i] : overall,
   }));
-  return { score: overall, syllables };
+  // Word score = the average of the syllables actually shown, so the number and
+  // the green/amber/red colouring always agree (Azure's word-level score can
+  // otherwise sit lower than every individual syllable).
+  const score = Math.round(syllables.reduce((a, s) => a + s.score, 0) / syllables.length);
+  return { score, syllables };
 }
 
 // ── Syllable word display ────────────────────────────────────────────────────
@@ -141,14 +145,31 @@ function SyllableWord({ syllables, scored, revealed, isDark, big = false }) {
 function LeaderboardModal({ onClose, today }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [viewDate, setViewDate] = useState(today);
   const { theme } = useTheme();
   const { user } = useAuth();
   const dark = theme === 'dark';
 
+  const minDate = (() => { const d = new Date(today); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); })();
+  const isToday = viewDate === today;
+  const formatViewDate = (s) => { const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
+  const formatDayMonth = (s) => { const [, m, d] = s.split('-'); return `${d}/${m}`; };
+  function getDayLabel(s) {
+    if (s === today) return 'TODAY';
+    const y = new Date(today); y.setDate(y.getDate() - 1);
+    if (s === y.toISOString().slice(0, 10)) return 'YESTERDAY';
+    return ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][new Date(`${s}T12:00:00`).getDay()];
+  }
+  function navigateDate(delta) {
+    const d = new Date(viewDate); d.setDate(d.getDate() + delta);
+    const n = d.toISOString().slice(0, 10);
+    if (n >= minDate && n <= today) setViewDate(n);
+  }
+
   useEffect(() => {
-    setLoading(true);
-    api.jstwLeaderboard(today).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
-  }, [today]);
+    setLoading(true); setData(null);
+    api.jstwLeaderboard(viewDate).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+  }, [viewDate]);
 
   const modalBg = dark ? '#1e1e1c' : '#ffffff';
   const cardBg = dark ? '#30302e' : '#f5f5f4';
@@ -162,7 +183,7 @@ function LeaderboardModal({ onClose, today }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: modalBg }}>
         <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-          <h2 className="font-bold text-lg tracking-tight" style={{ color: PINK }}>Dirty Talk</h2>
+          <h2 className="font-bold text-lg tracking-tight" style={{ color: PINK }}>Dirty Talk Leaderboard</h2>
           <button onClick={onClose} aria-label="Close" style={{ color: textSec, background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, padding: '0 0 0 8px' }}>✕</button>
         </div>
         <div className="px-5 pb-5 space-y-6 max-h-[80vh] overflow-y-auto">
@@ -170,32 +191,51 @@ function LeaderboardModal({ onClose, today }) {
           {!loading && !data && <p className="text-sm text-center" style={{ color: textSec }}>Couldn't load scores.</p>}
           {data && (
             <>
-              {/* Today */}
+              {/* Today + date navigation */}
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: textSec }}>Today</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: textSec }}>{getDayLabel(viewDate)}</p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: textSec }}>{formatViewDate(viewDate)}</p>
+                    <button onClick={() => navigateDate(-1)} disabled={viewDate <= minDate}
+                      style={{ background: 'none', border: 'none', cursor: viewDate <= minDate ? 'default' : 'pointer', color: textPri, fontSize: 20, lineHeight: 1, padding: '0 4px', opacity: viewDate <= minDate ? 0.25 : 1, position: 'relative', top: '-1px' }}>‹</button>
+                    <button onClick={() => navigateDate(1)} disabled={viewDate >= today}
+                      style={{ background: 'none', border: 'none', cursor: viewDate >= today ? 'default' : 'pointer', color: textPri, fontSize: 20, lineHeight: 1, padding: '0 4px', opacity: viewDate >= today ? 0.25 : 1, position: 'relative', top: '-1px' }}>›</button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {data.today.map((p) => {
                     const mine = p.name === user?.name;
                     const colour = mine ? GOOD : PINK;
-                    return (
-                      <div key={p.name} className="rounded-xl p-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                    const cardHeight = 280;
+                    return p.words.length > 0 ? (
+                      <div key={p.name} className="rounded-xl p-3 flex flex-col" style={{ background: cardBg, border: `1px solid ${cardBorder}`, height: cardHeight }}>
                         <p className="text-sm font-bold uppercase tracking-wide text-center mb-2" style={{ color: colour }}>{p.name}</p>
-                        {p.words.length === 0 ? (
-                          <p className="text-xs text-center" style={{ color: textSec }}>yet to play</p>
-                        ) : (
-                          <div className="space-y-1">
-                            {p.words.map((w) => (
-                              <div key={w.word_index} className="flex items-center justify-between text-xs" style={{ color: textPri }}>
-                                <span className="truncate font-medium">{w.word}</span>
-                                <span style={{ color: colourForScore(w.score), fontWeight: 700 }}>{w.score}</span>
-                              </div>
-                            ))}
-                            <div className="flex items-center justify-between text-xs pt-1 mt-1" style={{ borderTop: `1px solid ${cardBorder}`, color: textSec }}>
-                              <span>{p.attempted}/{5}</span>
-                              <span className="rounded px-1.5 py-0.5 font-semibold" style={{ background: GOOD, color: '#0d3d2e' }}>+{p.total} pts</span>
+                        <div className="flex-1 overflow-y-auto space-y-1">
+                          {p.words.map((w) => (
+                            <div key={w.word_index} className="flex items-center justify-between text-xs" style={{ color: textPri }}>
+                              <span className="truncate font-medium pr-2">{w.word}</span>
+                              <span style={{ color: colourForScore(w.score), fontWeight: 700 }}>{w.score}</span>
                             </div>
-                          </div>
-                        )}
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between text-xs pt-1 mt-1" style={{ borderTop: `1px solid ${cardBorder}`, color: textSec }}>
+                          <span>{p.attempted}/{data.words_per_day ?? 5}</span>
+                          <span className="rounded px-1.5 py-0.5 font-semibold" style={{ background: GOOD, color: '#0d3d2e' }}>+{p.total} pts</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={p.name} className="rounded-xl p-3 flex flex-col items-center justify-center gap-2"
+                        style={{ background: cardBg, border: `1px dashed ${cardBorder}`, height: cardHeight }}>
+                        <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-full" style={{ border: `3px solid ${colour}` }}>
+                          {p.photo_url
+                            ? <img src={p.photo_url} alt="" className="h-full w-full object-cover" />
+                            : <span className="flex h-full w-full items-center justify-center text-sm font-bold" style={{ background: cardBorder, color: textPri }}>{p.name?.[0]}</span>}
+                        </span>
+                        <p className="text-sm font-bold uppercase tracking-wide" style={{ color: colour }}>{p.name}</p>
+                        <p className="text-xs text-center font-semibold uppercase tracking-wide leading-relaxed" style={{ color: textSec }}>
+                          {isToday ? <>yet to play<br />today</> : <>didn't play<br />on {formatDayMonth(viewDate)}</>}
+                        </p>
                       </div>
                     );
                   })}
@@ -320,7 +360,7 @@ export default function JustSayTheWordPage() {
     } catch (e) {
       setListening(false);
       setActive(null);
-      const msg = /not configured/i.test(e?.message) ? 'Speech scoring isn’t switched on yet.' : 'Didn’t catch that — try again.';
+      const msg = /not configured/i.test(e?.message) ? 'Speech scoring isn’t switched on yet.' : 'Speak up, buddy - didn’t catch that.';
       setError(msg);
       hapticShudder();
     }
@@ -336,7 +376,7 @@ export default function JustSayTheWordPage() {
         <h1 className="font-bold text-lg tracking-wide text-center">Dirty Talk</h1>
         <button onClick={() => setShowBoard(true)} className="w-20 text-right text-sm font-medium text-neutral-500">Scores</button>
       </div>
-      <p className="text-xs text-neutral-400">{formatUKDate()} — say it like you mean it.</p>
+      <p className="text-xs text-neutral-400">{formatUKDate()}. Say it like you mean it, yeah?</p>
 
       {loadErr && <p className="text-sm text-red-500">{loadErr}</p>}
 
@@ -371,9 +411,9 @@ export default function JustSayTheWordPage() {
               big
             />
           </div>
-          {error && <p className="text-sm" style={{ color: BAD }}>{error}</p>}
+          {error && <p className="text-sm font-semibold" style={{ color: PINK }}>{error}</p>}
           <button onClick={listen} disabled={listening} className={`${TEAL_BTN} w-44 disabled:opacity-60`}>
-            {listening ? 'Listening…' : 'Say the word'}
+            {listening ? 'Listening…' : "Let's hear it, then"}
           </button>
           <p className="text-[11px] text-neutral-400">Today: {totalToday} pts</p>
         </div>

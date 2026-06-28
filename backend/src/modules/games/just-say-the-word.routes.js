@@ -193,6 +193,7 @@ export default async function justSayTheWordRoutes(fastify) {
   // ── Leaderboard (today's per-word scores + all-time + series) ──────────────
   fastify.get('/api/games/just-say-the-word/leaderboard', async (req) => {
     const date = req.query.date ?? todayUK();
+    const cfg = await getConfig();
 
     // Today: every account, with their per-word rows for this date.
     const { rows: people } = await query(
@@ -239,6 +240,7 @@ export default async function justSayTheWordRoutes(fastify) {
 
     return {
       date,
+      words_per_day: cfg?.words_per_day ?? 5,
       completed_series_count: completed.length,
       today: people.map((p) => {
         const words = byAccountToday[p.account_id] ?? [];
