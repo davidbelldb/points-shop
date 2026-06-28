@@ -27,4 +27,7 @@ struct CrowActivityAttributes: ActivityAttributes {
     var originLabel: String   // road name the crow left from
     var destLabel: String     // road name the crow is heading to
     var scrollId: String = "" // maps a per-activity update token back to the scroll
+    /// "scroll" (normal person-to-person) or "forecast" (Three-Eyed Crow weather
+    /// scroll) — only the latter changes the arrival title copy.
+    var kind: String = "scroll"
 }

@@ -12,7 +12,7 @@ private let crowRight = "crow_land_10"
 
 private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     s.landed
-        ? "News from \(a.originLabel)."
+        ? (a.kind == "forecast" ? "A Three-Eyed Crow has arrived" : "News from \(a.originLabel).")
         : "A scroll will shortly be arriving."
 }
 

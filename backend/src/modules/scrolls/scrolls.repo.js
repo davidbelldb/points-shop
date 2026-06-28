@@ -49,15 +49,22 @@ async function startLiveActivityFor(scroll) {
     const startedAtMs = arrivesAtMs - (Number(scroll.flight_seconds) || 0) * 1000;
     await sendLiveActivityPush(token, {
       event: 'start',
-      contentState: crowContentState({ startedAtMs, arrivesAtMs, landed: false }),
+      contentState: crowContentState({
+        startedAtMs, arrivesAtMs, landed: false,
+        // Forecast scrolls open with their own line before street narration.
+        message: scroll.from_label ? 'A Three-Eyed Crow travels south with news' : '',
+      }),
       attributes: {
+        kind: scroll.from_label ? 'forecast' : 'scroll',
         originLabel: scroll.from_label || scroll.origin_label || 'afar',
         destLabel: scroll.dest_label || '',
         scrollId: scroll.id,
       },
       alert: {
         title: 'A scroll will shortly be arriving.',
-        body: `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
+        body: scroll.from_label
+          ? 'A Three-Eyed Crow travels south with news'
+          : `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
       },
     });
   } catch { /* best effort */ }
@@ -254,8 +261,10 @@ export async function pushStreetSubtitleUpdates() {
 // ---------------------------------------------------------------------------
 
 // The flight always lands at the configured forecast location; it sets off from
-// this fixed Cambridge point so the crow has a real journey to narrate.
-const FORECAST_ORIGIN = { lat: 52.2230, lng: 0.0960 }; // ~Grange Road / west Cambridge
+// the Met Office Weather Station, Cambridge (CB24 9NZ — north of the city) so the
+// crow genuinely "travels south" with a real journey to narrate.
+const FORECAST_ORIGIN = { lat: 52.24543314352076, lng: 0.10027112765321439 };
+const FORECAST_ORIGIN_LABEL = 'the Met Office Weather Station, Cambridge';
 const FORECAST_FROM_LABEL = 'the Three-Eyed Crow';
 
 export async function getForecastSettings() {
@@ -324,7 +333,7 @@ async function sendForecastScroll(cfg) {
       senderId: adminId,
       recipientId,
       body,
-      origin: { label: cfg.location_label, lat: FORECAST_ORIGIN.lat, lng: FORECAST_ORIGIN.lng },
+      origin: { label: FORECAST_ORIGIN_LABEL, lat: FORECAST_ORIGIN.lat, lng: FORECAST_ORIGIN.lng },
       dest: { label: cfg.location_label, lat: cfg.location_lat, lng: cfg.location_lng },
       fromLabel: FORECAST_FROM_LABEL,
       skipMaxChars: true,
@@ -593,6 +602,8 @@ export async function resolveDueScrolls() {
   for (const s of rows) {
     try {
       const origin = s.from_label || s.origin_label || 'afar';
+      // Forecast scrolls (from the Three-Eyed Crow) get their own arrival title.
+      const arrivedTitle = s.from_label ? 'A Three-Eyed Crow has arrived' : `News from ${origin}.`;
       // The scroll's own text becomes the landed subtitle (widget truncates).
       const preview = (s.body || '').replace(/\s+/g, ' ').trim().slice(0, 140);
       // While muted, finalise any running activity silently (no alert) and never
@@ -607,13 +618,13 @@ export async function resolveDueScrolls() {
           await sendLiveActivityPush(token, {
             event: 'update',
             contentState: state,
-            alert: muted ? undefined : { title: `News from ${origin}.`, body: preview || 'A crow has arrived' },
+            alert: muted ? undefined : { title: arrivedTitle, body: preview || 'A crow has arrived' },
           });
         }
       } else {
         // No Live Activity running — fall back to the classic alert push.
         await sendPush(s.recipient_id, {
-          title: `News from ${origin}.`,
+          title: arrivedTitle,
           body: preview || 'A crow has arrived',
           url: '/messages?scrolls=1',
           tag: 'scroll-arrival',
