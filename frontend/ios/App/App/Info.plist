@@ -70,6 +70,10 @@
 	<string>Sneaky Social uses your location for scroll flight times and location stickers.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

@@ -1,6 +1,6 @@
 import { query, pool } from '../../db.js';
 import { sendPush, isMuted } from '../notifications/push.js';
-import { sendLiveActivityPush, crowContentState } from '../notifications/apns.js';
+import { sendLiveActivityPush, crowContentState, sendSilentWake } from '../notifications/apns.js';
 import { findOtherUser } from '../chat/chat.repo.js';
 import { fetchForecastBody } from './forecast.js';
 
@@ -67,6 +67,11 @@ async function startLiveActivityFor(scroll) {
           : `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
       },
     });
+    // Shortly after the activity starts, silently wake the recipient's app so it
+    // captures this activity's update token (needed for live street updates + the
+    // in-scroll landing) even if the phone was locked. Best-effort; the existing
+    // token-if-app-was-open path is untouched, so this can only help.
+    setTimeout(() => { sendSilentWake(scroll.recipient_id).catch(() => {}); }, 3000);
   } catch { /* best effort */ }
 }
 

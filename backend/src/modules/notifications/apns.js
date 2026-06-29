@@ -163,6 +163,52 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
 }
 
 /**
+ * Silent "wake" push (content-available, no alert/sound). Nudges the recipient's
+ * app to run briefly in the background so it can capture a freshly-started Live
+ * Activity's update token — without which live street updates + the in-scroll
+ * landing can't reach a phone that was locked when the crow set off.
+ * Best-effort and silent: never shows anything, never throws.
+ */
+export async function sendSilentWake(accountId) {
+  if (!enabled || !accountId) return;
+  let token;
+  try {
+    const { rows } = await query(
+      `SELECT token FROM apns_tokens WHERE account_id = $1 ORDER BY updated_at DESC LIMIT 1`,
+      [accountId],
+    );
+    token = rows[0]?.token;
+  } catch { return; }
+  if (!token) return;
+
+  const body = JSON.stringify({ aps: { 'content-available': 1 }, wake: 'crow' });
+  let client;
+  try {
+    client = http2.connect(HOST);
+    client.on('error', () => {});
+    const jwt = providerToken();
+    await new Promise((resolve) => {
+      const req = client.request({
+        ':method': 'POST',
+        ':path': `/3/device/${token}`,
+        authorization: `bearer ${jwt}`,
+        'apns-topic': config.apns.bundleId,
+        'apns-push-type': 'background',
+        'apns-priority': '5',
+      });
+      req.on('response', () => {});
+      req.on('error', () => resolve());
+      req.on('end', () => resolve());
+      req.end(body);
+    });
+  } catch {
+    /* silent — a failed wake just falls back to the token-if-captured path */
+  } finally {
+    try { if (client) client.close(); } catch { /* ignore */ }
+  }
+}
+
+/**
  * Send a push to every iOS device an account has registered.
  * Dead tokens (410 / BadDeviceToken) are pruned automatically.
  */
