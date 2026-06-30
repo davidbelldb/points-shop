@@ -256,6 +256,9 @@ export async function sendBroadcast(channelId, { event, contentState, alert, dis
         authorization: `bearer ${jwt}`,
         'apns-push-type': 'liveactivity',
         'apns-priority': '10',
+        // Broadcasts require an expiration; a future time lets APNs retain the
+        // update so a phone that's offline/locked still gets it on reconnect.
+        'apns-expiration': String(Math.floor(Date.now() / 1000) + 3600),
         'apns-channel-id': channelId,
       });
       req.setEncoding('utf8');
