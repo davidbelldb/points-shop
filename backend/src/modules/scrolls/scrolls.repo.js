@@ -1,6 +1,9 @@
 import { query, pool } from '../../db.js';
 import { sendPush, isMuted } from '../notifications/push.js';
-import { sendLiveActivityPush, crowContentState, sendSilentWake } from '../notifications/apns.js';
+import {
+  sendLiveActivityPush, crowContentState, sendSilentWake,
+  createBroadcastChannel, deleteBroadcastChannel, sendBroadcast,
+} from '../notifications/apns.js';
 import { findOtherUser } from '../chat/chat.repo.js';
 import { fetchForecastBody } from './forecast.js';
 
@@ -47,8 +50,17 @@ async function startLiveActivityFor(scroll) {
     if (!token) return;
     const arrivesAtMs = new Date(scroll.deliver_at).getTime();
     const startedAtMs = arrivesAtMs - (Number(scroll.flight_seconds) || 0) * 1000;
+    // Create a broadcast channel so live updates + the landing reach the recipient
+    // even with their app fully closed (no device-captured token needed). Falls
+    // back to the device-token path if channel creation fails.
+    let channelId = null;
+    try { channelId = await createBroadcastChannel(); } catch { /* fall back */ }
+    if (channelId) {
+      await query(`UPDATE scrolls SET la_channel_id = $1 WHERE id = $2`, [channelId, scroll.id]).catch(() => {});
+    }
     await sendLiveActivityPush(token, {
       event: 'start',
+      channelId,
       contentState: crowContentState({
         startedAtMs, arrivesAtMs, landed: false,
         // Forecast scrolls open with their own line before street narration.
@@ -67,11 +79,9 @@ async function startLiveActivityFor(scroll) {
           : `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
       },
     });
-    // Shortly after the activity starts, silently wake the recipient's app so it
-    // captures this activity's update token (needed for live street updates + the
-    // in-scroll landing) even if the phone was locked. Best-effort; the existing
-    // token-if-app-was-open path is untouched, so this can only help.
-    setTimeout(() => { sendSilentWake(scroll.recipient_id).catch(() => {}); }, 3000);
+    // Only the device-token fallback needs the app awake; with a channel the
+    // updates broadcast regardless, so skip the wake when we have one.
+    if (!channelId) setTimeout(() => { sendSilentWake(scroll.recipient_id).catch(() => {}); }, 3000);
   } catch { /* best effort */ }
 }
 
@@ -233,12 +243,12 @@ function reachedPhase(startedAtMs, arrivesAtMs) {
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
     `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
-            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets, s.la_channel_id
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
-        AND EXISTS (
+        AND (s.la_channel_id IS NOT NULL OR EXISTS (
           SELECT 1 FROM live_activity_tokens t
-           WHERE t.scroll_id = s.id AND t.kind = 'update')`,
+           WHERE t.scroll_id = s.id AND t.kind = 'update'))`,
   );
   for (const s of rows) {
     try {
@@ -251,9 +261,13 @@ export async function pushStreetSubtitleUpdates() {
       const state = crowContentState({
         startedAtMs, arrivesAtMs, landed: false, message: streetMessage(target, s), phase: target,
       });
-      const tokens = await updateTokensFor(s.id);
-      for (const token of tokens) {
-        await sendLiveActivityPush(token, { event: 'update', contentState: state });
+      if (s.la_channel_id) {
+        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state });
+      } else {
+        const tokens = await updateTokensFor(s.id);
+        for (const token of tokens) {
+          await sendLiveActivityPush(token, { event: 'update', contentState: state });
+        }
       }
       await query(`UPDATE scrolls SET la_phase = $1 WHERE id = $2`, [target, s.id]);
     } catch { /* best effort per scroll */ }
@@ -580,10 +594,19 @@ export async function unreadCount(recipientId) {
 // Activity for it first so the crow banner dismisses when you open the scroll.
 export async function markRead(scrollId, accountId) {
   try {
-    const tokens = await updateTokensFor(scrollId);
     const state = crowContentState({ startedAtMs: Date.now() - 1000, arrivesAtMs: Date.now(), landed: true });
-    for (const token of tokens) {
-      sendLiveActivityPush(token, { event: 'end', contentState: state, dismissalMs: Date.now() }).catch(() => {});
+    const { rows } = await query(`SELECT la_channel_id FROM scrolls WHERE id = $1`, [scrollId]);
+    const channelId = rows[0]?.la_channel_id;
+    if (channelId) {
+      // End + tear down the broadcast channel.
+      sendBroadcast(channelId, { event: 'end', contentState: state, dismissalMs: Date.now() })
+        .then(() => deleteBroadcastChannel(channelId))
+        .catch(() => {});
+    } else {
+      const tokens = await updateTokensFor(scrollId);
+      for (const token of tokens) {
+        sendLiveActivityPush(token, { event: 'end', contentState: state, dismissalMs: Date.now() }).catch(() => {});
+      }
     }
   } catch { /* best effort */ }
   await query(
@@ -602,7 +625,7 @@ export async function resolveDueScrolls() {
     `UPDATE scrolls
         SET delivered = TRUE, delivered_at = NOW(), status = 'delivered'
       WHERE delivered = FALSE AND deliver_at <= NOW()
-      RETURNING id, recipient_id, origin_label, from_label, flight_seconds, body`,
+      RETURNING id, recipient_id, origin_label, from_label, flight_seconds, body, la_channel_id`,
   );
   for (const s of rows) {
     try {
@@ -611,29 +634,31 @@ export async function resolveDueScrolls() {
       const arrivedTitle = s.from_label ? 'A Three-Eyed Crow has arrived' : `News from ${origin}.`;
       // The scroll's own text becomes the landed subtitle (widget truncates).
       const preview = (s.body || '').replace(/\s+/g, ' ').trim().slice(0, 140);
-      // While muted, finalise any running activity silently (no alert) and never
-      // raise the fallback banner.
+      // While muted, finalise silently (no alert) and never raise a banner.
       const muted = await isMuted(s.recipient_id);
-      const tokens = await updateTokensFor(s.id);
-      if (tokens.length) {
-        const arrivesAtMs = Date.now();
-        const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
-        const state = crowContentState({ startedAtMs, arrivesAtMs, landed: true, message: preview, phase: 4 });
-        for (const token of tokens) {
-          await sendLiveActivityPush(token, {
-            event: 'update',
-            contentState: state,
-            alert: muted ? undefined : { title: arrivedTitle, body: preview || 'A crow has arrived' },
+      const arrivesAtMs = Date.now();
+      const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
+      const state = crowContentState({ startedAtMs, arrivesAtMs, landed: true, message: preview, phase: 4 });
+      const alert = muted ? undefined : { title: arrivedTitle, body: preview || 'A crow has arrived' };
+
+      if (s.la_channel_id) {
+        // Broadcast the landing to the channel — reaches a closed app, in-scroll.
+        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert });
+      } else {
+        const tokens = await updateTokensFor(s.id);
+        if (tokens.length) {
+          for (const token of tokens) {
+            await sendLiveActivityPush(token, { event: 'update', contentState: state, alert });
+          }
+        } else {
+          // No Live Activity reachable — fall back to the classic alert push.
+          await sendPush(s.recipient_id, {
+            title: arrivedTitle,
+            body: preview || 'A crow has arrived',
+            url: '/messages?scrolls=1',
+            tag: 'scroll-arrival',
           });
         }
-      } else {
-        // No Live Activity running — fall back to the classic alert push.
-        await sendPush(s.recipient_id, {
-          title: arrivedTitle,
-          body: preview || 'A crow has arrived',
-          url: '/messages?scrolls=1',
-          tag: 'scroll-arrival',
-        });
       }
     } catch { /* push is best-effort */ }
   }

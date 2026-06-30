@@ -18,6 +18,11 @@ const HOST = config.apns.production
   ? 'https://api.push.apple.com'
   : 'https://api.sandbox.push.apple.com';
 
+// Channel management endpoint (broadcast Live Activities) — note the ports.
+const MANAGE_HOST = config.apns.production
+  ? 'https://api-manage-broadcast.push.apple.com:2196'
+  : 'https://api-manage-broadcast.sandbox.push.apple.com:2195';
+
 let privateKey = null;
 if (config.apns.keyBase64) {
   try {
@@ -111,7 +116,7 @@ export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '
  *  - event 'end'    → dismiss the activity
  * Returns the HTTP status (0 on transport failure). Never throws.
  */
-export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs } = {}) {
+export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs, channelId } = {}) {
   if (!enabled || !token) return 0;
   const aps = {
     timestamp: Math.floor(Date.now() / 1000),
@@ -121,6 +126,9 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
   if (event === 'start') {
     aps['attributes-type'] = 'CrowActivityAttributes';
     aps.attributes = attributes || {};
+    // Subscribe the started activity to a broadcast channel so updates reach it
+    // without the device having to upload a per-activity token.
+    if (channelId) aps['input-push-channel'] = channelId;
   }
   if (alert) aps.alert = alert;
   if (event === 'end' && dismissalMs) aps['dismissal-date'] = Math.floor(dismissalMs / 1000);
@@ -151,6 +159,111 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
         if (status === 410 || (status === 400 && /BadDeviceToken/.test(data))) {
           await query(`DELETE FROM live_activity_tokens WHERE token = $1`, [token]).catch(() => {});
         }
+        try { client.close(); } catch { /* ignore */ }
+        resolve(status);
+      });
+      req.end(body);
+    } catch {
+      try { if (client) client.close(); } catch { /* ignore */ }
+      resolve(0);
+    }
+  });
+}
+
+// ── Broadcast channels (Apple Sports-style updates that reach a closed app) ──
+
+/** Create a broadcast channel for a Live Activity. Returns the channel id (base64
+ *  string) or null on failure. */
+export async function createBroadcastChannel() {
+  if (!enabled) return null;
+  // message-storage-policy 1 = keep most-recent message so a device that connects
+  // a little late still gets the latest update. push-type is PascalCase here.
+  const body = JSON.stringify({ 'message-storage-policy': 1, 'push-type': 'LiveActivity' });
+  return new Promise((resolve) => {
+    let client;
+    try {
+      client = http2.connect(MANAGE_HOST);
+      client.on('error', () => resolve(null));
+      const jwt = providerToken();
+      let status = 0; let data = ''; let channelId = null;
+      const req = client.request({
+        ':method': 'POST',
+        ':path': `/1/apps/${config.apns.bundleId}/channels`,
+        authorization: `bearer ${jwt}`,
+      });
+      req.setEncoding('utf8');
+      req.on('response', (h) => { status = h[':status']; channelId = h['apns-channel-id'] || null; });
+      req.on('data', (c) => { data += c; });
+      req.on('error', () => { try { client.close(); } catch { /* ignore */ } resolve(null); });
+      req.on('end', () => {
+        if (!channelId) console.error(`[apns-channel] create failed: ${status} ${data}`);
+        try { client.close(); } catch { /* ignore */ }
+        resolve(channelId);
+      });
+      req.end(body);
+    } catch {
+      try { if (client) client.close(); } catch { /* ignore */ }
+      resolve(null);
+    }
+  });
+}
+
+/** Delete a broadcast channel (cleanup once a scroll is done). */
+export async function deleteBroadcastChannel(channelId) {
+  if (!enabled || !channelId) return;
+  return new Promise((resolve) => {
+    let client;
+    try {
+      client = http2.connect(MANAGE_HOST);
+      client.on('error', () => resolve());
+      const jwt = providerToken();
+      const req = client.request({
+        ':method': 'DELETE',
+        ':path': `/1/apps/${config.apns.bundleId}/channels`,
+        authorization: `bearer ${jwt}`,
+        'apns-channel-id': channelId,
+      });
+      req.on('response', () => {});
+      req.on('error', () => { try { client.close(); } catch { /* ignore */ } resolve(); });
+      req.on('end', () => { try { client.close(); } catch { /* ignore */ } resolve(); });
+      req.end();
+    } catch {
+      try { if (client) client.close(); } catch { /* ignore */ }
+      resolve();
+    }
+  });
+}
+
+/** Broadcast a Live Activity update/end to every device subscribed to a channel.
+ *  No device token needed — works with the recipient's app fully closed. */
+export async function sendBroadcast(channelId, { event, contentState, alert, dismissalMs } = {}) {
+  if (!enabled || !channelId) return 0;
+  const aps = { timestamp: Math.floor(Date.now() / 1000), event, 'content-state': contentState || {} };
+  if (alert) aps.alert = alert;
+  if (event === 'end' && dismissalMs) aps['dismissal-date'] = Math.floor(dismissalMs / 1000);
+  const body = JSON.stringify({ aps });
+
+  return new Promise((resolve) => {
+    let client;
+    try {
+      client = http2.connect(HOST);
+      client.on('error', () => resolve(0));
+      const jwt = providerToken();
+      let status = 0; let data = '';
+      const req = client.request({
+        ':method': 'POST',
+        ':path': `/4/broadcasts/apps/${config.apns.bundleId}`,
+        authorization: `bearer ${jwt}`,
+        'apns-push-type': 'liveactivity',
+        'apns-priority': '10',
+        'apns-channel-id': channelId,
+      });
+      req.setEncoding('utf8');
+      req.on('response', (h) => { status = h[':status']; });
+      req.on('data', (c) => { data += c; });
+      req.on('error', () => { try { client.close(); } catch { /* ignore */ } resolve(0); });
+      req.on('end', () => {
+        if (status !== 200) console.error(`[apns-broadcast] ${event} failed: ${status} ${data}`);
         try { client.close(); } catch { /* ignore */ }
         resolve(status);
       });
