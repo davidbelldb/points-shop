@@ -243,7 +243,7 @@ function reachedPhase(startedAtMs, arrivesAtMs) {
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
     `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
-            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets, s.la_channel_id
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets, s.la_channel_id, s.from_label
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
         AND (s.la_channel_id IS NOT NULL OR EXISTS (
@@ -258,15 +258,18 @@ export async function pushStreetSubtitleUpdates() {
       const target = reachedPhase(startedAtMs, arrivesAtMs);
       if (target <= (Number(s.la_phase) || 0)) continue;
 
+      const msg = streetMessage(target, s);
       const state = crowContentState({
-        startedAtMs, arrivesAtMs, landed: false, message: streetMessage(target, s), phase: target,
+        startedAtMs, arrivesAtMs, landed: false, message: msg, phase: target,
       });
+      // A little ping/vibration as the crow passes each waypoint.
+      const alert = { title: s.from_label ? 'The Three-Eyed Crow' : 'A crow en route', body: msg };
       if (s.la_channel_id) {
-        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state });
+        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert });
       } else {
         const tokens = await updateTokensFor(s.id);
         for (const token of tokens) {
-          await sendLiveActivityPush(token, { event: 'update', contentState: state });
+          await sendLiveActivityPush(token, { event: 'update', contentState: state, alert });
         }
       }
       await query(`UPDATE scrolls SET la_phase = $1 WHERE id = $2`, [target, s.id]);
