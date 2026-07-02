@@ -375,6 +375,9 @@ export async function sendApns(accountId, payload) {
         'apns-topic': config.apns.bundleId,
         'apns-push-type': 'alert',
         'apns-priority': '10',
+        // Collapse repeated pings (e.g. each crow waypoint) into one updating
+        // banner instead of stacking — still wakes the screen each time.
+        ...(payload.collapseId ? { 'apns-collapse-id': String(payload.collapseId).slice(0, 64) } : {}),
       });
       req.setEncoding('utf8');
       req.on('response', (headers) => { status = headers[':status']; });

@@ -565,10 +565,12 @@ function LeaderboardModal({ onClose, today }) {
                 </div>
               </div>
 
-              {/* ── All-time stats ── */}
+              {/* ── Current series stats ── */}
               {data.allTime.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: textSec }}>All time</p>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: textSec }}>
+                    {data.current_series_name ?? 'Current series'}
+                  </p>
                   <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${cardBorder}` }}>
                     {/* Header */}
                     <div className="grid px-3 py-2 text-xs font-semibold uppercase tracking-wide"

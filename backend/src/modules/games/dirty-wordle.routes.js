@@ -184,7 +184,21 @@ export default async function dirtyWordleRoutes(fastify) {
       [`dirty-wordle:${date}`, date],
     );
 
-    // All-time stats — all accounts shown even if they haven't played yet
+    // Current-series stats — find the active series, fall back to most recent
+    const { rows: seriesRows } = await query(
+      `SELECT id, name, starts_on, ends_on
+         FROM dirty_wordle_series
+        WHERE starts_on <= CURRENT_DATE
+        ORDER BY starts_on DESC
+        LIMIT 1`,
+    );
+    const currentSeries     = seriesRows[0] ?? null;
+    const seriesStartStr    = currentSeries?.starts_on?.toISOString?.().slice(0, 10)
+                              ?? currentSeries?.starts_on ?? null;
+    const seriesEndStr      = currentSeries?.ends_on?.toISOString?.().slice(0, 10)
+                              ?? currentSeries?.ends_on ?? null;
+    const currentSeriesName = currentSeries?.name ?? null;
+
     const { rows: statsRows } = await query(
       `SELECT a.id AS account_id,
               a.name,
@@ -194,13 +208,17 @@ export default async function dirtyWordleRoutes(fastify) {
               ROUND(AVG(r.guesses_taken) FILTER (WHERE r.won)::numeric, 1) AS avg_guesses,
               COALESCE(SUM(pl.delta), 0)                         AS total_pts
          FROM accounts a
-         LEFT JOIN dirty_wordle_results r ON r.account_id = a.id
+         LEFT JOIN dirty_wordle_results r
+           ON r.account_id = a.id
+          AND ($1::date IS NULL OR r.date >= $1::date)
+          AND ($2::date IS NULL OR r.date <= $2::date)
          LEFT JOIN points_ledger pl
            ON pl.account_id = a.id
           AND pl.reason = 'dirty-wordle:' || r.date::text
           AND r.won = true
         GROUP BY a.id, a.name, a.photo_url
         ORDER BY wins DESC, avg_guesses ASC NULLS LAST`,
+      [seriesStartStr, seriesEndStr],
     );
 
     // ── Series wins ───────────────────────────────────────────────────────
@@ -238,6 +256,7 @@ export default async function dirtyWordleRoutes(fastify) {
 
     return {
       date,
+      current_series_name: currentSeriesName,
       completed_series_count: completedSeries.length,
       today: todayRows.map(r => ({
         name:         r.name,
