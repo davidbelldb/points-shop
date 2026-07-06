@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { hydrateThenFetch } from '../lib/swrCache.js';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
+import Pressable from '../components/Pressable.jsx';
 import HeroCarousel from '../components/HeroCarousel.jsx';
 import WheelHomeSection from '../components/WheelHomeSection.jsx';
 import EntertainmentWheelHomeSection from '../components/EntertainmentWheelHomeSection.jsx';
@@ -170,10 +171,11 @@ export default function HomePage() {
           {sorted && (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {sorted.map((p) => (
-                <Link
+                <Pressable
+                  as={Link}
                   key={p.id}
                   to={`/product/${p.id}`}
-                  className="group rounded-2xl border border-neutral-200 bg-white p-3 md:p-4 transition-all hover:shadow-md active:scale-[0.98]"
+                  className="group rounded-2xl border border-neutral-200 bg-white p-3 md:p-4 transition-all hover:shadow-md"
                 >
                   <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-400">
                     {p.thumbnail_url ? (
@@ -194,7 +196,7 @@ export default function HomePage() {
                   </div>
                   <h3 className="mt-2 line-clamp-1 text-sm font-medium">{p.name}</h3>
                   <p className="text-sm font-semibold text-amber-700">{p.price_points} pts</p>
-                </Link>
+                </Pressable>
               ))}
             </div>
           )}

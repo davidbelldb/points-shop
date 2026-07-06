@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
+import Pressable from '../components/Pressable.jsx';
 
 export default function BasketPage() {
   const { basket, account, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder } = useBasket();
@@ -30,9 +31,9 @@ export default function BasketPage() {
       <div className="space-y-4">
         <h1 className="text-xl font-semibold">{pocketLabel}</h1>
         <p className="text-sm text-neutral-500">Oh look. It's empty. Better put something in it.</p>
-        <Link to="/" className="inline-block rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-amber-900">
+        <Pressable as={Link} to="/" className="inline-block rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-amber-900">
           Close basket
-        </Link>
+        </Pressable>
       </div>
     );
   }
@@ -109,25 +110,25 @@ export default function BasketPage() {
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-sm font-medium leading-tight">{item.name}</h3>
-                      <button onClick={() => removeItem(item.product_id)} className="text-xs text-neutral-400 hover:text-red-600">
+                      <Pressable onClick={() => removeItem(item.product_id)} className="text-xs text-neutral-400 hover:text-red-600">
                         Remove
-                      </button>
+                      </Pressable>
                     </div>
                     <p className="text-sm font-semibold text-amber-700">{item.price_points} pts</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
+                    <Pressable
                       onClick={() => setItemQty(item.product_id, item.qty - 1)}
                       className="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-200 text-base"
                       aria-label="Decrease quantity"
-                    >{'\u2212'}</button>
+                    >{'\u2212'}</Pressable>
                     <span className="min-w-6 text-center text-sm font-medium">{item.qty}</span>
-                    <button
+                    <Pressable
                       onClick={() => setItemQty(item.product_id, item.qty + 1)}
                       disabled={item.qty >= item.stock_qty}
                       className="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-200 text-base disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="Increase quantity"
-                    >+</button>
+                    >+</Pressable>
                   </div>
                 </div>
               </li>
@@ -179,9 +180,9 @@ export default function BasketPage() {
                   <p className="text-xs text-emerald-700">{basket.discount.description}</p>
                 )}
               </div>
-              <button onClick={handleRemovePromo} disabled={busy} className="text-xs font-medium text-emerald-800 hover:text-red-600">
+              <Pressable onClick={handleRemovePromo} disabled={busy} className="text-xs font-medium text-emerald-800 hover:text-red-600">
                 Remove
-              </button>
+              </Pressable>
             </div>
           ) : (
             <div className="flex gap-2">
@@ -191,13 +192,13 @@ export default function BasketPage() {
                 placeholder="Discount code"
                 className="block min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
               />
-              <button
+              <Pressable
                 onClick={handleApply}
                 disabled={busy || !code.trim()}
                 className="shrink-0 rounded-md bg-neutral-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
               >
                 Apply
-              </button>
+              </Pressable>
             </div>
           )}
 
@@ -234,13 +235,13 @@ export default function BasketPage() {
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
           )}
 
-          <button
+          <Pressable
             disabled={!canAfford || placing}
             onClick={handlePlace}
-            className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300"
+            className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition disabled:cursor-not-allowed disabled:bg-neutral-300"
           >
             {placing ? 'Placing order...' : canAfford ? 'Place order' : "You're a bit too poor for that. Pauper."}
-          </button>
+          </Pressable>
         </div>
 
       </div>

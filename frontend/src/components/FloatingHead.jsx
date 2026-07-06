@@ -36,6 +36,7 @@ export default function FloatingHead() {
   const [data, setData] = useState(null);           // { count, other }
   const [vp, setVp]     = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const [dragging, setDragging] = useState(false);
+  const [pressed, setPressed]   = useState(false); // iOS-style press-in on touch-down
 
   // Anchored starting position: restore the saved side + vertical fraction,
   // else default to the right edge around two-thirds down.
@@ -99,6 +100,7 @@ export default function FloatingHead() {
       originX: posRef.current.x, originY: posRef.current.y,
       moved: false, downAt: Date.now(),
     };
+    setPressed(true);
     setDragging(true);
   }
 
@@ -119,12 +121,14 @@ export default function FloatingHead() {
     const d = dragRef.current;
     dragRef.current = null;
     setDragging(false);
+    setPressed(false);
     if (!d) return;
 
     // A quick, near-stationary press is a tap → open the chat.
     if (!d.moved && Date.now() - d.downAt < 500) {
       hapticTap();
-      navigate('/messages');
+      // sheet: true → MessagesPage slides up from the bottom (see SheetIn).
+      navigate('/messages', { state: { sheet: true } });
       return;
     }
 
@@ -180,8 +184,10 @@ export default function FloatingHead() {
       <span
         className="block h-full w-full overflow-hidden rounded-full bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 shadow-lg"
         style={{
-          transform: dragging ? 'scale(1.08)' : 'scale(1)',
-          transition: 'transform 200ms ease',
+          // Press-in on touch-down (0.94), scale-up while dragging (1.08),
+          // rest at 1. Snappy iOS curve for the press so it feels tactile.
+          transform: dragging ? 'scale(1.08)' : pressed ? 'scale(0.94)' : 'scale(1)',
+          transition: 'transform 180ms cubic-bezier(0.32, 0.72, 0, 1)',
         }}
       >
         {other.photo_url ? (
@@ -206,7 +212,7 @@ export default function FloatingHead() {
           transform: `translate3d(${bubble.x}px, ${bubble.y}px, 0)`,
           transition: dragging ? 'none' : SPRING,
         }}
-        className="flex items-center justify-center rounded-full bg-teal-500 text-[11px] font-bold leading-none text-white ring-2 ring-white dark:ring-neutral-800"
+        className="flex items-center justify-center rounded-full bg-teal-500 text-[11px] font-bold leading-none text-white"
       >
         {count > 0 ? (
           count > 9 ? '9+' : count

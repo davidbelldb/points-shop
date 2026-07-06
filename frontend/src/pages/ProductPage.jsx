@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import ProductGallery from '../components/ProductGallery.jsx';
 import ProductReviews from '../components/ProductReviews.jsx';
+import Pressable from '../components/Pressable.jsx';
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -39,9 +40,9 @@ export default function ProductPage() {
 
   return (
     <div className="space-y-4">
-      <Link to="/" className="inline-flex items-center gap-1 text-sm text-neutral-600">
+      <Pressable as={Link} to="/" className="inline-flex items-center gap-1 text-sm text-neutral-600">
         <span aria-hidden>{'\u2190'}</span> Back
-      </Link>
+      </Pressable>
 
       {/* Mobile: stacked. md+: gallery left, details right. */}
       <div className="md:grid md:grid-cols-2 lg:grid-cols-[3fr_2fr] md:gap-8 md:items-start">
@@ -74,13 +75,13 @@ export default function ProductPage() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <button
+          <Pressable
             disabled={!inStock || adding}
             onClick={handleAdd}
-            className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300"
+            className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition disabled:cursor-not-allowed disabled:bg-neutral-300"
           >
             {adding ? 'Adding...' : inStock ? 'Add to safe pocket' : 'Out of stock'}
-          </button>
+          </Pressable>
 
           <ProductReviews productId={product.id} />
         </div>

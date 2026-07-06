@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import Pressable from '../components/Pressable.jsx';
 
 export default function OrderConfirmationPage() {
   const { id } = useParams();
@@ -92,9 +93,9 @@ export default function OrderConfirmationPage() {
         </div>
       </div>
 
-      <Link to="/" className="block w-full rounded-xl bg-amber-600 py-3 text-center text-sm font-semibold text-amber-900">
+      <Pressable as={Link} to="/" className="block w-full rounded-xl bg-amber-600 py-3 text-center text-sm font-semibold text-amber-900">
         Back
-      </Link>
+      </Pressable>
     </div>
   );
 }

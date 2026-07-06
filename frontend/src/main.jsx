@@ -20,6 +20,7 @@ import RewardsPage from './pages/RewardsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MessagesPage from './pages/MessagesPage.jsx';
 import NewChatPage from './pages/NewChatPage.jsx';
+import SheetIn from './components/SheetIn.jsx';
 
 // ── Lazy — heavy feature bundles, fetched only when their route is opened.
 // The games carry three.js / react-three-fiber / rapier; Notes carries
@@ -162,7 +163,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="basket" element={<BasketPage />} />
               <Route path="order/:id" element={<OrderConfirmationPage />} />
               <Route path="account" element={<AccountPage />} />
-              <Route path="messages" element={<MessagesPage />} />
+              <Route path="messages" element={<SheetIn><MessagesPage /></SheetIn>} />
               {/* Scrolls feature dev clone — URL-only, admin-gated inside the
                   page, intentionally NOT linked in any menu. Merges into
                   /messages when tested. */}
