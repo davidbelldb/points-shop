@@ -58,6 +58,21 @@ body { min-height: -webkit-fill-available; min-height: 100dvh; min-height: 100sv
 
 body { -webkit-tap-highlight-color: transparent; }
 
+/* ── Accessibility: reduced motion ───────────────────────────────────────────
+   Global fallback so every CSS animation/transition collapses to near-instant
+   when the user asks the OS for reduced motion. framer-motion animations are
+   guarded separately in JS via useReducedMotion (re-exported from lib/motion.js),
+   which cross-fades instead of sliding. Keeping motion out of the way here is
+   both an accessibility win and expected iOS/App Store behaviour. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Hide the horizontal scrollbar on carousels (e.g. the stories strip) while
    keeping the element scrollable. */
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }

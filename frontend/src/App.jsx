@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -18,6 +18,7 @@ import WelcomeOverlay from './components/WelcomeOverlay.jsx';
 import PullToRefresh from './components/PullToRefresh.jsx';
 import SplashFireworks from './components/SplashFireworks.jsx';
 import FloatingHead from './components/FloatingHead.jsx';
+import PageTransition from './components/PageTransition.jsx';
 import { countdownClock } from './lib/countdown.js';
 import { hapticTap, hapticFireworks } from './lib/haptics.js';
 
@@ -414,7 +415,7 @@ export default function App() {
       })()}
       {showFloater && <SurveyBanner />}
       <main className={isFullGame ? 'flex-1 min-h-0 flex flex-col w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-8' : isMessages ? 'w-full pb-0 lg:px-8' : 'w-full pb-24 lg:px-8'}`}>
-        <Outlet />
+        <PageTransition />
       </main>
       </div>{/* end md:pl-56 wrapper */}
     </div>
