@@ -1,6 +1,7 @@
 import {
   findOtherUser, listMessages, sendMessage, markAllRead, deleteMessage,
   editMessage, setReaction, toggleSparkle, setTyping, votePoll, revealSecretMessage,
+  unreadCountFrom,
 } from './chat.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
@@ -44,6 +45,16 @@ export default async function chatRoutes(fastify) {
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }
+  });
+
+  // Lightweight poll target for the floating head: the partner's photo plus
+  // how many of their messages I haven't read yet.
+  fastify.get('/api/messages/unread-count', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    const other = await findOtherUser(accountId);
+    if (!other) return { count: 0, other: null };
+    const count = await unreadCountFrom(accountId, other.id);
+    return { count, other: { id: other.id, name: other.name, photo_url: other.photo_url ?? null } };
   });
 
   fastify.post('/api/messages/mark-read', async (req) => {

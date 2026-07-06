@@ -272,6 +272,20 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
   return message;
 }
 
+// Count of unread messages the other person has sent me — drives the floating
+// head's bubble. Excludes system bodies (nudges / rain) so it mirrors what the
+// user perceives as "unread messages".
+export async function unreadCountFrom(accountId, fromUserId) {
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS count
+       FROM chat_messages
+      WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL
+        AND body NOT IN ('__nudge__', '__rain_twirl__', '__rain_popcorn__', '__rain_duck__')`,
+    [accountId, fromUserId],
+  );
+  return rows[0]?.count ?? 0;
+}
+
 export async function markAllRead(accountId, fromUserId) {
   await query(
     `UPDATE chat_messages SET read_at = NOW()

@@ -150,6 +150,7 @@ export const api = {
       }),
     }),
   markMessagesRead: () => request('/messages/mark-read', { method: 'POST' }),
+  messagesUnreadCount: () => request('/messages/unread-count'),
   deleteMessage: (id) => request(`/messages/${id}`, { method: 'DELETE' }),
   editMessage: (id, body) =>
     request(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),

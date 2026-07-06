@@ -17,6 +17,7 @@ import InAppNotifier from './components/InAppNotifier.jsx';
 import WelcomeOverlay from './components/WelcomeOverlay.jsx';
 import PullToRefresh from './components/PullToRefresh.jsx';
 import SplashFireworks from './components/SplashFireworks.jsx';
+import FloatingHead from './components/FloatingHead.jsx';
 import { countdownClock } from './lib/countdown.js';
 import { hapticTap, hapticFireworks } from './lib/haptics.js';
 
@@ -81,6 +82,13 @@ export default function App() {
   const logoUrl  = settings.logo_url;
 
   const isHome = location.pathname === '/';
+  // Floating partner head on the home page. Defaults: on for David (admin),
+  // off for Katie (partner) until toggled on from the admin panel.
+  const floatingHeadEnabled = isHome && (
+    user?.role === 'admin'
+      ? settings.floating_head_admin !== 'false'
+      : settings.floating_head_partner === 'true'
+  );
   const isGame = location.pathname.startsWith('/games/');
   const isFullGame = location.pathname === '/games/streets-of-cambs-rage';
   const isMessages = location.pathname.startsWith('/messages');
@@ -385,6 +393,7 @@ export default function App() {
       <WelcomeOverlay />
       <SplashFireworks />
       <PullToRefresh />
+      {floatingHeadEnabled && <FloatingHead />}
       {isHome && bannerOn && (() => {
         const bannerLink = (settings.banner_link_url || '').trim();
         const inner = (

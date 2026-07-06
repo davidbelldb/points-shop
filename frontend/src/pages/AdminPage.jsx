@@ -18,6 +18,7 @@ import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
 import AdminScrollsSection from './AdminScrollsSection.jsx';
 import AdminForecastSection from './AdminForecastSection.jsx';
+import AdminFloatingHeadSection from './AdminFloatingHeadSection.jsx';
 import AdminJustSayWordSection from './AdminJustSayWordSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
@@ -185,6 +186,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Daily Forecast Scroll" storageKey="admin::forecast">
         <AdminForecastSection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Floating Head" storageKey="admin::floatinghead">
+        <AdminFloatingHeadSection />
       </AdminCollapsible>
 
       <AdminCollapsible title="Dirty Talk" storageKey="admin::jstw">
