@@ -5,6 +5,7 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { formatLedgerReason } from '../lib/formatters.js';
 import GameRewardsCard from '../components/GameRewardsCard.jsx';
+import Pressable from '../components/Pressable.jsx';
 import PushToggle from '../components/PushToggle.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import Confetti from '../components/Confetti.jsx';
@@ -88,19 +89,19 @@ export default function AccountPage() {
 
           {/* Admin-only (David) — hidden from Katie until launch */}
           {user?.role === 'admin' && (
-            <Link to="/sneakyscapes"
+            <Pressable as={Link} to="/sneakyscapes"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm font-medium text-amber-700">
               <span>Sneakyscapes</span>
               <span aria-hidden>&rarr;</span>
-            </Link>
+            </Pressable>
           )}
 
           {user?.role === 'admin' && (
-            <Link to="/justsaytheword"
+            <Pressable as={Link} to="/justsaytheword"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm font-medium text-amber-700">
               <span>Dirty Talk</span>
               <span aria-hidden>&rarr;</span>
-            </Link>
+            </Pressable>
           )}
 
           <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
@@ -147,7 +148,8 @@ export default function AccountPage() {
             {error && <p className="text-sm text-red-600">{error}</p>}
           </section>
 
-          <Link
+          <Pressable
+            as={Link}
             to="/messages"
             className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
           >
@@ -163,9 +165,10 @@ export default function AccountPage() {
               </div>
             </div>
             <span className="text-neutral-400">{'\u2192'}</span>
-          </Link>
+          </Pressable>
 
-          <Link
+          <Pressable
+            as={Link}
             to="/rewatch"
             className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
           >
@@ -183,7 +186,7 @@ export default function AccountPage() {
               </div>
             </div>
             <span className="text-neutral-400">{'\u2192'}</span>
-          </Link>
+          </Pressable>
 
           <PushToggle />
 
@@ -192,7 +195,8 @@ export default function AccountPage() {
           </section>
 
           {user?.username === 'david' && (
-            <Link
+            <Pressable
+              as={Link}
               to="/shopping-list"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
             >
@@ -210,11 +214,12 @@ export default function AccountPage() {
                 <p className="text-sm font-medium">Sneaky Lists</p>
               </div>
               <span className="text-neutral-400">→</span>
-            </Link>
+            </Pressable>
           )}
 
           {user?.username === 'david' && (
-            <Link
+            <Pressable
+              as={Link}
               to="/timeline"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
             >
@@ -228,11 +233,12 @@ export default function AccountPage() {
                 <p className="text-sm font-medium">Timeline</p>
               </div>
               <span className="text-neutral-400">→</span>
-            </Link>
+            </Pressable>
           )}
 
           {user?.username === 'david' && (
-            <Link
+            <Pressable
+              as={Link}
               to="/journal"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
             >
@@ -246,11 +252,12 @@ export default function AccountPage() {
                 <p className="text-sm font-medium">Journal editor</p>
               </div>
               <span className="text-neutral-400">→</span>
-            </Link>
+            </Pressable>
           )}
 
           {user?.username === 'david' && (
-            <Link
+            <Pressable
+              as={Link}
               to="/admin"
               className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 hover:shadow-sm"
             >
@@ -263,7 +270,7 @@ export default function AccountPage() {
                 <p className="text-sm font-medium">Admin</p>
               </div>
               <span className="text-neutral-400">→</span>
-            </Link>
+            </Pressable>
           )}
         </div>
 
