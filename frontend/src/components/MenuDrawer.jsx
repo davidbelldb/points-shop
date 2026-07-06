@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle.jsx';
+import Pressable from './Pressable.jsx';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock.js';
-import { hapticTap } from '../lib/haptics.js';
 
 const ICON_COLOUR = '#ed70bd';
 
@@ -118,9 +118,10 @@ function Item({ to, label, icon, onClose }) {
     ? location.pathname === '/'
     : location.pathname === to || location.pathname.startsWith(`${to}/`);
   return (
-    <Link
+    <Pressable
+      as={Link}
       to={to}
-      onClick={() => { hapticTap(); onClose(); }}
+      onClick={onClose}
       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
         active ? 'bg-amber-100 text-amber-900' : 'text-neutral-800 hover:bg-neutral-100'
       }`}
@@ -129,7 +130,7 @@ function Item({ to, label, icon, onClose }) {
         {icon}
       </span>
       {label}
-    </Link>
+    </Pressable>
   );
 }
 

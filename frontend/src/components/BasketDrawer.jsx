@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock.js';
+import Pressable from './Pressable.jsx';
 
 const SWIPE_RIGHT_THRESHOLD = 60;
 
@@ -116,7 +117,7 @@ export default function BasketDrawer({ open, onClose }) {
             <img src="/sphincter-pink.svg" alt="" className="h-5 w-5" />
             {(() => { const n = `${account?.name ?? 'Your'}'s safe pocket`; return isEmpty ? n : `${n} (${basket.items.length})`; })()}
           </h2>
-          <button
+          <Pressable
             onClick={onClose}
             aria-label="Close safe pocket"
             className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors"
@@ -125,7 +126,7 @@ export default function BasketDrawer({ open, onClose }) {
               <line x1="6" y1="6" x2="18" y2="18" />
               <line x1="18" y1="6" x2="6" y2="18" />
             </svg>
-          </button>
+          </Pressable>
         </div>
 
         {/* ── Loading ── */}
@@ -145,12 +146,12 @@ export default function BasketDrawer({ open, onClose }) {
               <p className="font-semibold text-white">It's a bit clean in here</p>
               <p className="mt-1 text-sm text-white">Let's put something in it...</p>
             </div>
-            <button
+            <Pressable
               onClick={onClose}
               className="rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-amber-900"
             >
               Close
-            </button>
+            </Pressable>
           </div>
         )}
 
@@ -178,19 +179,19 @@ export default function BasketDrawer({ open, onClose }) {
                       <div>
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="text-sm font-medium leading-tight text-white">{item.name}</h3>
-                          <button onClick={() => removeItem(item.product_id)} className="text-xs text-white/60 hover:text-red-400">Remove</button>
+                          <Pressable onClick={() => removeItem(item.product_id)} className="text-xs text-white/60 hover:text-red-400">Remove</Pressable>
                         </div>
                         <p className="text-sm font-semibold text-white/80">{item.price_points} pts</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setItemQty(item.product_id, item.qty - 1)}
+                        <Pressable onClick={() => setItemQty(item.product_id, item.qty - 1)}
                           className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-base text-white"
-                          aria-label="Decrease">−</button>
+                          aria-label="Decrease">−</Pressable>
                         <span className="min-w-6 text-center text-sm font-medium text-white">{item.qty}</span>
-                        <button onClick={() => setItemQty(item.product_id, item.qty + 1)}
+                        <Pressable onClick={() => setItemQty(item.product_id, item.qty + 1)}
                           disabled={item.qty >= item.stock_qty}
                           className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-base text-white disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label="Increase">+</button>
+                          aria-label="Increase">+</Pressable>
                       </div>
                     </div>
                   </li>
@@ -222,17 +223,17 @@ export default function BasketDrawer({ open, onClose }) {
                     <p className="font-semibold text-white">{basket.discount.code} applied</p>
                     {basket.discount.description && <p className="text-xs text-white/70">{basket.discount.description}</p>}
                   </div>
-                  <button onClick={handleRemovePromo} disabled={busy} className="text-xs font-medium text-white/70 hover:text-red-400">Remove</button>
+                  <Pressable onClick={handleRemovePromo} disabled={busy} className="text-xs font-medium text-white/70 hover:text-red-400">Remove</Pressable>
                 </div>
               ) : (
                 <div className="flex gap-2">
                   <input value={code} onChange={(e) => setCode(e.target.value)}
                     placeholder="Discount code"
                     className="block min-w-0 flex-1 rounded-md border border-white/30 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/50 focus:border-white/60 focus:outline-none" />
-                  <button onClick={handleApply} disabled={busy || !code.trim()}
+                  <Pressable onClick={handleApply} disabled={busy || !code.trim()}
                     className="shrink-0 rounded-md bg-white/20 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">
                     Apply
-                  </button>
+                  </Pressable>
                 </div>
               )}
 
@@ -281,13 +282,13 @@ export default function BasketDrawer({ open, onClose }) {
 
               {error && <p className="rounded-lg bg-white/10 px-3 py-2 text-sm text-red-400">{error}</p>}
 
-              <button
+              <Pressable
                 disabled={!canAfford || placing}
                 onClick={handlePlace}
-                className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300"
+                className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
                 {placing ? 'Placing order...' : canAfford ? 'Place order' : "Not enough points. Keep earning!"}
-              </button>
+              </Pressable>
             </div>
           </>
         )}

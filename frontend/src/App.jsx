@@ -19,10 +19,11 @@ import PullToRefresh from './components/PullToRefresh.jsx';
 import SplashFireworks from './components/SplashFireworks.jsx';
 import FloatingHead from './components/FloatingHead.jsx';
 import AnimatedPoints from './components/AnimatedPoints.jsx';
+import Pressable from './components/Pressable.jsx';
 import { motion } from 'framer-motion';
 import { spring } from './lib/motion.js';
 import { countdownClock } from './lib/countdown.js';
-import { hapticTap, hapticFireworks } from './lib/haptics.js';
+import { hapticFireworks } from './lib/haptics.js';
 
 // Fire a celebratory launch haptic exactly once per app session (module-level
 // guard survives App re-mounts on route changes; native shell only).
@@ -280,7 +281,7 @@ export default function App() {
         <div className="flex w-full items-center justify-between gap-2 px-3 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-2">
             {/* Hamburger — mobile only normally; always shown on game route (no SideNav there) */}
-            <button
+            <Pressable
               onClick={() => setMenuOpen((o) => !o)}
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100 ${isFullGame ? '' : 'md:hidden'}`}
@@ -317,12 +318,12 @@ export default function App() {
                   }}
                 />
               </svg>
-            </button>
+            </Pressable>
             {/* Logo/name — hidden on md+ normally; always shown on game route (no SideNav there) */}
-            <Link
+            <Pressable
+              as={Link}
               to="/"
               onClick={(e) => {
-                hapticTap();
                 // On the homepage, scroll back to the top instead of re-navigating;
                 // from any other page, behave as a normal "home" link.
                 if (location.pathname === '/') {
@@ -336,11 +337,12 @@ export default function App() {
                 <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
               ) : null}
               <span className="truncate text-lg font-semibold tracking-tight">{shopName}</span>
-            </Link>
+            </Pressable>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Link
+            <Pressable
+              as={Link}
               to="/account"
               className="flex items-center gap-1.5 rounded-full bg-amber-100 py-1 pl-1 pr-2.5 text-sm font-semibold text-amber-900"
               aria-label="Account"
@@ -360,9 +362,9 @@ export default function App() {
                 )}
               </span>
               <AnimatedPoints value={points} />
-            </Link>
+            </Pressable>
 
-            <button
+            <Pressable
               onClick={() => setBasketOpen(true)}
               className="block rounded-full p-0.5"
               aria-label="Open basket"
@@ -388,7 +390,7 @@ export default function App() {
                   </span>
                 )}
               </span>
-            </button>
+            </Pressable>
           </div>
         </div>
       </header>}

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 import { spring } from '../lib/motion.js';
+import Pressable from './Pressable.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 
 const ICON_COLOUR = '#ed70bd';
@@ -106,7 +107,8 @@ function NavItem({ to, label, icon }) {
     ? location.pathname === '/'
     : location.pathname === to || location.pathname.startsWith(`${to}/`);
   return (
-    <Link
+    <Pressable
+      as={Link}
       to={to}
       className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
         active ? 'text-amber-900' : 'text-neutral-800 hover:bg-neutral-100'
@@ -128,7 +130,7 @@ function NavItem({ to, label, icon }) {
         {icon}
       </span>
       <span className="relative z-10">{label}</span>
-    </Link>
+    </Pressable>
   );
 }
 
@@ -176,7 +178,8 @@ export default function SideNav() {
 
         {/* Account at bottom of nav */}
         <div className="mt-auto pt-2 space-y-0.5">
-          <Link
+          <Pressable
+            as={Link}
             to="/account"
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               window.location.pathname === '/account'
@@ -193,7 +196,7 @@ export default function SideNav() {
               )}
             </span>
             Account
-          </Link>
+          </Pressable>
         </div>
       </nav>
 

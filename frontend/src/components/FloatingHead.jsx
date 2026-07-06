@@ -14,7 +14,7 @@ import { hapticTap, hapticSelect } from '../lib/haptics.js';
  * dead-centre exactly at the 50% horizontal threshold.
  */
 
-const D        = 60;   // head diameter (px)
+const D        = 69;   // head diameter (px) — 15% larger than the original 60
 const R        = D / 2;
 const BUBBLE   = 22;   // unread badge diameter (px)
 const MARGIN   = 12;   // inset from the screen edge when anchored
@@ -193,24 +193,29 @@ export default function FloatingHead() {
         )}
       </span>
 
-      {/* Unread bubble — orbits the rim as the head travels across the screen */}
-      {count > 0 && (
-        <span
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: BUBBLE,
-            height: BUBBLE,
-            transform: `translate3d(${bubble.x}px, ${bubble.y}px, 0)`,
-            transition: dragging ? 'none' : SPRING,
-          }}
-          className="flex items-center justify-center rounded-full bg-teal-500 text-[11px] font-bold leading-none text-white ring-2 ring-white dark:ring-neutral-800"
-        >
-          {count > 9 ? '9+' : count}
-        </span>
-      )}
+      {/* Bubble — orbits the rim as the head travels across the screen. Shows a
+          chat icon by default; swaps to the unread count as messages arrive. */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: BUBBLE,
+          height: BUBBLE,
+          transform: `translate3d(${bubble.x}px, ${bubble.y}px, 0)`,
+          transition: dragging ? 'none' : SPRING,
+        }}
+        className="flex items-center justify-center rounded-full bg-teal-500 text-[11px] font-bold leading-none text-white ring-2 ring-white dark:ring-neutral-800"
+      >
+        {count > 0 ? (
+          count > 9 ? '9+' : count
+        ) : (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+          </svg>
+        )}
+      </span>
     </button>
   );
 }
