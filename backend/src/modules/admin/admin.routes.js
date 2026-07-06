@@ -1,9 +1,10 @@
 import path from 'path';
-import { mkdir, unlink } from 'fs/promises';
+import { mkdir, unlink, stat } from 'fs/promises';
 import { config } from '../../config.js';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { randomUUID } from 'crypto';
+import archiver from 'archiver';
 import {
   listAllProducts,
   getAdminProduct,
@@ -19,6 +20,7 @@ import {
 import { listAllOrders, updateOrderStatus } from '../orders/orders.repo.js';
 import { transcodeVideoIfNeeded } from '../media/transcode.js';
 import { optimizeImage } from '../media/image.js';
+import { listStoriesForExport } from '../stories/stories.repo.js';
 
 const MEDIA_DIR = config.mediaDir;
 
@@ -43,6 +45,32 @@ function classifyMimetype(mimetype = '', filename = '') {
   if (AUDIO_EXTS.has(ext)) return 'audio';
 
   return null;
+}
+
+// --- Story export helpers (see /api/admin/stories/export below) ---
+
+// Zip entry paths can't contain slashes/backslashes from free-text names —
+// flatten them so a stray "/" in someone's display name can't escape the
+// per-author folder.
+function sanitizeZipSegment(s, fallback) {
+  const clean = String(s ?? '').replace(/[\\/]+/g, '-').trim();
+  return clean || fallback;
+}
+
+// Short, readable, collision-safe filename for one story's media inside the
+// zip: date + first 8 chars of the id (always unique) + an optional caption
+// slug for human browsing.
+function storyExportFilename(story) {
+  const dateStr = new Date(story.created_at).toISOString().slice(0, 10);
+  const shortId = String(story.id).slice(0, 8);
+  const ext = path.extname(story.media_url || '') ||
+    (story.media_type === 'video' ? '.mp4' : story.media_type === 'audio' ? '.m4a' : '.jpg');
+  const captionSlug = String(story.caption ?? '')
+    .trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return `${dateStr}_${shortId}${captionSlug ? `_${captionSlug}` : ''}${ext}`;
 }
 
 export default async function adminRoutes(fastify) {
@@ -86,6 +114,55 @@ export default async function adminRoutes(fastify) {
       }
     }
     return { url: mediaUrl, type, mimetype: data.mimetype };
+  });
+
+  /* Bulk export — zips up every Sneaky Story ever posted (photos + videos,
+     including ones soft-hidden into a highlight reel) for offline backup.
+     ?account_id=<uuid> filters to one author; omit or pass "all" for both.
+     Streams straight from disk with no intermediate temp file, and skips
+     any story whose media file has since gone missing rather than failing
+     the whole export. */
+  fastify.get('/api/admin/stories/export', async (req, reply) => {
+    const accountIdParam = String(req.query?.account_id ?? 'all').trim();
+    const authorId = accountIdParam === 'all' ? null : accountIdParam;
+
+    const stories = await listStoriesForExport(authorId);
+    if (stories.length === 0) {
+      return reply.code(404).send({ error: 'No stories found for that filter' });
+    }
+
+    const who = authorId
+      ? sanitizeZipSegment(stories[0].author_name, 'user').toLowerCase().replace(/\s+/g, '-')
+      : 'all';
+    const zipFilename = `sneaky-stories-${who}-${new Date().toISOString().slice(0, 10)}.zip`;
+
+    // Media is already JPEG/WebP/MP4 — all pre-compressed — so store (no
+    // re-deflate) is both faster and doesn't waste CPU for near-zero gain.
+    const archive = archiver('zip', { store: true });
+    archive.on('warning', (err) => req.log.warn({ err }, 'stories export zip warning'));
+    archive.on('error', (err) => req.log.error({ err }, 'stories export zip error'));
+
+    reply.header('Content-Disposition', `attachment; filename="${zipFilename}"`);
+    reply.type('application/zip');
+    reply.send(archive);
+
+    for (const story of stories) {
+      const filename = path.basename(story.media_url || '');
+      if (!filename) continue;
+      const filepath = path.join(MEDIA_DIR, filename);
+      try {
+        await stat(filepath);
+      } catch {
+        continue; // file missing on disk — skip rather than abort the export
+      }
+      const baseName = storyExportFilename(story);
+      const entryName = authorId
+        ? baseName
+        : `${sanitizeZipSegment(story.author_name, 'unknown')}/${baseName}`;
+      archive.file(filepath, { name: entryName, store: true });
+    }
+
+    await archive.finalize();
   });
 
   fastify.get('/api/admin/products', async () => listAllProducts());

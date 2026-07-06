@@ -213,6 +213,27 @@ export async function deleteStory(id, accountId) {
   return { mode: 'deleted' };
 }
 
+/* Every story ever posted — active, archived, AND soft-hidden ones tucked
+   away inside a highlight reel — for one author, or for both when authorId
+   is null. Unlike listArchive() this doesn't filter out hidden_at rows,
+   since those are still real media on disk that a full backup should
+   include. Powers the admin "download all stories" zip export (see
+   admin.routes.js). Oldest first so exported filenames sort chronologically. */
+export async function listStoriesForExport(authorId = null) {
+  const where = authorId ? 'WHERE s.author_id = $1' : '';
+  const params = authorId ? [authorId] : [];
+  const { rows } = await query(
+    `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption, s.created_at,
+            a.name AS author_name
+       FROM sneaky_stories s
+       JOIN accounts a ON a.id = s.author_id
+       ${where}
+      ORDER BY s.created_at ASC`,
+    params,
+  );
+  return rows;
+}
+
 function httpError(code, msg) {
   const err = new Error(msg);
   err.statusCode = code;

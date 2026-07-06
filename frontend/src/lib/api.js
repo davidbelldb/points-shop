@@ -517,6 +517,13 @@ export const api = {
     cleanupStorageReels: (ids) =>
       request('/admin/storage/reels/cleanup', { method: 'POST', body: JSON.stringify({ ids }) }),
 
+    // Bulk story export — direct-navigable URL (server streams a zip with
+    // Content-Disposition: attachment), not a fetch() call.
+    exportStoriesUrl: (accountId) => {
+      const qs = accountId && accountId !== 'all' ? `?account_id=${encodeURIComponent(accountId)}` : '';
+      return `${BASE}/admin/stories/export${qs}`;
+    },
+
     // Relationship Timeline
     listEntertainmentTitles: () => request('/admin/entertainment/titles'),
     listEntertainmentWatchlistTitles: () => request('/admin/entertainment/watchlist-titles'),

@@ -224,6 +224,52 @@ export default function AdminPage() {
           </Link>
         </div>
       </AdminCollapsible>
+
+      <AdminCollapsible title="Download stories" storageKey="admin::stories-export">
+        <StoriesExportSection />
+      </AdminCollapsible>
+    </div>
+  );
+}
+
+// Bulk-download every Sneaky Story (photos + videos) as a single zip, either
+// for one person or both. The download itself is just a plain link to a
+// server endpoint that streams the zip — no fetch/blob handling needed.
+function StoriesExportSection() {
+  const [users, setUsers] = useState([]);
+  const [target, setTarget] = useState('all');
+
+  useEffect(() => {
+    api.admin.listUsers().then(setUsers).catch(() => {});
+  }, []);
+
+  const href = api.admin.exportStoriesUrl(target);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        Bundles every past Sneaky Story's media into one zip file for backup — includes photos and videos,
+        even ones only saved in a highlight reel.
+      </p>
+      <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+        Whose stories
+        <select
+          className={inputCls + ' mt-1'}
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+        >
+          <option value="all">Both</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>{u.name}</option>
+          ))}
+        </select>
+      </label>
+      <a
+        href={href}
+        className="block w-full rounded-md bg-amber-600 py-2 text-center text-sm font-semibold text-amber-900 hover:bg-amber-500"
+      >
+        Download zip
+      </a>
     </div>
   );
 }

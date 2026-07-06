@@ -595,7 +595,7 @@ function EventEditor({ initial, defaultDate, partnerName, onCancel, onSave, onDe
           </button>
         </header>
 
-        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y p-4">
+        <div data-modal-scroll className="sheet-safe-bottom flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y px-4 pt-4 pb-8">
           <div>
             <label className="text-xs font-semibold text-neutral-500">Title</label>
             <input
@@ -634,6 +634,13 @@ function EventEditor({ initial, defaultDate, partnerName, onCancel, onSave, onDe
             <span>All day</span>
             <input type="checkbox" checked={allDay} onChange={(e) => toggleAllDay(e.target.checked)} className="h-4 w-4" />
           </label>
+
+          {isNew && partnerName && (
+            <label className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+              <span>Invite {partnerName}</span>
+              <input type="checkbox" checked={invite} onChange={(e) => setInvite(e.target.checked)} className="h-4 w-4" />
+            </label>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -721,13 +728,6 @@ function EventEditor({ initial, defaultDate, partnerName, onCancel, onSave, onDe
               ))}
             </div>
           </div>
-
-          {isNew && partnerName && (
-            <label className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-              <span>Invite {partnerName}</span>
-              <input type="checkbox" checked={invite} onChange={(e) => setInvite(e.target.checked)} className="h-4 w-4" />
-            </label>
-          )}
 
           {err && <p className="text-xs text-red-600">{err}</p>}
 
