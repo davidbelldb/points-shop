@@ -217,11 +217,16 @@ export async function deleteStory(id, accountId) {
    away inside a highlight reel — for one author, or for both when authorId
    is null. Unlike listArchive() this doesn't filter out hidden_at rows,
    since those are still real media on disk that a full backup should
-   include. Powers the admin "download all stories" zip export (see
-   admin.routes.js). Oldest first so exported filenames sort chronologically. */
-export async function listStoriesForExport(authorId = null) {
-  const where = authorId ? 'WHERE s.author_id = $1' : '';
-  const params = authorId ? [authorId] : [];
+   include. Optional sinceIso restricts to stories created on/after that
+   date (defaults to everything). Powers the admin "download all stories"
+   zip export (see admin.routes.js). Oldest first so exported filenames
+   sort chronologically. */
+export async function listStoriesForExport(authorId = null, sinceIso = null) {
+  const clauses = [];
+  const params = [];
+  if (authorId) { params.push(authorId); clauses.push(`s.author_id = $${params.length}`); }
+  if (sinceIso) { params.push(sinceIso); clauses.push(`s.created_at >= $${params.length}`); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const { rows } = await query(
     `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption, s.created_at,
             a.name AS author_name

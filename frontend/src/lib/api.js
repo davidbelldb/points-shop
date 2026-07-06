@@ -518,10 +518,14 @@ export const api = {
       request('/admin/storage/reels/cleanup', { method: 'POST', body: JSON.stringify({ ids }) }),
 
     // Bulk story export — direct-navigable URL (server streams a zip with
-    // Content-Disposition: attachment), not a fetch() call.
-    exportStoriesUrl: (accountId) => {
-      const qs = accountId && accountId !== 'all' ? `?account_id=${encodeURIComponent(accountId)}` : '';
-      return `${BASE}/admin/stories/export${qs}`;
+    // Content-Disposition: attachment), not a fetch() call. `since` is an
+    // optional YYYY-MM-DD string; omit or pass "all" for full history.
+    exportStoriesUrl: (accountId, since) => {
+      const params = new URLSearchParams();
+      if (accountId && accountId !== 'all') params.set('account_id', accountId);
+      if (since && since !== 'all') params.set('since', since);
+      const qs = params.toString();
+      return `${BASE}/admin/stories/export${qs ? `?${qs}` : ''}`;
     },
 
     // Relationship Timeline

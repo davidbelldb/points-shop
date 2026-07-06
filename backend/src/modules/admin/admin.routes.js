@@ -119,14 +119,25 @@ export default async function adminRoutes(fastify) {
   /* Bulk export — zips up every Sneaky Story ever posted (photos + videos,
      including ones soft-hidden into a highlight reel) for offline backup.
      ?account_id=<uuid> filters to one author; omit or pass "all" for both.
-     Streams straight from disk with no intermediate temp file, and skips
-     any story whose media file has since gone missing rather than failing
-     the whole export. */
+     ?since=<date> restricts to stories created on/after that date; omit or
+     pass "all" for full history. Streams straight from disk with no
+     intermediate temp file, and skips any story whose media file has since
+     gone missing rather than failing the whole export. */
   fastify.get('/api/admin/stories/export', async (req, reply) => {
     const accountIdParam = String(req.query?.account_id ?? 'all').trim();
     const authorId = accountIdParam === 'all' ? null : accountIdParam;
 
-    const stories = await listStoriesForExport(authorId);
+    const sinceParam = String(req.query?.since ?? 'all').trim();
+    let sinceIso = null;
+    if (sinceParam && sinceParam !== 'all') {
+      const sinceDate = new Date(sinceParam);
+      if (Number.isNaN(sinceDate.getTime())) {
+        return reply.code(400).send({ error: 'since must be a valid date' });
+      }
+      sinceIso = sinceDate.toISOString();
+    }
+
+    const stories = await listStoriesForExport(authorId, sinceIso);
     if (stories.length === 0) {
       return reply.code(404).send({ error: 'No stories found for that filter' });
     }
@@ -134,7 +145,8 @@ export default async function adminRoutes(fastify) {
     const who = authorId
       ? sanitizeZipSegment(stories[0].author_name, 'user').toLowerCase().replace(/\s+/g, '-')
       : 'all';
-    const zipFilename = `sneaky-stories-${who}-${new Date().toISOString().slice(0, 10)}.zip`;
+    const sinceLabel = sinceIso ? `-since-${sinceIso.slice(0, 10)}` : '';
+    const zipFilename = `sneaky-stories-${who}${sinceLabel}-${new Date().toISOString().slice(0, 10)}.zip`;
 
     // Media is already JPEG/WebP/MP4 — all pre-compressed — so store (no
     // re-deflate) is both faster and doesn't waste CPU for near-zero gain.

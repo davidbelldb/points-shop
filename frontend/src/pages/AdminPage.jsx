@@ -238,12 +238,13 @@ export default function AdminPage() {
 function StoriesExportSection() {
   const [users, setUsers] = useState([]);
   const [target, setTarget] = useState('all');
+  const [since, setSince] = useState('');
 
   useEffect(() => {
     api.admin.listUsers().then(setUsers).catch(() => {});
   }, []);
 
-  const href = api.admin.exportStoriesUrl(target);
+  const href = api.admin.exportStoriesUrl(target, since);
 
   return (
     <div className="space-y-3">
@@ -264,6 +265,24 @@ function StoriesExportSection() {
           ))}
         </select>
       </label>
+      <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+        Since (optional — leave blank for all time)
+        <input
+          type="date"
+          className={inputCls + ' mt-1'}
+          value={since}
+          onChange={(e) => setSince(e.target.value)}
+        />
+      </label>
+      {since && (
+        <button
+          type="button"
+          onClick={() => setSince('')}
+          className="text-xs text-neutral-500 underline decoration-dotted hover:text-neutral-700 dark:text-neutral-400"
+        >
+          Clear date (use all time)
+        </button>
+      )}
       <a
         href={href}
         className="block w-full rounded-md bg-amber-600 py-2 text-center text-sm font-semibold text-amber-900 hover:bg-amber-500"
