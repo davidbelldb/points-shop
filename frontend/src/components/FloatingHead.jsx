@@ -178,7 +178,7 @@ export default function FloatingHead() {
     >
       {/* Head */}
       <span
-        className="block h-full w-full overflow-hidden rounded-full bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 shadow-lg ring-2 ring-white dark:ring-neutral-800"
+        className="block h-full w-full overflow-hidden rounded-full bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400 shadow-lg"
         style={{
           transform: dragging ? 'scale(1.08)' : 'scale(1)',
           transition: 'transform 200ms ease',
