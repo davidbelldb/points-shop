@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
+import { spring } from '../lib/motion.js';
 import ThemeToggle from './ThemeToggle.jsx';
 
 const ICON_COLOUR = '#ed70bd';
@@ -106,19 +108,26 @@ function NavItem({ to, label, icon }) {
   return (
     <Link
       to={to}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-        active
-          ? 'bg-amber-100 text-amber-900'
-          : 'text-neutral-800 hover:bg-neutral-100'
+      className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+        active ? 'text-amber-900' : 'text-neutral-800 hover:bg-neutral-100'
       }`}
     >
+      {/* Shared selection pill — morphs from the previously-active item to this
+          one whenever the route changes. */}
+      {active && (
+        <motion.span
+          layoutId="sidenav-pill"
+          className="absolute inset-0 z-0 rounded-lg bg-amber-100"
+          transition={spring.gentle}
+        />
+      )}
       <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100"
+        className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100"
         style={{ color: ICON_COLOUR }}
       >
         {icon}
       </span>
-      {label}
+      <span className="relative z-10">{label}</span>
     </Link>
   );
 }

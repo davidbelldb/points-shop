@@ -5,7 +5,15 @@ import { hapticTap } from '../lib/haptics.js';
 // Native pull-to-refresh: drag down from the top of any page to reload its
 // content. Shows a plum spinner that tracks the pull, and reloads on release
 // past the threshold. Native shell only (the browser has its own pull-refresh).
-const THRESHOLD = 70;
+//
+// Tuned to require a *deliberate* downward pull so ordinary scrolling never
+// triggers it: the finger has to travel a clear distance, the motion has to be
+// dominantly vertical, and the first chunk of travel is a dead-zone (no spinner)
+// before anything shows.
+const THRESHOLD = 90;    // finger-damped pull distance needed to arm a refresh
+const DECIDE_SLOP = 16;  // travel required before we lock the gesture's axis
+const DIR_RATIO = 1.6;   // vertical must beat horizontal by this factor to count
+const DEAD_ZONE = 28;    // initial pull swallowed before the spinner appears
 
 export default function PullToRefresh() {
   const [pull, setPull] = useState(0);
@@ -25,9 +33,25 @@ export default function PullToRefresh() {
     if (!Capacitor.isNativePlatform()) return undefined;
     const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
 
+    // Many pages scroll an inner container rather than the window (messages,
+    // lists, etc.), so window.scrollY stays 0 even when you're reading halfway
+    // down. Walk up from the touch target: if any scrollable ancestor is already
+    // scrolled, this is a scroll gesture, not a pull — leave it alone.
+    const innerScrolled = (node) => {
+      let el = node;
+      while (el && el !== document.body && el !== document.documentElement) {
+        if (el instanceof HTMLElement && el.scrollTop > 0) {
+          const oy = getComputedStyle(el).overflowY;
+          if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return true;
+        }
+        el = el.parentNode;
+      }
+      return false;
+    };
+
     const onStart = (e) => {
       const x = e.touches[0].clientX;
-      if (refreshing || !atTop() || x <= EDGE_ZONE || x >= window.innerWidth - EDGE_ZONE) {
+      if (refreshing || !atTop() || x <= EDGE_ZONE || x >= window.innerWidth - EDGE_ZONE || innerScrolled(e.target)) {
         active.current = false; return;
       }
       start.current = e.touches[0].clientY;
@@ -43,11 +67,16 @@ export default function PullToRefresh() {
       // Lock the gesture's axis once it has moved a meaningful amount. If it's
       // mostly horizontal (a drawer pull), abandon — don't show the spinner.
       if (!decided.current) {
-        if (Math.abs(dx) <= 8 && Math.abs(dy) <= 8) return; // wait for a clear direction
-        if (Math.abs(dx) > Math.abs(dy)) { active.current = false; setPull(0); return; }
+        // Wait until the finger has clearly committed to a direction.
+        if (Math.abs(dx) < DECIDE_SLOP && Math.abs(dy) < DECIDE_SLOP) return;
+        // Only a dominant *downward* drag counts. Anything sideways or upward
+        // (i.e. an ordinary scroll flick) abandons the gesture entirely.
+        if (dy <= 0 || Math.abs(dy) < Math.abs(dx) * DIR_RATIO) { active.current = false; setPull(0); return; }
         decided.current = true;
       }
-      const next = dy > 0 && atTop() ? Math.min(110, dy * 0.5) : 0;
+      // Swallow the first DEAD_ZONE px so a small pull never peeks the spinner.
+      const raw = dy - DEAD_ZONE;
+      const next = raw > 0 && atTop() ? Math.min(120, raw * 0.5) : 0;
       // Buzz once the moment the pull passes the release threshold, so you can
       // feel exactly when letting go will trigger a refresh. Re-arms if you ease
       // back below it.

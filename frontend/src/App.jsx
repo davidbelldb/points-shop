@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -18,7 +18,9 @@ import WelcomeOverlay from './components/WelcomeOverlay.jsx';
 import PullToRefresh from './components/PullToRefresh.jsx';
 import SplashFireworks from './components/SplashFireworks.jsx';
 import FloatingHead from './components/FloatingHead.jsx';
-import PageTransition from './components/PageTransition.jsx';
+import AnimatedPoints from './components/AnimatedPoints.jsx';
+import { motion } from 'framer-motion';
+import { spring } from './lib/motion.js';
 import { countdownClock } from './lib/countdown.js';
 import { hapticTap, hapticFireworks } from './lib/haptics.js';
 
@@ -357,7 +359,7 @@ export default function App() {
                   </span>
                 )}
               </span>
-              {points.toLocaleString()} pts
+              <AnimatedPoints value={points} />
             </Link>
 
             <button
@@ -373,8 +375,16 @@ export default function App() {
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
                 {itemCount > 0 && (
-                  <span className="absolute right-0 top-1/2 flex h-5 min-w-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-amber-600 px-1 text-xs font-semibold text-amber-900">
-                    {itemCount}
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2">
+                    <motion.span
+                      key={itemCount}
+                      initial={{ scale: 0.5 }}
+                      animate={{ scale: 1 }}
+                      transition={spring.bouncy}
+                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1 text-xs font-semibold text-amber-900"
+                    >
+                      {itemCount}
+                    </motion.span>
                   </span>
                 )}
               </span>
@@ -415,7 +425,7 @@ export default function App() {
       })()}
       {showFloater && <SurveyBanner />}
       <main className={isFullGame ? 'flex-1 min-h-0 flex flex-col w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-8' : isMessages ? 'w-full pb-0 lg:px-8' : 'w-full pb-24 lg:px-8'}`}>
-        <PageTransition />
+        <Outlet />
       </main>
       </div>{/* end md:pl-56 wrapper */}
     </div>

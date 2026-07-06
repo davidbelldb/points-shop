@@ -1,6 +1,7 @@
 import { StrictMode, Suspense, lazy, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import App from './App.jsx';
 import { initNativePush } from './lib/nativePush.js';
@@ -131,6 +132,10 @@ const lazyFallback = (
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
+    {/* reducedMotion="user" makes every framer-motion transform/layout animation
+        honour the OS "Reduce Motion" setting automatically — no per-component
+        guards needed. Opacity fades are kept, so nothing disappears abruptly. */}
+    <MotionConfig reducedMotion="user">
     <BrowserRouter>
       <ToastProvider>
       <ToastHost />
@@ -208,5 +213,6 @@ createRoot(document.getElementById('root')).render(
       </ThemeProvider>
       </ToastProvider>
     </BrowserRouter>
+    </MotionConfig>
   </StrictMode>
 );

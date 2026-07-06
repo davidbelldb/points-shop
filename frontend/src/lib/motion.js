@@ -33,17 +33,3 @@ export const duration = {
 
 /** Standard press-down scale for tappable elements. */
 export const pressScale = 0.96;
-
-/**
- * Direction-aware page transition variants (subtle iOS push/pop). Forward
- * navigation slides the incoming page in from the right a touch and fades up;
- * back navigation mirrors it. Kept small on purpose — no full-width horizontal
- * slide, which keeps window-scroll and position:sticky behaviour intact.
- *
- * `custom` is the direction: 1 = forward (push), -1 = back (pop).
- */
-export const pageVariants = {
-  initial: (dir) => ({ opacity: 0, x: dir * 24, scale: 0.99 }),
-  animate: { opacity: 1, x: 0, scale: 1 },
-  exit: (dir) => ({ opacity: 0, x: dir * -24, scale: 0.99 }),
-};
