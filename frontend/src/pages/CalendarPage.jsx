@@ -145,8 +145,18 @@ export default function CalendarPage() {
   const [editing, setEditing] = useState(null); // null | 'new' | event obj
 
   const [monthStories, setMonthStories] = useState(null); // archived stories for the focused month
+  const [partnerName, setPartnerName] = useState(null); // the other account — for the "Invite" box
 
   const grid = useMemo(() => buildMonthGrid(focusDate), [focusDate]);
+
+  // The other person's name, so the editor can label the "Invite {name}" box.
+  useEffect(() => {
+    let cancelled = false;
+    api.getCalendarPartner()
+      .then((p) => { if (!cancelled) setPartnerName(p?.name ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Archived stories for the whole focused month — feeds both the Featured
   // story panel and the Sneaky Highlights grid below, so we only query once.
@@ -359,6 +369,7 @@ export default function CalendarPage() {
         <EventEditor
           initial={editing === 'new' ? null : editing}
           defaultDate={selectedDay || new Date()}
+          partnerName={partnerName}
           onCancel={() => setEditing(null)}
           onSave={(payload, id) => handleSave(payload, id)}
           onDelete={(id) => handleDelete(id)}
@@ -502,7 +513,7 @@ function EventCard({ ev, onClick }) {
 /* ============================================================
    Event editor (create + edit + delete in one).
    ============================================================ */
-function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
+function EventEditor({ initial, defaultDate, partnerName, onCancel, onSave, onDelete }) {
   // Lock the page behind this full-screen sheet so scroll gestures only move
   // the sheet's own content, not the calendar underneath.
   useBodyScrollLock();
@@ -528,6 +539,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
   const [gifts, setGifts]           = useState(!!seed.gifts);
   const [snackList, setSnackList]   = useState(Array.isArray(seed.snack_list) ? seed.snack_list.slice() : []);
   const [icon, setIcon]             = useState(seed.icon ?? 'calendar');
+  const [invite, setInvite]         = useState(true); // notify the other person (new events only)
   const [busy, setBusy]   = useState(false);
   const [err, setErr]     = useState(null);
   const valid = title.trim() && startsAt;
@@ -547,6 +559,7 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
         gifts,
         snack_list:   snackList.map((s) => s.trim()).filter(Boolean),
         icon,
+        invite:       isNew ? invite : false,
       }, initial?.id);
     } catch (e) {
       setErr(e.message);
@@ -708,6 +721,13 @@ function EventEditor({ initial, defaultDate, onCancel, onSave, onDelete }) {
               ))}
             </div>
           </div>
+
+          {isNew && partnerName && (
+            <label className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+              <span>Invite {partnerName}</span>
+              <input type="checkbox" checked={invite} onChange={(e) => setInvite(e.target.checked)} className="h-4 w-4" />
+            </label>
+          )}
 
           {err && <p className="text-xs text-red-600">{err}</p>}
 

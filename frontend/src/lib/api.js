@@ -168,6 +168,7 @@ export const api = {
   listCalendarUpcoming: (limit = 3) =>
     request(`/calendar/upcoming?limit=${limit}`),
   getCalendarEvent: (id) => request(`/calendar/events/${id}`),
+  getCalendarPartner: () => request('/calendar/partner'),
   createCalendarEvent: (data) =>
     request('/calendar/events', { method: 'POST', body: JSON.stringify(data) }),
   updateCalendarEvent: (id, patch) =>
