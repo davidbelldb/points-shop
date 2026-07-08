@@ -56,6 +56,7 @@ import storageRoutes from './storage/storage.routes.js';
 import readsRoutes from './reads/reads.routes.js';
 import sneakyscapesRoutes from './sneakyscapes/sneakyscapes.routes.js';
 import entertainmentRoutes from './entertainment/entertainment.routes.js';
+import nfcRoutes from './nfc/nfc.routes.js';
 
 export async function registerAppRoutes(fastify) {
   await fastify.register(productsRoutes);
@@ -103,4 +104,5 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(readsRoutes);
   await fastify.register(sneakyscapesRoutes);
   await fastify.register(entertainmentRoutes);
+  await fastify.register(nfcRoutes);
 }
