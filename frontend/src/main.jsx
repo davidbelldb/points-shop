@@ -36,6 +36,7 @@ const Magic8BallPage       = lazy(() => import('./pages/Magic8BallPage.jsx'));
 const DuckyDerbyPage       = lazy(() => import('./pages/DuckyDerbyPage.jsx'));
 const GameContainer        = lazy(() => import('./game/GameContainer.jsx'));
 const DirtyWordlePage      = lazy(() => import('./pages/DirtyWordlePage.jsx'));
+const PlinkoPage           = lazy(() => import('./pages/PlinkoPage.jsx'));
 const JustSayTheWordPage   = lazy(() => import('./pages/JustSayTheWordPage.jsx'));
 const RewatchListPage      = lazy(() => import('./pages/RewatchListPage.jsx'));
 const RewatchDetailPage    = lazy(() => import('./pages/RewatchDetailPage.jsx'));
@@ -180,6 +181,8 @@ createRoot(document.getElementById('root')).render(
               <Route path="magic-8-ball" element={<Magic8BallPage />} />
               <Route path="games/ducky" element={<DuckyDerbyPage />} />
               <Route path="games/dirty-wordle" element={<DirtyWordlePage />} />
+              {/* Plinko — admin-gated inside the page; URL-only, not in any menu yet. */}
+              <Route path="plinko" element={<PlinkoPage />} />
               {/* Hidden / URL-only while in test — not linked in any menu. */}
               <Route path="justsaytheword" element={<JustSayTheWordPage />} />
               <Route path="games/streets-of-cambs-rage" element={<GameContainer />} />

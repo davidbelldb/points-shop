@@ -271,6 +271,9 @@ export const api = {
     request(`/games/dirty-wordle/progress?date=${date}`),
   dirtyWordleSaveProgress: (payload) =>
     request('/games/dirty-wordle/progress', { method: 'POST', body: JSON.stringify(payload) }),
+  // Plinko
+  plinkoConfig: () => request('/games/plinko/config'),
+  plinkoDrop:   () => request('/games/plinko/drop', { method: 'POST' }),
   // Just Say The Word
   jstwWords:       (date) => request(`/games/just-say-the-word/words?date=${date}`),
   jstwProgress:    (date) => request(`/games/just-say-the-word/progress?date=${date}`),
@@ -437,6 +440,9 @@ export const api = {
 
   admin: {
     listProducts:    () => request('/admin/products'),
+    plinkoGet:       () => request('/games/plinko/admin'),
+    plinkoSettings:  (payload) => request('/games/plinko/admin/settings', { method: 'PUT', body: JSON.stringify(payload) }),
+    plinkoSlots:     (slots) => request('/games/plinko/admin/slots', { method: 'PUT', body: JSON.stringify({ slots }) }),
     createProduct:   (data) => request('/admin/products', { method: 'POST', body: JSON.stringify(data) }),
     updateProduct:   (id, patch) => request(`/admin/products/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     setInventory:    (id, stock_qty, lead_time_days) =>

@@ -35,6 +35,7 @@ import stb15Routes from './games/stb15.routes.js';
 import duckyRoutes from './games/ducky.routes.js';
 import cambsRageRoutes from './games/cambs-rage.routes.js';
 import dirtyWordleRoutes from './games/dirty-wordle.routes.js';
+import plinkoRoutes from './games/plinko.routes.js';
 import justSayTheWordRoutes from './games/just-say-the-word.routes.js';
 import { rtcRoutes } from './games/rtc.routes.js';
 import rewatchRoutes from './rewatch/rewatch.routes.js';
@@ -83,6 +84,7 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(duckyRoutes);
   await fastify.register(cambsRageRoutes);
   await fastify.register(dirtyWordleRoutes);
+  await fastify.register(plinkoRoutes);
   await fastify.register(justSayTheWordRoutes);
   await fastify.register(rtcRoutes);
   await fastify.register(rewatchRoutes);

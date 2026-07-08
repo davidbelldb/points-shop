@@ -13,6 +13,7 @@ import AdminEntertainmentSection from './AdminEntertainmentSection.jsx';
 import AdminShutTheBox15Section from './AdminShutTheBox15Section.jsx';
 import AdminSneakyButtonSection from './AdminSneakyButtonSection.jsx';
 import AdminDuckySection from './AdminDuckySection.jsx';
+import AdminPlinkoSection from './AdminPlinkoSection.jsx';
 import AdminSurveysSection from './AdminSurveysSection.jsx';
 import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
@@ -179,6 +180,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="Ducky Derby" storageKey="admin::ducky">
         <AdminDuckySection bare />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Plinko" storageKey="admin::plinko">
+        <AdminPlinkoSection />
       </AdminCollapsible>
 
       <AdminCollapsible title="Scrolls (raven messages)" storageKey="admin::scrolls">
