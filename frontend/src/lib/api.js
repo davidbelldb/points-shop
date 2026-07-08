@@ -184,6 +184,7 @@ export const api = {
     return request(`/stories/archive${qs}`);
   },
   getStory: (id) => request(`/stories/${id}`),
+  getSecretStory: (token) => request(`/stories/secret/${encodeURIComponent(token)}`),
   createStory: (data) => request('/stories', { method: 'POST', body: JSON.stringify(data) }),
   deleteStory: (id) => request(`/stories/${id}`, { method: 'DELETE' }),
   markStoryViewed: (id) => request(`/stories/${id}/view`, { method: 'POST' }),

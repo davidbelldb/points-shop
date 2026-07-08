@@ -83,27 +83,35 @@ function evaluateGuess(guess, target) {
 
 // ─── Mini colour grid (shared between result modal and leaderboard) ───────────
 
-function ColourGrid({ grid, cellSize = 32 }) {
+// `outline` renders in-progress attempts: each cell's colour is drawn as the
+// STROKE only (transparent fill) so live/mid-game grids read differently from
+// completed (filled) grids. Empty cells stay a faint outline placeholder.
+function ColourGrid({ grid, cellSize = 32, outline = false }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const emptyBg = isDark ? '#2a2a28' : '#ebebea';
+  const colourFor = (state) =>
+    state === 'correct' ? '#61dbbb'
+    : state === 'present' ? '#ed70bd'
+    : isDark ? '#525252' : '#939391'; // absent
   return (
     <div className="flex flex-col items-center gap-1">
       {grid.map((row, ri) => (
         <div key={ri} style={{ display: 'flex', gap: 4 }}>
-          {row.map((state, ci) => (
-            <div
-              key={ci}
-              style={{
-                width: cellSize, height: cellSize,
-                borderRadius: 4,
-                background:
-                  state === 'correct' ? '#61dbbb'
-                  : state === 'present' ? '#ed70bd'
-                  : state === 'empty' ? (isDark ? '#2a2a28' : '#ebebea')
-                  : isDark ? '#525252' : '#939391',
-              }}
-            />
-          ))}
+          {row.map((state, ci) => {
+            const isEmpty = state === 'empty';
+            const style = outline
+              ? {
+                  width: cellSize, height: cellSize, borderRadius: 4,
+                  boxSizing: 'border-box', background: 'transparent',
+                  border: isEmpty ? `1px solid ${emptyBg}` : `2px solid ${colourFor(state)}`,
+                }
+              : {
+                  width: cellSize, height: cellSize, borderRadius: 4,
+                  background: isEmpty ? emptyBg : colourFor(state),
+                };
+            return <div key={ci} style={style} />;
+          })}
         </div>
       ))}
     </div>
@@ -438,13 +446,21 @@ function LeaderboardModal({ onClose, today }) {
   }
 
   useEffect(() => {
-    setLoading(true);
-    setData(null);
-    api.dirtyWordleLeaderboard(viewDate)
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, [viewDate]);
+    let alive = true;
+    let timer = null;
+    const fetchBoard = (initial) => {
+      if (initial) { setLoading(true); setData(null); }
+      api.dirtyWordleLeaderboard(viewDate)
+        .then((d) => { if (alive) setData(d); })
+        .catch(() => { if (alive && initial) setData(null); })
+        .finally(() => { if (alive && initial) setLoading(false); });
+    };
+    fetchBoard(true);
+    // While viewing today, poll so opponents' in-progress attempts appear live
+    // (the pressure play) without a manual refresh.
+    if (viewDate === today) timer = setInterval(() => fetchBoard(false), 4000);
+    return () => { alive = false; if (timer) clearInterval(timer); };
+  }, [viewDate, today]);
 
   const modalBg   = dark ? '#1e1e1c' : '#ffffff';
   const cardBg    = dark ? '#30302e' : '#f5f5f4';

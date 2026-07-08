@@ -20,6 +20,31 @@ import { creditPoints }          from './games.repo.js';
 import { query }                 from '../../db.js';
 
 const PTS_BY_GUESS = [44, 36, 28, 16, 8, 4];
+const WORD_LENGTH = 5;
+
+/**
+ * Score a guess against the target — standard two-pass Wordle scoring so
+ * duplicate letters resolve correctly. Mirrors the frontend evaluateGuess so
+ * in-progress grids look identical to completed ones. Returns an array of
+ * 'correct' | 'present' | 'absent' (colours only — never the letters).
+ */
+function evaluateGuess(guess, target) {
+  const result    = Array(WORD_LENGTH).fill('absent');
+  const targetArr = target.split('');
+  const guessArr  = guess.split('');
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (guessArr[i] === targetArr[i]) {
+      result[i] = 'correct'; targetArr[i] = null; guessArr[i] = null;
+    }
+  }
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (guessArr[i] !== null) {
+      const idx = targetArr.indexOf(guessArr[i]);
+      if (idx !== -1) { result[i] = 'present'; targetArr[idx] = null; }
+    }
+  }
+  return result;
+}
 
 // Master word list — must match the frontend WORDS array
 const WORDS = [
@@ -254,10 +279,41 @@ export default async function dirtyWordleRoutes(fastify) {
       }
     }
 
+    // ── In-progress players ───────────────────────────────────────────────
+    // Players with saved mid-game guesses but no completed result for the date.
+    // We colour their partial grids server-side so only the colour pattern
+    // (never the letters) leaves the server — same privacy model as completed
+    // grids. Drives the live "pressure" view in the leaderboard modal.
+    const { rows: wordRows } = await query(
+      `SELECT word FROM dirty_wordle_schedule WHERE date = $1`,
+      [date],
+    );
+    const todayWord = wordRows[0]?.word ?? null;
+    const completedIds = new Set(todayRows.map(r => r.account_id));
+    let inProgress = [];
+    if (todayWord) {
+      const { rows: progressRows } = await query(
+        `SELECT p.account_id, p.guesses, a.name, a.photo_url
+           FROM dirty_wordle_progress p
+           JOIN accounts a ON a.id = p.account_id
+          WHERE p.date = $1`,
+        [date],
+      );
+      inProgress = progressRows
+        .filter(r => !completedIds.has(r.account_id) && Array.isArray(r.guesses) && r.guesses.length > 0)
+        .map(r => ({
+          name:       r.name,
+          photo_url:  r.photo_url,
+          attempts:   r.guesses.length,
+          guess_grid: r.guesses.map(g => evaluateGuess(String(g).toUpperCase(), todayWord)),
+        }));
+    }
+
     return {
       date,
       current_series_name: currentSeriesName,
       completed_series_count: completedSeries.length,
+      inProgress,
       today: todayRows.map(r => ({
         name:         r.name,
         photo_url:    r.photo_url,

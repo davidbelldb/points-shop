@@ -53,14 +53,23 @@ export async function initNativePush(onOpenUrl) {
       if (url && typeof onOpenUrl === 'function') onOpenUrl(url);
     });
 
-    // Custom-scheme deep links (e.g. tapping the crow Live Activity, which
-    // opens sneakystuff://messages). Strip the scheme/host → in-app path.
+    // Deep links into the app:
+    //  • custom scheme (crow Live Activity → sneakystuff://messages)
+    //  • https universal links (NFC tag / shared link → https://sneakypoints.com/s/<token>)
+    // Both are reduced to an in-app path and handed to the router.
     CapApp.addListener('appUrlOpen', ({ url }) => {
       if (!url || typeof onOpenUrl !== 'function') return;
       report('app-url-open', url);
       try {
-        const path = url.replace(/^sneakystuff:\/\//, '/').replace(/^\/+/, '/');
-        onOpenUrl(path.startsWith('/') ? path : `/${path}`);
+        let path;
+        if (/^https?:\/\//i.test(url)) {
+          const u = new URL(url);
+          path = `${u.pathname}${u.search}`;
+        } else {
+          path = url.replace(/^sneakystuff:\/\//, '/');
+        }
+        path = `/${path.replace(/^\/+/, '')}`;
+        onOpenUrl(path);
       } catch { /* ignore malformed url */ }
     });
   }

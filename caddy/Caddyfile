@@ -15,6 +15,16 @@ sneakypoints.com {
         reverse_proxy backend:3001
     }
 
+    # Apple universal-links association file. Must be served as JSON, over the
+    # apex domain, with no auth and no redirect, so iOS will let the app claim
+    # https://sneakypoints.com/s/* links (opens the story in-app, incl. NFC).
+    @aasa path /.well-known/apple-app-site-association
+    handle @aasa {
+        root * /srv
+        header Content-Type application/json
+        file_server
+    }
+
     handle {
         root * /srv
 

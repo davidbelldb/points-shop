@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
+import { useAuth } from '../../lib/AuthContext.jsx';
 import { useBodyScrollLock } from '../../lib/useBodyScrollLock.js';
 import { useKeyboardHeight } from '../../lib/useKeyboardHeight.js';
 import SliderSticker from './SliderSticker.jsx';
@@ -19,8 +20,14 @@ import DraggableSticker from './DraggableSticker.jsx';
    viewer (1–60s). For video/audio we use the file's natural duration. */
 const DEFAULT_IMAGE_SECONDS = 5;
 const MAX_SECONDS = 600; // image display-duration slider ceiling (no hard cap server-side)
+// Canonical public origin — hidden-story links must point at the real domain
+// (not https://localhost inside the native shell) so they open via a universal
+// link / in a browser fallback.
+const SHARE_BASE = 'https://sneakypoints.com';
 
 export default function StoryUploader({ onClose, onPosted }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   // Lock the feed behind this full-screen sheet so scroll gestures stay inside it.
   useBodyScrollLock();
   // Native: pad the scroll area by the keyboard height so the caption ("Say
@@ -35,6 +42,11 @@ export default function StoryUploader({ onClose, onPosted }) {
   const [seconds, setSeconds] = useState(DEFAULT_IMAGE_SECONDS);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  // Hidden ("link only") story — admin only. After posting, we surface the
+  // shareable link so it can be copied (and later written to an NFC tag).
+  const [secret, setSecret] = useState(false);
+  const [postedLink, setPostedLink] = useState(null);
+  const [copied, setCopied] = useState(false);
   // Some iOS-recorded HEVC clips can't be decoded by the local <video>
   // element even though they upload + play fine after server-side handling.
   // We swap to a friendlier "ready to upload" tile when the element errors.
@@ -181,13 +193,39 @@ export default function StoryUploader({ onClose, onPosted }) {
       if (type === 'video' && thumbnail_url) payload.thumbnail_url = thumbnail_url;
       const allStickers = [...(sticker ? [sticker] : []), ...canvasStickers];
       if (allStickers.length) payload.stickers = allStickers.slice(0, 6);
-      await api.createStory(payload);
+      if (isAdmin && secret) payload.secret = true;
+      const created = await api.createStory(payload);
       onPosted?.();
+      // Hidden story → don't close yet; show the shareable link to copy.
+      if (created?.secret_token) {
+        setPostedLink(`${SHARE_BASE}/s/${created.secret_token}`);
+        setBusy(false);
+        return;
+      }
       onClose();
     } catch (e) {
       setErr(e.message);
       setBusy(false);
     }
+  }
+
+  async function copyLink() {
+    if (!postedLink) return;
+    try {
+      await navigator.clipboard.writeText(postedLink);
+    } catch {
+      // Fallback for WebViews that block the async clipboard API.
+      const ta = document.createElement('textarea');
+      ta.value = postedLink;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -373,9 +411,55 @@ export default function StoryUploader({ onClose, onPosted }) {
             </button>
           )}
 
+          {/* Hidden story — admin only. Posts without notifying Katie and stays
+              out of her feed; only reachable via the link shown after posting. */}
+          {isAdmin && (
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2.5">
+              <span>
+                <span className="block text-sm font-semibold text-purple-900">Hidden story (link only)</span>
+                <span className="block text-xs text-purple-700">She won’t see it in the feed — you’ll get a link to share or write to an NFC tag.</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={secret}
+                onChange={(e) => setSecret(e.target.checked)}
+                className="h-5 w-5 shrink-0 accent-purple-600"
+              />
+            </label>
+          )}
+
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
       </div>
+
+      {/* Post-success panel for a hidden story: copy its shareable link. */}
+      {postedLink && (
+        <div className="sheet-below-nav flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold text-neutral-900">Hidden story posted</h3>
+            <p className="mt-1 text-sm text-neutral-500">
+              Only someone with this link can open it. Copy it to share, or write it to an NFC tag.
+            </p>
+            <div className="mt-3 break-all rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">
+              {postedLink}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={copyLink}
+                className="flex-1 rounded-xl bg-purple-600 py-2.5 text-sm font-semibold text-white active:scale-95"
+              >
+                {copied ? 'Copied ✓' : 'Copy link'}
+              </button>
+              <button
+                onClick={onClose}
+                className="rounded-xl bg-neutral-100 px-4 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {configOpen && sticker && (
         <SliderStickerConfig

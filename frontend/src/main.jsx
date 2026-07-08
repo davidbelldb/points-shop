@@ -56,6 +56,7 @@ const AdminStoragePage     = lazy(() => import('./pages/AdminStoragePage.jsx'));
 const SneakyReadsPage      = lazy(() => import('./pages/SneakyReadsPage.jsx'));
 const SneakyReadDetailPage = lazy(() => import('./pages/SneakyReadDetailPage.jsx'));
 const SneakyscapesPage     = lazy(() => import('./pages/SneakyscapesPage.jsx'));
+const SecretStoryPage      = lazy(() => import('./pages/SecretStoryPage.jsx'));
 
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
@@ -193,6 +194,8 @@ createRoot(document.getElementById('root')).render(
               <Route path="playlist/:id" element={<PlaylistDetailPage />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="stories" element={<SneakyFeedPage />} />
+              {/* Hidden story deep link — opened via shared link / NFC tag. */}
+              <Route path="s/:token" element={<SecretStoryPage />} />
               <Route path="store" element={<SneakyStorePage />} />
               <Route path="notes" element={<NotesPage />} />
               <Route path="sneakytime" element={<SneakyCallsPage />} />

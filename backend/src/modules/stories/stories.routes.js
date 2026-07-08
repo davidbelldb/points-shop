@@ -1,12 +1,12 @@
 import {
-  listActive, listArchive, getStory, createStory, deleteStory, markStoryViewed,
-  listStoryReplies,
+  listActive, listArchive, getStory, getStoryBySecret, createStory, deleteStory,
+  markStoryViewed, listStoryReplies,
 } from './stories.repo.js';
 import {
   listReels, getReel, getReelOwner, createReel, updateReel, deleteReel,
   addStoryToReel, removeStoryFromReel,
 } from './reels.repo.js';
-import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
 
 // Mutation gate — only the reel's creator can rename / delete / add / remove.
 async function assertReelOwner(reelId, accountId, reply) {
@@ -37,6 +37,16 @@ export default async function storiesRoutes(fastify) {
     return s;
   });
 
+  /* Hidden ("link only") story fetched by its secret token — this is what the
+     shared link / NFC tag opens. Works for either logged-in person; the token
+     is the gate. Ignores expiry so the link keeps working indefinitely. */
+  fastify.get('/api/stories/secret/:token', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const s = await getStoryBySecret(req.params.token, accountId);
+    if (!s) return reply.code(404).send({ error: 'not found' });
+    return s;
+  });
+
   /* Replies threaded to a story — float Instagram-style over the media in
      the viewer. Both participants can read them (it's a two-person app). */
   fastify.get('/api/stories/:id/replies', async (req) => {
@@ -54,8 +64,10 @@ export default async function storiesRoutes(fastify) {
      hands us back the URL + type. Author = effective account. */
   fastify.post('/api/stories', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
+    // Only an admin (David) may post a hidden story; strip the flag otherwise.
+    const body = { ...(req.body ?? {}), secret: isAdmin(req) ? !!req.body?.secret : false };
     try {
-      return reply.code(201).send(await createStory(accountId, req.body ?? {}));
+      return reply.code(201).send(await createStory(accountId, body));
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }

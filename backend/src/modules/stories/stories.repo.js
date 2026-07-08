@@ -1,9 +1,10 @@
+import { randomBytes } from 'node:crypto';
 import { query } from '../../db.js';
 import { sendPush } from '../notifications/push.js';
 
 const COLUMNS = `
   s.id, s.author_id, s.media_url, s.media_type, s.caption,
-  s.duration_seconds, s.stickers, s.thumbnail_url,
+  s.duration_seconds, s.stickers, s.thumbnail_url, s.secret_token,
   s.created_at, s.expires_at,
   a.name     AS author_name,
   a.username AS author_username,
@@ -34,6 +35,7 @@ export async function listActive(callerId = null) {
        JOIN accounts a ON a.id = s.author_id
       WHERE s.expires_at > NOW()
         AND s.hidden_at IS NULL
+        AND (s.secret_token IS NULL OR s.author_id = $1)
       ORDER BY s.created_at DESC`,
     [callerId],
   );
@@ -51,6 +53,7 @@ export async function listArchive(fromIso, toIso, callerId = null) {
          JOIN accounts a ON a.id = s.author_id
         WHERE s.expires_at <= NOW()
           AND s.hidden_at IS NULL
+          AND (s.secret_token IS NULL OR s.author_id = $3)
           AND s.created_at >= $1
           AND s.created_at <  $2
         ORDER BY s.created_at DESC`,
@@ -64,6 +67,7 @@ export async function listArchive(fromIso, toIso, callerId = null) {
        JOIN accounts a ON a.id = s.author_id
       WHERE s.expires_at <= NOW()
         AND s.hidden_at IS NULL
+        AND (s.secret_token IS NULL OR s.author_id = $1)
       ORDER BY s.created_at DESC`,
     [callerId],
   );
@@ -77,6 +81,21 @@ export async function getStory(id, callerId = null) {
        JOIN accounts a ON a.id = s.author_id
       WHERE s.id = $1`,
     [id, callerId],
+  );
+  return rows[0] ?? null;
+}
+
+/* Fetch a hidden story by its secret token. Deliberately ignores expires_at
+   and hidden_at so the direct link (e.g. an NFC tag) keeps working long after
+   the story would have rolled off the live feed. The token itself is the gate. */
+export async function getStoryBySecret(token, callerId = null) {
+  if (!token) return null;
+  const { rows } = await query(
+    `SELECT ${COLUMNS}, ${callerViewedColumn(2)}
+       FROM sneaky_stories s
+       JOIN accounts a ON a.id = s.author_id
+      WHERE s.secret_token = $1`,
+    [token, callerId],
   );
   return rows[0] ?? null;
 }
@@ -120,7 +139,7 @@ export async function markStoryViewed(storyId, viewerId) {
   );
 }
 
-export async function createStory(authorId, { media_url, media_type, caption, duration_seconds, stickers, thumbnail_url }) {
+export async function createStory(authorId, { media_url, media_type, caption, duration_seconds, stickers, thumbnail_url, secret }) {
   if (!media_url) throw httpError(400, 'media_url required');
   if (!['image', 'video', 'audio'].includes(media_type)) {
     throw httpError(400, 'media_type must be image, video, or audio');
@@ -140,16 +159,21 @@ export async function createStory(authorId, { media_url, media_type, caption, du
         .filter((s) => s && typeof s === 'object' && !Array.isArray(s))
         .slice(0, 6)
     : [];
+  // Hidden ("link only") story → mint an unguessable token. It's kept out of
+  // the other person's feed and only reachable via its direct link.
+  const secretToken = secret ? randomBytes(16).toString('hex') : null;
   const { rows } = await query(
-    `INSERT INTO sneaky_stories (author_id, media_url, media_type, caption, duration_seconds, stickers, thumbnail_url)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
-     RETURNING id, author_id, media_url, media_type, caption, duration_seconds, stickers, thumbnail_url, created_at, expires_at`,
-    [authorId, media_url, media_type, caption ? String(caption).trim() : null, dur, JSON.stringify(safeStickers), thumbnail_url || null],
+    `INSERT INTO sneaky_stories (author_id, media_url, media_type, caption, duration_seconds, stickers, thumbnail_url, secret_token)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+     RETURNING id, author_id, media_url, media_type, caption, duration_seconds, stickers, thumbnail_url, secret_token, created_at, expires_at`,
+    [authorId, media_url, media_type, caption ? String(caption).trim() : null, dur, JSON.stringify(safeStickers), thumbnail_url || null, secretToken],
   );
   const story = rows[0];
-  // Let the other person know a sneaky story just dropped. Fire-and-forget so
-  // a notification hiccup can never fail the story upload itself.
-  notifyStoryPosted(authorId, story.thumbnail_url || story.media_url).catch(() => {});
+  // Let the other person know a sneaky story just dropped — but NOT for a hidden
+  // story (that would give the surprise away). Fire-and-forget either way.
+  if (!secretToken) {
+    notifyStoryPosted(authorId, story.thumbnail_url || story.media_url).catch(() => {});
+  }
   return story;
 }
 
