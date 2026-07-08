@@ -515,6 +515,8 @@ function LeaderboardModal({ onClose, today }) {
                 <div className="grid grid-cols-2 gap-3">
                   {data.allTime.map(player => {
                     const played = data.today.find(t => t.name === player.name);
+                    // In-progress (mid-game) attempts for players who haven't finished.
+                    const progress = !played ? (data.inProgress ?? []).find(p => p.name === player.name) : null;
                     const emptyRow = Array(WORD_LENGTH).fill('empty');
                     const emptyGrid = Array(MAX_GUESSES).fill(emptyRow);
                     const playerColor = player.name === user?.name ? '#61dbbb' : '#ed70bd';
@@ -548,6 +550,26 @@ function LeaderboardModal({ onClose, today }) {
                           {!played.won && (
                             <p className="text-xs" style={{ color: '#ed70bd' }}>No points</p>
                           )}
+                        </div>
+                      </div>
+                    ) : progress ? (
+                      <div
+                        key={player.name}
+                        className="rounded-xl p-3 flex flex-col items-center justify-between"
+                        style={{ background: cardBg, border: `1px solid ${cardBorder}`, height: cardHeight }}
+                      >
+                        {/* Top: name */}
+                        <p className="text-sm font-bold uppercase tracking-wide" style={{ color: playerColor }}>{player.name}</p>
+                        {/* Middle: outline grid — in-progress attempts, stroke-only */}
+                        <div style={{ height: gridZoneH, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ColourGrid grid={progress.guess_grid} cellSize={24} outline />
+                        </div>
+                        {/* Bottom: live attempt count, in the pts-pill slot */}
+                        <div className="text-center space-y-0.5">
+                          <span className="inline-block rounded-lg px-2 py-0.5 text-xs font-semibold"
+                            style={{ background: 'transparent', border: `1px solid ${playerColor}`, color: playerColor }}>
+                            {progress.attempts}/{MAX_GUESSES}
+                          </span>
                         </div>
                       </div>
                     ) : (
