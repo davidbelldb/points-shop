@@ -3,6 +3,7 @@ import {
   editMessage, setReaction, toggleSparkle, setTyping, votePoll, revealSecretMessage,
   unreadCountFrom,
 } from './chat.repo.js';
+import { unreadCount as scrollsUnreadCount } from '../scrolls/scrolls.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
 // Whitelist of allowed reaction keys. Keep tiny — we render a fixed emoji
@@ -53,7 +54,14 @@ export default async function chatRoutes(fastify) {
     const accountId = getEffectiveAccountId(req);
     const other = await findOtherUser(accountId);
     if (!other) return { count: 0, other: null };
-    const count = await unreadCountFrom(accountId, other.id);
+    // Floating-head bubble reflects everything waiting in the messages feature:
+    // unread chat (text, photos, nudges, rain) + arrived-but-unread scrolls.
+    // Scrolls are summed defensively so a scrolls failure never zeroes the badge.
+    const [msgCount, scrollCount] = await Promise.all([
+      unreadCountFrom(accountId, other.id),
+      scrollsUnreadCount(accountId).catch(() => 0),
+    ]);
+    const count = msgCount + scrollCount;
     return { count, other: { id: other.id, name: other.name, photo_url: other.photo_url ?? null } };
   });
 

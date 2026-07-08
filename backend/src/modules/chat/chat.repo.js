@@ -273,14 +273,14 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
 }
 
 // Count of unread messages the other person has sent me — drives the floating
-// head's bubble. Excludes system bodies (nudges / rain) so it mirrors what the
-// user perceives as "unread messages".
+// head's bubble. Counts every unread item (text, photos, nudges, rain) so the
+// badge reflects all activity waiting in the messages feature; the endpoint
+// then adds unread scrolls on top.
 export async function unreadCountFrom(accountId, fromUserId) {
   const { rows } = await query(
     `SELECT COUNT(*)::int AS count
        FROM chat_messages
-      WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL
-        AND body NOT IN ('__nudge__', '__rain_twirl__', '__rain_popcorn__', '__rain_duck__')`,
+      WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL`,
     [accountId, fromUserId],
   );
   return rows[0]?.count ?? 0;
