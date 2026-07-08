@@ -24,3 +24,8 @@ export async function nfcAvailable() {
 export async function writeNfcUrl(url) {
   return Nfc.writeUrl({ url });
 }
+
+// Wipes a tag (writes a single empty NDEF record). Same resolve/reject shape.
+export async function eraseNfcTag() {
+  return Nfc.eraseTag();
+}

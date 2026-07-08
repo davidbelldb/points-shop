@@ -2,12 +2,15 @@ import Foundation
 import Capacitor
 import CoreNFC
 
-/// Writes a URL to an NFC tag (NDEF URI record). Used by the hidden-story flow
-/// so David can tap "Write to NFC tag" and hold his iPhone to a blank tag.
+/// Reads/writes NFC tags for the hidden-story flow.
 ///
 /// JS usage (see frontend/src/lib/nfc.js):
 ///   Nfc.isAvailable()            // -> { available: Bool }
 ///   Nfc.writeUrl({ url })        // -> { written: true } | rejects
+///   Nfc.eraseTag()               // -> { written: true } | rejects  (wipes a tag)
+///
+/// A write always overwrites whatever the tag already held, so re-writing a tag
+/// just replaces the old link. Erase writes a single empty NDEF record.
 ///
 /// Auto-registered by Capacitor via CAPBridgedPlugin — no manual wiring needed.
 @objc(NfcPlugin)
@@ -17,32 +20,59 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "writeUrl", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "eraseTag", returnType: CAPPluginReturnPromise),
     ]
 
     private var session: NFCNDEFReaderSession?
     private var pendingCall: CAPPluginCall?
-    private var urlToWrite: URL?
+    private var messageToWrite: NFCNDEFMessage?
+    private var successAlert: String = "Done."
 
     @objc func isAvailable(_ call: CAPPluginCall) {
         call.resolve(["available": NFCNDEFReaderSession.readingAvailable])
     }
 
     @objc func writeUrl(_ call: CAPPluginCall) {
-        guard NFCNDEFReaderSession.readingAvailable else {
-            call.reject("NFC is not available on this device")
-            return
-        }
         guard let urlString = call.getString("url"), let url = URL(string: urlString) else {
             call.reject("A valid url is required")
             return
         }
-        // Hold the call open across the async tag session.
+        guard let payload = NFCNDEFPayload.wellKnownTypeURIPayload(url: url) else {
+            call.reject("Couldn't build the link record.")
+            return
+        }
+        begin(
+            call: call,
+            message: NFCNDEFMessage(records: [payload]),
+            prompt: "Hold your iPhone near the NFC tag to write the story link.",
+            success: "Story link written to tag."
+        )
+    }
+
+    @objc func eraseTag(_ call: CAPPluginCall) {
+        let empty = NFCNDEFPayload(format: .empty, type: Data(), identifier: Data(), payload: Data())
+        begin(
+            call: call,
+            message: NFCNDEFMessage(records: [empty]),
+            prompt: "Hold your iPhone near the NFC tag to wipe it.",
+            success: "Tag wiped."
+        )
+    }
+
+    // MARK: - Session lifecycle
+
+    private func begin(call: CAPPluginCall, message: NFCNDEFMessage, prompt: String, success: String) {
+        guard NFCNDEFReaderSession.readingAvailable else {
+            call.reject("NFC is not available on this device")
+            return
+        }
         call.keepAlive = true
         self.pendingCall = call
-        self.urlToWrite = url
+        self.messageToWrite = message
+        self.successAlert = success
         DispatchQueue.main.async {
             let session = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: false)
-            session.alertMessage = "Hold your iPhone near the NFC tag to write the story link."
+            session.alertMessage = prompt
             self.session = session
             session.begin()
         }
@@ -53,7 +83,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             self.pendingCall = nil
             call.resolve(payload)
         }
-        self.urlToWrite = nil
+        self.messageToWrite = nil
         self.session = nil
     }
 
@@ -62,7 +92,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             self.pendingCall = nil
             call.reject(message)
         }
-        self.urlToWrite = nil
+        self.messageToWrite = nil
         self.session = nil
     }
 }
@@ -84,7 +114,7 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
     }
 
     public func readerSession(_ session: NFCNDEFReaderSession, didDetect tags: [NFCNDEFTag]) {
-        guard let url = self.urlToWrite else {
+        guard let message = self.messageToWrite else {
             session.invalidate(errorMessage: "Nothing to write.")
             return
         }
@@ -108,11 +138,6 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
                     session.invalidate(errorMessage: "Couldn't read the tag: \(error.localizedDescription)")
                     return
                 }
-                guard let payload = NFCNDEFPayload.wellKnownTypeURIPayload(url: url) else {
-                    session.invalidate(errorMessage: "Couldn't build the link record.")
-                    return
-                }
-                let message = NFCNDEFMessage(records: [payload])
                 switch status {
                 case .notSupported:
                     session.invalidate(errorMessage: "This tag isn't NDEF compatible.")
@@ -125,7 +150,7 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
                         } else {
                             // Resolve BEFORE invalidating so didInvalidate is a no-op.
                             self.finish(resolve: ["written": true])
-                            session.alertMessage = "Story link written to tag."
+                            session.alertMessage = self.successAlert
                             session.invalidate()
                         }
                     }
