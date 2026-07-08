@@ -284,29 +284,36 @@ export default async function dirtyWordleRoutes(fastify) {
     // We colour their partial grids server-side so only the colour pattern
     // (never the letters) leaves the server — same privacy model as completed
     // grids. Drives the live "pressure" view in the leaderboard modal.
-    const { rows: wordRows } = await query(
-      `SELECT word FROM dirty_wordle_schedule WHERE date = $1`,
-      [date],
-    );
-    const todayWord = wordRows[0]?.word ?? null;
-    const completedIds = new Set(todayRows.map(r => r.account_id));
+    // Defensive: this is an enhancement layered on the core leaderboard, so any
+    // failure here (e.g. the dirty_wordle_progress table missing on an older DB)
+    // must degrade to "no in-progress cards" rather than 500 the whole board.
     let inProgress = [];
-    if (todayWord) {
-      const { rows: progressRows } = await query(
-        `SELECT p.account_id, p.guesses, a.name, a.photo_url
-           FROM dirty_wordle_progress p
-           JOIN accounts a ON a.id = p.account_id
-          WHERE p.date = $1`,
+    try {
+      const { rows: wordRows } = await query(
+        `SELECT word FROM dirty_wordle_schedule WHERE date = $1`,
         [date],
       );
-      inProgress = progressRows
-        .filter(r => !completedIds.has(r.account_id) && Array.isArray(r.guesses) && r.guesses.length > 0)
-        .map(r => ({
-          name:       r.name,
-          photo_url:  r.photo_url,
-          attempts:   r.guesses.length,
-          guess_grid: r.guesses.map(g => evaluateGuess(String(g).toUpperCase(), todayWord)),
-        }));
+      const todayWord = wordRows[0]?.word ?? null;
+      const completedIds = new Set(todayRows.map(r => r.account_id));
+      if (todayWord) {
+        const { rows: progressRows } = await query(
+          `SELECT p.account_id, p.guesses, a.name, a.photo_url
+             FROM dirty_wordle_progress p
+             JOIN accounts a ON a.id = p.account_id
+            WHERE p.date = $1`,
+          [date],
+        );
+        inProgress = progressRows
+          .filter(r => !completedIds.has(r.account_id) && Array.isArray(r.guesses) && r.guesses.length > 0)
+          .map(r => ({
+            name:       r.name,
+            photo_url:  r.photo_url,
+            attempts:   r.guesses.length,
+            guess_grid: r.guesses.map(g => evaluateGuess(String(g).toUpperCase(), todayWord)),
+          }));
+      }
+    } catch (err) {
+      req.log?.warn?.({ err }, 'dirty-wordle: in-progress lookup failed; returning empty');
     }
 
     return {
