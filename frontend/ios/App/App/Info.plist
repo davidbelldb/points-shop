@@ -68,6 +68,8 @@
 	<string>Sneaky Social can save images you create or receive.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Sneaky Social uses your location for scroll flight times and location stickers.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>Sneaky Social writes hidden story links to NFC tags so you can hide surprises for each other.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>

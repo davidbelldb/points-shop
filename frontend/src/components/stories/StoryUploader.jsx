@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useAuth } from '../../lib/AuthContext.jsx';
+import { nfcSupported, writeNfcUrl } from '../../lib/nfc.js';
 import { useBodyScrollLock } from '../../lib/useBodyScrollLock.js';
 import { useKeyboardHeight } from '../../lib/useKeyboardHeight.js';
 import SliderSticker from './SliderSticker.jsx';
@@ -47,6 +48,8 @@ export default function StoryUploader({ onClose, onPosted }) {
   const [secret, setSecret] = useState(false);
   const [postedLink, setPostedLink] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [nfcState, setNfcState] = useState('idle'); // idle | writing | done | error
+  const [nfcMsg, setNfcMsg] = useState(null);
   // Some iOS-recorded HEVC clips can't be decoded by the local <video>
   // element even though they upload + play fine after server-side handling.
   // We swap to a friendlier "ready to upload" tile when the element errors.
@@ -226,6 +229,20 @@ export default function StoryUploader({ onClose, onPosted }) {
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function writeTag() {
+    if (!postedLink || nfcState === 'writing') return;
+    setNfcState('writing'); setNfcMsg(null);
+    try {
+      await writeNfcUrl(postedLink);
+      setNfcState('done');
+    } catch (e) {
+      // User dismissing the NFC sheet isn't an error worth shouting about.
+      if (e?.message === 'cancelled') { setNfcState('idle'); return; }
+      setNfcState('error');
+      setNfcMsg(e?.message || 'Could not write the tag.');
+    }
   }
 
   return (
@@ -457,6 +474,29 @@ export default function StoryUploader({ onClose, onPosted }) {
                 Done
               </button>
             </div>
+
+            {/* Write straight to an NFC tag (native iOS). */}
+            {nfcSupported() && (
+              <>
+                <button
+                  onClick={writeTag}
+                  disabled={nfcState === 'writing'}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-purple-300 bg-white py-2.5 text-sm font-semibold text-purple-800 active:scale-95 disabled:opacity-60"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 8a10 10 0 0 1 14 0" />
+                    <path d="M8.5 11.5a5 5 0 0 1 7 0" />
+                    <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none" />
+                  </svg>
+                  {nfcState === 'writing' ? 'Hold near the tag…'
+                    : nfcState === 'done' ? 'Written ✓'
+                    : 'Write to NFC tag'}
+                </button>
+                {nfcState === 'error' && nfcMsg && (
+                  <p className="mt-1.5 text-center text-xs text-red-600">{nfcMsg}</p>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
