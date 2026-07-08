@@ -297,9 +297,12 @@ export default async function dirtyWordleRoutes(fastify) {
       const completedIds = new Set(todayRows.map(r => r.account_id));
       if (todayWord) {
         const { rows: progressRows } = await query(
+          // dirty_wordle_progress.account_id is TEXT on existing DBs while
+          // accounts.id is UUID — cast both to text so the join works
+          // regardless of the column's underlying type.
           `SELECT p.account_id, p.guesses, a.name, a.photo_url
              FROM dirty_wordle_progress p
-             JOIN accounts a ON a.id = p.account_id
+             JOIN accounts a ON a.id::text = p.account_id::text
             WHERE p.date = $1`,
           [date],
         );
