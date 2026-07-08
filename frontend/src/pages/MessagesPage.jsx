@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { api } from '../lib/api.js';
+import { getCached, setCached } from '../lib/swrCache.js';
 import { hapticNudge, hapticTap } from '../lib/haptics.js';
 import { playCaw } from '../lib/sounds.js';
 
@@ -1447,7 +1448,10 @@ export default function MessagesPage() {
     }
   }, [scrolls.loading, scrolls.unread]);
 
-  const [data, setData] = useState({ other: null, messages: [] });
+  // Hydrate synchronously from the last-known thread so the chat paints instantly
+  // on mount (no empty "No one to chat yet" flash) — the background refresh below
+  // then reconciles it. Cached under a stable key; see refresh() for the write.
+  const [data, setData] = useState(() => getCached('messages:thread') ?? { other: null, messages: [] });
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -1519,6 +1523,7 @@ export default function MessagesPage() {
       result.messages.forEach(m => seenMessageIdsRef.current.add(m.id));
 
       setData(result);
+      setCached('messages:thread', result); // keep the instant-paint snapshot fresh
       if (markRead && result.messages.length > 0) {
         await api.markMessagesRead();
         await refreshBasket();
