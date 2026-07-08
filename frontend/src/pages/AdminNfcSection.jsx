@@ -12,13 +12,14 @@ function fmtDate(iso) {
   catch { return ''; }
 }
 
-/* Story chooser overlay for a slot. */
+/* Story chooser overlay for a slot. Neutral surfaces auto-flip in dark mode
+   (the app inverts the neutral scale via CSS vars), so no dark: variants. */
 function StoryPicker({ stories, onPick, onClose }) {
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl dark:bg-neutral-900">
-        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
-          <span className="text-sm font-semibold">Assign a story</span>
+      <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl">
+        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+          <span className="text-sm font-semibold text-neutral-900">Assign a story</span>
           <button onClick={onClose} className="text-sm text-neutral-500">Close</button>
         </header>
         <div className="grid grid-cols-3 gap-2 overflow-y-auto p-3">
@@ -29,7 +30,7 @@ function StoryPicker({ stories, onPick, onClose }) {
             <button
               key={s.id}
               onClick={() => onPick(s)}
-              className="relative block h-28 w-full overflow-hidden rounded-lg bg-neutral-200 active:scale-95 dark:bg-neutral-700"
+              className="relative block h-28 w-full overflow-hidden rounded-lg bg-neutral-200 active:scale-95"
             >
               {s.thumb ? (
                 <img src={s.thumb} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -39,7 +40,7 @@ function StoryPicker({ stories, onPick, onClose }) {
                 </span>
               )}
               {s.secret && (
-                <span className="absolute left-1 top-1 rounded bg-purple-600 px-1 text-[9px] font-bold text-white">HIDDEN</span>
+                <span className="absolute left-1 top-1 rounded bg-red-500 px-1 text-[9px] font-bold text-white">HIDDEN</span>
               )}
               <span className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5 text-[9px] text-white">
                 {fmtDate(s.created_at)}{s.caption ? ` · ${s.caption}` : ''}
@@ -122,7 +123,7 @@ export default function AdminNfcSection() {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-neutral-600 dark:text-neutral-300">
+      <p className="text-sm text-neutral-600">
         Write each tag once, then point it at any story from here — reassign
         anytime without rewriting the tag. Scanning a tag opens its current story
         in the app.
@@ -135,21 +136,21 @@ export default function AdminNfcSection() {
           {slots.map((slot) => {
             const w = write.id === slot.id ? write : null;
             return (
-              <div key={slot.id} className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+              <div key={slot.id} className="rounded-xl border border-neutral-200 p-3">
                 <div className="flex items-center gap-2">
                   <input
                     defaultValue={slot.label}
                     onBlur={(e) => e.target.value.trim() && e.target.value !== slot.label && rename(slot.id, e.target.value.trim())}
-                    className="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-sm font-semibold focus:border-amber-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800"
+                    className="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-sm font-semibold text-neutral-900 focus:border-amber-500 focus:outline-none"
                   />
-                  <button onClick={() => removeSlot(slot.id)} aria-label="Delete slot" className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-red-600 dark:hover:bg-neutral-800">
+                  <button onClick={() => removeSlot(slot.id)} aria-label="Delete slot" className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-red-600">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" /></svg>
                   </button>
                 </div>
 
                 {/* Current assignment */}
                 <div className="mt-2 flex items-center gap-3">
-                  <div className="h-14 w-11 shrink-0 overflow-hidden rounded-md bg-neutral-200 dark:bg-neutral-700">
+                  <div className="h-14 w-11 shrink-0 overflow-hidden rounded-md bg-neutral-200">
                     {slot.story_thumb ? (
                       <img src={slot.story_thumb} alt="" className="h-full w-full object-cover" />
                     ) : (
@@ -157,7 +158,7 @@ export default function AdminNfcSection() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-neutral-800 dark:text-neutral-100">
+                    <p className="truncate text-sm text-neutral-800">
                       {slot.story_id ? (slot.story_caption || 'Story assigned') : 'No story assigned'}
                     </p>
                     <p className="truncate text-xs text-neutral-400">{slotUrl(slot.slug)}</p>
@@ -176,7 +177,7 @@ export default function AdminNfcSection() {
                     <button
                       onClick={() => writeSlot(slot)}
                       disabled={w?.status === 'writing'}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-purple-300 bg-white py-2 text-xs font-semibold text-purple-800 active:scale-95 disabled:opacity-60 dark:bg-neutral-900"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400 bg-white py-2 text-xs font-semibold text-red-600 active:scale-95 disabled:opacity-60"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8a10 10 0 0 1 14 0" /><path d="M8.5 11.5a5 5 0 0 1 7 0" /><circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none" /></svg>
                       {w?.status === 'writing' ? 'Hold near the tag…' : w?.status === 'done' ? 'Written ✓' : 'Write this slot to a tag'}
@@ -190,17 +191,17 @@ export default function AdminNfcSection() {
 
           <button
             onClick={addSlot}
-            className="w-full rounded-xl border-2 border-dashed border-neutral-300 py-2.5 text-sm font-semibold text-neutral-600 active:scale-[0.99] dark:border-neutral-600 dark:text-neutral-300"
+            className="w-full rounded-xl border-2 border-dashed border-neutral-300 py-2.5 text-sm font-semibold text-neutral-600 active:scale-[0.99]"
           >
             + New tag slot
           </button>
 
           {supported && (
-            <div className="border-t border-neutral-200 pt-3 dark:border-neutral-700">
+            <div className="border-t border-neutral-200 pt-3">
               <button
                 onClick={wipe}
                 disabled={write.id === 'wipe' && write.status === 'writing'}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white active:scale-95 disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white active:scale-95 disabled:opacity-60"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" /></svg>
                 {write.id === 'wipe' && write.status === 'writing' ? 'Hold near the tag…' : write.id === 'wipe' && write.status === 'done' ? 'Tag wiped ✓' : 'Wipe a blank tag'}
@@ -212,7 +213,7 @@ export default function AdminNfcSection() {
           )}
 
           {!supported && (
-            <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800/40">
+            <p className="rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm text-neutral-500">
               Open the app on your iPhone to write or wipe tags. You can still
               manage slots and assignments here.
             </p>

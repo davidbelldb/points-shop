@@ -455,13 +455,13 @@ export default function StoryUploader({ onClose, onPosted }) {
           {/* Hidden story — admin only. Posts without notifying Katie and stays
               out of her feed; only reachable via the link shown after posting. */}
           {isAdmin && (
-            <label className="flex items-center justify-between rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-3 dark:border-neutral-700 dark:bg-neutral-800">
-              <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Hidden story</span>
+            <label className="flex items-center justify-between rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-3">
+              <span className="text-sm font-semibold text-neutral-800">Hidden story</span>
               <input
                 type="checkbox"
                 checked={secret}
                 onChange={(e) => setSecret(e.target.checked)}
-                className="h-5 w-5 shrink-0 accent-teal-500"
+                className="h-5 w-5 shrink-0 accent-amber-500"
               />
             </label>
           )}
@@ -473,24 +473,24 @@ export default function StoryUploader({ onClose, onPosted }) {
       {/* Post-success panel for a hidden story: copy its shareable link. */}
       {postedLink && (
         <div className="sheet-below-nav flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl dark:bg-neutral-900">
-            <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Hidden story posted</h3>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold text-neutral-900">Hidden story posted</h3>
+            <p className="mt-1 text-sm text-neutral-500">
               Only someone with this link can open it. Copy it to share, or write it to an NFC tag.
             </p>
-            <div className="mt-3 break-all rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+            <div className="mt-3 break-all rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-xs text-neutral-700">
               {postedLink}
             </div>
             <div className="mt-4 flex gap-2">
               <button
                 onClick={copyLink}
-                className="flex-1 rounded-xl bg-teal-500 py-2.5 text-sm font-semibold text-white active:scale-95 hover:bg-teal-600"
+                className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-white active:scale-95"
               >
                 {copied ? 'Copied ✓' : 'Copy link'}
               </button>
               <button
                 onClick={onClose}
-                className="rounded-xl bg-neutral-100 px-4 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95 dark:bg-neutral-800 dark:text-neutral-200"
+                className="rounded-xl bg-neutral-100 px-4 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95"
               >
                 Done
               </button>
@@ -502,7 +502,7 @@ export default function StoryUploader({ onClose, onPosted }) {
                 <button
                   onClick={writeTag}
                   disabled={nfcState === 'writing'}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-pink-300 bg-white py-2.5 text-sm font-semibold text-pink-700 active:scale-95 disabled:opacity-60 dark:border-pink-500/40 dark:bg-neutral-900 dark:text-pink-300"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-400 bg-white py-2.5 text-sm font-semibold text-red-600 active:scale-95 disabled:opacity-60"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 8a10 10 0 0 1 14 0" />
@@ -514,7 +514,7 @@ export default function StoryUploader({ onClose, onPosted }) {
                     : 'Write to NFC tag'}
                 </button>
                 {nfcState === 'error' && nfcMsg && (
-                  <p className="mt-1.5 text-center text-xs text-red-600 dark:text-red-400">{nfcMsg}</p>
+                  <p className="mt-1.5 text-center text-xs text-red-600">{nfcMsg}</p>
                 )}
               </>
             )}
@@ -522,13 +522,13 @@ export default function StoryUploader({ onClose, onPosted }) {
             {/* Assign this story to a reusable tag slot (write the tag once,
                 remap it from Admin → NFC Tags any time). */}
             {slots && slots.length > 0 && (
-              <div className="mt-3 border-t border-neutral-200 pt-3 dark:border-neutral-700">
-                <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Or point a reusable tag slot at it</p>
+              <div className="mt-3 border-t border-neutral-200 pt-3">
+                <p className="text-xs font-semibold text-neutral-500">Or point a reusable tag slot at it</p>
                 <div className="mt-1.5 flex gap-2">
                   <select
                     value={selectedSlotId}
                     onChange={(e) => setSelectedSlotId(e.target.value)}
-                    className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-2 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-2 py-2 text-sm text-neutral-900 focus:border-amber-500 focus:outline-none"
                   >
                     {slots.map((s) => (
                       <option key={s.id} value={s.id}>{s.label}{s.story_id ? ' (in use)' : ''}</option>
@@ -537,16 +537,16 @@ export default function StoryUploader({ onClose, onPosted }) {
                   <button
                     onClick={assignToSlot}
                     disabled={assigning}
-                    className="shrink-0 rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white active:scale-95 disabled:opacity-60 hover:bg-pink-600"
+                    className="shrink-0 rounded-lg bg-red-500 px-3 py-2 text-sm font-semibold text-white active:scale-95 disabled:opacity-60"
                   >
                     Assign
                   </button>
                 </div>
-                {assignMsg && <p className="mt-1.5 text-xs text-teal-600 dark:text-teal-400">{assignMsg}</p>}
+                {assignMsg && <p className="mt-1.5 text-xs text-amber-700">{assignMsg}</p>}
               </div>
             )}
             {slots && slots.length === 0 && (
-              <p className="mt-3 border-t border-neutral-200 pt-3 text-xs text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+              <p className="mt-3 border-t border-neutral-200 pt-3 text-xs text-neutral-500">
                 No reusable tag slots yet — create one in Admin → NFC Tags to point a physical tag at this later.
               </p>
             )}
