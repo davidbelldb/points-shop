@@ -29,10 +29,10 @@ function StoryPicker({ stories, onPick, onClose }) {
             <button
               key={s.id}
               onClick={() => onPick(s)}
-              className="relative aspect-[9/12] overflow-hidden rounded-lg bg-neutral-200 active:scale-95 dark:bg-neutral-700"
+              className="relative block h-28 w-full overflow-hidden rounded-lg bg-neutral-200 active:scale-95 dark:bg-neutral-700"
             >
               {s.thumb ? (
-                <img src={s.thumb} alt="" className="h-full w-full object-cover" />
+                <img src={s.thumb} alt="" className="absolute inset-0 h-full w-full object-cover" />
               ) : (
                 <span className="flex h-full w-full items-center justify-center text-xs text-neutral-500">
                   {s.media_type}
