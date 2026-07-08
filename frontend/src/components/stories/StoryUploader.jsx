@@ -50,6 +50,12 @@ export default function StoryUploader({ onClose, onPosted }) {
   const [copied, setCopied] = useState(false);
   const [nfcState, setNfcState] = useState('idle'); // idle | writing | done | error
   const [nfcMsg, setNfcMsg] = useState(null);
+  // Assign the just-posted hidden story to a reusable tag slot.
+  const [postedStoryId, setPostedStoryId] = useState(null);
+  const [slots, setSlots] = useState(null); // null = not loaded yet, [] = none
+  const [selectedSlotId, setSelectedSlotId] = useState('');
+  const [assignMsg, setAssignMsg] = useState(null);
+  const [assigning, setAssigning] = useState(false);
   // Some iOS-recorded HEVC clips can't be decoded by the local <video>
   // element even though they upload + play fine after server-side handling.
   // We swap to a friendlier "ready to upload" tile when the element errors.
@@ -199,9 +205,13 @@ export default function StoryUploader({ onClose, onPosted }) {
       if (isAdmin && secret) payload.secret = true;
       const created = await api.createStory(payload);
       onPosted?.();
-      // Hidden story → don't close yet; show the shareable link to copy.
+      // Hidden story → don't close yet; show the shareable link + slot assign.
       if (created?.secret_token) {
         setPostedLink(`${SHARE_BASE}/s/${created.secret_token}`);
+        setPostedStoryId(created.id);
+        api.admin.nfcSlots()
+          .then((s) => { setSlots(s); if (s[0]) setSelectedSlotId(String(s[0].id)); })
+          .catch(() => setSlots([]));
         setBusy(false);
         return;
       }
@@ -242,6 +252,20 @@ export default function StoryUploader({ onClose, onPosted }) {
       if (e?.message === 'cancelled') { setNfcState('idle'); return; }
       setNfcState('error');
       setNfcMsg(e?.message || 'Could not write the tag.');
+    }
+  }
+
+  async function assignToSlot() {
+    if (!selectedSlotId || !postedStoryId || assigning) return;
+    setAssigning(true); setAssignMsg(null);
+    try {
+      await api.admin.updateNfcSlot(selectedSlotId, { story_id: postedStoryId });
+      const slot = slots?.find((s) => String(s.id) === String(selectedSlotId));
+      setAssignMsg(`Assigned to “${slot?.label ?? 'slot'}” — that tag now shows this story.`);
+    } catch (e) {
+      setAssignMsg(e?.message || 'Could not assign to that slot.');
+    } finally {
+      setAssigning(false);
     }
   }
 
@@ -496,6 +520,38 @@ export default function StoryUploader({ onClose, onPosted }) {
                   <p className="mt-1.5 text-center text-xs text-red-600">{nfcMsg}</p>
                 )}
               </>
+            )}
+
+            {/* Assign this story to a reusable tag slot (write the tag once,
+                remap it from Admin → NFC Tags any time). */}
+            {slots && slots.length > 0 && (
+              <div className="mt-3 border-t border-neutral-200 pt-3">
+                <p className="text-xs font-semibold text-neutral-500">Or point a reusable tag slot at it</p>
+                <div className="mt-1.5 flex gap-2">
+                  <select
+                    value={selectedSlotId}
+                    onChange={(e) => setSelectedSlotId(e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-2 py-2 text-sm focus:border-amber-500 focus:outline-none"
+                  >
+                    {slots.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}{s.story_id ? ' (in use)' : ''}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={assignToSlot}
+                    disabled={assigning}
+                    className="shrink-0 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white active:scale-95 disabled:opacity-60"
+                  >
+                    Assign
+                  </button>
+                </div>
+                {assignMsg && <p className="mt-1.5 text-xs text-emerald-700">{assignMsg}</p>}
+              </div>
+            )}
+            {slots && slots.length === 0 && (
+              <p className="mt-3 border-t border-neutral-200 pt-3 text-xs text-neutral-500">
+                No reusable tag slots yet — create one in Admin → NFC Tags to point a physical tag at this later.
+              </p>
             )}
           </div>
         </div>
