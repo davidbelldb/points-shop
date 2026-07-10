@@ -704,12 +704,17 @@ export default function DirtyWordlePage() {
         // Always apply server state — even empty — to prevent bleed from another user's localStorage.
         setGuesses(serverGuesses ?? []);
         if (serverGuesses && serverGuesses.length > 0) {
-          // Recompute derived state from loaded guesses
+          // Recompute derived state from loaded guesses. The server is
+          // authoritative, so ALWAYS set (not only when true): otherwise a stale
+          // local "gameOver/won" from a previous word — e.g. after an admin word
+          // swap — is never cleared and the player stays locked out even though
+          // they have guesses left. Clearing it lets them resume the remaining rows.
           const lastGuess = serverGuesses[serverGuesses.length - 1];
           const isWon  = lastGuess === word;
           const isOver = isWon || serverGuesses.length >= MAX_GUESSES;
-          if (isWon)  setWon(true);
-          if (isOver) setGameOver(true);
+          setWon(isWon);
+          setGameOver(isOver);
+          if (!isOver) { setPtsEarned(null); setResultSaved(false); }
           if (isOver && !saved.modalAcked) setModalDismissed(false);
         } else {
           // No guesses on server → fresh game for this user; clear any stale local state.
