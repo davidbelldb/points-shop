@@ -225,8 +225,8 @@ export default function CrossWordsPage() {
 
       {puzzle?.rows > 0 && (
         <>
-          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-2">
-            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})`, justifyContent: 'center' }}>
+          <div className="flex justify-center">
+            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})` }}>
               {Array.from({ length: puzzle.rows * puzzle.cols }).map((_, idx) => {
                 const r = Math.floor(idx / puzzle.cols), c = idx % puzzle.cols;
                 const k = key(r, c);
