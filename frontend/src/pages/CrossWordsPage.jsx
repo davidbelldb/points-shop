@@ -9,6 +9,10 @@ import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
 const key = (r, c) => `${r},${c}`;
 const CORRECT = '#61dbbc';
 const WRONG = '#a04d89';
+const fmtTime = (ts) => {
+  try { return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }); }
+  catch { return ''; }
+};
 
 export default function CrossWordsPage() {
   const { user } = useAuth();
@@ -25,9 +29,11 @@ export default function CrossWordsPage() {
   const [won, setWon] = useState(false);
   const [result, setResult] = useState(null); // { "r,c": bool }
   const [pts, setPts] = useState(0);
-  const [savedFlash, setSavedFlash] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const inputRefs = useRef({});
+  const saveTimer = useRef(null);
 
   const canSee = user?.role === 'admin' || settings.crossword_open === 'true';
 
@@ -41,9 +47,12 @@ export default function CrossWordsPage() {
         setSubmitted(!!prog.submitted);
         setWon(!!prog.won);
         setResult(prog.result ?? null);
+        if (prog.updatedAt) setLastSavedAt(prog.updatedAt);
       })
       .catch((e) => setError(e.message));
   }, [canSee]);
+
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
 
   const across = puzzle?.across ?? [];
   const down = puzzle?.down ?? [];
@@ -108,14 +117,22 @@ export default function CrossWordsPage() {
   }
 
   async function saveProgress(next) {
-    try { await api.saveCrosswordProgress(next); setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1500); }
+    clearTimeout(saveTimer.current);
+    try { await api.saveCrosswordProgress(next); setLastSavedAt(Date.now()); }
     catch { /* best effort */ }
+  }
+  // Autosave shortly after any change, so every word set is persisted.
+  function scheduleSave(next) {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveProgress(next), 700);
   }
 
   function onInput(r, c, value) {
     if (submitted) return;
     const ch = (value.slice(-1) || '').toUpperCase().replace(/[^A-Z]/g, '');
-    setEntries((e) => ({ ...e, [key(r, c)]: ch }));
+    const next = { ...entries, [key(r, c)]: ch };
+    setEntries(next);
+    scheduleSave(next);
     if (ch) { const nxt = stepFrom(r, c, 1); if (nxt) focusCell(nxt.r, nxt.c); }
   }
 
@@ -125,7 +142,7 @@ export default function CrossWordsPage() {
     if (e.key === 'Backspace' && !entries[key(r, c)]) {
       e.preventDefault();
       const prev = stepFrom(r, c, -1);
-      if (prev) { setEntries((en) => ({ ...en, [key(prev.r, prev.c)]: '' })); focusCell(prev.r, prev.c); }
+      if (prev) { const next = { ...entries, [key(prev.r, prev.c)]: '' }; setEntries(next); scheduleSave(next); focusCell(prev.r, prev.c); }
     } else if (e.key === 'ArrowRight' && cells[key(r, c + 1)]) { setDir('across'); focusCell(r, c + 1); }
     else if (e.key === 'ArrowLeft' && cells[key(r, c - 1)]) { setDir('across'); focusCell(r, c - 1); }
     else if (e.key === 'ArrowDown' && cells[key(r + 1, c)]) { setDir('down'); focusCell(r + 1, c); }
@@ -151,6 +168,13 @@ export default function CrossWordsPage() {
     setEntries({}); setConfirmClear(false); saveProgress({});
   }
 
+  async function resetBoard() {
+    setConfirmReset(false);
+    try { await api.resetCrossword(); } catch { /* best effort */ }
+    setEntries({}); setSubmitted(false); setWon(false); setResult(null); setPts(0);
+    setSelected(null); setLastSavedAt(null);
+  }
+
   const title = puzzle?.title || 'Crossword';
   const cellSize = puzzle?.cols ? `min(2.4rem, calc((100vw - 2.5rem) / ${puzzle.cols}))` : '2.4rem';
 
@@ -160,9 +184,11 @@ export default function CrossWordsPage() {
       style={kbHeight ? { paddingBottom: kbHeight + 32, scrollPaddingBottom: kbHeight + 32 } : undefined}
     >
       <div className="flex items-center justify-between py-3">
-        <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
+        <Link to="/" className="w-28 text-sm font-medium text-neutral-500">Back</Link>
         <span className="text-sm font-semibold text-neutral-800">{title}</span>
-        <span className="w-16 text-right text-xs font-semibold text-amber-700">{savedFlash ? 'Saved ✓' : ''}</span>
+        <span className="w-28 text-right text-[11px] font-medium text-neutral-400">
+          {lastSavedAt ? `Last saved ${fmtTime(lastSavedAt)}` : ''}
+        </span>
       </div>
 
       {error && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -177,7 +203,7 @@ export default function CrossWordsPage() {
           {submitted && (
             <p className={`mb-3 rounded-xl px-3 py-2 text-center text-sm font-semibold ${won ? 'bg-teal-100 text-teal-900' : 'text-white'}`}
                style={won ? undefined : { backgroundColor: WRONG }}>
-              {won ? `Solved! +${pts || 200} pts 🎉` : 'Locked in — some answers were off. Better luck next time.'}
+              {won ? `Solved! +${pts || 200} pts 🎉` : 'Ahhh that’s a shame.. close though.'}
             </p>
           )}
 
@@ -195,9 +221,14 @@ export default function CrossWordsPage() {
                 if (isSel && !submitted) cls = 'bg-pink-200 ring-2 ring-pink-500 z-10';
                 const val = entries[k] ?? '';
                 const graded = submitted && result ? result[k] : null;
-                const color = graded === true ? CORRECT : graded === false ? WRONG : undefined;
+                // On submit the BOX takes the result colour; the letter stays white.
+                const gradedBg = graded === true ? CORRECT : graded === false ? WRONG : null;
                 return (
-                  <div key={k} className={`relative rounded-[3px] border border-neutral-200 ${cls}`} style={{ width: cellSize, height: cellSize }}>
+                  <div
+                    key={k}
+                    className={`relative rounded-[3px] border border-neutral-200 ${cls}`}
+                    style={{ width: cellSize, height: cellSize, ...(gradedBg ? { backgroundColor: gradedBg } : {}) }}
+                  >
                     {cell.number && <span className="pointer-events-none absolute left-[2px] top-[1px] text-[8px] leading-none text-neutral-500">{cell.number}</span>}
                     <input
                       ref={(el) => { inputRefs.current[k] = el; }}
@@ -209,8 +240,7 @@ export default function CrossWordsPage() {
                       disabled={submitted}
                       maxLength={1}
                       autoCapitalize="characters"
-                      className="h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase focus:outline-none disabled:opacity-100"
-                      style={{ color: color ?? undefined }}
+                      className={`h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase focus:outline-none disabled:opacity-100 ${graded !== null ? 'text-white' : 'text-neutral-800'}`}
                     />
                   </div>
                 );
@@ -231,6 +261,14 @@ export default function CrossWordsPage() {
               </button>
               <button onClick={() => setConfirmClear(true)} className="rounded-xl bg-neutral-100 px-4 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95">Clear</button>
             </div>
+          )}
+          {submitted && (
+            <button
+              onClick={() => setConfirmReset(true)}
+              className="mt-3 w-full rounded-xl bg-teal-300 py-2.5 text-sm font-semibold text-teal-900 active:scale-95"
+            >
+              Reset &amp; try again
+            </button>
           )}
 
           {/* Clues */}
@@ -265,6 +303,20 @@ export default function CrossWordsPage() {
             <div className="mt-4 flex gap-2">
               <button onClick={doClear} className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white active:scale-95" style={{ backgroundColor: WRONG }}>Clear</button>
               <button onClick={() => setConfirmClear(false)} className="flex-1 rounded-xl bg-neutral-100 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset confirmation (after submit) */}
+      {confirmReset && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-5 text-center shadow-xl">
+            <p className="text-sm font-semibold text-neutral-900">Reset the board?</p>
+            <p className="mt-1 text-sm text-neutral-500">This clears your answers so you can try again. It can’t be undone.</p>
+            <div className="mt-4 flex gap-2">
+              <button onClick={resetBoard} className="flex-1 rounded-xl bg-teal-300 py-2.5 text-sm font-semibold text-teal-900 active:scale-95">Reset</button>
+              <button onClick={() => setConfirmReset(false)} className="flex-1 rounded-xl bg-neutral-100 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95">Cancel</button>
             </div>
           </div>
         </div>

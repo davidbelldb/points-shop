@@ -1,5 +1,5 @@
 import {
-  getCrossword, saveCrossword, getProgress, saveProgress, markSubmitted,
+  getCrossword, saveCrossword, getProgress, saveProgress, markSubmitted, resetProgress,
 } from './crossword.repo.js';
 import { buildLayout, toPlayPayload } from './layout.js';
 import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
@@ -88,7 +88,7 @@ export default async function crosswordRoutes(fastify) {
       title: cw.title,
       version: cw.version,
       ...toPlayPayload(layout),
-      progress: { entries: prog.entries ?? {}, submitted: !!prog.submitted, won: !!prog.won, result },
+      progress: { entries: prog.entries ?? {}, submitted: !!prog.submitted, won: !!prog.won, result, updatedAt: prog.updated_at ?? null },
     };
   });
 
@@ -97,6 +97,13 @@ export default async function crosswordRoutes(fastify) {
     if (!(await canPlay(req))) return reply.code(404).send({ error: 'not found' });
     const accountId = getEffectiveAccountId(req);
     await saveProgress(accountId, sanitizeEntries(req.body?.entries));
+    return { ok: true };
+  });
+
+  // Reset the board after a submission so the player can try again.
+  fastify.post('/api/crossword/reset', async (req, reply) => {
+    if (!(await canPlay(req))) return reply.code(404).send({ error: 'not found' });
+    await resetProgress(getEffectiveAccountId(req));
     return { ok: true };
   });
 

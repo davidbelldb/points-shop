@@ -23,10 +23,10 @@ export async function saveCrossword(title, words) {
 
 export async function getProgress(accountId) {
   const { rows } = await query(
-    `SELECT entries, submitted, won FROM crossword_progress WHERE account_id = $1`,
+    `SELECT entries, submitted, won, updated_at FROM crossword_progress WHERE account_id = $1`,
     [accountId],
   );
-  return rows[0] ?? { entries: {}, submitted: false, won: false };
+  return rows[0] ?? { entries: {}, submitted: false, won: false, updated_at: null };
 }
 
 export async function saveProgress(accountId, entries) {
@@ -38,6 +38,12 @@ export async function saveProgress(accountId, entries) {
      WHERE crossword_progress.submitted = FALSE`,
     [accountId, JSON.stringify(entries)],
   );
+}
+
+// Reset a player's board so they can try again. Points already awarded stay in
+// the ledger, so re-winning the same puzzle version won't pay out twice.
+export async function resetProgress(accountId) {
+  await query(`DELETE FROM crossword_progress WHERE account_id = $1`, [accountId]);
 }
 
 export async function markSubmitted(accountId, entries, won) {
