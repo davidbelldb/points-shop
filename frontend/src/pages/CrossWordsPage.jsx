@@ -272,8 +272,13 @@ export default function CrossWordsPage() {
               <button
                 onClick={doSubmit}
                 disabled={!allFilled}
+                aria-disabled={!allFilled}
                 title={allFilled ? '' : 'Fill every square first'}
-                className="flex-1 rounded-xl bg-teal-300 py-2.5 text-sm font-semibold text-teal-900 active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
+                className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition ${
+                  allFilled
+                    ? 'bg-teal-300 text-teal-900 active:scale-95'
+                    : 'cursor-not-allowed bg-neutral-200 text-neutral-400 opacity-60'
+                }`}
               >
                 Submit
               </button>
