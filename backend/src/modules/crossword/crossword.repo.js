@@ -46,6 +46,11 @@ export async function resetProgress(accountId) {
   await query(`DELETE FROM crossword_progress WHERE account_id = $1`, [accountId]);
 }
 
+// Admin: clear every player's board so it can be attempted fresh.
+export async function resetAllProgress() {
+  await query(`DELETE FROM crossword_progress`);
+}
+
 export async function markSubmitted(accountId, entries, won) {
   await query(
     `INSERT INTO crossword_progress (account_id, entries, submitted, won, submitted_at, updated_at)

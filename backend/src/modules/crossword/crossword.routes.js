@@ -1,5 +1,5 @@
 import {
-  getCrossword, saveCrossword, getProgress, saveProgress, markSubmitted, resetProgress,
+  getCrossword, saveCrossword, getProgress, saveProgress, markSubmitted, resetProgress, resetAllProgress,
 } from './crossword.repo.js';
 import { buildLayout, toPlayPayload } from './layout.js';
 import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
@@ -58,6 +58,12 @@ export default async function crosswordRoutes(fastify) {
   fastify.get('/api/admin/crossword', async () => {
     const cw = await getCrossword();
     return { ...cw, open: await isOpen() };
+  });
+
+  // Admin: reset everyone's play so the crossword can be attempted fresh.
+  fastify.post('/api/admin/crossword/reset-progress', async () => {
+    await resetAllProgress();
+    return { ok: true };
   });
 
   fastify.put('/api/admin/crossword', async (req, reply) => {

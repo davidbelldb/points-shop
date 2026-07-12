@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
+import { useTheme } from '../lib/ThemeContext.jsx';
 import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
 
 const key = (r, c) => `${r},${c}`;
@@ -14,10 +15,40 @@ const fmtTime = (ts) => {
   catch { return ''; }
 };
 
+// Tiny intersecting crossword shown in the result modal — teal letters.
+// Win: YOU / WON crossing at O. Loss: YOU / SUCK crossing at U.
+function MiniCrossword({ won, isDark }) {
+  const cellBg = isDark ? '#262626' : '#f2f2f0';
+  const S = 26;
+  const layout = won
+    ? { rows: 3, cols: 3, cells: { '0,1': 'W', '1,0': 'Y', '1,1': 'O', '1,2': 'U', '2,1': 'N' } }
+    : { rows: 4, cols: 3, cells: { '0,2': 'S', '1,0': 'Y', '1,1': 'O', '1,2': 'U', '2,2': 'C', '3,2': 'K' } };
+  const squares = [];
+  for (let r = 0; r < layout.rows; r++) {
+    for (let c = 0; c < layout.cols; c++) {
+      const ch = layout.cells[`${r},${c}`];
+      squares.push(
+        <div key={`${r},${c}`} style={{
+          width: S, height: S, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: ch ? cellBg : 'transparent', borderRadius: 4,
+          color: CORRECT, fontWeight: 800, fontSize: 15,
+        }}>{ch || ''}</div>,
+      );
+    }
+  }
+  return (
+    <div style={{ display: 'grid', gap: 3, gridTemplateColumns: `repeat(${layout.cols}, ${S}px)`, justifyContent: 'center' }}>
+      {squares}
+    </div>
+  );
+}
+
 export default function CrossWordsPage() {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { refresh: refreshBasket } = useBasket();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const kbHeight = useKeyboardHeight();
 
   const [puzzle, setPuzzle] = useState(null); // { title, rows, cols, cells, across, down }
@@ -31,7 +62,7 @@ export default function CrossWordsPage() {
   const [pts, setPts] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [resultModalOpen, setResultModalOpen] = useState(false);
   const inputRefs = useRef({});
   const saveTimer = useRef(null);
 
@@ -160,19 +191,13 @@ export default function CrossWordsPage() {
     try {
       const res = await api.submitCrossword(entries);
       setSubmitted(true); setWon(!!res.won); setResult(res.result ?? null); setPts(res.pts ?? 0);
+      setResultModalOpen(true);
       if (res.won) refreshBasket?.();
     } catch (e) { setError(e.message); }
   }
 
   function doClear() {
     setEntries({}); setConfirmClear(false); saveProgress({});
-  }
-
-  async function resetBoard() {
-    setConfirmReset(false);
-    try { await api.resetCrossword(); } catch { /* best effort */ }
-    setEntries({}); setSubmitted(false); setWon(false); setResult(null); setPts(0);
-    setSelected(null); setLastSavedAt(null);
   }
 
   const title = puzzle?.title || 'Crossword';
@@ -200,13 +225,6 @@ export default function CrossWordsPage() {
 
       {puzzle?.rows > 0 && (
         <>
-          {submitted && (
-            <p className={`mb-3 rounded-xl px-3 py-2 text-center text-sm font-semibold ${won ? 'bg-teal-100 text-teal-900' : 'text-white'}`}
-               style={won ? undefined : { backgroundColor: WRONG }}>
-              {won ? `Solved! +${pts || 200} pts 🎉` : 'Ahhh that’s a shame.. close though.'}
-            </p>
-          )}
-
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-2">
             <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})`, justifyContent: 'center' }}>
               {Array.from({ length: puzzle.rows * puzzle.cols }).map((_, idx) => {
@@ -262,14 +280,6 @@ export default function CrossWordsPage() {
               <button onClick={() => setConfirmClear(true)} className="rounded-xl bg-neutral-100 px-4 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95">Clear</button>
             </div>
           )}
-          {submitted && (
-            <button
-              onClick={() => setConfirmReset(true)}
-              className="mt-3 w-full rounded-xl bg-teal-300 py-2.5 text-sm font-semibold text-teal-900 active:scale-95"
-            >
-              Reset &amp; try again
-            </button>
-          )}
 
           {/* Clues */}
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -308,16 +318,21 @@ export default function CrossWordsPage() {
         </div>
       )}
 
-      {/* Reset confirmation (after submit) */}
-      {confirmReset && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xs rounded-2xl bg-white p-5 text-center shadow-xl">
-            <p className="text-sm font-semibold text-neutral-900">Reset the board?</p>
-            <p className="mt-1 text-sm text-neutral-500">This clears your answers so you can try again. It can’t be undone.</p>
-            <div className="mt-4 flex gap-2">
-              <button onClick={resetBoard} className="flex-1 rounded-xl bg-teal-300 py-2.5 text-sm font-semibold text-teal-900 active:scale-95">Reset</button>
-              <button onClick={() => setConfirmReset(false)} className="flex-1 rounded-xl bg-neutral-100 py-2.5 text-sm font-semibold text-neutral-700 active:scale-95">Cancel</button>
-            </div>
+      {/* Result modal (Ducky-Derby style) */}
+      {submitted && resultModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xs rounded-3xl p-6 text-center shadow-2xl" style={{ background: isDark ? '#171717' : '#ffffff' }}>
+            <div className="mb-3 flex justify-center"><MiniCrossword won={won} isDark={isDark} /></div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{won ? 'Solved' : 'So close'}</p>
+            <p className="mt-2 text-lg font-extrabold" style={{ color: won ? CORRECT : WRONG }}>
+              {won ? `Solved! +${pts || 200} pts 🎉` : 'Ahhh that’s a shame.. close though.'}
+            </p>
+            <button
+              onClick={() => setResultModalOpen(false)}
+              className="mt-5 block w-full rounded-xl bg-teal-300 py-3 text-base font-semibold text-teal-900 active:scale-95"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

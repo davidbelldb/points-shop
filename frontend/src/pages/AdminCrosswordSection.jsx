@@ -41,6 +41,7 @@ export default function AdminCrosswordSection() {
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
   const [open, setOpen] = useState(false); // playable by Katie?
+  const [resetMsg, setResetMsg] = useState(null);
 
   useEffect(() => {
     api.admin.getCrossword()
@@ -181,6 +182,22 @@ export default function AdminCrosswordSection() {
         </button>
         {saved && <span className="text-sm text-amber-700">Saved ✓</span>}
         {error && <span className="text-sm text-red-600">{error}</span>}
+      </div>
+
+      {/* Reset play — clears everyone's board so it can be attempted fresh.
+          Players can't reset in-game; only you can, here. */}
+      <div className="border-t border-neutral-200 pt-3">
+        <button
+          onClick={async () => {
+            if (!confirm("Reset everyone's crossword play? This clears all placed answers so it can be attempted fresh.")) return;
+            try { await api.admin.resetCrosswordProgress(); setResetMsg('Play reset ✓'); setTimeout(() => setResetMsg(null), 2000); }
+            catch (e) { setError(e.message); }
+          }}
+          className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white active:scale-95"
+        >
+          Reset everyone’s play
+        </button>
+        {resetMsg && <span className="ml-3 text-sm text-amber-700">{resetMsg}</span>}
       </div>
     </div>
   );

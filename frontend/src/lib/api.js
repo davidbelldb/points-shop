@@ -466,6 +466,7 @@ export const api = {
     nfcMyStories:    () => request('/admin/nfc/my-stories'),
     getCrossword:    () => request('/admin/crossword'),
     saveCrossword:   (data) => request('/admin/crossword', { method: 'PUT', body: JSON.stringify(data) }),
+    resetCrosswordProgress: () => request('/admin/crossword/reset-progress', { method: 'POST' }),
     listDiscountCodes:  () => request('/admin/discount-codes'),
     createDiscountCode: (data) => request('/admin/discount-codes', { method: 'POST', body: JSON.stringify(data) }),
     updateDiscountCode: (id, patch) => request(`/admin/discount-codes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
