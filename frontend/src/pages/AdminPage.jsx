@@ -21,6 +21,7 @@ import AdminScrollsSection from './AdminScrollsSection.jsx';
 import AdminForecastSection from './AdminForecastSection.jsx';
 import AdminFloatingHeadSection from './AdminFloatingHeadSection.jsx';
 import AdminNfcSection from './AdminNfcSection.jsx';
+import AdminCrosswordSection from './AdminCrosswordSection.jsx';
 import AdminJustSayWordSection from './AdminJustSayWordSection.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 
@@ -200,6 +201,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="NFC Tags" storageKey="admin::nfc">
         <AdminNfcSection />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Cross-words" storageKey="admin::crossword">
+        <AdminCrosswordSection />
       </AdminCollapsible>
 
       <AdminCollapsible title="Dirty Talk" storageKey="admin::jstw">

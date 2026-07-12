@@ -59,6 +59,7 @@ const SneakyReadDetailPage = lazy(() => import('./pages/SneakyReadDetailPage.jsx
 const SneakyscapesPage     = lazy(() => import('./pages/SneakyscapesPage.jsx'));
 const SecretStoryPage      = lazy(() => import('./pages/SecretStoryPage.jsx'));
 const NfcSlotPage          = lazy(() => import('./pages/NfcSlotPage.jsx'));
+const CrossWordsPage       = lazy(() => import('./pages/CrossWordsPage.jsx'));
 
 import { BasketProvider } from './lib/BasketContext.jsx';
 import { SettingsProvider } from './lib/SettingsContext.jsx';
@@ -202,6 +203,8 @@ createRoot(document.getElementById('root')).render(
               <Route path="s/:token" element={<SecretStoryPage />} />
               {/* Reusable NFC slot — resolves to its currently-assigned story. */}
               <Route path="t/:slug" element={<NfcSlotPage />} />
+              {/* Private crossword — admin-only, URL-only, not linked anywhere. */}
+              <Route path="cross-words" element={<CrossWordsPage />} />
               <Route path="store" element={<SneakyStorePage />} />
               <Route path="notes" element={<NotesPage />} />
               <Route path="sneakytime" element={<SneakyCallsPage />} />
