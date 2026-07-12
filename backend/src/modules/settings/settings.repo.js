@@ -32,6 +32,7 @@ const ALLOWED = [
   'entertainment_home_start', 'entertainment_home_end',
   'entertainment_home_title', 'entertainment_home_subtitle',
   'floating_head_admin', 'floating_head_partner',
+  'crossword_open',
 ];
 
 export async function getAllSettings() {

@@ -40,15 +40,24 @@ export default function AdminCrosswordSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [open, setOpen] = useState(false); // playable by Katie?
 
   useEffect(() => {
     api.admin.getCrossword()
       .then((cfg) => {
         setTitle(cfg.title ?? 'Crossword');
         setWords(cfg.words?.length ? cfg.words : [{ word: '', hint: '', direction: 'across' }]);
+        setOpen(cfg.open === true);
       })
       .catch((e) => setError(e.message));
   }, []);
+
+  async function toggleOpen() {
+    const next = !open;
+    setOpen(next);
+    try { await api.admin.updateSettings({ crossword_open: next ? 'true' : 'false' }); }
+    catch (e) { setError(e.message); setOpen(!next); }
+  }
 
   const layout = useMemo(() => buildLayout(words), [words]);
   const validationMsg = useMemo(() => connectivityError(words), [words]);
@@ -84,6 +93,19 @@ export default function AdminCrosswordSection() {
         later word must share a letter with an earlier one so it can cross. Blank
         squares become black automatically.
       </p>
+
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 px-3 py-2.5">
+        <div>
+          <p className="text-sm font-semibold text-neutral-800">Playable by Katie</p>
+          <p className="text-xs text-neutral-500">Off = only you can open /cross-words. On = Katie can play it for 200 pts.</p>
+        </div>
+        <button
+          onClick={toggleOpen}
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${open ? 'bg-amber-500 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {open ? 'On' : 'Off'}
+        </button>
+      </div>
 
       <div>
         <label className="text-xs font-semibold text-neutral-500">Title</label>

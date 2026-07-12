@@ -1,35 +1,11 @@
 /*
- * Crossword layout engine (shared by the admin editor preview and the play
- * page). Takes an ordered list of authored words — { word, hint, direction } —
- * and greedily places them into an intersecting grid: word 1 at the origin,
- * every later word crossing an existing letter at a matching square. Cells not
- * covered by any word are "black" (blanks). Returns the grid dimensions, a cell
- * map, standard clue numbering, and Across/Down clue lists.
+ * Server-side crossword layout (mirror of frontend/src/lib/crosswordLayout.js).
+ * Kept here so the backend can produce an answer-stripped puzzle payload and
+ * grade submissions without ever sending the solution letters to the client.
  */
 
 export const cleanWord = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
 const key = (r, c) => `${r},${c}`;
-
-// Precise validation message for the admin UI (mirrors the backend rules).
-export function connectivityError(rawWords) {
-  const words = (rawWords || []).map((w) => ({
-    word: cleanWord(w.word), hint: String(w.hint ?? '').trim(), direction: w.direction,
-  }));
-  if (words.length < 1) return 'Add at least one word.';
-  if (words.length > 30) return 'Maximum of 30 words.';
-  const pool = new Set();
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i];
-    if (w.word.length < 2) return `Word ${i + 1} needs at least two letters.`;
-    if (!w.hint) return `Word ${i + 1} needs a hint.`;
-    if (w.direction !== 'across' && w.direction !== 'down') return `Word ${i + 1} needs a direction.`;
-    if (i > 0 && ![...w.word].some((ch) => pool.has(ch))) {
-      return `Word ${i + 1} must share a letter with an earlier word.`;
-    }
-    for (const ch of w.word) pool.add(ch);
-  }
-  return null;
-}
 
 export function buildLayout(rawWords) {
   const words = (rawWords || [])
@@ -42,16 +18,14 @@ export function buildLayout(rawWords) {
 
   const placed = [];
   const unplaced = [];
-  const grid = new Map(); // "r,c" -> letter
+  const grid = new Map();
 
-  // Evaluate a candidate placement. A word may reuse MORE THAN ONE existing
-  // letter (multiple crossings) as long as every overlapped square matches;
-  // brand-new squares must not touch a parallel word. Returns the number of
-  // crossings (shared letters) so callers can prefer the densest placement.
+  // Allow a word to reuse MORE THAN ONE existing letter (multiple crossings);
+  // every overlap must match, fresh squares mustn't touch a parallel word.
+  // Returns the crossing count (or -1 if invalid) so we can pick the densest fit.
   function evaluate(word, dir, startR, startC) {
     const dr = dir === 'down' ? 1 : 0;
     const dc = dir === 'across' ? 1 : 0;
-    // Squares immediately before/after the word must be empty (no run-ons).
     if (grid.has(key(startR - dr, startC - dc))) return -1;
     if (grid.has(key(startR + dr * word.length, startC + dc * word.length))) return -1;
     let crossings = 0;
@@ -59,14 +33,13 @@ export function buildLayout(rawWords) {
       const r = startR + dr * j, c = startC + dc * j;
       const existing = grid.get(key(r, c));
       if (existing !== undefined) {
-        if (existing !== word[j]) return -1; // conflicting overlap
-        crossings++;                          // a valid shared letter
-      } else {
-        // A fresh square must not sit alongside a parallel word.
-        if (grid.has(key(r + dc, c + dr)) || grid.has(key(r - dc, c - dr))) return -1;
+        if (existing !== word[j]) return -1;
+        crossings++;
+      } else if (grid.has(key(r + dc, c + dr)) || grid.has(key(r - dc, c - dr))) {
+        return -1;
       }
     }
-    return crossings >= 1 ? crossings : -1; // must connect to the grid
+    return crossings >= 1 ? crossings : -1;
   }
 
   function commit(w, dir, startR, startC) {
@@ -86,8 +59,6 @@ export function buildLayout(rawWords) {
     const dir = w.direction;
     const dr = dir === 'down' ? 1 : 0;
     const dc = dir === 'across' ? 1 : 0;
-    // Try anchoring every letter of the new word onto every matching square,
-    // and keep the placement that reuses the most existing letters.
     let best = null;
     const seen = new Set();
     for (const [cellKey, letter] of grid) {
@@ -108,7 +79,6 @@ export function buildLayout(rawWords) {
 
   if (!placed.length) return { rows: 0, cols: 0, cells: {}, across: [], down: [], placements: [], unplaced };
 
-  // Normalise coordinates to a 0-based bounding box.
   let minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity;
   for (const p of placed) for (const { r, c } of p.cells) {
     minR = Math.min(minR, r); minC = Math.min(minC, c);
@@ -121,7 +91,6 @@ export function buildLayout(rawWords) {
     cells: p.cells.map(({ r, c }) => ({ r: r - minR, c: c - minC })),
   }));
 
-  // Number the start squares in reading order (top→bottom, left→right).
   const startKeys = [...new Set(norm.map((p) => key(p.startR, p.startC)))]
     .map((k) => k.split(',').map(Number))
     .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -155,4 +124,25 @@ export function buildLayout(rawWords) {
   down.sort((a, b) => a.number - b.number);
 
   return { rows, cols, cells, across, down, placements: norm, unplaced };
+}
+
+/* Strip the solution letters for the client. Returns the grid geometry, clue
+   numbering and clue text/lengths — everything needed to render and play,
+   but not the answers. */
+export function toPlayPayload(layout) {
+  const cells = {};
+  for (const [k, cell] of Object.entries(layout.cells)) {
+    cells[k] = {};
+    if (cell.number) cells[k].number = cell.number;
+    if (cell.acrossId) cells[k].acrossId = cell.acrossId;
+    if (cell.downId) cells[k].downId = cell.downId;
+  }
+  const strip = (e) => ({
+    id: e.id, number: e.number, hint: e.hint, len: e.len,
+    direction: e.direction, startR: e.startR, startC: e.startC, cells: e.cells,
+  });
+  return {
+    rows: layout.rows, cols: layout.cols, cells,
+    across: layout.across.map(strip), down: layout.down.map(strip),
+  };
 }

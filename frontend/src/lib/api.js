@@ -185,6 +185,10 @@ export const api = {
   },
   getStory: (id) => request(`/stories/${id}`),
   getSecretStory: (token) => request(`/stories/secret/${encodeURIComponent(token)}`),
+  // Crossword play (answer-stripped puzzle + this player's progress)
+  getCrosswordPlay: () => request('/crossword'),
+  saveCrosswordProgress: (entries) => request('/crossword/progress', { method: 'PUT', body: JSON.stringify({ entries }) }),
+  submitCrossword: (entries) => request('/crossword/submit', { method: 'POST', body: JSON.stringify({ entries }) }),
   resolveNfcSlot: (slug) => request(`/nfc/slots/${encodeURIComponent(slug)}/story`),
   createStory: (data) => request('/stories', { method: 'POST', body: JSON.stringify(data) }),
   deleteStory: (id) => request(`/stories/${id}`, { method: 'DELETE' }),
