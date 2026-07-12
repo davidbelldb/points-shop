@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { useBasket } from '../lib/BasketContext.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
+import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
 
 const key = (r, c) => `${r},${c}`;
 const CORRECT = '#61dbbc';
@@ -13,6 +14,7 @@ export default function CrossWordsPage() {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { refresh: refreshBasket } = useBasket();
+  const kbHeight = useKeyboardHeight();
 
   const [puzzle, setPuzzle] = useState(null); // { title, rows, cols, cells, across, down }
   const [error, setError] = useState(null);
@@ -78,6 +80,14 @@ export default function CrossWordsPage() {
   function focusCell(r, c) {
     inputRefs.current[key(r, c)]?.focus();
     inputRefs.current[key(r, c)]?.select?.();
+    revealCell(r, c);
+  }
+
+  // Lift the focused square above the on-screen keyboard once it has animated in.
+  function revealCell(r, c) {
+    setTimeout(() => {
+      inputRefs.current[key(r, c)]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 240);
   }
 
   function selectCell(r, c) {
@@ -145,7 +155,10 @@ export default function CrossWordsPage() {
   const cellSize = puzzle?.cols ? `min(2.4rem, calc((100vw - 2.5rem) / ${puzzle.cols}))` : '2.4rem';
 
   return (
-    <div className="mx-auto max-w-2xl pb-24">
+    <div
+      className="mx-auto max-w-2xl pb-24"
+      style={kbHeight ? { paddingBottom: kbHeight + 32, scrollPaddingBottom: kbHeight + 32 } : undefined}
+    >
       <div className="flex items-center justify-between py-3">
         <Link to="/" className="text-sm font-medium text-neutral-500">Back</Link>
         <span className="text-sm font-semibold text-neutral-800">{title}</span>
@@ -191,7 +204,7 @@ export default function CrossWordsPage() {
                       value={val}
                       onChange={(e) => onInput(r, c, e.target.value)}
                       onKeyDown={(e) => onKeyDown(r, c, e)}
-                      onFocus={() => selectCell(r, c)}
+                      onFocus={() => { selectCell(r, c); revealCell(r, c); }}
                       onClick={() => selectCell(r, c)}
                       disabled={submitted}
                       maxLength={1}
