@@ -227,16 +227,14 @@ export default function AdminCrosswordSection() {
         <PreviewGrid layout={layout} media={media} anchor={anchor} />
       </div>
 
-      {!validationMsg && (
-        <div className="border-t border-neutral-200 pt-3">
-          <CrosswordMediaManager words={words} media={media} setMedia={setMedia} anchor={anchor} />
-        </div>
-      )}
+      <div className="border-t border-neutral-200 pt-3">
+        <CrosswordMediaManager words={words} media={media} setMedia={setMedia} anchor={anchor} />
+      </div>
 
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          disabled={busy || !!validationMsg || !!mediaMsg}
+          disabled={busy || !!validationMsg || !!mediaMsg || layout.unplaced.length > 0}
           className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white active:scale-95 disabled:opacity-40"
         >
           {busy ? 'Saving…' : 'Save crossword'}
