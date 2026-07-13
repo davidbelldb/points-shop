@@ -337,39 +337,42 @@ export default function CrossWordsPage() {
             <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})`, gridAutoRows: cellSize }}>
               {media.map((m) => {
                 const subs = m.w * m.h;
-                // Fully revealed once EVERY linked word is solved (even if fewer
-                // words than tiles were linked), so a tile can't get stuck part-open.
+                // Fully revealed once EVERY linked word is solved.
                 const fully = m.words.length > 0 && m.words.every((wi) => wi != null && solvedWords.has(wi));
+                // Each tile is either solid black (obfuscated, looks like a blank
+                // square) or shows its own slice of the media — no full image
+                // sits underneath, so nothing leaks through the gaps.
+                function tileStyle(si) {
+                  const shown = fully || (m.words[si] != null && solvedWords.has(m.words[si]));
+                  if (!shown) return { backgroundColor: '#000' };
+                  if (m.type === 'voice') return { backgroundColor: PINK };
+                  const tr = Math.floor(si / m.w), tc = si % m.w;
+                  const px = m.w > 1 ? (tc / (m.w - 1)) * 100 : 0;
+                  const py = m.h > 1 ? (tr / (m.h - 1)) * 100 : 0;
+                  return { backgroundImage: `url(${m.url})`, backgroundSize: `${m.w * 100}% ${m.h * 100}%`, backgroundPosition: `${px}% ${py}%` };
+                }
                 return (
                   <div
                     key={`media-${m.id}`}
                     className="relative"
                     style={{ gridColumn: `${m.col + 1} / span ${m.w}`, gridRow: `${m.row + 1} / span ${m.h}`, zIndex: 20 }}
                   >
-                    {/* Base media (hidden behind the mosaic mask until revealed). */}
-                    {m.type === 'photo' ? (
-                      <img src={m.url} alt="" className="absolute inset-0 h-full w-full rounded-md object-cover" />
-                    ) : (
+                    {/* Voice, once fully revealed, becomes a solid pink play button. */}
+                    {m.type === 'voice' && fully ? (
                       <button
                         type="button"
-                        disabled={!fully}
-                        onClick={() => { if (fully) { try { new Audio(m.url).play().catch(() => {}); } catch { /* ignore */ } } }}
+                        onClick={() => { try { new Audio(m.url).play().catch(() => {}); } catch { /* ignore */ } }}
                         className="absolute inset-0 flex items-center justify-center rounded-full active:scale-95"
                         style={{ backgroundColor: PINK }}
                         aria-label="Play voice note"
                       >
                         <svg viewBox="0 0 24 24" fill="white" width="46%" height="46%"><path d="M8 5v14l11-7z" /></svg>
                       </button>
-                    )}
-                    {/* Mosaic mask — black tiles that look like blank squares, each
-                        revealing when its linked word is solved. Gone once complete. */}
-                    {!fully && (
+                    ) : (
                       <div className="pointer-events-none absolute inset-0 grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${m.w}, 1fr)`, gridTemplateRows: `repeat(${m.h}, 1fr)` }}>
-                        {Array.from({ length: subs }).map((_, si) => {
-                          const wi = m.words[si];
-                          const shown = wi != null && solvedWords.has(wi);
-                          return <div key={si} className="rounded-[3px]" style={{ backgroundColor: shown ? 'transparent' : '#000', transition: 'background-color .4s' }} />;
-                        })}
+                        {Array.from({ length: subs }).map((_, si) => (
+                          <div key={si} className="rounded-[3px] bg-cover" style={{ transition: 'background-color .4s', ...tileStyle(si) }} />
+                        ))}
                       </div>
                     )}
                   </div>
