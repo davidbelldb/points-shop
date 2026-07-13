@@ -6,10 +6,34 @@ import { useBasket } from '../lib/BasketContext.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
+import { hapticSuccess, hapticTap, hapticParty, hapticFireworks } from '../lib/haptics.js';
 
 const key = (r, c) => `${r},${c}`;
 const CORRECT = '#61dbbc';
 const WRONG = '#a04d89';
+const PINK = '#ee70bd';
+
+// One-shot celebratory burst on a win — reuses the splash-pop animation.
+function WinBurst() {
+  const particles = useMemo(() => Array.from({ length: 16 }, () => ({
+    left: 6 + Math.random() * 88, top: 8 + Math.random() * 70,
+    s0: 0.04 + Math.random() * 0.05, s1: 0.14 + Math.random() * 0.30,
+    r0: Math.random() * 40 - 20, r1: Math.random() * 80 - 40,
+    delay: Math.random() * 0.7, dur: 0.45 + Math.random() * 0.4,
+  })), []);
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[300] overflow-hidden">
+      {particles.map((p, i) => (
+        <img key={i} src="/splash.png" alt="" aria-hidden="true" style={{
+          position: 'absolute', left: `${p.left}%`, top: `${p.top}%`, width: '60vw',
+          transform: 'translate(-50%, -50%)', willChange: 'transform, opacity',
+          '--s0': p.s0, '--s1': p.s1, '--r0': `${p.r0}deg`, '--r1': `${p.r1}deg`,
+          animation: `splash-pop ${p.dur}s ease-out ${p.delay}s both`,
+        }} />
+      ))}
+    </div>
+  );
+}
 const fmtTime = (ts) => {
   try { return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }); }
   catch { return ''; }
@@ -63,6 +87,7 @@ export default function CrossWordsPage() {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [showBurst, setShowBurst] = useState(false);
   const inputRefs = useRef({});
   const saveTimer = useRef(null);
 
@@ -158,13 +183,35 @@ export default function CrossWordsPage() {
     saveTimer.current = setTimeout(() => saveProgress(next), 700);
   }
 
+  const isEntryFilled = (entry, e) => entry.cells.every((cell) => e[key(cell.r, cell.c)]);
+
+  // The next clue (across then down) that still has an empty square.
+  function nextUnsolvedEntry(e, current) {
+    const order = [...across, ...down];
+    const start = current ? order.findIndex((x) => x.id === current.id) : -1;
+    for (let i = 1; i <= order.length; i++) {
+      const entry = order[(start + i + order.length) % order.length];
+      if (entry && !isEntryFilled(entry, e)) return entry;
+    }
+    return null;
+  }
+
   function onInput(r, c, value) {
     if (submitted) return;
     const ch = (value.slice(-1) || '').toUpperCase().replace(/[^A-Z]/g, '');
     const next = { ...entries, [key(r, c)]: ch };
     setEntries(next);
     scheduleSave(next);
-    if (ch) { const nxt = stepFrom(r, c, 1); if (nxt) focusCell(nxt.r, nxt.c); }
+    if (!ch) return;
+    // Word complete → satisfying tap + jump to the next unsolved clue.
+    if (currentEntry && isEntryFilled(currentEntry, next)) {
+      hapticSuccess();
+      const nxtEntry = nextUnsolvedEntry(next, currentEntry);
+      if (nxtEntry) selectEntry(nxtEntry, next);
+    } else {
+      const nxt = stepFrom(r, c, 1);
+      if (nxt) focusCell(nxt.r, nxt.c);
+    }
   }
 
   function onKeyDown(r, c, e) {
@@ -180,19 +227,25 @@ export default function CrossWordsPage() {
     else if (e.key === 'ArrowUp' && cells[key(r - 1, c)]) { setDir('down'); focusCell(r - 1, c); }
   }
 
-  function selectEntry(entry) {
+  function selectEntry(entry, e = entries) {
     setDir(entry.direction);
-    setSelected({ r: entry.startR, c: entry.startC });
-    setTimeout(() => focusCell(entry.startR, entry.startC), 0);
+    const target = entry.cells.find((cell) => !e[key(cell.r, cell.c)]) ?? entry.cells[0];
+    setSelected({ r: target.r, c: target.c });
+    setTimeout(() => focusCell(target.r, target.c), 0);
   }
 
   async function doSubmit() {
     if (!allFilled || submitted) return;
+    hapticTap();
     try {
       const res = await api.submitCrossword(entries);
       setSubmitted(true); setWon(!!res.won); setResult(res.result ?? null); setPts(res.pts ?? 0);
       setResultModalOpen(true);
-      if (res.won) refreshBasket?.();
+      if (res.won) {
+        hapticParty(); hapticFireworks();
+        setShowBurst(true); setTimeout(() => setShowBurst(false), 1600);
+        refreshBasket?.();
+      }
     } catch (e) { setError(e.message); }
   }
 
@@ -208,6 +261,7 @@ export default function CrossWordsPage() {
       className="mx-auto max-w-2xl pb-24"
       style={kbHeight ? { paddingBottom: kbHeight + 32, scrollPaddingBottom: kbHeight + 32 } : undefined}
     >
+      {showBurst && <WinBurst />}
       <div className="flex items-center justify-between py-3">
         <Link to="/" className="w-28 text-sm font-medium text-neutral-500">Back</Link>
         <span className="text-sm font-semibold text-neutral-800">{title}</span>
@@ -225,6 +279,18 @@ export default function CrossWordsPage() {
 
       {puzzle?.rows > 0 && (
         <>
+          {/* Active-clue banner — pinned under the header so she never has to
+              scroll to the clue list. Tap to flip across/down. */}
+          <div
+            onClick={() => currentEntry && setDir((d) => (d === 'across' ? 'down' : 'across'))}
+            className="sticky z-20 mb-2 rounded-lg px-3 py-2 text-sm font-semibold text-white"
+            style={{ top: 'var(--app-header-h)', backgroundColor: PINK }}
+          >
+            {currentEntry
+              ? `${currentEntry.number} ${currentEntry.direction === 'across' ? 'Across' : 'Down'} · ${currentEntry.hint} (${currentEntry.len})`
+              : 'Tap a square or a clue to begin'}
+          </div>
+
           <div className="flex justify-center">
             <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})` }}>
               {Array.from({ length: puzzle.rows * puzzle.cols }).map((_, idx) => {
@@ -258,7 +324,7 @@ export default function CrossWordsPage() {
                       disabled={submitted}
                       maxLength={1}
                       autoCapitalize="characters"
-                      className={`h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase focus:outline-none disabled:opacity-100 ${graded !== null ? 'text-white' : 'text-neutral-800'}`}
+                      className={`h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase caret-transparent focus:outline-none disabled:opacity-100 ${graded !== null ? 'text-white' : 'text-neutral-800'}`}
                     />
                   </div>
                 );
