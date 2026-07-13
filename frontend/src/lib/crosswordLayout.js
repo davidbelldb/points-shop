@@ -20,11 +20,14 @@ export function connectivityError(rawWords) {
   const pool = new Set();
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
+    // Manually-pinned words (integer row+col) may stand alone; only auto-placed
+    // words must cross an earlier word (mirrors the backend validate()).
+    const pinned = Number.isInteger(rawWords[i]?.row) && Number.isInteger(rawWords[i]?.col);
     if (w.word.length < 2) return `Word ${i + 1} needs at least two letters.`;
     if (!w.hint) return `Word ${i + 1} needs a hint.`;
     if (w.direction !== 'across' && w.direction !== 'down') return `Word ${i + 1} needs a direction.`;
-    if (i > 0 && ![...w.word].some((ch) => pool.has(ch))) {
-      return `Word ${i + 1} must share a letter with an earlier word.`;
+    if (i > 0 && !pinned && ![...w.word].some((ch) => pool.has(ch))) {
+      return `Word ${i + 1} must share a letter with an earlier word or be placed on the grid.`;
     }
     for (const ch of w.word) pool.add(ch);
   }
@@ -37,6 +40,10 @@ export function buildLayout(rawWords) {
       word: cleanWord(w.word),
       hint: String(w.hint ?? ''),
       direction: w.direction === 'down' ? 'down' : 'across',
+      // Optional manual placement: a word with integer row+col is PINNED to that
+      // start square; words without one are auto-placed exactly as before.
+      row: Number.isInteger(w.row) ? w.row : undefined,
+      col: Number.isInteger(w.col) ? w.col : undefined,
       _idx: i,
     }))
     .filter((w) => w.word.length >= 1);
@@ -82,8 +89,29 @@ export function buildLayout(rawWords) {
     placed.push({ ...w, cells, startR, startC });
   }
 
+  // A PINNED word may sit anywhere the author drops it; the only hard rule is
+  // that overlapping squares must agree on their letter (else grading breaks).
+  function canPlaceExact(word, dir, startR, startC) {
+    const dr = dir === 'down' ? 1 : 0;
+    const dc = dir === 'across' ? 1 : 0;
+    for (let j = 0; j < word.length; j++) {
+      const ex = grid.get(key(startR + dr * j, startC + dc * j));
+      if (ex !== undefined && ex !== word[j]) return false;
+    }
+    return true;
+  }
+
+  const hasPos = (w) => w.row !== undefined && w.col !== undefined;
+
   words.forEach((w, i) => {
-    if (i === 0) { commit(w, w.direction, 0, 0); return; }
+    // Manually-placed word: pin it exactly where the author put it.
+    if (hasPos(w)) {
+      if (canPlaceExact(w.word, w.direction, w.row, w.col)) commit(w, w.direction, w.row, w.col);
+      else unplaced.push({ ...w, index: i });
+      return;
+    }
+    // First auto word (empty grid) anchors the origin — unchanged from before.
+    if (grid.size === 0) { commit(w, w.direction, 0, 0); return; }
     const dir = w.direction;
     const dr = dir === 'down' ? 1 : 0;
     const dc = dir === 'across' ? 1 : 0;

@@ -4,32 +4,77 @@ import { buildLayout, connectivityError } from '../lib/crosswordLayout.js';
 import CrosswordMediaManager from './AdminCrosswordMedia.jsx';
 
 const MAX_WORDS = 30;
+const MAX_COLS = 18; // hard cap — beyond this the squares get too small to tap on a phone
 const inputCls =
   'block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-900 focus:border-amber-500 focus:outline-none';
 
 /* Compact preview so David can see the grid his words produce. Blanks render
-   as true black squares; filled squares show the solution letter. */
-function PreviewGrid({ layout, media = [], anchor = { r: 0, c: 0 } }) {
-  if (!layout.rows) return <p className="text-xs text-neutral-500">Add words to preview the grid.</p>;
-  const cellPx = Math.max(16, Math.min(30, Math.floor(300 / Math.max(layout.rows, layout.cols))));
-  const grid = [];
-  for (let r = 0; r < layout.rows; r++) {
-    for (let c = 0; c < layout.cols; c++) {
-      const cell = layout.cells[`${r},${c}`];
-      grid.push(
-        <div
-          key={`${r},${c}`}
-          className={`relative flex items-center justify-center rounded-[3px] ${cell ? 'bg-neutral-100 border border-neutral-200' : 'bg-black'}`}
-          style={{ gridColumn: c + 1, gridRow: r + 1, width: cellPx, height: cellPx }}
-        >
-          {cell?.number && <span className="absolute left-[1px] top-0 text-[7px] leading-none text-neutral-500">{cell.number}</span>}
-          {cell && <span className="text-[11px] font-bold text-neutral-800">{cell.letter}</span>}
-        </div>,
+   as true black squares; filled squares show the solution letter.
+
+   When `placing` is set (an index), the grid becomes interactive: a padding ring
+   of empty squares is added around the current grid so a word can be dropped into
+   blank space, and tapping any square calls onPlace(normRow, normCol) to pin the
+   selected word's start there. The selected word's current cells are ringed. */
+function PreviewGrid({ layout, media = [], anchor = { r: 0, c: 0 }, placing = null, onPlace }) {
+  const isPlacing = placing != null;
+
+  // No grid yet but placing the first word → offer a blank canvas to drop onto.
+  if (!layout.rows) {
+    if (!isPlacing) return <p className="text-xs text-neutral-500">Add words to preview the grid.</p>;
+    const N = 12, cellPx = 24, cells = [];
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      cells.push(
+        <button key={`${r},${c}`} type="button" onClick={() => onPlace(r, c)}
+          className="rounded-[3px] bg-black hover:ring-2 hover:ring-amber-400"
+          style={{ gridColumn: c + 1, gridRow: r + 1, width: cellPx, height: cellPx }} />,
       );
     }
+    return (
+      <div className="inline-block rounded-xl border border-neutral-200 bg-neutral-50 p-2">
+        <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${N}, ${cellPx}px)`, gridAutoRows: `${cellPx}px` }}>{cells}</div>
+      </div>
+    );
   }
-  // Media overlays so David can see where each tile lands.
-  media.forEach((m) => {
+
+  const PAD = isPlacing ? 2 : 0;
+  const totalCols = layout.cols + 2 * PAD, totalRows = layout.rows + 2 * PAD;
+  const cellPx = Math.max(14, Math.min(30, Math.floor(340 / Math.max(totalRows, totalCols))));
+
+  // Cells of the word currently being placed, so we can ring its position.
+  const activeCells = new Set();
+  if (isPlacing) {
+    for (const e of [...layout.across, ...layout.down]) {
+      if (e.wordIndex === placing) for (const cc of e.cells) activeCells.add(`${cc.r},${cc.c}`);
+    }
+  }
+
+  const grid = [];
+  for (let r = -PAD; r < layout.rows + PAD; r++) {
+    for (let c = -PAD; c < layout.cols + PAD; c++) {
+      const cell = layout.cells[`${r},${c}`];
+      const gc = c + PAD + 1, gr = r + PAD + 1;
+      const base = cell ? 'bg-neutral-100 border border-neutral-200' : 'bg-black';
+      const ring = activeCells.has(`${r},${c}`) ? 'ring-2 ring-amber-500' : '';
+      const inner = (
+        <>
+          {cell?.number && <span className="absolute left-[1px] top-0 text-[7px] leading-none text-neutral-500">{cell.number}</span>}
+          {cell && <span className="text-[11px] font-bold text-neutral-800">{cell.letter}</span>}
+        </>
+      );
+      grid.push(isPlacing ? (
+        <button key={`${r},${c}`} type="button" onClick={() => onPlace(r, c)}
+          className={`relative flex items-center justify-center rounded-[3px] ${base} ${ring} hover:ring-2 hover:ring-amber-400`}
+          style={{ gridColumn: gc, gridRow: gr, width: cellPx, height: cellPx }}>{inner}</button>
+      ) : (
+        <div key={`${r},${c}`}
+          className={`relative flex items-center justify-center rounded-[3px] ${base}`}
+          style={{ gridColumn: gc, gridRow: gr, width: cellPx, height: cellPx }}>{inner}</div>
+      ));
+    }
+  }
+
+  // Media overlays (only in view mode, so they don't block placement taps).
+  if (!isPlacing) media.forEach((m) => {
     const w = 2, h = m.type === 'photo' ? 3 : 2;
     if (!m.url && !m.type) return;
     grid.push(
@@ -53,7 +98,7 @@ function PreviewGrid({ layout, media = [], anchor = { r: 0, c: 0 } }) {
 
   return (
     <div className="inline-block rounded-xl border border-neutral-200 bg-neutral-50 p-2">
-      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${layout.cols}, ${cellPx}px)`, gridAutoRows: `${cellPx}px` }}>{grid}</div>
+      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${totalCols}, ${cellPx}px)`, gridAutoRows: `${cellPx}px` }}>{grid}</div>
     </div>
   );
 }
@@ -67,6 +112,7 @@ export default function AdminCrosswordSection() {
   const [saved, setSaved] = useState(false);
   const [open, setOpen] = useState(false); // playable by Katie?
   const [resetMsg, setResetMsg] = useState(null);
+  const [placingIdx, setPlacingIdx] = useState(null); // word being hand-placed on the grid
 
   useEffect(() => {
     api.admin.getCrossword()
@@ -114,13 +160,23 @@ export default function AdminCrosswordSection() {
     setSaved(false);
     setWords((ws) => ws.map((w, idx) => (idx === i ? { ...w, ...patch } : w)));
   }
+  const isPinned = (w) => Number.isInteger(w?.row) && Number.isInteger(w?.col);
+  // Tapped a preview square while placing: pin the selected word's start there.
+  // The tap is in normalised grid coords; store in the pre-normalisation frame
+  // (add the layout offset) so the position is stable as the grid grows.
+  function onPlace(nr, nc) {
+    if (placingIdx == null) return;
+    update(placingIdx, { row: nr + (layout.offsetR ?? 0), col: nc + (layout.offsetC ?? 0) });
+  }
   function addWord() {
     if (words.length >= MAX_WORDS) return;
     setSaved(false);
+    setPlacingIdx(null);
     setWords((ws) => [...ws, { word: '', hint: '', direction: 'across' }]);
   }
   function removeWord(i) {
     setSaved(false);
+    setPlacingIdx(null);
     setWords((ws) => (ws.length <= 1 ? ws : ws.filter((_, idx) => idx !== i)));
     // Word indexes shift when one is removed — keep media links pointing at the
     // right words: drop links to the removed word, decrement the ones after it.
@@ -144,9 +200,10 @@ export default function AdminCrosswordSection() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-neutral-600">
-        Build the private crossword at <span className="font-mono">/cross-words</span>. Word 1 anchors the grid; each
-        later word must share a letter with an earlier one so it can cross. Blank
-        squares become black automatically.
+        Build the private crossword at <span className="font-mono">/cross-words</span>. Auto-placed words must share a
+        letter with an earlier one so they can cross. Or tap <span className="font-semibold">Place</span> on any word and
+        tap a preview square to pin it exactly where you want — handy for filling blank space and keeping the grid narrow.
+        Blank squares become black automatically.
       </p>
 
       <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 px-3 py-2.5">
@@ -193,6 +250,16 @@ export default function AdminCrosswordSection() {
                 <option value="down">Down</option>
               </select>
             </div>
+            <div className="mt-0.5 flex shrink-0 flex-col items-stretch gap-1">
+              {placingIdx === i ? (
+                <button type="button" onClick={() => setPlacingIdx(null)} className="rounded-md bg-amber-500 px-2 py-1 text-[11px] font-semibold text-white">Done</button>
+              ) : (
+                <button type="button" onClick={() => setPlacingIdx(i)} className="rounded-md bg-neutral-700 px-2 py-1 text-[11px] font-semibold text-white">{isPinned(w) ? 'Move' : 'Place'}</button>
+              )}
+              {isPinned(w) && (
+                <button type="button" onClick={() => update(i, { row: undefined, col: undefined })} className="rounded-md bg-neutral-100 px-2 py-1 text-[11px] font-semibold text-neutral-600">Auto</button>
+              )}
+            </div>
             <button
               onClick={() => removeWord(i)}
               disabled={words.length <= 1}
@@ -221,10 +288,17 @@ export default function AdminCrosswordSection() {
         </p>
       )}
       {!validationMsg && mediaMsg && <p className="text-sm text-red-600">{mediaMsg}</p>}
+      {layout.cols > MAX_COLS && (
+        <p className="text-sm text-red-600">
+          This grid is {layout.cols} columns wide — the maximum is {MAX_COLS} (any wider and the squares get too small to tap). Move a word or use more down words to bring it in before saving.
+        </p>
+      )}
 
       <div>
-        <p className="mb-1 text-xs font-semibold text-neutral-500">Preview</p>
-        <PreviewGrid layout={layout} media={media} anchor={anchor} />
+        <p className="mb-1 text-xs font-semibold text-neutral-500">
+          Preview{placingIdx != null && words[placingIdx] ? ` — tap a square to set where “${words[placingIdx].word || 'this word'}” starts (${words[placingIdx].direction}); use its Across/Down control to rotate` : ''}
+        </p>
+        <PreviewGrid layout={layout} media={media} anchor={anchor} placing={placingIdx} onPlace={onPlace} />
       </div>
 
       <div className="border-t border-neutral-200 pt-3">
@@ -234,7 +308,7 @@ export default function AdminCrosswordSection() {
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          disabled={busy || !!validationMsg || !!mediaMsg || layout.unplaced.length > 0}
+          disabled={busy || !!validationMsg || !!mediaMsg || layout.unplaced.length > 0 || layout.cols > MAX_COLS}
           className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white active:scale-95 disabled:opacity-40"
         >
           {busy ? 'Saving…' : 'Save crossword'}

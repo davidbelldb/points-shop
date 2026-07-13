@@ -9,6 +9,7 @@ import { query } from '../../db.js';
 
 const DIRECTIONS = new Set(['across', 'down']);
 const MAX_WORDS = 30;
+const MAX_COLS = 18; // hard cap on grid width (kept in sync with the admin UI)
 const SOLVE_POINTS = 200;
 
 const clean = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
@@ -20,11 +21,14 @@ function validate(words) {
   for (let i = 0; i < words.length; i++) {
     const w = words[i] ?? {};
     const letters = clean(w.word);
+    // A word the author manually pinned (integer row+col) may stand alone; only
+    // AUTO-placed words must cross an earlier word so the engine can position them.
+    const pinned = Number.isInteger(w.row) && Number.isInteger(w.col);
     if (letters.length < 2) return `Word ${i + 1} needs at least two letters.`;
     if (!String(w.hint ?? '').trim()) return `Word ${i + 1} needs a hint.`;
     if (!DIRECTIONS.has(w.direction)) return `Word ${i + 1} needs a direction (across or down).`;
-    if (i > 0 && ![...letters].some((ch) => pool.has(ch))) {
-      return `Word ${i + 1} ("${w.word}") must share a letter with an earlier word.`;
+    if (i > 0 && !pinned && ![...letters].some((ch) => pool.has(ch))) {
+      return `Word ${i + 1} ("${w.word}") must share a letter with an earlier word or be placed manually.`;
     }
     for (const ch of letters) pool.add(ch);
   }
@@ -108,10 +112,21 @@ export default async function crosswordRoutes(fastify) {
     const { title, words } = req.body ?? {};
     const err = validate(words);
     if (err) return reply.code(400).send({ error: err });
-    const cleanWords = words.map((w) => ({
-      word: clean(w.word), hint: String(w.hint).trim(), direction: w.direction,
-    }));
+    const cleanWords = words.map((w) => {
+      const out = { word: clean(w.word), hint: String(w.hint).trim(), direction: w.direction };
+      // Preserve an optional manual position (0..99). Anything else = auto-placed.
+      if (Number.isInteger(w.row) && Number.isInteger(w.col)
+          && w.row >= 0 && w.col >= 0 && w.row < 100 && w.col < 100) {
+        out.row = w.row; out.col = w.col;
+      }
+      return out;
+    });
     const cleanMedia = sanitizeMedia(req.body?.media, cleanWords.length);
+    // Hard cap on grid width — beyond this the squares are too small to tap.
+    const previewLayout = buildLayout(cleanWords);
+    if (previewLayout.cols > MAX_COLS) {
+      return reply.code(400).send({ error: `Grid is ${previewLayout.cols} columns wide — the maximum is ${MAX_COLS}. Place words more compactly or use more down words.` });
+    }
     // Preserve in-flight play across the edit: carry each player's letters onto
     // the new grid word-by-word (see remapAllProgress) so answers follow their
     // slots wherever the repacked layout moves them.
