@@ -9,7 +9,7 @@ const inputCls =
 
 /* Compact preview so David can see the grid his words produce. Blanks render
    as true black squares; filled squares show the solution letter. */
-function PreviewGrid({ layout, media = [] }) {
+function PreviewGrid({ layout, media = [], anchor = { r: 0, c: 0 } }) {
   if (!layout.rows) return <p className="text-xs text-neutral-500">Add words to preview the grid.</p>;
   const cellPx = Math.max(16, Math.min(30, Math.floor(300 / Math.max(layout.rows, layout.cols))));
   const grid = [];
@@ -36,8 +36,8 @@ function PreviewGrid({ layout, media = [] }) {
       <div
         key={`m-${m.id}`}
         style={{
-          gridColumn: `${(m.col ?? 0) + 1} / span ${w}`,
-          gridRow: `${(m.row ?? 0) + 1} / span ${h}`,
+          gridColumn: `${(m.col ?? 0) + anchor.c + 1} / span ${w}`,
+          gridRow: `${(m.row ?? 0) + anchor.r + 1} / span ${h}`,
           zIndex: 5,
         }}
         className="flex items-center justify-center overflow-hidden rounded-md"
@@ -87,7 +87,28 @@ export default function AdminCrosswordSection() {
   }
 
   const layout = useMemo(() => buildLayout(words), [words]);
+  // Word 1's cell — media positions are stored relative to it (grid-shift proof).
+  const anchor = useMemo(() => {
+    const p = layout.placements?.[0];
+    return p ? { r: p.startR, c: p.startC } : { r: 0, c: 0 };
+  }, [layout]);
   const validationMsg = useMemo(() => connectivityError(words), [words]);
+  // Media tiles must sit on blank space and within the grid.
+  const mediaMsg = useMemo(() => {
+    if (!layout.rows) return null;
+    for (const m of media) {
+      if (!m.url) continue;
+      const w = 2, h = m.type === 'photo' ? 3 : 2;
+      const r0 = Math.round(Number(m.row) || 0) + anchor.r, c0 = Math.round(Number(m.col) || 0) + anchor.c;
+      if (r0 < 0 || c0 < 0 || r0 + h > layout.rows || c0 + w > layout.cols) {
+        return `A ${m.type} tile is off the grid — move it within bounds.`;
+      }
+      for (let r = r0; r < r0 + h; r++) for (let c = c0; c < c0 + w; c++) {
+        if (layout.cells[`${r},${c}`]) return `A ${m.type} tile is covering letter squares — place it on blank space.`;
+      }
+    }
+    return null;
+  }, [media, layout, anchor]);
 
   function update(i, patch) {
     setSaved(false);
@@ -101,6 +122,12 @@ export default function AdminCrosswordSection() {
   function removeWord(i) {
     setSaved(false);
     setWords((ws) => (ws.length <= 1 ? ws : ws.filter((_, idx) => idx !== i)));
+    // Word indexes shift when one is removed — keep media links pointing at the
+    // right words: drop links to the removed word, decrement the ones after it.
+    setMedia((ms) => ms.map((m) => ({
+      ...m,
+      words: (m.words || []).filter((wi) => wi !== i).map((wi) => (wi > i ? wi - 1 : wi)),
+    })));
   }
 
   async function save() {
@@ -193,22 +220,23 @@ export default function AdminCrosswordSection() {
           Couldn’t place: {layout.unplaced.map((u) => u.word).join(', ')}. Try a different word order or direction so it can cross.
         </p>
       )}
+      {!validationMsg && mediaMsg && <p className="text-sm text-red-600">{mediaMsg}</p>}
 
       <div>
         <p className="mb-1 text-xs font-semibold text-neutral-500">Preview</p>
-        <PreviewGrid layout={layout} media={media} />
+        <PreviewGrid layout={layout} media={media} anchor={anchor} />
       </div>
 
       {!validationMsg && (
         <div className="border-t border-neutral-200 pt-3">
-          <CrosswordMediaManager words={words} media={media} setMedia={setMedia} />
+          <CrosswordMediaManager words={words} media={media} setMedia={setMedia} anchor={anchor} />
         </div>
       )}
 
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          disabled={busy || !!validationMsg}
+          disabled={busy || !!validationMsg || !!mediaMsg}
           className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white active:scale-95 disabled:opacity-40"
         >
           {busy ? 'Saving…' : 'Save crossword'}

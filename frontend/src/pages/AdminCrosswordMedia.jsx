@@ -12,7 +12,7 @@ function wordOptions(words) {
     .map((e) => ({ wordIndex: e.wordIndex, label: `${e.number}${e.direction === 'across' ? 'A' : 'D'} · ${e.word}` }));
 }
 
-export default function CrosswordMediaManager({ words, media, setMedia }) {
+export default function CrosswordMediaManager({ words, media, setMedia, anchor = { r: 0, c: 0 } }) {
   const opts = wordOptions(words);
   const [recording, setRecording] = useState(null);
   const recRef = useRef(null);
@@ -31,14 +31,18 @@ export default function CrosswordMediaManager({ words, media, setMedia }) {
     if (recording === i) { recRef.current?.stop(); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
+      // Same format selection as the chat voice notes: iOS records m4a directly;
+      // desktop webm is normalised to m4a server-side on upload.
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const rec = new MediaRecorder(stream, { mimeType });
       const chunks = [];
       rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
       rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         setRecording(null); recRef.current = null;
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-        const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
+        const blob = new Blob(chunks, { type: mimeType });
+        const ext = mimeType.includes('webm') ? 'webm' : 'm4a';
+        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: mimeType });
         try { const { url } = await api.upload(file); update(i, { url }); } catch (e) { alert(e.message); }
       };
       recRef.current = rec; setRecording(i); rec.start();

@@ -59,11 +59,20 @@ function sanitizeMedia(media, wordCount) {
       id: String(m?.id || Math.random().toString(36).slice(2)),
       type,
       url: typeof m?.url === 'string' ? m.url : '',
-      row: Math.max(0, Math.round(Number(m?.row) || 0)),
-      col: Math.max(0, Math.round(Number(m?.col) || 0)),
+      // Stored RELATIVE to word 1's cell (can be negative) so tiles survive
+      // grid shifts when words are added. Converted to absolute on the way out.
+      row: Math.round(Number(m?.row) || 0),
+      col: Math.round(Number(m?.col) || 0),
       words,
     };
   }).filter((m) => m.url);
+}
+
+// Word 1's cell in the current layout — the anchor media positions are stored
+// relative to, so tiles stay put when the grid shifts.
+function anchorOf(layout) {
+  const p = layout.placements?.[0];
+  return p ? { r: p.startR, c: p.startC } : { r: 0, c: 0 };
 }
 
 // Union of every word index that has any media attached (gets live validation).
@@ -133,8 +142,10 @@ export default async function crosswordRoutes(fastify) {
     // the media tiles (positions/footprint), without any answers.
     const mediaWords = mediaWordSet(cw.media);
     for (const e of [...payload.across, ...payload.down]) e.hasMedia = mediaWords.has(e.wordIndex);
+    const anchor = anchorOf(layout); // relative → absolute for rendering
     const media = (cw.media ?? []).map((m) => ({
-      id: m.id, type: m.type, url: m.url, row: m.row, col: m.col,
+      id: m.id, type: m.type, url: m.url,
+      row: (m.row ?? 0) + anchor.r, col: (m.col ?? 0) + anchor.c,
       w: 2, h: m.type === 'photo' ? 3 : 2, words: m.words ?? [],
     }));
     return {

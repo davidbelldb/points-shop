@@ -64,6 +64,35 @@ export async function extractVideoThumbnail(videoPath) {
 
 const TRANSCODE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes — long story clips on a small VPS
 
+/* Normalise uploaded audio to AAC in an .m4a container so it plays everywhere,
+   crucially in the iOS WKWebView (which won't play webm/opus that MediaRecorder
+   produces). Passes through formats iOS already handles. Soft-fails to the
+   original on error. */
+export async function transcodeAudioIfNeeded(filepath, type) {
+  if (type !== 'audio') return { filepath, filename: path.basename(filepath), transcoded: false };
+  const ext = path.extname(filepath).toLowerCase();
+  if (['.mp3', '.m4a', '.aac'].includes(ext)) {
+    return { filepath, filename: path.basename(filepath), transcoded: false };
+  }
+  const dir = path.dirname(filepath);
+  const base = path.basename(filepath, path.extname(filepath));
+  const outPath = path.join(dir, `${base}.m4a`);
+  const intermediate = path.join(dir, `${base}.transcoding.m4a`);
+  try {
+    await execFileAsync(
+      'ffmpeg',
+      ['-i', filepath, '-vn', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', intermediate],
+      { timeout: 3 * 60 * 1000, maxBuffer: 100 * 1024 * 1024 },
+    );
+    if (filepath !== outPath) await unlink(filepath).catch(() => {});
+    await rename(intermediate, outPath);
+    return { filepath: outPath, filename: path.basename(outPath), transcoded: true };
+  } catch (err) {
+    await unlink(intermediate).catch(() => {});
+    return { filepath, filename: path.basename(filepath), transcoded: false, error: err.message };
+  }
+}
+
 export async function transcodeVideoIfNeeded(filepath, type) {
   if (type !== 'video') return { filepath, filename: path.basename(filepath), transcoded: false };
 

@@ -337,7 +337,9 @@ export default function CrossWordsPage() {
             <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})`, gridAutoRows: cellSize }}>
               {media.map((m) => {
                 const subs = m.w * m.h;
-                const fully = m.words.length >= subs && m.words.slice(0, subs).every((wi) => wi != null && solvedWords.has(wi));
+                // Fully revealed once EVERY linked word is solved (even if fewer
+                // words than tiles were linked), so a tile can't get stuck part-open.
+                const fully = m.words.length > 0 && m.words.every((wi) => wi != null && solvedWords.has(wi));
                 return (
                   <div
                     key={`media-${m.id}`}

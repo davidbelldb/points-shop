@@ -8,7 +8,7 @@ import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { randomUUID } from 'crypto';
 import { config } from '../../config.js';
-import { transcodeVideoIfNeeded, extractVideoThumbnail } from './transcode.js';
+import { transcodeVideoIfNeeded, transcodeAudioIfNeeded, extractVideoThumbnail } from './transcode.js';
 import { optimizeImage, generateImageThumbnail } from './image.js';
 
 const MEDIA_DIR = config.mediaDir;
@@ -89,6 +89,11 @@ export default async function mediaRoutes(fastify) {
         if (thumbName) thumbnail_url = `/media/${thumbName}`;
         else req.log?.warn({ filename }, 'image thumbnail failed');
       }
+    } else if (type === 'audio') {
+      // Re-encode to AAC/.m4a so it plays in the iOS WKWebView (webm/opus won't).
+      const a = await transcodeAudioIfNeeded(out.filepath, type);
+      if (a.transcoded) mediaUrl = `/media/${a.filename}`;
+      else if (a.error) req.log?.warn({ filename, err: a.error }, 'audio transcode skipped');
     }
     return { url: mediaUrl, type, mimetype: data.mimetype, thumbnail_url };
   });
