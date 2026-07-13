@@ -7,6 +7,7 @@ import { useSettings } from '../lib/SettingsContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
 import { hapticSuccess, hapticTap, hapticParty, hapticFireworks } from '../lib/haptics.js';
+import PhotoLightbox from '../components/PhotoLightbox.jsx';
 
 const key = (r, c) => `${r},${c}`;
 const CORRECT = '#61dbbc';
@@ -90,6 +91,7 @@ export default function CrossWordsPage() {
   const [showBurst, setShowBurst] = useState(false);
   const [solvedWords, setSolvedWords] = useState(() => new Set()); // wordIndexes confirmed via live-check
   const [lockedCells, setLockedCells] = useState(() => new Set());  // "r,c" confirmed correct (locked teal)
+  const [lightboxSrc, setLightboxSrc] = useState(null); // fully-revealed photo opened full-screen
   const inputRefs = useRef({});
   const saveTimer = useRef(null);
 
@@ -358,11 +360,13 @@ export default function CrossWordsPage() {
                   const py = m.h > 1 ? (tr / (m.h - 1)) * 100 : 0;
                   return { backgroundImage: `url(${m.url})`, backgroundSize: `${m.w * 100}% ${m.h * 100}%`, backgroundPosition: `${px}% ${py}%` };
                 }
+                const photoDone = m.type === 'photo' && fully;
                 return (
                   <div
                     key={`media-${m.id}`}
-                    className="relative"
+                    className={`relative ${photoDone ? 'cursor-pointer' : ''}`}
                     style={{ gridColumn: `${m.col + 1} / span ${m.w}`, gridRow: `${m.row + 1} / span ${m.h}`, zIndex: 20 }}
+                    onClick={photoDone ? () => setLightboxSrc(m.url) : undefined}
                   >
                     {/* Voice, once fully revealed, becomes a solid pink play button. */}
                     {m.type === 'voice' && fully ? (
@@ -513,6 +517,8 @@ export default function CrossWordsPage() {
           </div>
         </div>
       )}
+
+      {lightboxSrc && <PhotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }
