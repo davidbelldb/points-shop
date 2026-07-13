@@ -131,17 +131,16 @@ export default function CrossWordsPage() {
   const mediaEntries = useMemo(() => [...across, ...down].filter((e) => e.hasMedia), [across, down]);
 
   // Live-check a media word: if the player's letters are complete + correct,
-  // lock its cells teal and mark it solved (drives photo-mosaic reveal).
+  // mark it solved (drives the media reveal). Deliberately does NOT colour or
+  // lock the squares — a teal cell here would make her think the uncoloured
+  // squares are wrong. The only visible effect is the media tile uncovering.
   async function liveCheck(entry, e) {
     if (entry.wordIndex == null) return;
     const letters = entry.cells.map((cell) => e[key(cell.r, cell.c)] || '').join('');
     if (letters.length < entry.len) return;
     try {
       const res = await api.checkCrosswordWord(entry.wordIndex, letters);
-      if (res?.correct) {
-        setSolvedWords((s) => new Set(s).add(entry.wordIndex));
-        setLockedCells((s) => { const n = new Set(s); for (const c of entry.cells) n.add(key(c.r, c.c)); return n; });
-      }
+      if (res?.correct) setSolvedWords((s) => new Set(s).add(entry.wordIndex));
     } catch { /* ignore */ }
   }
 
@@ -228,7 +227,7 @@ export default function CrossWordsPage() {
   }
 
   function onInput(r, c, value) {
-    if (submitted || lockedCells.has(key(r, c))) return;
+    if (submitted) return;
     if (result) setResult(null); // clear a previous miss's red marks as she edits
     const ch = (value.slice(-1) || '').toUpperCase().replace(/[^A-Z]/g, '');
     const next = { ...entries, [key(r, c)]: ch };
@@ -399,15 +398,15 @@ export default function CrossWordsPage() {
                 if (!cell) return <div key={k} className="rounded-[3px] bg-black" style={{ ...placeStyle, width: cellSize, height: cellSize }} />;
                 const isSel = selected && selected.r === r && selected.c === c;
                 const inWord = highlight.has(k);
-                const locked = lockedCells.has(k);
                 let cls = 'bg-neutral-100';
                 if (inWord) cls = 'bg-teal-100';
-                if (isSel && !submitted && !locked) cls = 'bg-pink-200 ring-2 ring-pink-500 z-10';
+                if (isSel && !submitted) cls = 'bg-pink-200 ring-2 ring-pink-500 z-10';
                 const val = entries[k] ?? '';
                 const graded = result ? result[k] : null;
-                // Box colour: submit grading, or teal for a live-validated (locked) square.
-                const gradedBg = graded === true ? CORRECT : graded === false ? WRONG : (locked ? CORRECT : null);
-                const whiteLetter = graded !== null || locked;
+                // Box colour ONLY from Submit grading — auto-validation stays grey
+                // so she can't mistake uncoloured squares for wrong ones.
+                const gradedBg = graded === true ? CORRECT : graded === false ? WRONG : null;
+                const whiteLetter = graded !== null;
                 return (
                   <div
                     key={k}
@@ -422,7 +421,7 @@ export default function CrossWordsPage() {
                       onKeyDown={(e) => onKeyDown(r, c, e)}
                       onFocus={() => { selectCell(r, c); revealCell(r, c); }}
                       onClick={() => selectCell(r, c)}
-                      disabled={submitted || locked}
+                      disabled={submitted}
                       maxLength={1}
                       autoCapitalize="characters"
                       className={`h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase caret-transparent focus:outline-none disabled:opacity-100 ${whiteLetter ? 'text-white' : 'text-neutral-800'}`}
