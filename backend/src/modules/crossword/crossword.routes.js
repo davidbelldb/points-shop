@@ -114,9 +114,13 @@ export default async function crosswordRoutes(fastify) {
     if (err) return reply.code(400).send({ error: err });
     const cleanWords = words.map((w) => {
       const out = { word: clean(w.word), hint: String(w.hint).trim(), direction: w.direction };
-      // Preserve an optional manual position (0..99). Anything else = auto-placed.
+      // Preserve the editor's manual position EXACTLY as authored. Positions are
+      // in the pre-normalisation frame (anchored on word 1) so they can be
+      // negative when a word sits above/left of word 1 — the layout engine
+      // normalises them. Dropping negatives here would desync the backend grid
+      // from the admin preview (it would re-auto-place the word wider).
       if (Number.isInteger(w.row) && Number.isInteger(w.col)
-          && w.row >= 0 && w.col >= 0 && w.row < 100 && w.col < 100) {
+          && Math.abs(w.row) < 200 && Math.abs(w.col) < 200) {
         out.row = w.row; out.col = w.col;
       }
       return out;

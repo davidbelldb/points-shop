@@ -296,7 +296,11 @@ export default function AdminCrosswordSection() {
 
       <div>
         <p className="mb-1 text-xs font-semibold text-neutral-500">
-          Preview{placingIdx != null && words[placingIdx] ? ` — tap a square to set where “${words[placingIdx].word || 'this word'}” starts (${words[placingIdx].direction}); use its Across/Down control to rotate` : ''}
+          Preview
+          {layout.rows ? (
+            <> · <span className={layout.cols > MAX_COLS ? 'text-red-600' : 'text-neutral-700'}>{layout.cols} wide</span> (max {MAX_COLS}) × {layout.rows} tall</>
+          ) : ''}
+          {placingIdx != null && words[placingIdx] ? ` — tap a square to set where “${words[placingIdx].word || 'this word'}” starts (${words[placingIdx].direction}); use its Across/Down control to rotate` : ''}
         </p>
         <PreviewGrid layout={layout} media={media} anchor={anchor} placing={placingIdx} onPlace={onPlace} />
       </div>
