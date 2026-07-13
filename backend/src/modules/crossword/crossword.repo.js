@@ -5,8 +5,10 @@ export async function getCrossword() {
   return rows[0] ?? { title: 'Crossword', words: [], version: 1 };
 }
 
-/* Save the authored puzzle. Bumps the version and wipes all play progress, so a
-   fresh puzzle is a clean slate (and can award its solve points anew). */
+/* Save the authored puzzle. Bumps the version but PRESERVES play progress so
+   the puzzle can be edited mid-game (see remapAllProgress in the route, which
+   shifts each player's letters to match the new grid). A full wipe is a
+   separate, explicit admin action (resetAllProgress). */
 export async function saveCrossword(title, words) {
   const { rows } = await query(
     `INSERT INTO crossword (id, title, words, version, updated_at)
@@ -17,8 +19,32 @@ export async function saveCrossword(title, words) {
      RETURNING title, words, version`,
     [title || 'Crossword', JSON.stringify(words)],
   );
-  await query(`DELETE FROM crossword_progress`);
   return rows[0];
+}
+
+/* After an edit, shift every player's placed letters by the grid's
+   normalisation delta (dR, dC) so they stay on the right squares, dropping any
+   that no longer land on a fillable cell. Reopens submitted boards so new words
+   can still be filled. Best-effort: correct when words are appended (the shared
+   prefix places identically); editing existing words may misplace letters. */
+export async function remapAllProgress(dR, dC, validKeys) {
+  if (dR === 0 && dC === 0) return; // grid didn't shift — nothing to move
+  const { rows } = await query(`SELECT account_id, entries, submitted FROM crossword_progress`);
+  for (const row of rows) {
+    const src = row.entries || {};
+    const next = {};
+    for (const [k, v] of Object.entries(src)) {
+      const [r, c] = k.split(',').map(Number);
+      const nk = `${r + dR},${c + dC}`;
+      if (validKeys.has(nk)) next[nk] = v;
+    }
+    await query(
+      `UPDATE crossword_progress
+          SET entries = $2::jsonb, submitted = FALSE, won = FALSE, submitted_at = NULL, updated_at = NOW()
+        WHERE account_id = $1`,
+      [row.account_id, JSON.stringify(next)],
+    );
+  }
 }
 
 export async function getProgress(accountId) {

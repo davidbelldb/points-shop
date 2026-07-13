@@ -1,5 +1,6 @@
 import {
   getCrossword, saveCrossword, getProgress, saveProgress, markSubmitted, resetProgress, resetAllProgress,
+  remapAllProgress,
 } from './crossword.repo.js';
 import { buildLayout, toPlayPayload } from './layout.js';
 import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
@@ -73,7 +74,15 @@ export default async function crosswordRoutes(fastify) {
     const cleanWords = words.map((w) => ({
       word: clean(w.word), hint: String(w.hint).trim(), direction: w.direction,
     }));
-    return saveCrossword(title, cleanWords);
+    // Preserve in-flight play across the edit: compute how the grid shifted and
+    // move every player's letters to match (see remapAllProgress).
+    const oldLayout = buildLayout((await getCrossword()).words ?? []);
+    const newLayout = buildLayout(cleanWords);
+    const saved = await saveCrossword(title, cleanWords);
+    const dR = (oldLayout.offsetR ?? 0) - (newLayout.offsetR ?? 0);
+    const dC = (oldLayout.offsetC ?? 0) - (newLayout.offsetC ?? 0);
+    await remapAllProgress(dR, dC, new Set(Object.keys(newLayout.cells)));
+    return saved;
   });
 
   /* ---- Play (admin always; Katie when opened) ---- */

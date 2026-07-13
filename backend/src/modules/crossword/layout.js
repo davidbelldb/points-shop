@@ -77,7 +77,7 @@ export function buildLayout(rawWords) {
     else unplaced.push({ ...w, index: i });
   });
 
-  if (!placed.length) return { rows: 0, cols: 0, cells: {}, across: [], down: [], placements: [], unplaced };
+  if (!placed.length) return { rows: 0, cols: 0, cells: {}, across: [], down: [], placements: [], unplaced, offsetR: 0, offsetC: 0 };
 
   let minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity;
   for (const p of placed) for (const { r, c } of p.cells) {
@@ -123,7 +123,7 @@ export function buildLayout(rawWords) {
   across.sort((a, b) => a.number - b.number);
   down.sort((a, b) => a.number - b.number);
 
-  return { rows, cols, cells, across, down, placements: norm, unplaced };
+  return { rows, cols, cells, across, down, placements: norm, unplaced, offsetR: minR, offsetC: minC };
 }
 
 /* Strip the solution letters for the client. Returns the grid geometry, clue

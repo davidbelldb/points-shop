@@ -106,7 +106,7 @@ export function buildLayout(rawWords) {
     else unplaced.push({ ...w, index: i });
   });
 
-  if (!placed.length) return { rows: 0, cols: 0, cells: {}, across: [], down: [], placements: [], unplaced };
+  if (!placed.length) return { rows: 0, cols: 0, cells: {}, across: [], down: [], placements: [], unplaced, offsetR: 0, offsetC: 0 };
 
   // Normalise coordinates to a 0-based bounding box.
   let minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity;
@@ -154,5 +154,5 @@ export function buildLayout(rawWords) {
   across.sort((a, b) => a.number - b.number);
   down.sort((a, b) => a.number - b.number);
 
-  return { rows, cols, cells, across, down, placements: norm, unplaced };
+  return { rows, cols, cells, across, down, placements: norm, unplaced, offsetR: minR, offsetC: minC };
 }
