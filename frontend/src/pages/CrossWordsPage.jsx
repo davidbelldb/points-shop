@@ -340,9 +340,12 @@ export default function CrossWordsPage() {
               : 'Tap a square or a clue to begin'}
           </div>
 
-          <div className="flex justify-center">
+          <div
+            className="flex justify-center"
+            style={{ width: '100vw', marginLeft: 'calc(50% - 50vw)', paddingLeft: '1px', paddingRight: '1px' }}
+          >
             <div
-              className="grid w-full gap-[3px]"
+              className="grid w-full items-start gap-[3px]"
               style={{
                 gridTemplateColumns: `repeat(${puzzle.cols}, minmax(0, 1fr))`,
                 maxWidth: `calc(${puzzle.cols} * 2.4rem + ${(puzzle.cols - 1) * 3}px)`,
@@ -368,7 +371,7 @@ export default function CrossWordsPage() {
                 return (
                   <div
                     key={`media-${m.id}`}
-                    className={`relative ${photoDone ? 'cursor-pointer' : ''}`}
+                    className={`relative self-stretch ${photoDone ? 'cursor-pointer' : ''}`}
                     style={{ gridColumn: `${m.col + 1} / span ${m.w}`, gridRow: `${m.row + 1} / span ${m.h}`, zIndex: 20 }}
                     onClick={photoDone ? () => setLightboxSrc(m.url) : undefined}
                   >
@@ -429,7 +432,7 @@ export default function CrossWordsPage() {
                       disabled={submitted}
                       maxLength={1}
                       autoCapitalize="characters"
-                      className={`h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase caret-transparent focus:outline-none disabled:opacity-100 ${whiteLetter ? 'text-white' : 'text-neutral-800'}`}
+                      className={`absolute inset-0 h-full w-full min-h-0 rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase caret-transparent focus:outline-none disabled:opacity-100 ${whiteLetter ? 'text-white' : 'text-neutral-800'}`}
                     />
                   </div>
                 );
