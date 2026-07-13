@@ -304,7 +304,6 @@ export default function CrossWordsPage() {
   }
 
   const title = puzzle?.title || 'Crossword';
-  const cellSize = puzzle?.cols ? `min(2.4rem, calc((100vw - 2.5rem) / ${puzzle.cols}))` : '2.4rem';
 
   return (
     <div
@@ -342,7 +341,13 @@ export default function CrossWordsPage() {
           </div>
 
           <div className="flex justify-center">
-            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})`, gridAutoRows: cellSize }}>
+            <div
+              className="grid w-full gap-[3px]"
+              style={{
+                gridTemplateColumns: `repeat(${puzzle.cols}, minmax(0, 1fr))`,
+                maxWidth: `calc(${puzzle.cols} * 2.4rem + ${(puzzle.cols - 1) * 3}px)`,
+              }}
+            >
               {media.map((m) => {
                 const subs = m.w * m.h;
                 // Fully revealed once EVERY linked word is solved.
@@ -395,7 +400,7 @@ export default function CrossWordsPage() {
                 // Every cell is placed EXPLICITLY so the media tiles (also explicit)
                 // can't push auto-flowed squares onto new rows.
                 const placeStyle = { gridColumn: c + 1, gridRow: r + 1 };
-                if (!cell) return <div key={k} className="rounded-[3px] bg-black" style={{ ...placeStyle, width: cellSize, height: cellSize }} />;
+                if (!cell) return <div key={k} className="aspect-square rounded-[3px] bg-black" style={placeStyle} />;
                 const isSel = selected && selected.r === r && selected.c === c;
                 const inWord = highlight.has(k);
                 let cls = 'bg-neutral-100';
@@ -410,8 +415,8 @@ export default function CrossWordsPage() {
                 return (
                   <div
                     key={k}
-                    className={`relative rounded-[3px] border border-neutral-200 ${cls}`}
-                    style={{ ...placeStyle, width: cellSize, height: cellSize, ...(gradedBg ? { backgroundColor: gradedBg } : {}) }}
+                    className={`relative aspect-square rounded-[3px] border border-neutral-200 ${cls}`}
+                    style={{ ...placeStyle, ...(gradedBg ? { backgroundColor: gradedBg } : {}) }}
                   >
                     {cell.number && <span className="pointer-events-none absolute left-[2px] top-[1px] text-[8px] leading-none text-neutral-500">{cell.number}</span>}
                     <input
