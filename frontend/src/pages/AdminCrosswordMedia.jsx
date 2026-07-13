@@ -57,7 +57,7 @@ export default function CrosswordMediaManager({ words, media, setMedia }) {
     <div className="space-y-3">
       <p className="text-xs font-semibold text-neutral-500">Media tiles (optional) — plotted into the blank space; linked words live-validate.</p>
       {media.map((item, i) => {
-        const max = item.type === 'photo' ? 6 : 1;
+        const max = item.type === 'photo' ? 6 : 4;
         return (
           <div key={item.id} className="space-y-2 rounded-xl border border-neutral-200 p-3">
             <div className="flex items-center justify-between">
@@ -106,7 +106,7 @@ export default function CrosswordMediaManager({ words, media, setMedia }) {
                   onChange={(e) => { if (e.target.value !== '') addWord(i, Number(e.target.value), max); }}
                   className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-sm"
                 >
-                  <option value="">{item.type === 'photo' ? `Add reveal word (${item.words.length}/6)` : 'Link a word'}</option>
+                  <option value="">Add reveal word ({item.words.length}/{max})</option>
                   {opts.filter((o) => !item.words.includes(o.wordIndex)).map((o) => (
                     <option key={o.wordIndex} value={o.wordIndex}>{o.label}</option>
                   ))}

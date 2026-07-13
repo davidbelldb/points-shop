@@ -45,14 +45,15 @@ function sanitizeEntries(obj) {
   return out;
 }
 
-// Keep media items well-formed. Voice links 1 word (2x2); photo links up to 6
-// words that reveal it as a mosaic (2x3). Word links must be valid indexes.
+// Keep media items well-formed. Both types reveal as a mosaic as linked words
+// are solved: voice = 2x2 (up to 4 words), photo = 2x3 (up to 6 words). Word
+// links must be valid indexes.
 function sanitizeMedia(media, wordCount) {
   if (!Array.isArray(media)) return [];
   return media.slice(0, 20).map((m) => {
     const type = m?.type === 'photo' ? 'photo' : 'voice';
     const words = Array.isArray(m?.words)
-      ? [...new Set(m.words.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < wordCount))].slice(0, type === 'photo' ? 6 : 1)
+      ? [...new Set(m.words.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < wordCount))].slice(0, type === 'photo' ? 6 : 4)
       : [];
     return {
       id: String(m?.id || Math.random().toString(36).slice(2)),
@@ -201,17 +202,20 @@ export default async function crosswordRoutes(fastify) {
       result[k] = ok;
       if (!ok) allCorrect = false;
     }
-    await markSubmitted(accountId, entries, allCorrect);
-
+    // Only a fully-correct solve locks the board + awards. A miss keeps the
+    // board open (entries saved) so she can fix it and submit again.
     let pts = 0;
     if (allCorrect) {
+      await markSubmitted(accountId, entries, true);
       const reason = `crossword-solve-v${cw.version}`;
       const { rows } = await query(
         `SELECT 1 FROM points_ledger WHERE reason = $1 AND account_id = $2 LIMIT 1`,
         [reason, accountId],
       );
       if (!rows.length) { pts = SOLVE_POINTS; await creditPoints(accountId, SOLVE_POINTS, reason); }
+    } else {
+      await saveProgress(accountId, entries);
     }
-    return { submitted: true, won: allCorrect, result, pts };
+    return { submitted: allCorrect, won: allCorrect, result, pts };
   });
 }

@@ -227,6 +227,7 @@ export default function CrossWordsPage() {
 
   function onInput(r, c, value) {
     if (submitted || lockedCells.has(key(r, c))) return;
+    if (result) setResult(null); // clear a previous miss's red marks as she edits
     const ch = (value.slice(-1) || '').toUpperCase().replace(/[^A-Z]/g, '');
     const next = { ...entries, [key(r, c)]: ch };
     setEntries(next);
@@ -272,14 +273,22 @@ export default function CrossWordsPage() {
     hapticTap();
     try {
       const res = await api.submitCrossword(entries);
-      setSubmitted(true); setWon(!!res.won); setResult(res.result ?? null); setPts(res.pts ?? 0);
+      setWon(!!res.won); setResult(res.result ?? null); setPts(res.pts ?? 0);
       setResultModalOpen(true);
       if (res.won) {
+        setSubmitted(true);         // lock only on a full solve
         hapticParty(); hapticFireworks();
         setShowBurst(true); setTimeout(() => setShowBurst(false), 1600);
         refreshBasket?.();
       }
+      // On a miss we DON'T lock — she keeps playing and can resubmit.
     } catch (e) { setError(e.message); }
+  }
+
+  // Leaving the result modal after a miss → clear the red marks and carry on.
+  function keepPlaying() {
+    setResultModalOpen(false);
+    setResult(null);
   }
 
   function doClear() {
@@ -326,36 +335,44 @@ export default function CrossWordsPage() {
 
           <div className="flex justify-center">
             <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})`, gridAutoRows: cellSize }}>
-              {media.map((m) => (
-                <div
-                  key={`media-${m.id}`}
-                  style={{ gridColumn: `${m.col + 1} / span ${m.w}`, gridRow: `${m.row + 1} / span ${m.h}`, zIndex: 20 }}
-                  className="relative overflow-hidden rounded-md p-[3px]"
-                >
-                  {m.type === 'photo' ? (
-                    <div className="relative h-full w-full overflow-hidden rounded-md">
-                      <img src={m.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gridTemplateRows: 'repeat(3, 1fr)' }}>
-                        {Array.from({ length: 6 }).map((_, si) => {
+              {media.map((m) => {
+                const subs = m.w * m.h;
+                const fully = m.words.length >= subs && m.words.slice(0, subs).every((wi) => wi != null && solvedWords.has(wi));
+                return (
+                  <div
+                    key={`media-${m.id}`}
+                    className="relative"
+                    style={{ gridColumn: `${m.col + 1} / span ${m.w}`, gridRow: `${m.row + 1} / span ${m.h}`, zIndex: 20 }}
+                  >
+                    {/* Base media (hidden behind the mosaic mask until revealed). */}
+                    {m.type === 'photo' ? (
+                      <img src={m.url} alt="" className="absolute inset-0 h-full w-full rounded-md object-cover" />
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!fully}
+                        onClick={() => { if (fully) { try { new Audio(m.url).play().catch(() => {}); } catch { /* ignore */ } } }}
+                        className="absolute inset-0 flex items-center justify-center rounded-full active:scale-95"
+                        style={{ backgroundColor: PINK }}
+                        aria-label="Play voice note"
+                      >
+                        <svg viewBox="0 0 24 24" fill="white" width="46%" height="46%"><path d="M8 5v14l11-7z" /></svg>
+                      </button>
+                    )}
+                    {/* Mosaic mask — black tiles that look like blank squares, each
+                        revealing when its linked word is solved. Gone once complete. */}
+                    {!fully && (
+                      <div className="pointer-events-none absolute inset-0 grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${m.w}, 1fr)`, gridTemplateRows: `repeat(${m.h}, 1fr)` }}>
+                        {Array.from({ length: subs }).map((_, si) => {
                           const wi = m.words[si];
                           const shown = wi != null && solvedWords.has(wi);
-                          return <div key={si} style={{ backgroundColor: shown ? 'transparent' : (isDark ? '#0c0c0c' : '#111'), transition: 'background-color .4s' }} />;
+                          return <div key={si} className="rounded-[3px]" style={{ backgroundColor: shown ? 'transparent' : '#000', transition: 'background-color .4s' }} />;
                         })}
                       </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => { try { new Audio(m.url).play().catch(() => {}); } catch { /* ignore */ } }}
-                      className="flex h-full w-full items-center justify-center rounded-full active:scale-95"
-                      style={{ backgroundColor: PINK }}
-                      aria-label="Play voice note"
-                    >
-                      <svg viewBox="0 0 24 24" fill="white" width="52%" height="52%"><path d="M8 5v14l11-7z" /></svg>
-                    </button>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
               {Array.from({ length: puzzle.rows * puzzle.cols }).map((_, idx) => {
                 const r = Math.floor(idx / puzzle.cols), c = idx % puzzle.cols;
                 const k = key(r, c);
@@ -368,7 +385,7 @@ export default function CrossWordsPage() {
                 if (inWord) cls = 'bg-teal-100';
                 if (isSel && !submitted && !locked) cls = 'bg-pink-200 ring-2 ring-pink-500 z-10';
                 const val = entries[k] ?? '';
-                const graded = submitted && result ? result[k] : null;
+                const graded = result ? result[k] : null;
                 // Box colour: submit grading, or teal for a live-validated (locked) square.
                 const gradedBg = graded === true ? CORRECT : graded === false ? WRONG : (locked ? CORRECT : null);
                 const whiteLetter = graded !== null || locked;
@@ -455,7 +472,7 @@ export default function CrossWordsPage() {
       )}
 
       {/* Result modal (Ducky-Derby style) */}
-      {submitted && resultModalOpen && (
+      {resultModalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-xs rounded-3xl p-6 text-center shadow-2xl" style={{ background: isDark ? '#171717' : '#ffffff' }}>
             <div className="mb-3 flex justify-center"><MiniCrossword won={won} isDark={isDark} /></div>
@@ -463,12 +480,21 @@ export default function CrossWordsPage() {
             <p className="mt-2 text-lg font-extrabold" style={{ color: won ? CORRECT : WRONG }}>
               {won ? `Solved! +${pts || 200} pts 🎉` : 'Ahhh that’s a shame.. close though.'}
             </p>
-            <button
-              onClick={() => setResultModalOpen(false)}
-              className="mt-5 block w-full rounded-xl bg-teal-300 py-3 text-base font-semibold text-teal-900 active:scale-95"
-            >
-              Close
-            </button>
+            {won ? (
+              <button
+                onClick={() => setResultModalOpen(false)}
+                className="mt-5 block w-full rounded-xl bg-teal-300 py-3 text-base font-semibold text-teal-900 active:scale-95"
+              >
+                Close
+              </button>
+            ) : (
+              <button
+                onClick={keepPlaying}
+                className="mt-5 block w-full rounded-xl bg-teal-300 py-3 text-base font-semibold text-teal-900 active:scale-95"
+              >
+                Keep playing
+              </button>
+            )}
           </div>
         </div>
       )}
