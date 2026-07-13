@@ -1,4 +1,7 @@
 import { query } from '../../db.js';
+import { buildLayout } from './layout.js';
+
+const rc = (r, c) => `${r},${c}`;
 
 export async function getCrossword() {
   const { rows } = await query(`SELECT title, words, media, version FROM crossword WHERE id = 1`);
@@ -22,21 +25,47 @@ export async function saveCrossword(title, words, media = []) {
   return rows[0];
 }
 
-/* After an edit, shift every player's placed letters by the grid's
-   normalisation delta (dR, dC) so they stay on the right squares, dropping any
-   that no longer land on a fillable cell. Reopens submitted boards so new words
-   can still be filled. Best-effort: correct when words are appended (the shared
-   prefix places identically); editing existing words may misplace letters. */
-export async function remapAllProgress(dR, dC, validKeys) {
-  if (dR === 0 && dC === 0) return; // grid didn't shift — nothing to move
-  const { rows } = await query(`SELECT account_id, entries, submitted FROM crossword_progress`);
+/* After an edit, carry every player's letters onto the NEW grid word-by-word.
+   Adding or reordering words repacks the whole layout, so a single global shift
+   is wrong (it scrambled boards). Instead we match each word between the old and
+   new layout by its answer + direction and copy the player's letters cell-by-cell
+   along the word, so each answer follows its slot wherever it moves. Letters for
+   words that were removed or whose spelling changed are dropped (their squares no
+   longer exist). Reopens submitted boards so freshly-added words can still be
+   filled. */
+export async function remapAllProgress(oldWords, newWords) {
+  const oldL = buildLayout(oldWords || []);
+  const newL = buildLayout(newWords || []);
+
+  // Pair each new-layout entry with an old-layout entry of the same answer +
+  // direction. Greedy-consume so duplicate answers pair one-to-one.
+  const oldByKey = new Map();
+  for (const e of [...oldL.across, ...oldL.down]) {
+    const kk = `${e.word}|${e.direction}`;
+    if (!oldByKey.has(kk)) oldByKey.set(kk, []);
+    oldByKey.get(kk).push(e);
+  }
+  const pairs = []; // [oldEntry, newEntry]
+  for (const ne of [...newL.across, ...newL.down]) {
+    const bucket = oldByKey.get(`${ne.word}|${ne.direction}`);
+    const oe = bucket && bucket.length ? bucket.shift() : null;
+    if (oe) pairs.push([oe, ne]);
+  }
+  if (!pairs.length) return; // nothing recognisable to carry over
+
+  const validKeys = new Set(Object.keys(newL.cells));
+  const { rows } = await query(`SELECT account_id, entries FROM crossword_progress`);
   for (const row of rows) {
     const src = row.entries || {};
     const next = {};
-    for (const [k, v] of Object.entries(src)) {
-      const [r, c] = k.split(',').map(Number);
-      const nk = `${r + dR},${c + dC}`;
-      if (validKeys.has(nk)) next[nk] = v;
+    for (const [oe, ne] of pairs) {
+      const n = Math.min(oe.cells.length, ne.cells.length);
+      for (let j = 0; j < n; j++) {
+        const v = src[rc(oe.cells[j].r, oe.cells[j].c)];
+        if (!v) continue;
+        const nk = rc(ne.cells[j].r, ne.cells[j].c);
+        if (validKeys.has(nk)) next[nk] = v;
+      }
     }
     await query(
       `UPDATE crossword_progress

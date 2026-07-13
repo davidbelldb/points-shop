@@ -112,14 +112,12 @@ export default async function crosswordRoutes(fastify) {
       word: clean(w.word), hint: String(w.hint).trim(), direction: w.direction,
     }));
     const cleanMedia = sanitizeMedia(req.body?.media, cleanWords.length);
-    // Preserve in-flight play across the edit: compute how the grid shifted and
-    // move every player's letters to match (see remapAllProgress).
-    const oldLayout = buildLayout((await getCrossword()).words ?? []);
-    const newLayout = buildLayout(cleanWords);
+    // Preserve in-flight play across the edit: carry each player's letters onto
+    // the new grid word-by-word (see remapAllProgress) so answers follow their
+    // slots wherever the repacked layout moves them.
+    const oldWords = (await getCrossword()).words ?? [];
     const saved = await saveCrossword(title, cleanWords, cleanMedia);
-    const dR = (oldLayout.offsetR ?? 0) - (newLayout.offsetR ?? 0);
-    const dC = (oldLayout.offsetC ?? 0) - (newLayout.offsetC ?? 0);
-    await remapAllProgress(dR, dC, new Set(Object.keys(newLayout.cells)));
+    await remapAllProgress(oldWords, cleanWords);
     return saved;
   });
 
