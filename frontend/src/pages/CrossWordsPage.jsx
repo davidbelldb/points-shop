@@ -292,7 +292,14 @@ export default function CrossWordsPage() {
   }
 
   function doClear() {
-    setEntries({}); setConfirmClear(false); saveProgress({});
+    setEntries({});
+    // Also drop the live-validated state so media tiles re-hide and locked
+    // squares unlock — otherwise reveals/locks linger over an empty grid.
+    setSolvedWords(new Set());
+    setLockedCells(new Set());
+    setResult(null);
+    setConfirmClear(false);
+    saveProgress({});
   }
 
   const title = puzzle?.title || 'Crossword';
