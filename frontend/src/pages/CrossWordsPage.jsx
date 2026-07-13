@@ -332,7 +332,7 @@ export default function CrossWordsPage() {
               scroll to the clue list. Tap to flip across/down. */}
           <div
             onClick={() => currentEntry && setDir((d) => (d === 'across' ? 'down' : 'across'))}
-            className="sticky z-20 mb-2 rounded-lg px-3 py-2 text-sm font-semibold text-white"
+            className="sticky z-30 mb-2 rounded-lg px-3 py-2 text-sm font-semibold text-white"
             style={{ top: 'var(--app-header-h)', backgroundColor: PINK }}
           >
             {currentEntry
