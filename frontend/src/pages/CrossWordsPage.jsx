@@ -379,7 +379,10 @@ export default function CrossWordsPage() {
                 const r = Math.floor(idx / puzzle.cols), c = idx % puzzle.cols;
                 const k = key(r, c);
                 const cell = cells[k];
-                if (!cell) return <div key={k} className="rounded-[3px] bg-black" style={{ width: cellSize, height: cellSize }} />;
+                // Every cell is placed EXPLICITLY so the media tiles (also explicit)
+                // can't push auto-flowed squares onto new rows.
+                const placeStyle = { gridColumn: c + 1, gridRow: r + 1 };
+                if (!cell) return <div key={k} className="rounded-[3px] bg-black" style={{ ...placeStyle, width: cellSize, height: cellSize }} />;
                 const isSel = selected && selected.r === r && selected.c === c;
                 const inWord = highlight.has(k);
                 const locked = lockedCells.has(k);
@@ -395,7 +398,7 @@ export default function CrossWordsPage() {
                   <div
                     key={k}
                     className={`relative rounded-[3px] border border-neutral-200 ${cls}`}
-                    style={{ width: cellSize, height: cellSize, ...(gradedBg ? { backgroundColor: gradedBg } : {}) }}
+                    style={{ ...placeStyle, width: cellSize, height: cellSize, ...(gradedBg ? { backgroundColor: gradedBg } : {}) }}
                   >
                     {cell.number && <span className="pointer-events-none absolute left-[2px] top-[1px] text-[8px] leading-none text-neutral-500">{cell.number}</span>}
                     <input

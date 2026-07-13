@@ -20,7 +20,7 @@ function PreviewGrid({ layout, media = [], anchor = { r: 0, c: 0 } }) {
         <div
           key={`${r},${c}`}
           className={`relative flex items-center justify-center rounded-[3px] ${cell ? 'bg-neutral-100 border border-neutral-200' : 'bg-black'}`}
-          style={{ width: cellPx, height: cellPx }}
+          style={{ gridColumn: c + 1, gridRow: r + 1, width: cellPx, height: cellPx }}
         >
           {cell?.number && <span className="absolute left-[1px] top-0 text-[7px] leading-none text-neutral-500">{cell.number}</span>}
           {cell && <span className="text-[11px] font-bold text-neutral-800">{cell.letter}</span>}
