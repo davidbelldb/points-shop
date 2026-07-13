@@ -120,8 +120,8 @@ export default function CrosswordMediaManager({ words, media, setMedia, anchor =
 
             <div className="flex items-center gap-3 text-xs text-neutral-600">
               <span className="text-neutral-500">Top-left square:</span>
-              <label>row <input type="number" min={0} value={item.row} onChange={(e) => update(i, { row: Math.max(0, Number(e.target.value) || 0) })} className="w-14 rounded border border-neutral-200 bg-white px-1 py-0.5" /></label>
-              <label>col <input type="number" min={0} value={item.col} onChange={(e) => update(i, { col: Math.max(0, Number(e.target.value) || 0) })} className="w-14 rounded border border-neutral-200 bg-white px-1 py-0.5" /></label>
+              <label>row <input type="number" min={0} value={(item.row ?? 0) + anchor.r} onChange={(e) => update(i, { row: (Math.round(Number(e.target.value)) || 0) - anchor.r })} className="w-14 rounded border border-neutral-200 bg-white px-1 py-0.5" /></label>
+              <label>col <input type="number" min={0} value={(item.col ?? 0) + anchor.c} onChange={(e) => update(i, { col: (Math.round(Number(e.target.value)) || 0) - anchor.c })} className="w-14 rounded border border-neutral-200 bg-white px-1 py-0.5" /></label>
             </div>
           </div>
         );
