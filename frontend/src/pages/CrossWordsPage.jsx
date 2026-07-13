@@ -362,7 +362,7 @@ export default function CrossWordsPage() {
                       <button
                         type="button"
                         onClick={() => { try { new Audio(m.url).play().catch(() => {}); } catch { /* ignore */ } }}
-                        className="absolute inset-0 flex items-center justify-center rounded-full active:scale-95"
+                        className="absolute inset-0 flex items-center justify-center rounded-md active:scale-95"
                         style={{ backgroundColor: PINK }}
                         aria-label="Play voice note"
                       >
