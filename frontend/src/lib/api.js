@@ -190,6 +190,7 @@ export const api = {
   saveCrosswordProgress: (entries) => request('/crossword/progress', { method: 'PUT', body: JSON.stringify({ entries }) }),
   submitCrossword: (entries) => request('/crossword/submit', { method: 'POST', body: JSON.stringify({ entries }) }),
   resetCrossword: () => request('/crossword/reset', { method: 'POST' }),
+  checkCrosswordWord: (wordIndex, letters) => request('/crossword/check-word', { method: 'POST', body: JSON.stringify({ wordIndex, letters }) }),
   resolveNfcSlot: (slug) => request(`/nfc/slots/${encodeURIComponent(slug)}/story`),
   createStory: (data) => request('/stories', { method: 'POST', body: JSON.stringify(data) }),
   deleteStory: (id) => request(`/stories/${id}`, { method: 'DELETE' }),

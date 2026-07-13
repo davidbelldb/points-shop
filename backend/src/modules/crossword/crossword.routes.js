@@ -45,6 +45,33 @@ function sanitizeEntries(obj) {
   return out;
 }
 
+// Keep media items well-formed. Voice links 1 word (2x2); photo links up to 6
+// words that reveal it as a mosaic (2x3). Word links must be valid indexes.
+function sanitizeMedia(media, wordCount) {
+  if (!Array.isArray(media)) return [];
+  return media.slice(0, 20).map((m) => {
+    const type = m?.type === 'photo' ? 'photo' : 'voice';
+    const words = Array.isArray(m?.words)
+      ? [...new Set(m.words.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < wordCount))].slice(0, type === 'photo' ? 6 : 1)
+      : [];
+    return {
+      id: String(m?.id || Math.random().toString(36).slice(2)),
+      type,
+      url: typeof m?.url === 'string' ? m.url : '',
+      row: Math.max(0, Math.round(Number(m?.row) || 0)),
+      col: Math.max(0, Math.round(Number(m?.col) || 0)),
+      words,
+    };
+  }).filter((m) => m.url);
+}
+
+// Union of every word index that has any media attached (gets live validation).
+function mediaWordSet(media) {
+  const s = new Set();
+  for (const m of media || []) for (const wi of m.words || []) s.add(wi);
+  return s;
+}
+
 async function isOpen() {
   const { rows } = await query(`SELECT value FROM settings WHERE key = 'crossword_open'`);
   return rows[0]?.value === 'true';
@@ -74,11 +101,12 @@ export default async function crosswordRoutes(fastify) {
     const cleanWords = words.map((w) => ({
       word: clean(w.word), hint: String(w.hint).trim(), direction: w.direction,
     }));
+    const cleanMedia = sanitizeMedia(req.body?.media, cleanWords.length);
     // Preserve in-flight play across the edit: compute how the grid shifted and
     // move every player's letters to match (see remapAllProgress).
     const oldLayout = buildLayout((await getCrossword()).words ?? []);
     const newLayout = buildLayout(cleanWords);
-    const saved = await saveCrossword(title, cleanWords);
+    const saved = await saveCrossword(title, cleanWords, cleanMedia);
     const dR = (oldLayout.offsetR ?? 0) - (newLayout.offsetR ?? 0);
     const dC = (oldLayout.offsetC ?? 0) - (newLayout.offsetC ?? 0);
     await remapAllProgress(dR, dC, new Set(Object.keys(newLayout.cells)));
@@ -99,12 +127,34 @@ export default async function crosswordRoutes(fastify) {
         result[k] = (prog.entries?.[k] ?? '') === cell.letter;
       }
     }
+    const payload = toPlayPayload(layout);
+    // Flag entries that carry media (they live-validate as a bonus) and expose
+    // the media tiles (positions/footprint), without any answers.
+    const mediaWords = mediaWordSet(cw.media);
+    for (const e of [...payload.across, ...payload.down]) e.hasMedia = mediaWords.has(e.wordIndex);
+    const media = (cw.media ?? []).map((m) => ({
+      id: m.id, type: m.type, url: m.url, row: m.row, col: m.col,
+      w: 2, h: m.type === 'photo' ? 3 : 2, words: m.words ?? [],
+    }));
     return {
       title: cw.title,
       version: cw.version,
-      ...toPlayPayload(layout),
+      ...payload,
+      media,
       progress: { entries: prog.entries ?? {}, submitted: !!prog.submitted, won: !!prog.won, result, updatedAt: prog.updated_at ?? null },
     };
+  });
+
+  // Live word-check (media words only). Returns whether the player's letters for
+  // that word are complete + correct, without ever sending the answer.
+  fastify.post('/api/crossword/check-word', async (req, reply) => {
+    if (!(await canPlay(req))) return reply.code(404).send({ error: 'not found' });
+    const cw = await getCrossword();
+    const wordIndex = Number(req.body?.wordIndex);
+    if (!mediaWordSet(cw.media).has(wordIndex)) return reply.code(400).send({ error: 'not a media word' });
+    const answer = clean(cw.words?.[wordIndex]?.word);
+    const letters = clean(req.body?.letters);
+    return { wordIndex, complete: letters.length === answer.length, correct: letters.length > 0 && letters === answer };
   });
 
   // "Set" — persist the current fill so the player can leave and resume.

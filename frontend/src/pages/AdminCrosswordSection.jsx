@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { buildLayout, connectivityError } from '../lib/crosswordLayout.js';
+import CrosswordMediaManager from './AdminCrosswordMedia.jsx';
 
 const MAX_WORDS = 30;
 const inputCls =
@@ -8,7 +9,7 @@ const inputCls =
 
 /* Compact preview so David can see the grid his words produce. Blanks render
    as true black squares; filled squares show the solution letter. */
-function PreviewGrid({ layout }) {
+function PreviewGrid({ layout, media = [] }) {
   if (!layout.rows) return <p className="text-xs text-neutral-500">Add words to preview the grid.</p>;
   const cellPx = Math.max(16, Math.min(30, Math.floor(300 / Math.max(layout.rows, layout.cols))));
   const grid = [];
@@ -27,9 +28,32 @@ function PreviewGrid({ layout }) {
       );
     }
   }
+  // Media overlays so David can see where each tile lands.
+  media.forEach((m) => {
+    const w = 2, h = m.type === 'photo' ? 3 : 2;
+    if (!m.url && !m.type) return;
+    grid.push(
+      <div
+        key={`m-${m.id}`}
+        style={{
+          gridColumn: `${(m.col ?? 0) + 1} / span ${w}`,
+          gridRow: `${(m.row ?? 0) + 1} / span ${h}`,
+          zIndex: 5,
+        }}
+        className="flex items-center justify-center overflow-hidden rounded-md"
+      >
+        {m.type === 'photo'
+          ? (m.url ? <img src={m.url} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-blue-500/70" />)
+          : <div className="flex h-full w-full items-center justify-center rounded-full" style={{ backgroundColor: '#ee70bd' }}>
+              <svg width={cellPx} height={cellPx} viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z" /></svg>
+            </div>}
+      </div>,
+    );
+  });
+
   return (
     <div className="inline-block rounded-xl border border-neutral-200 bg-neutral-50 p-2">
-      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${layout.cols}, ${cellPx}px)` }}>{grid}</div>
+      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${layout.cols}, ${cellPx}px)`, gridAutoRows: `${cellPx}px` }}>{grid}</div>
     </div>
   );
 }
@@ -37,6 +61,7 @@ function PreviewGrid({ layout }) {
 export default function AdminCrosswordSection() {
   const [title, setTitle] = useState('Crossword');
   const [words, setWords] = useState([{ word: '', hint: '', direction: 'across' }]);
+  const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -48,6 +73,7 @@ export default function AdminCrosswordSection() {
       .then((cfg) => {
         setTitle(cfg.title ?? 'Crossword');
         setWords(cfg.words?.length ? cfg.words : [{ word: '', hint: '', direction: 'across' }]);
+        setMedia(Array.isArray(cfg.media) ? cfg.media : []);
         setOpen(cfg.open === true);
       })
       .catch((e) => setError(e.message));
@@ -80,8 +106,9 @@ export default function AdminCrosswordSection() {
   async function save() {
     setBusy(true); setError(null); setSaved(false);
     try {
-      const cfg = await api.admin.saveCrossword({ title, words });
+      const cfg = await api.admin.saveCrossword({ title, words, media });
       setWords(cfg.words?.length ? cfg.words : words);
+      if (Array.isArray(cfg.media)) setMedia(cfg.media);
       setSaved(true);
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -169,8 +196,14 @@ export default function AdminCrosswordSection() {
 
       <div>
         <p className="mb-1 text-xs font-semibold text-neutral-500">Preview</p>
-        <PreviewGrid layout={layout} />
+        <PreviewGrid layout={layout} media={media} />
       </div>
+
+      {!validationMsg && (
+        <div className="border-t border-neutral-200 pt-3">
+          <CrosswordMediaManager words={words} media={media} setMedia={setMedia} />
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <button

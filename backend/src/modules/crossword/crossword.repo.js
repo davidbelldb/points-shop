@@ -1,23 +1,23 @@
 import { query } from '../../db.js';
 
 export async function getCrossword() {
-  const { rows } = await query(`SELECT title, words, version FROM crossword WHERE id = 1`);
-  return rows[0] ?? { title: 'Crossword', words: [], version: 1 };
+  const { rows } = await query(`SELECT title, words, media, version FROM crossword WHERE id = 1`);
+  return rows[0] ?? { title: 'Crossword', words: [], media: [], version: 1 };
 }
 
 /* Save the authored puzzle. Bumps the version but PRESERVES play progress so
    the puzzle can be edited mid-game (see remapAllProgress in the route, which
    shifts each player's letters to match the new grid). A full wipe is a
    separate, explicit admin action (resetAllProgress). */
-export async function saveCrossword(title, words) {
+export async function saveCrossword(title, words, media = []) {
   const { rows } = await query(
-    `INSERT INTO crossword (id, title, words, version, updated_at)
-     VALUES (1, $1, $2::jsonb, 2, NOW())
+    `INSERT INTO crossword (id, title, words, media, version, updated_at)
+     VALUES (1, $1, $2::jsonb, $3::jsonb, 2, NOW())
      ON CONFLICT (id) DO UPDATE
-       SET title = EXCLUDED.title, words = EXCLUDED.words,
+       SET title = EXCLUDED.title, words = EXCLUDED.words, media = EXCLUDED.media,
            version = crossword.version + 1, updated_at = NOW()
-     RETURNING title, words, version`,
-    [title || 'Crossword', JSON.stringify(words)],
+     RETURNING title, words, media, version`,
+    [title || 'Crossword', JSON.stringify(words), JSON.stringify(media)],
   );
   return rows[0];
 }

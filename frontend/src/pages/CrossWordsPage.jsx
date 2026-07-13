@@ -88,6 +88,8 @@ export default function CrossWordsPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [showBurst, setShowBurst] = useState(false);
+  const [solvedWords, setSolvedWords] = useState(() => new Set()); // wordIndexes confirmed via live-check
+  const [lockedCells, setLockedCells] = useState(() => new Set());  // "r,c" confirmed correct (locked teal)
   const inputRefs = useRef({});
   const saveTimer = useRef(null);
 
@@ -110,9 +112,36 @@ export default function CrossWordsPage() {
 
   useEffect(() => () => clearTimeout(saveTimer.current), []);
 
+  // On load, restore live-check locks for any media word already filled in.
+  useEffect(() => {
+    if (!puzzle) return;
+    const e = puzzle.progress?.entries ?? {};
+    for (const entry of [...(puzzle.across ?? []), ...(puzzle.down ?? [])]) {
+      if (entry.hasMedia && entry.cells.every((c) => e[key(c.r, c.c)])) liveCheck(entry, e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puzzle]);
+
   const across = puzzle?.across ?? [];
   const down = puzzle?.down ?? [];
   const cells = puzzle?.cells ?? {};
+  const media = puzzle?.media ?? [];
+  const mediaEntries = useMemo(() => [...across, ...down].filter((e) => e.hasMedia), [across, down]);
+
+  // Live-check a media word: if the player's letters are complete + correct,
+  // lock its cells teal and mark it solved (drives photo-mosaic reveal).
+  async function liveCheck(entry, e) {
+    if (entry.wordIndex == null) return;
+    const letters = entry.cells.map((cell) => e[key(cell.r, cell.c)] || '').join('');
+    if (letters.length < entry.len) return;
+    try {
+      const res = await api.checkCrosswordWord(entry.wordIndex, letters);
+      if (res?.correct) {
+        setSolvedWords((s) => new Set(s).add(entry.wordIndex));
+        setLockedCells((s) => { const n = new Set(s); for (const c of entry.cells) n.add(key(c.r, c.c)); return n; });
+      }
+    } catch { /* ignore */ }
+  }
 
   const currentEntry = useMemo(() => {
     if (!selected) return null;
@@ -197,11 +226,15 @@ export default function CrossWordsPage() {
   }
 
   function onInput(r, c, value) {
-    if (submitted) return;
+    if (submitted || lockedCells.has(key(r, c))) return;
     const ch = (value.slice(-1) || '').toUpperCase().replace(/[^A-Z]/g, '');
     const next = { ...entries, [key(r, c)]: ch };
     setEntries(next);
     scheduleSave(next);
+    // Any media word that just got fully filled → live-validate it.
+    if (ch) for (const e of mediaEntries) {
+      if (!solvedWords.has(e.wordIndex) && e.cells.every((cell) => next[key(cell.r, cell.c)])) liveCheck(e, next);
+    }
     if (!ch) return;
     // Word complete → satisfying tap + jump to the next unsolved clue.
     if (currentEntry && isEntryFilled(currentEntry, next)) {
@@ -292,7 +325,37 @@ export default function CrossWordsPage() {
           </div>
 
           <div className="flex justify-center">
-            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})` }}>
+            <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellSize})`, gridAutoRows: cellSize }}>
+              {media.map((m) => (
+                <div
+                  key={`media-${m.id}`}
+                  style={{ gridColumn: `${m.col + 1} / span ${m.w}`, gridRow: `${m.row + 1} / span ${m.h}`, zIndex: 20 }}
+                  className="relative overflow-hidden rounded-md p-[3px]"
+                >
+                  {m.type === 'photo' ? (
+                    <div className="relative h-full w-full overflow-hidden rounded-md">
+                      <img src={m.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gridTemplateRows: 'repeat(3, 1fr)' }}>
+                        {Array.from({ length: 6 }).map((_, si) => {
+                          const wi = m.words[si];
+                          const shown = wi != null && solvedWords.has(wi);
+                          return <div key={si} style={{ backgroundColor: shown ? 'transparent' : (isDark ? '#0c0c0c' : '#111'), transition: 'background-color .4s' }} />;
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { try { new Audio(m.url).play().catch(() => {}); } catch { /* ignore */ } }}
+                      className="flex h-full w-full items-center justify-center rounded-full active:scale-95"
+                      style={{ backgroundColor: PINK }}
+                      aria-label="Play voice note"
+                    >
+                      <svg viewBox="0 0 24 24" fill="white" width="52%" height="52%"><path d="M8 5v14l11-7z" /></svg>
+                    </button>
+                  )}
+                </div>
+              ))}
               {Array.from({ length: puzzle.rows * puzzle.cols }).map((_, idx) => {
                 const r = Math.floor(idx / puzzle.cols), c = idx % puzzle.cols;
                 const k = key(r, c);
@@ -300,13 +363,15 @@ export default function CrossWordsPage() {
                 if (!cell) return <div key={k} className="rounded-[3px] bg-black" style={{ width: cellSize, height: cellSize }} />;
                 const isSel = selected && selected.r === r && selected.c === c;
                 const inWord = highlight.has(k);
+                const locked = lockedCells.has(k);
                 let cls = 'bg-neutral-100';
                 if (inWord) cls = 'bg-teal-100';
-                if (isSel && !submitted) cls = 'bg-pink-200 ring-2 ring-pink-500 z-10';
+                if (isSel && !submitted && !locked) cls = 'bg-pink-200 ring-2 ring-pink-500 z-10';
                 const val = entries[k] ?? '';
                 const graded = submitted && result ? result[k] : null;
-                // On submit the BOX takes the result colour; the letter stays white.
-                const gradedBg = graded === true ? CORRECT : graded === false ? WRONG : null;
+                // Box colour: submit grading, or teal for a live-validated (locked) square.
+                const gradedBg = graded === true ? CORRECT : graded === false ? WRONG : (locked ? CORRECT : null);
+                const whiteLetter = graded !== null || locked;
                 return (
                   <div
                     key={k}
@@ -321,10 +386,10 @@ export default function CrossWordsPage() {
                       onKeyDown={(e) => onKeyDown(r, c, e)}
                       onFocus={() => { selectCell(r, c); revealCell(r, c); }}
                       onClick={() => selectCell(r, c)}
-                      disabled={submitted}
+                      disabled={submitted || locked}
                       maxLength={1}
                       autoCapitalize="characters"
-                      className={`h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase caret-transparent focus:outline-none disabled:opacity-100 ${graded !== null ? 'text-white' : 'text-neutral-800'}`}
+                      className={`h-full w-full rounded-[3px] bg-transparent text-center text-[15px] font-bold uppercase caret-transparent focus:outline-none disabled:opacity-100 ${whiteLetter ? 'text-white' : 'text-neutral-800'}`}
                     />
                   </div>
                 );

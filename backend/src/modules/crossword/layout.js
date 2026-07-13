@@ -9,10 +9,11 @@ const key = (r, c) => `${r},${c}`;
 
 export function buildLayout(rawWords) {
   const words = (rawWords || [])
-    .map((w) => ({
+    .map((w, i) => ({
       word: cleanWord(w.word),
       hint: String(w.hint ?? ''),
       direction: w.direction === 'down' ? 'down' : 'across',
+      _idx: i,
     }))
     .filter((w) => w.word.length >= 1);
 
@@ -113,6 +114,7 @@ export function buildLayout(rawWords) {
       id: (p.direction === 'across' ? 'A' : 'D') + number,
       number, hint: p.hint, word: p.word, len: p.word.length,
       direction: p.direction, startR: p.startR, startC: p.startC, cells: p.cells,
+      wordIndex: p._idx,
     };
     (p.direction === 'across' ? across : down).push(entry);
     for (const { r, c } of p.cells) {
@@ -140,6 +142,7 @@ export function toPlayPayload(layout) {
   const strip = (e) => ({
     id: e.id, number: e.number, hint: e.hint, len: e.len,
     direction: e.direction, startR: e.startR, startC: e.startC, cells: e.cells,
+    wordIndex: e.wordIndex,
   });
   return {
     rows: layout.rows, cols: layout.cols, cells,
