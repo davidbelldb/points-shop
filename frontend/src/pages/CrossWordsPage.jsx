@@ -7,6 +7,7 @@ import { useSettings } from '../lib/SettingsContext.jsx';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { useKeyboardHeight } from '../lib/useKeyboardHeight.js';
 import { hapticSuccess, hapticTap, hapticParty, hapticFireworks } from '../lib/haptics.js';
+import { playSound } from '../lib/sounds.js';
 import PhotoLightbox from '../components/PhotoLightbox.jsx';
 
 const key = (r, c) => `${r},${c}`;
@@ -94,6 +95,7 @@ export default function CrossWordsPage() {
   const [lightboxSrc, setLightboxSrc] = useState(null); // fully-revealed photo opened full-screen
   const inputRefs = useRef({});
   const saveTimer = useRef(null);
+  const chimedRef = useRef(new Set()); // content words that have already played the jingle
 
   const canSee = user?.role === 'admin' || settings.crossword_open === 'true';
 
@@ -140,7 +142,16 @@ export default function CrossWordsPage() {
     if (letters.length < entry.len) return;
     try {
       const res = await api.checkCrosswordWord(entry.wordIndex, letters);
-      if (res?.correct) setSolvedWords((s) => new Set(s).add(entry.wordIndex));
+      if (res?.correct) {
+        // Chime the FIRST time each content word locks in — the jingle is the one
+        // bit of "you got it" feedback she gets before submitting. Ref-guarded so
+        // it fires exactly once per word even if liveCheck re-runs.
+        if (!chimedRef.current.has(entry.wordIndex)) {
+          chimedRef.current.add(entry.wordIndex);
+          playSound('/word-jingle.mp3', 0.9);
+        }
+        setSolvedWords((s) => new Set(s).add(entry.wordIndex));
+      }
     } catch { /* ignore */ }
   }
 
@@ -298,6 +309,7 @@ export default function CrossWordsPage() {
     // squares unlock — otherwise reveals/locks linger over an empty grid.
     setSolvedWords(new Set());
     setLockedCells(new Set());
+    chimedRef.current = new Set(); // let the jingle play again on a fresh attempt
     setResult(null);
     setConfirmClear(false);
     saveProgress({});
