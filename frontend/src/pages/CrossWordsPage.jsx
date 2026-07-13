@@ -93,9 +93,11 @@ export default function CrossWordsPage() {
   const [solvedWords, setSolvedWords] = useState(() => new Set()); // wordIndexes confirmed via live-check
   const [lockedCells, setLockedCells] = useState(() => new Set());  // "r,c" confirmed correct (locked teal)
   const [lightboxSrc, setLightboxSrc] = useState(null); // fully-revealed photo opened full-screen
+  const [playingId, setPlayingId] = useState(null); // id of the voice note currently playing
   const inputRefs = useRef({});
   const saveTimer = useRef(null);
   const chimedRef = useRef(new Set()); // content words that have already played the jingle
+  const voiceRef = useRef(null); // the <audio> for the currently-playing voice note
 
   const canSee = user?.role === 'admin' || settings.crossword_open === 'true';
 
@@ -154,6 +156,23 @@ export default function CrossWordsPage() {
       }
     } catch { /* ignore */ }
   }
+
+  // Play/pause a revealed voice note. Tapping the playing one pauses it; tapping
+  // another switches to it. The button icon reflects playingId.
+  function toggleVoice(m) {
+    if (playingId === m.id) {
+      voiceRef.current?.pause();
+      setPlayingId(null);
+      return;
+    }
+    try { voiceRef.current?.pause(); } catch { /* ignore */ }
+    const a = new Audio(m.url);
+    voiceRef.current = a;
+    a.onended = () => setPlayingId((p) => (p === m.id ? null : p));
+    a.play().then(() => setPlayingId(m.id)).catch(() => setPlayingId(null));
+  }
+  // Stop any voice note if the page unmounts.
+  useEffect(() => () => { try { voiceRef.current?.pause(); } catch { /* ignore */ } }, []);
 
   const currentEntry = useMemo(() => {
     if (!selected) return null;
@@ -391,12 +410,16 @@ export default function CrossWordsPage() {
                     {m.type === 'voice' && fully ? (
                       <button
                         type="button"
-                        onClick={() => { try { new Audio(m.url).play().catch(() => {}); } catch { /* ignore */ } }}
+                        onClick={() => toggleVoice(m)}
                         className="absolute inset-0 flex items-center justify-center rounded-md active:scale-95"
                         style={{ backgroundColor: PINK }}
-                        aria-label="Play voice note"
+                        aria-label={playingId === m.id ? 'Pause voice note' : 'Play voice note'}
                       >
-                        <svg viewBox="0 0 24 24" fill="white" width="46%" height="46%"><path d="M8 5v14l11-7z" /></svg>
+                        {playingId === m.id ? (
+                          <svg viewBox="0 0 24 24" fill="white" width="46%" height="46%"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" fill="white" width="46%" height="46%"><path d="M8 5v14l11-7z" /></svg>
+                        )}
                       </button>
                     ) : (
                       <div className="pointer-events-none absolute inset-0 grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${m.w}, 1fr)`, gridTemplateRows: `repeat(${m.h}, 1fr)` }}>
