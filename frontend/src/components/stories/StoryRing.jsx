@@ -24,14 +24,51 @@ export default function StoryRing({
       aria-label={label}
     >
       <span
-        className={`pointer-events-none select-none flex items-center justify-center rounded-full p-[3.5px] ${
-          glow
-            ? 'bg-gradient-to-tr from-pink-500 via-amber-500 to-emerald-400'
-            : 'bg-neutral-300'
+        className={`pointer-events-none relative select-none flex items-center justify-center rounded-full p-[3.5px] ${
+          glow ? '' : 'bg-neutral-300'
         }`}
         style={{ width: size, height: size, WebkitTouchCallout: 'none' }}
       >
-        <span className="flex h-full w-full items-center justify-center rounded-full bg-white p-[2.5px]">
+        {/* Animated "new stories" ring — half solid, half dashed gradient stroke
+            that slowly rotates while the dashes march. Only shown when there's
+            something unviewed (glow); otherwise the flat grey ring above stands
+            in. Sits behind the white gap + thumbnail, showing through the
+            3.5px padding band. */}
+        {glow && (
+          <svg
+            viewBox="0 0 100 100"
+            fill="none"
+            className="absolute inset-0 h-full w-full"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="sneakyStoryRing" gradientUnits="userSpaceOnUse" x1="12" y1="12" x2="88" y2="88">
+                <stop offset="0" stopColor="#ec4899" />
+                <stop offset="0.5" stopColor="#5fc4b1" />
+                <stop offset="1" stopColor="#34d399" />
+              </linearGradient>
+            </defs>
+            <g className="story-ring-spin">
+              {/* solid top half */}
+              <path
+                d="M 4 50 A 46 46 0 0 1 96 50"
+                stroke="url(#sneakyStoryRing)"
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
+              {/* dashed bottom half — marches via the CSS class */}
+              <path
+                className="story-ring-march"
+                d="M 96 50 A 46 46 0 0 1 4 50"
+                stroke="url(#sneakyStoryRing)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray="4 7"
+              />
+            </g>
+          </svg>
+        )}
+        <span className="relative flex h-full w-full items-center justify-center rounded-full bg-white p-[2.5px]">
           <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-neutral-100">
             {plus ? (
               <span className="flex h-full w-full items-center justify-center bg-amber-500 text-white">

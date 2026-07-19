@@ -95,6 +95,21 @@ body { -webkit-tap-highlight-color: transparent; }
   100% { transform: translate(-50%, -50%) scale(var(--s1)) rotate(var(--r1)); opacity: 0; }
 }
 
+/* ── Story ring (unviewed) ───────────────────────────────────────────────────
+   Instagram-style "new stories" ring rendered as an SVG in StoryRing.jsx:
+   a gradient stroke that's SOLID on one half and DASHED on the other. The
+   whole ring rotates slowly so the solid/dashed boundary sweeps around the
+   avatar, and the dashed arc "marches" so its segments appear to flow. The
+   global prefers-reduced-motion block above snaps both to a static state. */
+@keyframes story-ring-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes story-ring-march {
+  to { stroke-dashoffset: -11; }   /* one dash+gap cycle (4 + 7) → seamless loop */
+}
+.story-ring-spin  { animation: story-ring-spin 8s linear infinite; transform-origin: 50% 50%; }
+.story-ring-march { animation: story-ring-march 1.6s linear infinite; }
+
 /* ── Kill text selection + the iOS long-press callout app-wide ───────────────
    This is a native-feeling app, not a document: a long-press (intentional or
    accidental) should never highlight text or pop the "Copy / Look Up / Share"
