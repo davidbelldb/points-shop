@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import App from './App.jsx';
 import { initNativePush } from './lib/nativePush.js';
 import { enableCrowPush } from './lib/crowActivity.js';
+import { syncWidgetCredentials } from './lib/widgetBridge.js';
 
 // ── Eager — the core shell + everyday pages (kept small) ─────────────────────
 import HomePage from './pages/HomePage.jsx';
@@ -110,7 +111,7 @@ function NativePush() {
   const { user } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
-    if (user) { initNativePush((url) => navigate(url)); enableCrowPush(); }
+    if (user) { initNativePush((url) => navigate(url)); enableCrowPush(); syncWidgetCredentials(); }
   }, [user, navigate]);
   return null;
 }

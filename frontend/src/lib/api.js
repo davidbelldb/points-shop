@@ -192,6 +192,8 @@ export const api = {
   resetCrossword: () => request('/crossword/reset', { method: 'POST' }),
   checkCrosswordWord: (wordIndex, letters) => request('/crossword/check-word', { method: 'POST', body: JSON.stringify({ wordIndex, letters }) }),
   resolveNfcSlot: (slug) => request(`/nfc/slots/${encodeURIComponent(slug)}/story`),
+  // Mints a long-lived bearer token for the native home-screen widgets.
+  widgetToken: () => request('/widget/token', { method: 'POST' }),
   createStory: (data) => request('/stories', { method: 'POST', body: JSON.stringify(data) }),
   deleteStory: (id) => request(`/stories/${id}`, { method: 'DELETE' }),
   markStoryViewed: (id) => request(`/stories/${id}/view`, { method: 'POST' }),

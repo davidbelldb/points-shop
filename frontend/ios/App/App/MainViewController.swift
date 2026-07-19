@@ -10,5 +10,6 @@ class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(CrowActivityPlugin())
         bridge?.registerPluginInstance(NfcPlugin())
+        bridge?.registerPluginInstance(WidgetBridgePlugin())
     }
 }
