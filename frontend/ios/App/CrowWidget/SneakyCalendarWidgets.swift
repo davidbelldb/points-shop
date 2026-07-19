@@ -96,17 +96,19 @@ private struct MonthGrid: View {
         let isToday = day == today
         let hasEvent = eventDays.contains(day)
         let filled = isToday || hasEvent
-        ZStack {
-            if isToday {
-                Circle().fill(Color.sneakyTeal)
-            } else if hasEvent {
-                Circle().fill(Color.sneakyPink)
-            }
-            Text("\(day)")
-                .font(.system(size: 14, weight: filled ? .bold : .medium))
-                .foregroundStyle(filled ? .white : .white.opacity(0.85))
-        }
-        .frame(height: 24)
+        Text("\(day)")
+            .font(.system(size: 13, weight: filled ? .semibold : .medium))
+            .foregroundStyle(filled ? .white : .white.opacity(0.85))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .frame(width: 23, height: 23)
+            .background(
+                Group {
+                    if isToday { Circle().fill(Color.sneakyTeal) }
+                    else if hasEvent { Circle().fill(Color.sneakyPink) }
+                }
+            )
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -119,14 +121,9 @@ private struct NextEventPanel: View {
     var body: some View {
         if let ev = event {
             VStack(alignment: .leading, spacing: compact ? 4 : 7) {
-                HStack(spacing: 6) {
-                    Image(systemName: sneakySymbol(for: ev.icon))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.sneakyPink)
-                    Text("UP NEXT")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.45))
-                }
+                Text("UP NEXT")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.45))
                 Text(ev.title)
                     .font(.system(size: compact ? 14 : 19, weight: .bold))
                     .foregroundStyle(.white)
@@ -138,7 +135,7 @@ private struct NextEventPanel: View {
                         .foregroundStyle(Color.sneakyTeal)
                 }
                 if let loc = ev.location, !loc.isEmpty {
-                    Label(loc, systemImage: "mappin.and.ellipse")
+                    Text(loc)
                         .font(.system(size: 12))
                         .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
@@ -161,19 +158,19 @@ private struct NextEventPanel: View {
 
     @ViewBuilder
     private func badges(_ ev: WNextEvent) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             if ev.gifts { pill("gift.fill", "Gifts") }
             if ev.showAndTell { pill("sparkles", "Show & tell") }
-            if ev.snackCount > 0 { pill("takeoutbag.and.cup.and.straw.fill", "\(ev.snackCount)") }
+            if ev.snackCount > 0 { pill("takeoutbag.and.cup.and.straw.fill", "\(ev.snackCount) snack\(ev.snackCount == 1 ? "" : "s")") }
         }
     }
 
     private func pill(_ symbol: String, _ text: String) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: symbol).font(.system(size: 8))
-            Text(text).font(.system(size: 9, weight: .medium))
+        HStack(spacing: 4) {
+            Image(systemName: symbol).font(.system(size: 10))
+            Text(text).font(.system(size: 11, weight: .medium))
         }
-        .padding(.horizontal, 5).padding(.vertical, 2)
+        .padding(.horizontal, 7).padding(.vertical, 3)
         .background(Capsule().fill(Color.sneakyPink.opacity(0.22)))
         .foregroundStyle(Color.sneakyPink)
     }
@@ -188,7 +185,7 @@ private struct NextEventPanel: View {
         } else if cal.isDateInTomorrow(date) {
             df.dateFormat = allDay ? "'Tomorrow'" : "'Tomorrow' HH:mm"
         } else {
-            df.dateFormat = allDay ? "EEE d MMM" : "EEE d MMM · HH:mm"
+            df.dateFormat = allDay ? "EEE d MMM" : "EEE d MMM  HH:mm"
         }
         return df.string(from: date)
     }
@@ -199,7 +196,10 @@ private struct NextEventPanel: View {
 private struct CalendarMediumView: View {
     let data: WCalendar?
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
+            NextEventPanel(event: data?.next)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Rectangle().fill(.white.opacity(0.08)).frame(width: 1).frame(maxHeight: .infinity)
             if let d = data {
                 MonthGrid(year: d.year, month: d.month, today: d.today,
                           eventDays: Set(d.eventDays))
@@ -207,11 +207,10 @@ private struct CalendarMediumView: View {
             } else {
                 placeholderGrid.frame(maxWidth: .infinity)
             }
-            Rectangle().fill(.white.opacity(0.08)).frame(width: 1)
-            NextEventPanel(event: data?.next)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 13)
         .sneakyContainerBackground(Color.sneakyBG)
     }
     private var placeholderGrid: some View {
@@ -271,24 +270,20 @@ private struct CalendarLockView: View {
     var body: some View {
         if let ev = data?.next, let start = ev.start {
             VStack(alignment: .leading, spacing: 1) {
-                Label {
-                    Text(ev.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                } icon: {
-                    Image(systemName: sneakySymbol(for: ev.icon))
-                }
+                Text(ev.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                 Text(lockDate(start, allDay: ev.allDay))
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .widgetURL(URL(string: "https://sneakypoints.com/calendar"))
         } else {
-            Label("No events coming up", systemImage: "calendar")
+            Text("No events coming up")
                 .font(.system(size: 13, weight: .medium))
         }
     }
     private func lockDate(_ d: Date, allDay: Bool) -> String {
         let df = DateFormatter(); df.timeZone = WDate.london
-        df.dateFormat = allDay ? "EEE d MMM" : "EEE d MMM · HH:mm"
+        df.dateFormat = allDay ? "EEE d MMM" : "EEE d MMM  HH:mm"
         return df.string(from: d)
     }
 }

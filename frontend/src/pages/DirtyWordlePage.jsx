@@ -688,7 +688,12 @@ export default function DirtyWordlePage() {
   const [shared,           setShared]           = useState(false);
   const [modalDismissed,   setModalDismissed]   = useState(saved.modalAcked   ?? false);
   const [resultSaved,      setResultSaved]      = useState(saved.resultSaved  ?? false);
-  const [showLeaderboard,  setShowLeaderboard]  = useState(false);
+  // Open straight into the leaderboard when deep-linked from the widget
+  // (…/games/dirty-wordle?board=1) so a tap shows the partner's full grid.
+  const [showLeaderboard,  setShowLeaderboard]  = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('board') === '1'; }
+    catch { return false; }
+  });
   const [progressLoaded, setProgressLoaded] = useState(false);
 
   // On mount: fetch today's word + sync progress from server.

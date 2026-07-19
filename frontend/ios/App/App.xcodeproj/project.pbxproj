@@ -13,6 +13,11 @@
 		33634C8B2FEEE97D00071ADD /* CrowActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */; };
 		33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C922FEFF90F00071ADD /* MainViewController.swift */; };
 		33C83C16300D2F4C000FDAA8 /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */; };
+		33C83C25300D34A5000FDAA8 /* sneakywatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 33C83C1B300D34A4000FDAA8 /* sneakywatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		33C83C31300D36F7000FDAA8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */; };
+		33C83C32300D36F7000FDAA8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD34002FEEE5D50008C86C /* SwiftUI.framework */; };
+		33C83C41300D36F8000FDAA8 /* sneakywatchwidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33C83C30300D36F7000FDAA8 /* sneakywatchwidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		33C83C6A300D3B18000FDAA8 /* WatchTokenBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C83C69300D3B18000FDAA8 /* WatchTokenBridge.swift */; };
 		33FD33FF2FEEE5D50008C86C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */; };
 		33FD34012FEEE5D50008C86C /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD34002FEEE5D50008C86C /* SwiftUI.framework */; };
 		33FD34122FEEE5D60008C86C /* CrowWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -34,6 +39,20 @@
 			proxyType = 1;
 			remoteGlobalIDString = 3334C9562FEEDC15002EBBE0;
 			remoteInfo = SneakyNotificationService;
+		};
+		33C83C23300D34A5000FDAA8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 33C83C1A300D34A4000FDAA8;
+			remoteInfo = "sneakywatch Watch App";
+		};
+		33C83C3F300D36F8000FDAA8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 33C83C2F300D36F7000FDAA8;
+			remoteInfo = sneakywatchwidgetExtension;
 		};
 		33FD34102FEEE5D60008C86C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -57,6 +76,28 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		33C83C29300D34A5000FDAA8 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				33C83C25300D34A5000FDAA8 /* sneakywatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		33C83C46300D36F8000FDAA8 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				33C83C41300D36F8000FDAA8 /* sneakywatchwidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +108,10 @@
 		33634C922FEFF90F00071ADD /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		33C83C14300D2E05000FDAA8 /* CrowWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrowWidgetExtension.entitlements; sourceTree = "<group>"; };
 		33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
+		33C83C1B300D34A4000FDAA8 /* sneakywatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "sneakywatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		33C83C30300D36F7000FDAA8 /* sneakywatchwidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = sneakywatchwidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		33C83C67300D398E000FDAA8 /* sneakywatchwidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = sneakywatchwidgetExtension.entitlements; sourceTree = "<group>"; };
+		33C83C69300D3B18000FDAA8 /* WatchTokenBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchTokenBridge.swift; sourceTree = "<group>"; };
 		33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrowWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		33FD34002FEEE5D50008C86C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -91,6 +136,13 @@
 			);
 			target = 3334C9562FEEDC15002EBBE0 /* SneakyNotificationService */;
 		};
+		33C83C66300D3948000FDAA8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SneakyWidgetShared.swift,
+			);
+			target = 33C83C2F300D36F7000FDAA8 /* sneakywatchwidgetExtension */;
+		};
 		33FD34132FEEE5D60008C86C /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -98,11 +150,20 @@
 			);
 			target = 33FD33FB2FEEE5D50008C86C /* CrowWidgetExtension */;
 		};
+		AAABBBCC000000000000A001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 33C83C2F300D36F7000FDAA8 /* sneakywatchwidgetExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3334C9582FEEDC15002EBBE0 /* SneakyNotificationService */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (3334C95F2FEEDC15002EBBE0 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = SneakyNotificationService; sourceTree = "<group>"; };
-		33FD34022FEEE5D50008C86C /* CrowWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (33FD34132FEEE5D60008C86C /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = CrowWidget; sourceTree = "<group>"; };
+		33C83C1C300D34A4000FDAA8 /* sneakywatch Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "sneakywatch Watch App"; sourceTree = "<group>"; };
+		33C83C50300D3792000FDAA8 /* sneakywatchwidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AAABBBCC000000000000A001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = sneakywatchwidget; sourceTree = "<group>"; };
+		33FD34022FEEE5D50008C86C /* CrowWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (33FD34132FEEE5D60008C86C /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 33C83C66300D3948000FDAA8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = CrowWidget; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +171,22 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		33C83C18300D34A4000FDAA8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		33C83C2D300D36F7000FDAA8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				33C83C32300D36F7000FDAA8 /* SwiftUI.framework in Frameworks */,
+				33C83C31300D36F7000FDAA8 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -145,11 +222,14 @@
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
+				33C83C67300D398E000FDAA8 /* sneakywatchwidgetExtension.entitlements */,
 				33C83C14300D2E05000FDAA8 /* CrowWidgetExtension.entitlements */,
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				3334C9582FEEDC15002EBBE0 /* SneakyNotificationService */,
 				33FD34022FEEE5D50008C86C /* CrowWidget */,
+				33C83C1C300D34A4000FDAA8 /* sneakywatch Watch App */,
+				33C83C50300D3792000FDAA8 /* sneakywatchwidget */,
 				33FD33FD2FEEE5D50008C86C /* Frameworks */,
 				504EC3051FED79650016851F /* Products */,
 			);
@@ -161,6 +241,8 @@
 				504EC3041FED79650016851F /* App.app */,
 				3334C9572FEEDC15002EBBE0 /* SneakyNotificationService.appex */,
 				33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */,
+				33C83C1B300D34A4000FDAA8 /* sneakywatch Watch App.app */,
+				33C83C30300D36F7000FDAA8 /* sneakywatchwidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -168,6 +250,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				33C83C69300D3B18000FDAA8 /* WatchTokenBridge.swift */,
 				33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */,
 				33634C922FEFF90F00071ADD /* MainViewController.swift */,
 				33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */,
@@ -211,6 +294,52 @@
 			productReference = 3334C9572FEEDC15002EBBE0 /* SneakyNotificationService.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		33C83C1A300D34A4000FDAA8 /* sneakywatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 33C83C26300D34A5000FDAA8 /* Build configuration list for PBXNativeTarget "sneakywatch Watch App" */;
+			buildPhases = (
+				33C83C17300D34A4000FDAA8 /* Sources */,
+				33C83C18300D34A4000FDAA8 /* Frameworks */,
+				33C83C19300D34A4000FDAA8 /* Resources */,
+				33C83C46300D36F8000FDAA8 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				33C83C40300D36F8000FDAA8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				33C83C1C300D34A4000FDAA8 /* sneakywatch Watch App */,
+			);
+			name = "sneakywatch Watch App";
+			packageProductDependencies = (
+			);
+			productName = "sneakywatch Watch App";
+			productReference = 33C83C1B300D34A4000FDAA8 /* sneakywatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		33C83C2F300D36F7000FDAA8 /* sneakywatchwidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 33C83C43300D36F8000FDAA8 /* Build configuration list for PBXNativeTarget "sneakywatchwidgetExtension" */;
+			buildPhases = (
+				33C83C2C300D36F7000FDAA8 /* Sources */,
+				33C83C2D300D36F7000FDAA8 /* Frameworks */,
+				33C83C2E300D36F7000FDAA8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				33C83C50300D3792000FDAA8 /* sneakywatchwidget */,
+			);
+			name = sneakywatchwidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = sneakywatchwidgetExtension;
+			productReference = 33C83C30300D36F7000FDAA8 /* sneakywatchwidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		33FD33FB2FEEE5D50008C86C /* CrowWidgetExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 33FD34142FEEE5D60008C86C /* Build configuration list for PBXNativeTarget "CrowWidgetExtension" */;
@@ -241,12 +370,14 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				3334C9632FEEDC15002EBBE0 /* Embed Foundation Extensions */,
+				33C83C29300D34A5000FDAA8 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				3334C95D2FEEDC15002EBBE0 /* PBXTargetDependency */,
 				33FD34112FEEE5D60008C86C /* PBXTargetDependency */,
+				33C83C24300D34A5000FDAA8 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -266,6 +397,13 @@
 				LastUpgradeCheck = 0920;
 				TargetAttributes = {
 					3334C9562FEEDC15002EBBE0 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					33C83C1A300D34A4000FDAA8 = {
+						CreatedOnToolsVersion = 26.5;
+						LastSwiftMigration = 2650;
+					};
+					33C83C2F300D36F7000FDAA8 = {
 						CreatedOnToolsVersion = 26.5;
 					};
 					33FD33FB2FEEE5D50008C86C = {
@@ -297,12 +435,28 @@
 				504EC3031FED79650016851F /* App */,
 				3334C9562FEEDC15002EBBE0 /* SneakyNotificationService */,
 				33FD33FB2FEEE5D50008C86C /* CrowWidgetExtension */,
+				33C83C1A300D34A4000FDAA8 /* sneakywatch Watch App */,
+				33C83C2F300D36F7000FDAA8 /* sneakywatchwidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		3334C9552FEEDC15002EBBE0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		33C83C19300D34A4000FDAA8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		33C83C2E300D36F7000FDAA8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -339,6 +493,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		33C83C17300D34A4000FDAA8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		33C83C2C300D36F7000FDAA8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		33FD33F82FEEE5D50008C86C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -351,6 +519,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				33C83C6A300D3B18000FDAA8 /* WatchTokenBridge.swift in Sources */,
 				33FD34182FEEE6180008C86C /* CrowActivityPlugin.swift in Sources */,
 				FE0000000000000000000A02 /* NfcPlugin.swift in Sources */,
 				33634C8A2FEEE8B100071ADD /* CrowActivityAttributes.swift in Sources */,
@@ -367,6 +536,16 @@
 			isa = PBXTargetDependency;
 			target = 3334C9562FEEDC15002EBBE0 /* SneakyNotificationService */;
 			targetProxy = 3334C95C2FEEDC15002EBBE0 /* PBXContainerItemProxy */;
+		};
+		33C83C24300D34A5000FDAA8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 33C83C1A300D34A4000FDAA8 /* sneakywatch Watch App */;
+			targetProxy = 33C83C23300D34A5000FDAA8 /* PBXContainerItemProxy */;
+		};
+		33C83C40300D36F8000FDAA8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 33C83C2F300D36F7000FDAA8 /* sneakywatchwidgetExtension */;
+			targetProxy = 33C83C3F300D36F8000FDAA8 /* PBXContainerItemProxy */;
 		};
 		33FD34112FEEE5D60008C86C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -405,7 +584,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 87;
+				CURRENT_PROJECT_VERSION = 89;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -446,7 +625,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 87;
+				CURRENT_PROJECT_VERSION = 89;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -475,6 +654,189 @@
 			};
 			name = Release;
 		};
+		33C83C27300D34A5000FDAA8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_ENTITLEMENTS = "sneakywatch Watch App/sneakywatch Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 89;
+				DEVELOPMENT_TEAM = 799WF8VK5C;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Sneaky Watch";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.david.sneakystuff;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.david.sneakystuff.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		33C83C28300D34A5000FDAA8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_ENTITLEMENTS = "sneakywatch Watch App/sneakywatch Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 89;
+				DEVELOPMENT_TEAM = 799WF8VK5C;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Sneaky Watch";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.david.sneakystuff;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.david.sneakystuff.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
+		33C83C44300D36F8000FDAA8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_ENTITLEMENTS = sneakywatchwidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 89;
+				DEVELOPMENT_TEAM = 799WF8VK5C;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = sneakywatchwidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = sneakywatchwidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.david.sneakystuff.watchkitapp.sneakywatchwidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		33C83C45300D36F8000FDAA8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_ENTITLEMENTS = sneakywatchwidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 89;
+				DEVELOPMENT_TEAM = 799WF8VK5C;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = sneakywatchwidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = sneakywatchwidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.david.sneakystuff.watchkitapp.sneakywatchwidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
 		33FD34152FEEE5D60008C86C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -488,7 +850,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = CrowWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 87;
+				CURRENT_PROJECT_VERSION = 89;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -532,7 +894,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = CrowWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 87;
+				CURRENT_PROJECT_VERSION = 89;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -677,7 +1039,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 87;
+				CURRENT_PROJECT_VERSION = 89;
+				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Sneaky Social";
@@ -702,7 +1065,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 87;
+				CURRENT_PROJECT_VERSION = 89;
+				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Sneaky Social";
@@ -728,6 +1092,24 @@
 			buildConfigurations = (
 				3334C9612FEEDC15002EBBE0 /* Debug */,
 				3334C9622FEEDC15002EBBE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		33C83C26300D34A5000FDAA8 /* Build configuration list for PBXNativeTarget "sneakywatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				33C83C27300D34A5000FDAA8 /* Debug */,
+				33C83C28300D34A5000FDAA8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		33C83C43300D36F8000FDAA8 /* Build configuration list for PBXNativeTarget "sneakywatchwidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				33C83C44300D36F8000FDAA8 /* Debug */,
+				33C83C45300D36F8000FDAA8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
