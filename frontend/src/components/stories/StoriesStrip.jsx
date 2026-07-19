@@ -146,7 +146,12 @@ export default function StoriesStrip() {
   }, [archive]);
 
   function openActive(authorIdx) {
-    const target = activeGroups[authorIdx].all[0];
+    // Resume from the first story this viewer hasn't seen yet, so re-opening a
+    // ring after a new story drops jumps straight to the fresh content instead
+    // of replaying everything already viewed. If they've seen them all
+    // (e.g. it's your own ring), fall back to the very first story.
+    const { all } = activeGroups[authorIdx];
+    const target = all.find((s) => !s.viewed_by_me) || all[0];
     setViewer({ stories: activeQueue, index: activeQueue.findIndex((s) => s.id === target.id) });
   }
   function openArchiveDay(group) {
