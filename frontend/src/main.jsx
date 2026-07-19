@@ -21,6 +21,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import MessagesPage from './pages/MessagesPage.jsx';
 import NewChatPage from './pages/NewChatPage.jsx';
 import SheetIn from './components/SheetIn.jsx';
+import ScrollToTop from './components/ScrollToTop.jsx';
 
 // ── Lazy — heavy feature bundles, fetched only when their route is opened.
 // The games carry three.js / react-three-fiber / rapier; Notes carries
@@ -142,6 +143,7 @@ createRoot(document.getElementById('root')).render(
         guards needed. Opacity fades are kept, so nothing disappears abruptly. */}
     <MotionConfig reducedMotion="user">
     <BrowserRouter>
+      <ScrollToTop />
       <ToastProvider>
       <ToastHost />
       <ThemeProvider>
