@@ -110,6 +110,19 @@ body { -webkit-tap-highlight-color: transparent; }
 .story-ring-spin  { animation: story-ring-spin 8s linear infinite; transform-origin: 50% 50%; }
 .story-ring-march { animation: story-ring-march 1.6s linear infinite; }
 
+/* ── Page transitions ────────────────────────────────────────────────────────
+   iOS-style route slide. Forward (push) enters from the right, back (pop) from
+   the left, each with a quick fade. Implemented as CSS keyframes rather than a
+   JS/inline transform on purpose: a keyframe leaves NO transform on the element
+   once it finishes, so position:fixed descendants (the full-screen story viewer,
+   lightboxes, modals rendered inside the page) keep anchoring to the viewport.
+   The interactive swipe-back handles the outgoing slide. Reduced motion is
+   neutralised by the global block above. */
+@keyframes page-slide-fwd  { from { opacity: 0; transform: translateX(32px);  } to { opacity: 1; transform: translateX(0); } }
+@keyframes page-slide-back { from { opacity: 0; transform: translateX(-32px); } to { opacity: 1; transform: translateX(0); } }
+.page-enter-fwd  { animation: page-slide-fwd  280ms cubic-bezier(0.32, 0.72, 0, 1); }
+.page-enter-back { animation: page-slide-back 280ms cubic-bezier(0.32, 0.72, 0, 1); }
+
 /* ── Kill text selection + the iOS long-press callout app-wide ───────────────
    This is a native-feeling app, not a document: a long-press (intentional or
    accidental) should never highlight text or pop the "Copy / Look Up / Share"
@@ -212,6 +225,16 @@ html.dark .bg-white\/95 { background-color: rgba(42, 42, 40, 0.95) !important; }
 html.dark .bg-amber-50  { background-color: #14302a !important; }
 html.dark .bg-amber-100 { background-color: #1d4039 !important; }
 html.dark .bg-amber-200 { background-color: #2a5a4f !important; }
+
+/* Soft pink tints — the app's other card-surface family (gift events, rewards,
+   calendar, account cards). Left bright, they glared against the dark page, so
+   flip them to a deep plum that mirrors what the amber tints do above. Covers
+   plain + hover forms across the whole app in one place. */
+html.dark .bg-pink-50  { background-color: #2e1626 !important; }
+html.dark .bg-pink-100 { background-color: #3d1e33 !important; }
+html.dark .bg-pink-200 { background-color: #4f2843 !important; }
+html.dark .hover\:bg-pink-50:hover  { background-color: #2e1626 !important; }
+html.dark .hover\:bg-pink-100:hover { background-color: #3d1e33 !important; }
 
 /* Same tints used as hover states (e.g. `hover:bg-amber-50`) — Tailwind
    generates these as their own escaped-colon classes, so the plain

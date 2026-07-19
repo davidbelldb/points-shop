@@ -29,6 +29,20 @@ export async function createSession(accountId) {
   return token;
 }
 
+/* Long-lived token for the home-screen / lock-screen widgets. Same sessions
+   table (so the existing bearer lookup + expiry pruning just work), but with a
+   far longer horizon than a normal 30-day login since the widget can't
+   silently re-auth the way the app can. Revoke by deleting the row. */
+export async function createWidgetSession(accountId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  await query(
+    `INSERT INTO sessions (account_id, token, expires_at)
+     VALUES ($1, $2, NOW() + INTERVAL '400 days')`,
+    [accountId, token],
+  );
+  return token;
+}
+
 export async function findSession(token) {
   const { rows } = await query(
     `SELECT s.account_id, s.impersonating_account_id, s.token, s.expires_at,

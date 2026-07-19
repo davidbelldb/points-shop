@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -16,6 +16,7 @@ import IncomingCallBanner from './components/IncomingCallBanner.jsx';
 import InAppNotifier from './components/InAppNotifier.jsx';
 import WelcomeOverlay from './components/WelcomeOverlay.jsx';
 import PullToRefresh from './components/PullToRefresh.jsx';
+import PageTransition from './components/PageTransition.jsx';
 import SplashFireworks from './components/SplashFireworks.jsx';
 import FloatingHead from './components/FloatingHead.jsx';
 import AnimatedPoints from './components/AnimatedPoints.jsx';
@@ -222,7 +223,11 @@ export default function App() {
       const t = e.changedTouches[0];
       const dx = t.clientX - x0, dy = t.clientY - y0;
       if (Date.now() - t0 > MAX_MS || Math.abs(dy) > MAX_OFF_AXIS) return;
-      if (fromLeft && dx > THRESH) setMenuOpen(true);
+      // On pages with somewhere to go back to, the left edge belongs to the
+      // swipe-to-go-back gesture (see PageTransition) — only open the menu from
+      // the left edge when back isn't available (home / first history entry).
+      const backAvailable = (window.history.state?.idx ?? 0) > 0 && location.pathname !== '/';
+      if (fromLeft && dx > THRESH && !backAvailable) setMenuOpen(true);
       else if (fromRight && dx < -THRESH) navigate('/account');
     };
     window.addEventListener('touchstart', onStart, { passive: true });
@@ -231,7 +236,7 @@ export default function App() {
       window.removeEventListener('touchstart', onStart);
       window.removeEventListener('touchend', onEnd);
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // Refresh account/basket/notifications when the app returns to the foreground,
   // so reopening never shows stale points or a missed alert. Native only.
@@ -427,7 +432,7 @@ export default function App() {
       })()}
       {showFloater && <SurveyBanner />}
       <main className={isFullGame ? 'flex-1 min-h-0 flex flex-col w-full overflow-hidden' : `px-4 pt-4 ${isGame ? 'w-full max-w-md md:max-w-none md:px-8 pb-8' : isMessages ? 'w-full pb-0 lg:px-8' : 'w-full pb-24 lg:px-8'}`}>
-        <Outlet />
+        <PageTransition />
       </main>
       </div>{/* end md:pl-56 wrapper */}
     </div>

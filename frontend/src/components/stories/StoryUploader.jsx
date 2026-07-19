@@ -13,6 +13,7 @@ import EmojiStickerPicker from './EmojiStickerPicker.jsx';
 import GifStickerPicker from './GifStickerPicker.jsx';
 import StickerContent from './StickerContent.jsx';
 import DraggableSticker from './DraggableSticker.jsx';
+import Spinner from '../Spinner.jsx';
 
 /* Modal sheet for adding a new story. iPhone's <input type="file"> with
    image/video/audio accept brings up the native picker — Photo Library,
@@ -275,7 +276,8 @@ export default function StoryUploader({ onClose, onPosted }) {
         <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <button onClick={onClose} className="text-sm text-neutral-500">Cancel</button>
           <span className="text-sm font-semibold">New sneaky story</span>
-          <button onClick={post} disabled={!file || busy} className="text-sm font-semibold text-amber-700 disabled:opacity-40">
+          <button onClick={post} disabled={!file || busy} className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 disabled:opacity-40">
+            {busy && <Spinner size={14} />}
             {busy ? 'Posting…' : 'Post'}
           </button>
         </header>

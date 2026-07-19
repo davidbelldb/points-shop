@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useBasket } from '../lib/BasketContext.jsx';
 import Pressable from '../components/Pressable.jsx';
+import Spinner from '../components/Spinner.jsx';
 
 export default function BasketPage() {
   const { basket, account, setItemQty, removeItem, applyPromo, removePromo, setDelivery, setNotes, placeOrder } = useBasket();
@@ -238,8 +239,9 @@ export default function BasketPage() {
           <Pressable
             disabled={!canAfford || placing}
             onClick={handlePlace}
-            className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition disabled:cursor-not-allowed disabled:bg-neutral-300"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3 text-sm font-semibold text-amber-900 shadow-sm transition disabled:cursor-not-allowed disabled:bg-neutral-300"
           >
+            {placing && <Spinner size={16} />}
             {placing ? 'Placing order...' : canAfford ? 'Place order' : "You're a bit too poor for that. Pauper."}
           </Pressable>
         </div>

@@ -28,7 +28,12 @@ await fastify.register(cors, { origin: true, credentials: true });
 await fastify.register(cookie);
 
 fastify.addHook('onRequest', async (req) => {
-  const token = req.cookies?.[SESSION_COOKIE];
+  // Normally the session travels in the cookie. The home-screen widgets run as
+  // native code with no cookie jar, so they present the same session token as
+  // `Authorization: Bearer <token>` instead — accept either.
+  const authHeader = req.headers?.authorization;
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  const token = req.cookies?.[SESSION_COOKIE] || bearer;
   if (!token) return;
   try {
     const session = await findSession(token);
