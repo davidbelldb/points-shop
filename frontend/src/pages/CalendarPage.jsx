@@ -484,8 +484,8 @@ function EventCard({ ev, onClick }) {
       className={`flex w-full items-start gap-3 rounded-2xl p-3 text-left transition hover:shadow-sm active:scale-[0.99] ${tone}`}
     >
       <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm"
-        style={{ backgroundColor: '#fce7f3', color: EVENT_ICON_COLOR }}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-100 shadow-sm"
+        style={{ color: EVENT_ICON_COLOR }}
       >
         <EventIcon iconKey={ev.icon} size={20} />
       </span>

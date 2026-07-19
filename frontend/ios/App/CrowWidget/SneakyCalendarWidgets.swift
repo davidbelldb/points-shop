@@ -68,22 +68,22 @@ private struct MonthGrid: View {
         return (leading, range.count)
     }
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 3), count: 7)
     private let headers = ["M", "T", "W", "T", "F", "S", "S"]
 
     var body: some View {
         let l = layout
-        VStack(spacing: 3) {
-            HStack(spacing: 2) {
+        VStack(spacing: 5) {
+            HStack(spacing: 3) {
                 ForEach(0..<7, id: \.self) { i in
                     Text(headers[i])
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.4))
                         .frame(maxWidth: .infinity)
                 }
             }
-            LazyVGrid(columns: columns, spacing: 3) {
-                ForEach(0..<(l.leading), id: \.self) { _ in Color.clear.frame(height: 15) }
+            LazyVGrid(columns: columns, spacing: 5) {
+                ForEach(0..<(l.leading), id: \.self) { _ in Color.clear.frame(height: 24) }
                 ForEach(1...l.days, id: \.self) { day in
                     dayCell(day)
                 }
@@ -95,17 +95,18 @@ private struct MonthGrid: View {
     private func dayCell(_ day: Int) -> some View {
         let isToday = day == today
         let hasEvent = eventDays.contains(day)
+        let filled = isToday || hasEvent
         ZStack {
             if isToday {
                 Circle().fill(Color.sneakyTeal)
             } else if hasEvent {
-                Circle().stroke(Color.sneakyPink, lineWidth: 1.5)
+                Circle().fill(Color.sneakyPink)
             }
             Text("\(day)")
-                .font(.system(size: 9, weight: isToday ? .bold : .regular))
-                .foregroundStyle(isToday ? Color.sneakyBG : .white.opacity(0.9))
+                .font(.system(size: 14, weight: filled ? .bold : .medium))
+                .foregroundStyle(filled ? .white : .white.opacity(0.85))
         }
-        .frame(height: 15)
+        .frame(height: 24)
     }
 }
 
@@ -117,28 +118,29 @@ private struct NextEventPanel: View {
 
     var body: some View {
         if let ev = event {
-            VStack(alignment: .leading, spacing: compact ? 3 : 5) {
-                HStack(spacing: 5) {
+            VStack(alignment: .leading, spacing: compact ? 4 : 7) {
+                HStack(spacing: 6) {
                     Image(systemName: sneakySymbol(for: ev.icon))
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.sneakyPink)
                     Text("UP NEXT")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.45))
                 }
                 Text(ev.title)
-                    .font(.system(size: compact ? 13 : 14, weight: .semibold))
+                    .font(.system(size: compact ? 14 : 19, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.8)
                 if let start = ev.start {
                     Text(dateLine(start, allDay: ev.allDay))
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.sneakyTeal)
                 }
                 if let loc = ev.location, !loc.isEmpty {
                     Label(loc, systemImage: "mappin.and.ellipse")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
                 }
                 if !compact {

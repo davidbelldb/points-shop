@@ -45,6 +45,9 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
         store.set(token, forKey: "widgetToken")
         store.set(apiBase, forKey: "apiBase")
         reloadTimelines()
+        // Also ferry the token to the paired Apple Watch (App Groups don't span
+        // devices — the watch app writes it into the watch's own container).
+        WatchTokenBridge.shared.send(token: token, apiBase: apiBase)
         call.resolve(["ok": true])
     }
 

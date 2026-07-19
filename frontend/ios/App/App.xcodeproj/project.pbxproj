@@ -12,6 +12,7 @@
 		33634C8A2FEEE8B100071ADD /* CrowActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */; };
 		33634C8B2FEEE97D00071ADD /* CrowActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */; };
 		33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C922FEFF90F00071ADD /* MainViewController.swift */; };
+		33C83C16300D2F4C000FDAA8 /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */; };
 		33FD33FF2FEEE5D50008C86C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */; };
 		33FD34012FEEE5D50008C86C /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD34002FEEE5D50008C86C /* SwiftUI.framework */; };
 		33FD34122FEEE5D60008C86C /* CrowWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -64,6 +65,8 @@
 		3334C9572FEEDC15002EBBE0 /* SneakyNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SneakyNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrowActivityAttributes.swift; sourceTree = "<group>"; };
 		33634C922FEFF90F00071ADD /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		33C83C14300D2E05000FDAA8 /* CrowWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrowWidgetExtension.entitlements; sourceTree = "<group>"; };
+		33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
 		33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrowWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		33FD34002FEEE5D50008C86C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -142,6 +145,7 @@
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
+				33C83C14300D2E05000FDAA8 /* CrowWidgetExtension.entitlements */,
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				3334C9582FEEDC15002EBBE0 /* SneakyNotificationService */,
@@ -164,6 +168,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */,
 				33634C922FEFF90F00071ADD /* MainViewController.swift */,
 				33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */,
 				33FD34172FEEE6180008C86C /* CrowActivityPlugin.swift */,
@@ -351,6 +356,7 @@
 				33634C8A2FEEE8B100071ADD /* CrowActivityAttributes.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */,
+				33C83C16300D2F4C000FDAA8 /* WidgetBridgePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -399,7 +405,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 87;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -440,7 +446,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 87;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -480,8 +486,9 @@
 				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_ENTITLEMENTS = CrowWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 87;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -523,8 +530,9 @@
 				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_ENTITLEMENTS = CrowWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 87;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -669,7 +677,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 87;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Sneaky Social";
@@ -694,7 +702,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 87;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Sneaky Social";
