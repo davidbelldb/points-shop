@@ -181,13 +181,16 @@ export default function StoriesStrip() {
   const allCircles = [
     ...activeGroups.map((g, idx) => {
       const isYou = g.authorId === user?.id;
-      const allSeenByMe = !isYou && g.all.every((s) => s.viewed_by_me);
+      // Ring glows while anything in the set is unviewed — applies to your OWN
+      // circle too now that self-views are recorded, so it dims once you've
+      // watched all your own stories.
+      const allSeen = g.all.every((s) => s.viewed_by_me);
       return (
         <StoryRing
           key={`active-${g.authorId}`}
           thumbnailUrl={g.latest.author_photo}
           mediaType="image"
-          glow={!allSeenByMe}
+          glow={!allSeen}
           label={isYou ? 'Your story' : g.authorName}
           sublabel={g.all.length > 1 ? `${g.all.length} new` : null}
           onClick={() => openActive(idx)}
@@ -227,13 +230,13 @@ export default function StoriesStrip() {
         <div className="no-scrollbar flex items-start gap-3 overflow-x-auto pb-2">
           {activeGroups.map((g, idx) => {
             const isYou = g.authorId === user?.id;
-            const allSeenByMe = !isYou && g.all.every((s) => s.viewed_by_me);
+            const allSeen = g.all.every((s) => s.viewed_by_me);
             return (
               <StoryRing
                 key={`active-${g.authorId}`}
                 thumbnailUrl={g.latest.author_photo}
                 mediaType="image"
-                glow={!allSeenByMe}
+                glow={!allSeen}
                 label={isYou ? 'Your story' : g.authorName}
                 sublabel={g.all.length > 1 ? `${g.all.length} new` : null}
                 onClick={() => openActive(idx)}

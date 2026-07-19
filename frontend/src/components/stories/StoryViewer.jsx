@@ -103,13 +103,14 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
     }
   }, [paused]);
 
-  // Mark a story as seen the moment it lands in the viewer (skipping
-  // stories the current user authored — author self-views don't count).
-  // Fire-and-forget; never block the UI on this.
+  // Mark a story as seen the moment it lands in the viewer — including your
+  // OWN stories, so your circle dims once you've watched your whole set. The
+  // "seen by" count/list still excludes the author server-side, so self-views
+  // never show up there. Fire-and-forget; never block the UI on this.
   useEffect(() => {
-    if (!story?.id || isMine) return;
+    if (!story?.id) return;
     api.markStoryViewed(story.id).catch(() => {});
-  }, [story?.id, isMine]);
+  }, [story?.id]);
 
   // Pull the replies threaded to this story whenever it changes so they can
   // float over the media. Fire-and-forget; failures just leave it empty.

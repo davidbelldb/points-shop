@@ -125,15 +125,18 @@ export async function listStoryReplies(storyId, limit = 30) {
 }
 
 /* Record that `viewerId` has viewed `storyId`. Idempotent — re-opening
-   a story doesn't bump the timestamp. Authors viewing their own story
-   are a no-op (the UI doesn't count author self-views as a "seen"). */
+   a story doesn't bump the timestamp. Author self-views ARE recorded so the
+   author's own story circle can dim once they've watched their whole set —
+   the "seen by" count/list shown to others still excludes the author
+   (view_count_other + viewers both filter viewer_id <> author_id), so this
+   only ever flips the caller's own viewed_by_me flag. */
 export async function markStoryViewed(storyId, viewerId) {
   if (!viewerId || !storyId) return;
   await query(
     `INSERT INTO story_views (story_id, viewer_id)
      SELECT $1, $2
        FROM sneaky_stories s
-      WHERE s.id = $1 AND s.author_id <> $2
+      WHERE s.id = $1
      ON CONFLICT DO NOTHING`,
     [storyId, viewerId],
   );
