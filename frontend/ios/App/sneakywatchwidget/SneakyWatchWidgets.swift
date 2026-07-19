@@ -106,29 +106,43 @@ struct WatchDirdleView: View {
     private var isComplete: Bool { data?.status == "completed" }
     // Just the partner's latest guess row (5 states).
     private var lastRow: [String]? { data?.grid?.last }
+    private var attempts: Int { data?.attempts ?? 0 }
+    private var title: String {
+        let name = data?.name ?? "They"
+        return attempts > 0 ? "\(name) · \(dirdleOrdinal(attempts)) attempt" : "\(name) · yet to play"
+    }
 
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<5, id: \.self) { i in
-                cell(lastRow != nil && lastRow!.indices.contains(i) ? lastRow![i] : nil)
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            GeometryReader { geo in
+                let gap: CGFloat = 3
+                let side = min((geo.size.width - gap * 4) / 5, geo.size.height)
+                HStack(spacing: gap) {
+                    ForEach(0..<5, id: \.self) { i in
+                        cell(lastRow != nil && lastRow!.indices.contains(i) ? lastRow![i] : nil)
+                            .frame(width: side, height: side)
+                    }
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Tap → open the app to the partner's full grid (leaderboard modal).
         .widgetURL(URL(string: "https://sneakypoints.com/games/dirty-wordle?board=1"))
     }
 
-    // Solid when their game is complete, outlined while still in progress —
-    // either way tinted with the real Dirdle colours.
+    // Square boxes: solid when their game is complete, outlined while in
+    // progress — either way tinted with the real Dirdle colours.
     @ViewBuilder
     private func cell(_ state: String?) -> some View {
         let c = dirdleColour(state)
         if isComplete {
             RoundedRectangle(cornerRadius: 3).fill(c)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             RoundedRectangle(cornerRadius: 3).strokeBorder(c, lineWidth: 2)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

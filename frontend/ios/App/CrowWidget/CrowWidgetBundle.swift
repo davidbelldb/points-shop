@@ -16,5 +16,6 @@ struct CrowWidgetBundle: WidgetBundle {
         // …plus the Sneaky home-screen + lock-screen widgets.
         SneakyCalendarWidget()
         SneakyDirdleWidget()
+        SneakyDirdleBoardWidget()
     }
 }

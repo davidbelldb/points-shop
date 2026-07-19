@@ -45,37 +45,42 @@ struct DirdleProvider: TimelineProvider {
 /// filled once it's complete.
 struct DirdleLockView: View {
     let data: WDirdle?
-
-    private var attempts: Int { data?.attempts ?? 0 }
-    private var maxGuesses: Int { data?.max ?? 6 }
     private var isComplete: Bool { data?.status == "completed" }
-    // At least one row, at most two.
-    private var rowCount: Int { min(max(attempts, 1), 2) }
+    private var attempts: Int { data?.attempts ?? 0 }
+    private var title: String {
+        let name = data?.name ?? "They"
+        return attempts > 0 ? "\(name) · \(dirdleOrdinal(attempts)) attempt" : "\(name) · yet to play"
+    }
 
     var body: some View {
-        HStack(spacing: 9) {
-            grid
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            GeometryReader { geo in
+                let gap: CGFloat = 5
+                let side = min((geo.size.width - gap * 4) / 5, geo.size.height)
+                HStack(spacing: gap) {
+                    ForEach(0..<5, id: \.self) { _ in
+                        box.frame(width: side, height: side)
+                    }
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
+            }
         }
+        // Tap → the partner's full grid (leaderboard modal) in the app.
         .widgetURL(URL(string: "https://sneakypoints.com/games/dirty-wordle?board=1"))
     }
 
-    private var grid: some View {
-        VStack(spacing: 2.5) {
-            ForEach(0..<rowCount, id: \.self) { _ in
-                HStack(spacing: 2.5) {
-                    ForEach(0..<5, id: \.self) { _ in cell }
-                }
-            }
-        }
-    }
-
+    // One row of five SQUARES: stroke-only while their game is in progress, solid
+    // once it's complete.
     @ViewBuilder
-    private var cell: some View {
+    private var box: some View {
         if isComplete {
-            RoundedRectangle(cornerRadius: 2).fill(.white).frame(width: 12, height: 12)
+            RoundedRectangle(cornerRadius: 4).fill(.white)
         } else {
-            RoundedRectangle(cornerRadius: 2).strokeBorder(.white, lineWidth: 1.3).frame(width: 12, height: 12)
+            RoundedRectangle(cornerRadius: 4).strokeBorder(.white, lineWidth: 2)
         }
     }
 }

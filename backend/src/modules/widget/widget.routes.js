@@ -51,6 +51,13 @@ function londonToday() {
   }).format(new Date());
 }
 
+// Photo paths are stored relative (/media/…); widgets need an absolute URL to
+// download the image over the network.
+function absolutePhoto(p) {
+  if (!p) return null;
+  return /^https?:\/\//i.test(p) ? p : `https://sneakypoints.com${p}`;
+}
+
 function nextEventShape(ev) {
   if (!ev) return null;
   const snacks = Array.isArray(ev.snack_list) ? ev.snack_list.length : 0;
@@ -165,5 +172,74 @@ export default async function widgetRoutes(fastify) {
     }
 
     return { ...base, status: 'not_played' };
+  });
+
+  /* BOTH players' Dirdle boards for today — mirrors the in-game score modal.
+     Returns the caller first, each with photo + coloured grid of their guesses
+     so far. The widget pads to 6 rows and renders unplayed rows as empties. */
+  fastify.get('/api/widget/dirdle-board', async (req, reply) => {
+    if (!req.user) return reply.code(401).send({ error: 'not authenticated' });
+    const me = getEffectiveAccountId(req);
+    const date = londonToday();
+
+    // Both accounts, caller first.
+    const { rows: accounts } = await query(
+      `SELECT id, name, photo_url
+         FROM accounts
+        ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END, created_at`,
+      [me],
+    );
+
+    // Today's word — needed to colour in-progress guesses.
+    const { rows: wordRows } = await query(
+      `SELECT word FROM dirty_wordle_schedule WHERE date = $1`, [date],
+    );
+    const todayWord = wordRows[0]?.word ?? null;
+
+    const players = [];
+    for (const acc of accounts) {
+      let state = null;
+
+      const { rows: resRows } = await query(
+        `SELECT won, guesses_taken, guess_grid
+           FROM dirty_wordle_results WHERE account_id = $1 AND date = $2`,
+        [acc.id, date],
+      );
+      if (resRows[0]) {
+        const r = resRows[0];
+        state = {
+          status: 'completed',
+          won: r.won,
+          attempts: r.guesses_taken,
+          grid: Array.isArray(r.guess_grid) ? r.guess_grid : [],
+        };
+      } else if (todayWord) {
+        const { rows: progRows } = await query(
+          `SELECT guesses FROM dirty_wordle_progress
+            WHERE account_id::text = $1::text AND date = $2`,
+          [acc.id, date],
+        );
+        const guesses = Array.isArray(progRows[0]?.guesses) ? progRows[0].guesses : [];
+        if (guesses.length > 0) {
+          state = {
+            status: 'in_progress',
+            won: false,
+            attempts: guesses.length,
+            grid: guesses.map((g) => evaluateGuess(String(g).toUpperCase(), todayWord)),
+          };
+        }
+      }
+      if (!state) state = { status: 'not_played', won: false, attempts: 0, grid: [] };
+
+      players.push({
+        id: acc.id,
+        name: acc.name,
+        photo_url: absolutePhoto(acc.photo_url),
+        is_me: acc.id === me,
+        ...state,
+      });
+    }
+
+    return { date, max: MAX_GUESSES, players };
   });
 }

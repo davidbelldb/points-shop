@@ -73,17 +73,17 @@ private struct MonthGrid: View {
 
     var body: some View {
         let l = layout
-        VStack(spacing: 5) {
+        VStack(spacing: 3) {
             HStack(spacing: 3) {
                 ForEach(0..<7, id: \.self) { i in
                     Text(headers[i])
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.4))
                         .frame(maxWidth: .infinity)
                 }
             }
-            LazyVGrid(columns: columns, spacing: 5) {
-                ForEach(0..<(l.leading), id: \.self) { _ in Color.clear.frame(height: 24) }
+            LazyVGrid(columns: columns, spacing: 3) {
+                ForEach(0..<(l.leading), id: \.self) { _ in Color.clear.frame(height: 19) }
                 ForEach(1...l.days, id: \.self) { day in
                     dayCell(day)
                 }
@@ -95,19 +95,15 @@ private struct MonthGrid: View {
     private func dayCell(_ day: Int) -> some View {
         let isToday = day == today
         let hasEvent = eventDays.contains(day)
-        let filled = isToday || hasEvent
+        // No more circles — just colour the number: teal for today, pink for an
+        // event day, muted white otherwise. Reads far less congested.
+        let colour: Color = isToday ? .sneakyTeal : (hasEvent ? .sneakyPink : .white.opacity(0.85))
         Text("\(day)")
-            .font(.system(size: 13, weight: filled ? .semibold : .medium))
-            .foregroundStyle(filled ? .white : .white.opacity(0.85))
+            .font(.system(size: 12, weight: (isToday || hasEvent) ? .bold : .medium))
+            .foregroundStyle(colour)
             .lineLimit(1)
             .minimumScaleFactor(0.6)
-            .frame(width: 23, height: 23)
-            .background(
-                Group {
-                    if isToday { Circle().fill(Color.sneakyTeal) }
-                    else if hasEvent { Circle().fill(Color.sneakyPink) }
-                }
-            )
+            .frame(width: 19, height: 19)
             .frame(maxWidth: .infinity)
     }
 }
@@ -196,22 +192,34 @@ private struct NextEventPanel: View {
 private struct CalendarMediumView: View {
     let data: WCalendar?
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 14) {
             NextEventPanel(event: data?.next)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Rectangle().fill(.white.opacity(0.08)).frame(width: 1).frame(maxHeight: .infinity)
-            if let d = data {
-                MonthGrid(year: d.year, month: d.month, today: d.today,
-                          eventDays: Set(d.eventDays))
-                    .frame(maxWidth: .infinity)
-            } else {
-                placeholderGrid.frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(monthTitle)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.45))
+                if let d = data {
+                    MonthGrid(year: d.year, month: d.month, today: d.today,
+                              eventDays: Set(d.eventDays))
+                } else {
+                    placeholderGrid
+                }
             }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 11)
         .padding(.vertical, 13)
         .sneakyContainerBackground(Color.sneakyBG)
+    }
+    // Uppercase month name to sit beside "UP NEXT" (matches the native layout).
+    private var monthTitle: String {
+        guard let d = data else { return "" }
+        let symbols = DateFormatter().monthSymbols ?? []
+        let idx = max(0, min(11, d.month - 1))
+        return idx < symbols.count ? symbols[idx].uppercased() : ""
     }
     private var placeholderGrid: some View {
         RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.05))
@@ -274,6 +282,11 @@ private struct CalendarLockView: View {
                 Text(lockDate(start, allDay: ev.allDay))
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let loc = ev.location, !loc.isEmpty {
+                    Text(loc)
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             .widgetURL(URL(string: "https://sneakypoints.com/calendar"))
         } else {

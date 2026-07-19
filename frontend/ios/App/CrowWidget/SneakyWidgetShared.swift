@@ -81,6 +81,24 @@ struct WDirdle: Decodable {
     let grid: [[String]]?   // rows of "correct" | "present" | "absent"
 }
 
+// Both players' boards for today (the score-modal widget).
+struct WDirdlePlayer: Decodable {
+    let id: String
+    let name: String
+    let photoUrl: String?
+    let isMe: Bool
+    let status: String      // not_played | in_progress | completed
+    let won: Bool?
+    let attempts: Int
+    let grid: [[String]]    // coloured rows guessed so far
+}
+
+struct WDirdleBoard: Decodable {
+    let date: String
+    let max: Int
+    let players: [WDirdlePlayer]
+}
+
 // MARK: - Date helpers
 
 enum WDate {
@@ -107,6 +125,21 @@ enum WDate {
 enum WidgetAPI {
     static func calendar() async -> WCalendar? { await fetch("/api/widget/calendar") }
     static func dirdle() async -> WDirdle? { await fetch("/api/widget/dirdle") }
+    static func dirdleBoard() async -> WDirdleBoard? { await fetch("/api/widget/dirdle-board") }
+
+    // Download raw image bytes (profile photos) — widgets must fetch images in
+    // the timeline provider, not lazily in the view. Foundation only, so this is
+    // safe on both iOS and watchOS targets.
+    static func imageData(_ urlString: String?) async -> Data? {
+        guard let s = urlString, let url = URL(string: s) else { return nil }
+        do {
+            let (data, resp) = try await URLSession.shared.data(from: url)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return data
+        } catch {
+            return nil
+        }
+    }
 
     private static func fetch<T: Decodable>(_ path: String) async -> T? {
         guard let token = SneakyWidget.token,
@@ -156,6 +189,14 @@ func sneakySymbol(for icon: String?) -> String {
     case "lips": return "heart.fill"
     default: return "calendar"
     }
+}
+
+// MARK: - Ordinal ("1st", "2nd", "3rd"…) for the Dirdle attempt title
+
+func dirdleOrdinal(_ n: Int) -> String {
+    let ones = n % 10, tens = (n / 10) % 10
+    let suffix = (tens == 1) ? "th" : (ones == 1 ? "st" : ones == 2 ? "nd" : ones == 3 ? "rd" : "th")
+    return "\(n)\(suffix)"
 }
 
 // MARK: - iOS 17 container background shim (deployment target is 16.1)
