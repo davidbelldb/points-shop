@@ -7,16 +7,23 @@
 -- an admin-only self-test: a trip loops back to the traveller's own device.
 -- ===========================================================================
 
--- Per-account target destination the OMW crow… er, cyclist, heads toward.
--- Set in /admin → "On My Way". One row per user; the traveller's own live
--- location is the origin, this is always the destination.
-CREATE TABLE IF NOT EXISTS omw_destinations (
-  account_id  UUID PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+-- Each user's up to 3 "quick destinations" (position 1–3), self-managed on the
+-- /account page (Katie has no admin). Position 1 is the default the quick action
+-- fires. The trip always starts from the traveller's live location; the route +
+-- ETA are computed then, so no origin is stored here. Location search is bounded
+-- to Cambridge in the UI.
+CREATE TABLE IF NOT EXISTS omw_quick_destinations (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id  UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  position    INTEGER NOT NULL CHECK (position BETWEEN 1 AND 3),
   label       TEXT NOT NULL,
   lat         DOUBLE PRECISION NOT NULL,
   lng         DOUBLE PRECISION NOT NULL,
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  transport   TEXT NOT NULL DEFAULT 'bicycle' CHECK (transport IN ('bicycle', 'scooter')),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (account_id, position)
 );
+CREATE INDEX IF NOT EXISTS omw_quickdest_account_idx ON omw_quick_destinations (account_id);
 
 -- One in-flight (or recently finished) OMW journey.
 --   traveller_id : whose location is being tracked (the person on the move).
@@ -33,19 +40,23 @@ CREATE TABLE IF NOT EXISTS omw_trips (
   traveller_id     UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   viewer_id        UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   simulated        BOOLEAN NOT NULL DEFAULT FALSE,
+  traveller_pronoun TEXT NOT NULL DEFAULT 'they',  -- he | she | they — for the narration copy
 
   origin_lat       DOUBLE PRECISION,
   origin_lng       DOUBLE PRECISION,
   dest_label       TEXT,
   dest_lat         DOUBLE PRECISION,
   dest_lng         DOUBLE PRECISION,
+  transport        TEXT NOT NULL DEFAULT 'bicycle',
 
   current_lat      DOUBLE PRECISION,
   current_lng      DOUBLE PRECISION,
+  route_points     JSONB,   -- plotted [[lat,lng],…] polyline; progress projects onto it
 
   distance_total_km     DOUBLE PRECISION NOT NULL DEFAULT 0,
   distance_remaining_km DOUBLE PRECISION NOT NULL DEFAULT 0,
-  progress         DOUBLE PRECISION NOT NULL DEFAULT 0,   -- 0..1
+  eta_seconds      INTEGER NOT NULL DEFAULT 0,            -- estimated ride time; paces the bar + nodes
+  progress         DOUBLE PRECISION NOT NULL DEFAULT 0,   -- 0..1 (time-driven)
   phase            INTEGER NOT NULL DEFAULT 0,            -- highest node pushed
 
   status           TEXT NOT NULL DEFAULT 'active'
@@ -76,11 +87,16 @@ CREATE TABLE IF NOT EXISTS omw_activity_tokens (
 CREATE INDEX IF NOT EXISTS omw_tok_account_kind_idx ON omw_activity_tokens (account_id, kind);
 CREATE INDEX IF NOT EXISTS omw_tok_trip_idx ON omw_activity_tokens (trip_id);
 
--- Seed the two known destinations so /admin shows sensible defaults. Idempotent:
--- only fills a user's row if they don't already have one. Matches by username;
--- adjust in /admin if these coordinates need nudging.
---   Blinco Grove, Cambridge  ≈ 52.1893, 0.1387
---   Bishops Court (approx)   ≈ 52.2060, 0.1160  (tweak in admin)
-INSERT INTO omw_destinations (account_id, label, lat, lng)
-SELECT id, 'Blinco Grove', 52.1893, 0.1387 FROM accounts WHERE role = 'admin'
-ON CONFLICT (account_id) DO NOTHING;
+-- Seed David's first quick destination (Blinco Grove) so there's something to
+-- fire on day one. Idempotent. Users add/edit their three on /account.
+--   Blinco Grove, Cambridge ≈ 52.1893, 0.1387
+INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng)
+SELECT id, 1, 'Blinco Grove', 52.1893, 0.1387 FROM accounts WHERE role = 'admin'
+ON CONFLICT (account_id, position) DO NOTHING;
+
+-- Pronoun drives the narration copy ("he's" / "she's" / "they're"). Default is
+-- neutral; David and Katie get theirs so the feature reads right in both
+-- directions when we go two-way.
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS pronoun TEXT NOT NULL DEFAULT 'they';
+UPDATE accounts SET pronoun = 'he'  WHERE username = 'david' AND pronoun = 'they';
+UPDATE accounts SET pronoun = 'she' WHERE username = 'katie' AND pronoun = 'they';

@@ -32,5 +32,6 @@ struct OmwActivityAttributes: ActivityAttributes {
     /// Static info — fixed for the life of one trip.
     var travellerName: String  // e.g. "David"
     var destLabel: String      // e.g. "Blinco Grove"
+    var transport: String = "bicycle"  // "bicycle" | "scooter" — picks the sprite pair
     var tripId: String = ""    // maps a per-activity update token back to the trip
 }

@@ -12,6 +12,9 @@
 		33634C8A2FEEE8B100071ADD /* CrowActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */; };
 		33634C8B2FEEE97D00071ADD /* CrowActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */; };
 		33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33634C922FEFF90F00071ADD /* MainViewController.swift */; };
+		3392FC9A300E0FB900A62D8A /* OmwActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3392FC99300E0FB900A62D8A /* OmwActivityAttributes.swift */; };
+		3392FC9B300E0FB900A62D8A /* OmwActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3392FC99300E0FB900A62D8A /* OmwActivityAttributes.swift */; };
+		3392FC9D300E0FC200A62D8A /* OmwActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3392FC9C300E0FC200A62D8A /* OmwActivityPlugin.swift */; };
 		33C83C16300D2F4C000FDAA8 /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */; };
 		33C83C25300D34A5000FDAA8 /* sneakywatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 33C83C1B300D34A4000FDAA8 /* sneakywatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		33C83C31300D36F7000FDAA8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */; };
@@ -106,6 +109,8 @@
 		3334C9572FEEDC15002EBBE0 /* SneakyNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SneakyNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33634C892FEEE8B100071ADD /* CrowActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrowActivityAttributes.swift; sourceTree = "<group>"; };
 		33634C922FEFF90F00071ADD /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		3392FC99300E0FB900A62D8A /* OmwActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmwActivityAttributes.swift; sourceTree = "<group>"; };
+		3392FC9C300E0FC200A62D8A /* OmwActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmwActivityPlugin.swift; sourceTree = "<group>"; };
 		33C83C14300D2E05000FDAA8 /* CrowWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrowWidgetExtension.entitlements; sourceTree = "<group>"; };
 		33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
 		33C83C1B300D34A4000FDAA8 /* sneakywatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "sneakywatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -250,6 +255,8 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				3392FC9C300E0FC200A62D8A /* OmwActivityPlugin.swift */,
+				3392FC99300E0FB900A62D8A /* OmwActivityAttributes.swift */,
 				33C83C69300D3B18000FDAA8 /* WatchTokenBridge.swift */,
 				33C83C15300D2F4C000FDAA8 /* WidgetBridgePlugin.swift */,
 				33634C922FEFF90F00071ADD /* MainViewController.swift */,
@@ -512,6 +519,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				33634C8B2FEEE97D00071ADD /* CrowActivityAttributes.swift in Sources */,
+				3392FC9B300E0FB900A62D8A /* OmwActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -524,7 +532,9 @@
 				FE0000000000000000000A02 /* NfcPlugin.swift in Sources */,
 				33634C8A2FEEE8B100071ADD /* CrowActivityAttributes.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				3392FC9A300E0FB900A62D8A /* OmwActivityAttributes.swift in Sources */,
 				33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */,
+				3392FC9D300E0FC200A62D8A /* OmwActivityPlugin.swift in Sources */,
 				33C83C16300D2F4C000FDAA8 /* WidgetBridgePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -320,13 +320,15 @@ export const api = {
 
   // On My Way — live-location Live Activity.
   omw: {
-    listDestinations:  () => request('/omw/destinations'),
-    setDestination:    (accountId, dest) =>
-      request(`/omw/destinations/${accountId}`, { method: 'PUT', body: JSON.stringify(dest) }),
-    myDestination:     () => request('/omw/my-destination'),
+    listQuickDestinations: () => request('/omw/quick-destinations'),
+    setQuickDestination:   (position, dest) =>
+      request(`/omw/quick-destinations/${position}`, { method: 'PUT', body: JSON.stringify(dest) }),
+    deleteQuickDestination: (position) =>
+      request(`/omw/quick-destinations/${position}`, { method: 'DELETE' }),
     registerToken:     (kind, token, tripId) =>
       request('/omw/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, tripId }) }),
-    startTrip:         (origin) => request('/omw/trips', { method: 'POST', body: JSON.stringify({ origin }) }),
+    startTrip:         (origin, destId, transport) =>
+      request('/omw/trips', { method: 'POST', body: JSON.stringify({ origin, destId, transport }) }),
     ping:              (tripId, lat, lng) =>
       request(`/omw/trips/${tripId}/ping`, { method: 'POST', body: JSON.stringify({ lat, lng }) }),
     endTrip:           (tripId) => request(`/omw/trips/${tripId}/end`, { method: 'POST' }),

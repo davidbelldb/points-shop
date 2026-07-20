@@ -8,6 +8,7 @@ import GameRewardsCard from '../components/GameRewardsCard.jsx';
 import Pressable from '../components/Pressable.jsx';
 import PushToggle from '../components/PushToggle.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
+import OmwQuickDestinations from '../components/omw/OmwQuickDestinations.jsx';
 import Confetti from '../components/Confetti.jsx';
 import { useSettings } from '../lib/SettingsContext.jsx';
 import { daysUntil, countdownClock } from '../lib/countdown.js';
@@ -193,6 +194,14 @@ export default function AccountPage() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-2">
             <ThemeToggle />
           </section>
+
+          {/* On My Way — v1 is David-only while testing; remove the gate to open
+              it up to Katie once we go two-way. */}
+          {user?.username === 'david' && (
+            <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+              <OmwQuickDestinations />
+            </section>
+          )}
 
           {user?.username === 'david' && (
             <Pressable

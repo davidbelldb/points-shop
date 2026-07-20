@@ -1,18 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { startOmwTrip, stopOmwTrip, activeOmwTripId } from '../../lib/omwActivity.js';
 
 /*
- * "On My Way" — /new-chat test harness panel.
+ * "On My Way" — /new-chat test harness panel (David-only during v1).
  *
- * Sits below the scrolls area. Triggering starts a trip from your current
- * location toward your configured destination; the Live Activity loops back to
- * your own device (v1 self-test), so you can watch the banner advance as you
- * move. Location pings come from the native background plugin and a foreground
+ * Pick one of your quick destinations + transport, then trigger. The trip loops
+ * back to your own device, so you watch your own progress along the route.
+ * Location pings come from the native background plugin + a foreground
  * watchPosition fallback (see lib/omwActivity.js).
  */
 export default function OmwTestPanel({ dark, autoStart }) {
-  const [dest, setDest] = useState(null);
+  const [dests, setDests] = useState([]);
+  const [destId, setDestId] = useState('');
+  const [transport, setTransport] = useState('bicycle');
   const [trip, setTrip] = useState(null);
   const [status, setStatus] = useState('idle'); // idle | starting | tracking | error
   const [error, setError] = useState(null);
@@ -20,17 +21,29 @@ export default function OmwTestPanel({ dark, autoStart }) {
   const card = dark ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-200';
 
   useEffect(() => {
-    api.omw.myDestination()
-      .then((r) => setDest(r.destination))
+    api.omw.listQuickDestinations()
+      .then((r) => {
+        const list = r.destinations || [];
+        setDests(list);
+        if (list[0]) { setDestId(list[0].id); setTransport(list[0].transport || 'bicycle'); }
+      })
       .catch((e) => setError(e.message));
   }, []);
 
+  const selected = useMemo(() => dests.find((d) => d.id === destId) || null, [dests, destId]);
+
+  function pickDest(id) {
+    setDestId(id);
+    const d = dests.find((x) => x.id === id);
+    if (d?.transport) setTransport(d.transport);
+  }
+
   async function start() {
+    if (!destId) return;
     setError(null); setStatus('starting');
     try {
-      const t = await startOmwTrip();
-      setTrip(t);
-      setStatus('tracking');
+      const t = await startOmwTrip(destId, transport);
+      setTrip(t); setStatus('tracking');
     } catch (e) {
       setError(e.message || 'Could not start — location permission?');
       setStatus('error');
@@ -39,15 +52,14 @@ export default function OmwTestPanel({ dark, autoStart }) {
 
   async function stop() {
     await stopOmwTrip();
-    setTrip(null);
-    setStatus('idle');
+    setTrip(null); setStatus('idle');
   }
 
-  // Quick-action / Siri deep link (?omw=start) auto-triggers a trip once.
+  // Quick-action / Siri deep link (?omw=start) auto-fires the default slot once.
   useEffect(() => {
-    if (autoStart && status === 'idle' && dest) start();
+    if (autoStart && status === 'idle' && destId) start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, dest]);
+  }, [autoStart, destId]);
 
   const running = status === 'tracking' || (activeOmwTripId() != null);
 
@@ -59,53 +71,77 @@ export default function OmwTestPanel({ dark, autoStart }) {
       </div>
 
       <p className="mt-2 text-xs text-neutral-500">
-        Starts a Live Activity tracking your live progress toward your destination. Only you see it for now.
+        Tracks your live progress along the route to the chosen destination. Only you see it. Manage destinations on
+        your <span className="font-medium">Account</span> page.
       </p>
 
-      <div className="mt-3 text-xs">
-        <span className="text-neutral-500">Destination: </span>
-        {dest ? (
-          <span className="font-medium">
-            {dest.label}
-            <span className="ml-1 text-[10px] text-neutral-400">
-              ({Number(dest.lat).toFixed(4)}, {Number(dest.lng).toFixed(4)})
-            </span>
-          </span>
-        ) : (
-          <span className="text-neutral-400">none set — add one in Admin → On My Way</span>
-        )}
-      </div>
+      {dests.length === 0 ? (
+        <p className="mt-3 text-xs text-neutral-400">No quick destinations yet — add one on your Account page.</p>
+      ) : (
+        <>
+          {!running && (
+            <div className="mt-3 space-y-2">
+              <select
+                value={destId}
+                onChange={(e) => pickDest(e.target.value)}
+                className="block w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:bg-neutral-800 dark:border-neutral-700"
+              >
+                {dests.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.position === 1 ? '★ ' : ''}{d.label}
+                  </option>
+                ))}
+              </select>
+              <div className="flex items-center gap-1">
+                {['bicycle', 'scooter'].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTransport(t)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${transport === t ? 'bg-sky-600 text-white' : 'bg-neutral-100 text-neutral-600'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-      <div className="mt-4 flex items-center gap-3">
-        {!running ? (
-          <button
-            type="button"
-            onClick={start}
-            disabled={!dest || status === 'starting'}
-            className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            {status === 'starting' ? 'Getting location…' : "I'm on my way"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={stop}
-            className="rounded-md bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            End trip
-          </button>
-        )}
-        {running && trip && (
-          <span className="text-xs text-neutral-500">
-            Tracking · {Number(trip.distance_total_km).toFixed(2)} km to go
-          </span>
-        )}
-      </div>
+          <div className="mt-4 flex items-center gap-3">
+            {!running ? (
+              <button
+                type="button"
+                onClick={start}
+                disabled={!destId || status === 'starting'}
+                className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {status === 'starting' ? 'Getting location…' : "I'm on my way"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={stop}
+                className="rounded-md bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                End trip
+              </button>
+            )}
+            {running && trip && (
+              <span className="text-xs text-neutral-500">
+                {trip.dest_label} · {Number(trip.distance_total_km).toFixed(2)} km · ~{Math.round((trip.eta_seconds || 0) / 60)} min
+              </span>
+            )}
+            {!running && selected && (
+              <span className="text-xs text-neutral-400">to {selected.label}</span>
+            )}
+          </div>
+        </>
+      )}
 
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       <p className="mt-3 text-[11px] text-neutral-400">
-        Tip: to test without a bike ride, temporarily set your destination in Admin very close to where you are,
-        or use the iOS Simulator’s <span className="font-medium">Features → Location → City Bicycle Ride</span>.
+        Tip: to test without a ride, add a nearby destination on your Account page, or use the iOS Simulator’s
+        <span className="font-medium"> Features → Location → City Bicycle Ride</span>.
       </p>
     </div>
   );

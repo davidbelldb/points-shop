@@ -9,6 +9,13 @@ each end of a dashed 3-node trail.
 device, so you can watch your own banner advance as you move. Katie sees nothing
 until we flip the recipient later.
 
+**Pacing is by real position along the plotted route** (not a timer): each GPS
+ping projects you onto the route start→dest and progress = distance covered ÷
+route length, so the three nodes pop at 25/50/75% of the *distance* and it stays
+correct even if you deviate or set off from somewhere new. Transport (bicycle |
+scooter) sets the ETA shown in admin and which sprite pair the widget uses; live
+GPS also narrates the current street and detects real arrival (~80 m).
+
 Copy shown on the banner:
 - Title: **"{name} is on his way and will be with you soon"**
 - Subtitle: **"Wait and save? I think not."**
@@ -75,12 +82,13 @@ Copy shown on the banner:
      → tick **Location updates**. (The `Info.plist` already lists the mode and the
      usage strings; the capability just flips the entitlement.)
 
-4. **Drop in the cycling sprite(s)**
-   In the Project navigator open **CrowWidget → Assets.xcassets →
-   `david_cycle_00`** and drag your pixel cycling PNG into the image well (or add
-   more image sets and rename the `cycleLeft` / `cycleRight` constants at the top
-   of `OmwLiveActivity.swift` if you want a distinct departing vs waiting frame).
-   Until a PNG is present the sprite simply renders blank — nothing breaks.
+4. **Sprites** — four image sets in **CrowWidget → Assets.xcassets**:
+   - `david_leave` / `david_arrive` — bicycle (PNGs already added).
+   - `david_scoot_leave` / `david_scoot_arrive` — scooter (empty scaffolds; drag
+     `david_scoot_leave.png` / `david_scoot_arrive.png` into the image wells when
+     you have them). Until then the scooter sprites render blank — nothing breaks.
+   The widget picks the pair from the trip's `transport` (bicycle | scooter),
+   which is set per-trip in the /new-chat panel and defaults from the admin route.
 
 5. **Build & run on a real device** (background GPS + Live Activities need
    hardware; the Simulator works for the UI via *Features → Location → City
@@ -94,16 +102,20 @@ Copy shown on the banner:
 
 ## How to test end-to-end
 
-1. **Admin → On My Way**: confirm your destination (Blinco Grove) — nudge the
-   coordinates if the seed isn't spot-on. Set Katie's (Bishops Court) too.
+1. **Account page → On My Way destinations**: add up to three quick destinations
+   (Cambridge-bounded search; Blinco Grove is seeded in slot 1). Slot 1 is the
+   default the quick action fires. Pick bicycle/scooter per slot. (v1 shows this
+   editor for David only — remove the `username === 'david'` gate in
+   `AccountPage.jsx` to open it to Katie when we go two-way.)
 2. Open **/new-chat** → the **On My Way · Test Harness** panel (below scrolls) →
-   tap **"I'm on my way"** (or long-press the app icon → **On My Way**).
-3. The Live Activity appears on your lock screen / Dynamic Island. As your
-   location changes, the trail fills and the three nodes pop; within ~80 m of the
-   destination it flips to **"{name} has arrived"** and dismisses after a few
-   seconds.
-4. No bike? Point your destination somewhere within a few hundred metres, or use
-   the Simulator bicycle route.
+   choose a destination + transport → tap **"I'm on my way"** (or long-press the
+   app icon → **On My Way**, which fires slot 1).
+3. The Live Activity appears on your lock screen / Dynamic Island. As you move,
+   your position projects onto the route so the trail fills and the three nodes
+   pop at 25/50/75% of the route distance; within ~80 m it flips to **"{name} has
+   arrived"** and dismisses after a few seconds.
+4. No ride? Add a destination a few hundred metres away, or use the iOS
+   Simulator's **Features → Location → City Bicycle Ride**.
 
 ---
 

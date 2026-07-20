@@ -1,49 +1,47 @@
 import {
-  listDestinations, getDestination, setDestination,
+  listQuickDestinations, setQuickDestination, deleteQuickDestination,
   saveOmwToken, startTrip, recordPing, cancelTrip, sweepStaleTrips,
 } from './omw.repo.js';
-import { getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
+import { getActualAccountId } from '../auth/auth.helpers.js';
 
 /*
  * "On My Way" API.
  *
- * Admin owns the per-user destinations (David → Blinco Grove, Katie → Bishops
- * Court). Any authenticated user can start/ping/cancel their own trip, but v1
- * is gated to admin in the UI (the /new-chat test harness) and loops back to
- * the traveller's own device.
+ * Each user self-manages up to 3 "quick destinations" (on their Account page);
+ * a trip starts from their live location toward one of them. v1 is live for
+ * David only (gated in the UI) and loops back to the traveller's own device.
  */
 
 let sweeperStarted = false;
 function startSweeper() {
   if (sweeperStarted) return;
   sweeperStarted = true;
-  // Cancel abandoned trips every minute so no banner is orphaned.
+  // Progress is driven by location pings (distance along the route), so no time
+  // ticker is needed — just reap abandoned trips so no banner is orphaned.
   setInterval(() => { sweepStaleTrips().catch(() => {}); }, 60_000);
 }
 
 export default async function omwRoutes(fastify) {
   startSweeper();
 
-  // ----- Destinations (admin-managed) -----
-  fastify.get('/api/omw/destinations', async (req, reply) => {
-    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
-    return { destinations: await listDestinations() };
+  // ----- Quick destinations (each user manages their own) -----
+  fastify.get('/api/omw/quick-destinations', async (req) => {
+    const accountId = getActualAccountId(req);
+    return { destinations: await listQuickDestinations(accountId) };
   });
 
-  fastify.put('/api/omw/destinations/:accountId', async (req, reply) => {
-    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
-    const { label, lat, lng } = req.body ?? {};
+  fastify.put('/api/omw/quick-destinations/:position', async (req, reply) => {
+    const accountId = getActualAccountId(req);
     try {
-      return await setDestination(req.params.accountId, { label, lat, lng });
+      return await setQuickDestination(accountId, req.params.position, req.body ?? {});
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });
     }
   });
 
-  // The caller's own configured destination (used by the trigger flow).
-  fastify.get('/api/omw/my-destination', async (req) => {
+  fastify.delete('/api/omw/quick-destinations/:position', async (req) => {
     const accountId = getActualAccountId(req);
-    return { destination: await getDestination(accountId) };
+    return deleteQuickDestination(accountId, req.params.position);
   });
 
   // ----- Live Activity push tokens -----
@@ -59,13 +57,13 @@ export default async function omwRoutes(fastify) {
   });
 
   // ----- Trips -----
-  // Start a trip from the caller's current location toward their destination.
-  // body: { origin: { lat, lng } }
+  // Start a trip from the caller's live location to a quick destination.
+  // body: { origin: { lat, lng }, destId?, transport? }  (destId defaults to slot 1)
   fastify.post('/api/omw/trips', async (req, reply) => {
     const travellerId = getActualAccountId(req);
-    const { origin } = req.body ?? {};
+    const { origin, destId, transport } = req.body ?? {};
     try {
-      const trip = await startTrip({ travellerId, origin: origin ?? {}, simulate: true });
+      const trip = await startTrip({ travellerId, origin: origin ?? {}, destId, transport, simulate: true });
       return reply.code(201).send(trip);
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });

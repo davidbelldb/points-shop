@@ -71,9 +71,9 @@ function currentPosition() {
  * location, and runs a foreground watchPosition fallback.
  * @returns {Promise<object>} the created trip
  */
-export async function startOmwTrip() {
+export async function startOmwTrip(destId, transport) {
   const origin = await currentPosition();
-  const trip = await api.omw.startTrip(origin);
+  const trip = await api.omw.startTrip(origin, destId, transport);
   activeTripId = trip.id;
   lastPingAt = 0;
 

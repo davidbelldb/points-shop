@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "david_scoot_arrive.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
