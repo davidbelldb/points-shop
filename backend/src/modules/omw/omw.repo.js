@@ -182,29 +182,115 @@ function currentStreet(tripId, lat, lng) {
 function contraction(p) { return p === 'he' ? "he's" : p === 'she' ? "she's" : "they're"; }
 function possessive(p) { return p === 'he' ? 'his' : p === 'she' ? 'her' : 'their'; }
 function subjectPronoun(p) { return p === 'he' ? 'he' : p === 'she' ? 'she' : 'they'; }
+function objectPronoun(p) { return p === 'he' ? 'him' : p === 'she' ? 'her' : 'them'; }
 function comesVerb(p) { return p === 'they' ? 'come' : 'comes'; }
 
-// The narration line under the title, banded by how far along the route the
-// traveller is. Copy is transport-flavoured (active travel vs Uber) and pronoun
-// aware. Locations come from the live reverse-geocode.
-function narration(progress, street, pronoun = 'they', transport = 'bicycle') {
-  const loc = street || 'the road';
+// A random subtitle shown once they've arrived. Pronoun-aware.
+function arrivalSubtitle(pronoun = 'they') {
   const subj = contraction(pronoun);
+  const name = subjectPronoun(pronoun);
+  const obj = objectPronoun(pronoun);
+  const options = [
+    `What are you waiting for? Let ${obj} in already.`,
+    `I bet ${subj} dying for a cup of tea...`,
+    `I bet ${name} can't wait to give you a good sniff...`,
+  ];
+  return options[Math.floor(Math.random() * options.length)];
+}
 
-  if (transport === 'uber') {
-    if (progress >= 0.90) return `Here ${subjectPronoun(pronoun)} ${comesVerb(pronoun)}.. unlatch the door`;
-    if (progress >= 0.75) return `sailing merrily along ${loc}`;
-    if (progress >= 0.50) return `swooshing down ${loc}`;
-    if (progress >= 0.25) return `${subj} tootling along ${loc}`;
-    return `oh boy, ${subj} on ${possessive(pronoun)} way`;
-  }
+// Fill a narration template (pronoun + location), then capitalise the first
+// letter so every line reads as a proper sentence.
+function fillLine(t, loc, pronoun) {
+  const s = t
+    .replaceAll('{subj}', contraction(pronoun))
+    .replaceAll('{name}', subjectPronoun(pronoun))
+    .replaceAll('{obj}', objectPronoun(pronoun))
+    .replaceAll('{poss}', possessive(pronoun))
+    .replaceAll('{comes}', comesVerb(pronoun))
+    .replaceAll('{loc}', loc);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
-  // bicycle / scooter (active travel)
-  if (progress >= 0.90) return `hold onto your butt cheeks, ${subj} on ${loc}`;
-  if (progress >= 0.75) return `a lil' sweaty on ${loc}`;
-  if (progress >= 0.50) return `last seen ripping along ${loc}`;
-  if (progress >= 0.25) return `okay, ${subj} currently on ${loc}`;
-  return 'Wait and save? I think not.';
+// En-route narration pools, banded by how far along the route the traveller is.
+// Several variants per band; one is picked at random each update (never the same
+// twice running for a trip) so the copy stays fresh. Transport-flavoured.
+const ACTIVE_BANDS = {
+  start: 'wait and save? I think not.',
+  q1: [
+    'okay, {subj} currently on {loc}',
+    'underway, somewhere near {loc}',
+    'rolling out along {loc}',
+    'just spotted around {loc}',
+  ],
+  q2: [
+    'last seen ripping along {loc}',
+    'swooshing past {loc}',
+    'making good time down {loc}',
+    'somewhere near {loc}',
+  ],
+  q3: [
+    "a lil' sweaty on {loc}",
+    '{subj} on {loc}, so best get the kettle on..',
+    'getting close, over by {loc}',
+    'nearly there, just on {loc}',
+  ],
+  final: [
+    'hold onto your butt cheeks, {subj} on {loc}',
+    'any second now — {subj} on {loc}',
+    'almost at the door, {subj} on {loc}',
+  ],
+};
+const UBER_BANDS = {
+  start: 'oh boy, {subj} on {poss} way',
+  q1: [
+    '{subj} tootling along {loc}',
+    'gliding toward {loc}',
+    'in the cab near {loc}',
+  ],
+  q2: [
+    'swooshing down {loc}',
+    'cruising along {loc}',
+    'sailing past {loc}',
+  ],
+  q3: [
+    'sailing merrily along {loc}',
+    '{subj} on {loc}, so best get the kettle on..',
+    'nearly at the door, by {loc}',
+  ],
+  final: [
+    'here {name} {comes}.. unlatch the door',
+    'pulling up any second — here {name} {comes}',
+  ],
+};
+
+const lastVariant = new Map(); // `${tripId}:${band}` -> last template used
+
+function pickVariant(tripId, band, pool) {
+  if (pool.length <= 1) return pool[0];
+  const key = `${tripId}:${band}`;
+  const last = lastVariant.get(key);
+  const choices = last ? pool.filter((t) => t !== last) : pool;
+  const pick = choices[Math.floor(Math.random() * choices.length)];
+  lastVariant.set(key, pick);
+  return pick;
+}
+
+function bandFor(progress) {
+  if (progress >= 0.90) return 'final';
+  if (progress >= 0.75) return 'q3';
+  if (progress >= 0.50) return 'q2';
+  if (progress >= 0.25) return 'q1';
+  return 'start';
+}
+
+// The narration line under the title: banded by progress, pronoun aware,
+// capitalised, and varied per update. `tripId` scopes the anti-repeat memory.
+function narration(progress, street, pronoun = 'they', transport = 'bicycle', tripId = '') {
+  const loc = street || 'the road';
+  const bands = transport === 'uber' ? UBER_BANDS : ACTIVE_BANDS;
+  const band = bandFor(progress);
+  if (band === 'start') return fillLine(bands.start, loc, pronoun);
+  return fillLine(pickVariant(tripId, band, bands[band]), loc, pronoun);
 }
 
 // How many of the three nodes this progress (0..1) has passed.
@@ -224,7 +310,7 @@ function buildState(trip, { progress = 0, message = '', arrived = false } = {}) 
   return omwContentState({
     startedAtMs, etaAtMs, progress: p,
     remainingKm: Math.max(0, totalKm * (1 - p)),
-    message: arrived ? '' : message, phase, arrived,
+    message, phase, arrived,
   });
 }
 
@@ -445,7 +531,7 @@ async function startLiveActivityFor(trip) {
       event: 'start',
       channelId,
       attributesType: ATTR_TYPE,
-      contentState: buildState(trip, { progress: 0, message: narration(0, '', trip.traveller_pronoun, trip.transport) }),
+      contentState: buildState(trip, { progress: 0, message: narration(0, '', trip.traveller_pronoun, trip.transport, trip.id) }),
       attributes: {
         travellerName: traveller,
         destLabel: trip.dest_label || '',
@@ -464,10 +550,13 @@ async function startLiveActivityFor(trip) {
 
 async function finaliseArrival(trip) {
   streetCache.delete(trip.id);
+  lastVariant.delete(`${trip.id}:q1`); lastVariant.delete(`${trip.id}:q2`);
+  lastVariant.delete(`${trip.id}:q3`); lastVariant.delete(`${trip.id}:final`);
   const traveller = await travellerName(trip.traveller_id);
   const muted = await isMuted(trip.viewer_id);
-  const alert = muted ? undefined : { title: `${traveller} has arrived`, body: 'Wait and save? I think not.' };
-  await pushTripState(trip, { event: 'update', state: buildState(trip, { arrived: true }), alert });
+  const subtitle = arrivalSubtitle(trip.traveller_pronoun);
+  const alert = muted ? undefined : { title: `${traveller} has arrived!`, body: subtitle };
+  await pushTripState(trip, { event: 'update', state: buildState(trip, { arrived: true, message: subtitle }), alert });
   await query(`UPDATE omw_trips SET status = 'arrived', progress = 1, phase = 4, ended_at = NOW() WHERE id = $1`, [trip.id]);
   setTimeout(() => { endLiveActivity(trip, Date.now()).catch(() => {}); }, ARRIVE_LINGER_MS);
 }
@@ -502,7 +591,7 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
   const remainingToDest = haversineKm(lat, lng, trip.dest_lat, trip.dest_lng);
   const arrived = remainingToDest <= ARRIVE_KM || progress >= 0.999;
   const phase = arrived ? 4 : phaseFor(progress);
-  const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport);
+  const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId);
 
   await query(
     `UPDATE omw_trips SET current_lat = $1, current_lng = $2, distance_remaining_km = $3,
@@ -564,6 +653,22 @@ async function travellerInfo(accountId) {
 
 async function travellerName(accountId) {
   return (await travellerInfo(accountId)).name;
+}
+
+// Admin "kill switch": cancel EVERY active trip (all users), dismiss their Live
+// Activities, and tear down their broadcast channels. Use to clear zombie trips.
+export async function cancelAllActiveTrips() {
+  const { rows } = await query(
+    `UPDATE omw_trips SET status = 'cancelled', ended_at = NOW()
+      WHERE status = 'active' RETURNING *`,
+  );
+  for (const trip of rows) {
+    /* eslint-disable no-await-in-loop */
+    streetCache.delete(trip.id);
+    await endLiveActivity(trip, Date.now()).catch(() => {});
+    /* eslint-enable no-await-in-loop */
+  }
+  return rows.length;
 }
 
 // Safety net: cancel trips that have gone quiet for 30 min so a forgotten banner

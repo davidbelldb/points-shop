@@ -115,6 +115,8 @@ export default function AdminOmwSection() {
   const [users, setUsers] = useState(null);
   const [liveToPartner, setLiveToPartner] = useState(null);
   const [error, setError] = useState(null);
+  const [killing, setKilling] = useState(false);
+  const [killMsg, setKillMsg] = useState(null);
 
   useEffect(() => {
     api.admin.listUsers().then(setUsers).catch((e) => setError(e.message));
@@ -126,6 +128,12 @@ export default function AdminOmwSection() {
     setLiveToPartner(next);
     try { const c = await api.omw.setConfig(next); setLiveToPartner(!!c.live_to_partner); }
     catch (e) { setError(e.message); setLiveToPartner(!next); }
+  }
+
+  async function killAll() {
+    setKilling(true); setKillMsg(null);
+    try { const r = await api.omw.adminKillAll(); setKillMsg(`Cancelled ${r.cancelled} active trip${r.cancelled === 1 ? '' : 's'}.`); }
+    catch (e) { setKillMsg(e.message); } finally { setKilling(false); }
   }
 
   if (!users) {
@@ -155,6 +163,19 @@ export default function AdminOmwSection() {
           </button>
         </div>
       )}
+
+      {/* Kill switch — cancel every active trip (clears zombie/stuck trips). */}
+      <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-3">
+        <div className="pr-3">
+          <p className="text-sm font-medium text-red-800">End all active trips</p>
+          <p className="text-[11px] text-red-600">Cancels every in-progress journey and dismisses its Live Activity.</p>
+          {killMsg && <p className="mt-1 text-[11px] text-neutral-700">{killMsg}</p>}
+        </div>
+        <button type="button" onClick={killAll} disabled={killing}
+          className="shrink-0 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-60">
+          {killing ? 'Ending…' : 'End all'}
+        </button>
+      </div>
 
       {users.map((u) => (
         <div key={u.id} className="rounded-xl border border-neutral-200 p-3">

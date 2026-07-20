@@ -39,7 +39,7 @@ private let omwDeepLink = URL(string: "sneakystuff://messages")
 // Title is identical for everyone — it uses the traveller's name (no pronoun) and
 // the live ETA, which updates as the journey progresses.
 private func omwTitle(_ a: OmwActivityAttributes, _ s: OmwActivityAttributes.ContentState) -> String {
-    if s.arrived { return "\(a.travellerName) has arrived" }
+    if s.arrived { return "\(a.travellerName) has arrived!" }
     return "\(a.travellerName) will be with you in \(omwEtaMinutes(s)) min"
 }
 
@@ -55,7 +55,7 @@ private func omwEtaMinutes(_ s: OmwActivityAttributes.ContentState) -> Int {
 // falling back to the opening tagline before the first update lands.
 private let omwSubtitle = "Wait and save? I think not."
 private func omwLine(_ s: OmwActivityAttributes.ContentState) -> String {
-    if s.arrived { return "" }
+    if s.arrived { return s.message }   // the random arrival subtitle
     return s.message.isEmpty ? omwSubtitle : s.message
 }
 
@@ -109,10 +109,10 @@ struct OmwLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 6) {
@@ -175,14 +175,14 @@ struct OmwLockScreenView: View {
                 }
 
                 HStack(spacing: 10) {
-                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
                     ZStack {
                         DashedLine(color: .white)
                         OmwProgressFill(progress: progress, color: .white)
                         OmwWaypointNodes(reached: reached)
                     }
                     .frame(height: 12)
-                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
                 }
             }
             .padding(.horizontal, 18)

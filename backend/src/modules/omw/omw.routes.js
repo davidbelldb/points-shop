@@ -2,7 +2,7 @@ import {
   listQuickDestinations, setQuickDestination, deleteQuickDestination,
   getCurrentTransport, setCurrentTransport,
   getOmwConfig, setOmwConfig,
-  saveOmwToken, startTrip, recordPing, cancelTrip, sweepStaleTrips,
+  saveOmwToken, startTrip, recordPing, cancelTrip, sweepStaleTrips, cancelAllActiveTrips,
 } from './omw.repo.js';
 import { getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
@@ -94,6 +94,12 @@ export default async function omwRoutes(fastify) {
   fastify.put('/api/omw/config', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
     return setOmwConfig({ liveToPartner: req.body?.liveToPartner });
+  });
+
+  // Admin kill switch: cancel every active trip + dismiss their activities.
+  fastify.post('/api/omw/admin/kill-all', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return { cancelled: await cancelAllActiveTrips() };
   });
 
   // ----- Live Activity push tokens -----
