@@ -23,6 +23,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // finds it. Without this reference, an app-target plugin that's only
         // reached via the JS bridge can be missed ("plugin is not implemented").
         _ = CrowActivityPlugin.self
+        _ = OmwActivityPlugin.self
         _ = NfcPlugin.self
         return true
     }

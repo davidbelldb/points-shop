@@ -13,6 +13,8 @@ struct CrowWidgetBundle: WidgetBundle {
     var body: some Widget {
         // The Crow Live Activity…
         CrowWidgetLiveActivity()
+        // …the "On My Way" Live Activity…
+        OmwLiveActivity()
         // …plus the Sneaky home-screen + lock-screen widgets.
         SneakyCalendarWidget()
         SneakyDirdleWidget()

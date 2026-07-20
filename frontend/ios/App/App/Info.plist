@@ -70,14 +70,30 @@
 	<string>Sneaky Social uses your location for scroll flight times and location stickers.</string>
 	<key>NFCReaderUsageDescription</key>
 	<string>Sneaky Social writes hidden story links to NFC tags so you can hide surprises for each other.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Sneaky Social tracks your journey in the background so your "On My Way" Live Activity can show your live progress to your destination.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>location</string>
 	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.david.sneakystuff.omw</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>On My Way</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeLocation</string>
+			<key>UIApplicationShortcutItemUserInfo</key>
+			<dict>
+				<key>url</key>
+				<string>/new-chat?omw=start</string>
+			</dict>
+		</dict>
 		<dict>
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.david.sneakystuff.message</string>

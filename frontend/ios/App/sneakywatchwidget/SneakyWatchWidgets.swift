@@ -107,17 +107,25 @@ struct WatchDirdleView: View {
     // Just the partner's latest guess row (5 states).
     private var lastRow: [String]? { data?.grid?.last }
     private var attempts: Int { data?.attempts ?? 0 }
-    private var title: String {
-        let name = data?.name ?? "They"
-        return attempts > 0 ? "\(name) · \(dirdleOrdinal(attempts)) attempt" : "\(name) · yet to play"
+    private var name: String { data?.name ?? "They" }
+    private var attemptsText: String {
+        attempts == 0 ? "yet to play" : "\(attempts) attempt\(attempts == 1 ? "" : "s")"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            HStack(spacing: 5) {
+                Text(name)
+                    .font(.system(size: 13, weight: .semibold))
+                Text("|")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Text(attemptsText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             GeometryReader { geo in
                 let gap: CGFloat = 3
                 let side = min((geo.size.width - gap * 4) / 5, geo.size.height)

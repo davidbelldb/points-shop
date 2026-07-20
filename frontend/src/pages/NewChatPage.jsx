@@ -8,6 +8,7 @@ import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
 import CrowAnimationLayer from '../components/scrolls/CrowAnimationLayer.jsx';
 import ScrollBranch from '../components/scrolls/ScrollBranch.jsx';
 import LandingPerch from '../components/scrolls/LandingPerch.jsx';
+import OmwTestPanel from '../components/omw/OmwTestPanel.jsx';
 
 /* /new-chat — a PRIVATE, admin-only test harness for the scrolls (raven message)
    feature. Deliberately a blank sandbox: it does NOT import, read, or write the
@@ -25,11 +26,14 @@ export default function NewChatPage() {
   const [trayOpen, setTrayOpen] = useState(false);
   const [sendStage, setSendStage] = useState('idle'); // idle | intro | perched | flight
   const [landFlight, setLandFlight] = useState(false);
+  // Quick-action / Siri deep link (/new-chat?omw=start) auto-starts an OMW trip.
+  const [omwAutoStart, setOmwAutoStart] = useState(false);
 
   // Deep-link from the arrival push (/new-chat?scrolls=1) opens the list.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('scrolls') === '1') setListOpen(true);
+    if (p.get('omw') === 'start') setOmwAutoStart(true);
   }, []);
 
   // A freshly-arrived crow plays the landing fly-in once; the persistent perch
@@ -224,6 +228,9 @@ export default function NewChatPage() {
             Tip: set <code>scrolls_settings.speed_multiplier</code> high so test crows arrive in seconds.
           </p>
         </div>
+
+        {/* ── On My Way (below the scrolls area) ── */}
+        <OmwTestPanel dark={dark} autoStart={omwAutoStart} />
       </div>
     </>
   );

@@ -288,6 +288,7 @@ private struct CalendarLockView: View {
                         .lineLimit(1)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .widgetURL(URL(string: "https://sneakypoints.com/calendar"))
         } else {
             Text("No events coming up")

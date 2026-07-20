@@ -60,6 +60,7 @@ import entertainmentRoutes from './entertainment/entertainment.routes.js';
 import nfcRoutes from './nfc/nfc.routes.js';
 import widgetRoutes from './widget/widget.routes.js';
 import crosswordRoutes from './crossword/crossword.routes.js';
+import omwRoutes from './omw/omw.routes.js';
 
 export async function registerAppRoutes(fastify) {
   await fastify.register(productsRoutes);
@@ -111,4 +112,5 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(nfcRoutes);
   await fastify.register(crosswordRoutes);
   await fastify.register(widgetRoutes);
+  await fastify.register(omwRoutes);
 }

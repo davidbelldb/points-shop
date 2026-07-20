@@ -317,6 +317,20 @@ export const api = {
   // Crow Live Activity push tokens (push-to-start / per-scroll update).
   registerLiveActivityToken: (kind, token, scrollId) =>
     request('/scrolls/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, scrollId }) }),
+
+  // On My Way — live-location Live Activity.
+  omw: {
+    listDestinations:  () => request('/omw/destinations'),
+    setDestination:    (accountId, dest) =>
+      request(`/omw/destinations/${accountId}`, { method: 'PUT', body: JSON.stringify(dest) }),
+    myDestination:     () => request('/omw/my-destination'),
+    registerToken:     (kind, token, tripId) =>
+      request('/omw/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, tripId }) }),
+    startTrip:         (origin) => request('/omw/trips', { method: 'POST', body: JSON.stringify({ origin }) }),
+    ping:              (tripId, lat, lng) =>
+      request(`/omw/trips/${tripId}/ping`, { method: 'POST', body: JSON.stringify({ lat, lng }) }),
+    endTrip:           (tripId) => request(`/omw/trips/${tripId}/end`, { method: 'POST' }),
+  },
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
   rewatchGet: (id) => request(`/rewatch/${id}`),
   rewatchSeason: (id, n) => request(`/rewatch/${id}/season/${n}`),

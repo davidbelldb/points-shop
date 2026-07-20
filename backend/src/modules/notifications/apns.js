@@ -109,6 +109,23 @@ export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '
   };
 }
 
+/** Build the "On My Way" activity's ContentState in Swift-Codable form. Mirrors
+ *  OmwActivityAttributes.ContentState — progress is GPS-driven (0..1), not a
+ *  timer, so the widget renders a determinate bar. All keys always present. */
+export function omwContentState({
+  startedAtMs, etaAtMs, progress = 0, remainingKm = 0, message = '', phase = 0, arrived = false,
+}) {
+  return {
+    startedAt: toRefDate(startedAtMs),
+    etaAt: toRefDate(etaAtMs ?? startedAtMs),
+    progress: Math.max(0, Math.min(1, Number(progress) || 0)),
+    remainingKm: Math.max(0, Number(remainingKm) || 0),
+    message: message || '',
+    phase: Number(phase) || 0,
+    arrived: !!arrived,
+  };
+}
+
 /**
  * Send an ActivityKit Live Activity push to a single token.
  *  - event 'start'  → push-to-start (token is the account's pts token); needs attributes
@@ -116,7 +133,7 @@ export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '
  *  - event 'end'    → dismiss the activity
  * Returns the HTTP status (0 on transport failure). Never throws.
  */
-export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs, channelId } = {}) {
+export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs, channelId, attributesType = 'CrowActivityAttributes' } = {}) {
   if (!enabled || !token) return 0;
   const aps = {
     timestamp: Math.floor(Date.now() / 1000),
@@ -124,7 +141,7 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
     'content-state': contentState || {},
   };
   if (event === 'start') {
-    aps['attributes-type'] = 'CrowActivityAttributes';
+    aps['attributes-type'] = attributesType;
     aps.attributes = attributes || {};
     // Subscribe the started activity to a broadcast channel so updates reach it
     // without the device having to upload a per-activity token.
