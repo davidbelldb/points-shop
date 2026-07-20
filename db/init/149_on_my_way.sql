@@ -77,6 +77,17 @@ CREATE INDEX IF NOT EXISTS omw_trips_traveller_active_idx
   ON omw_trips (traveller_id) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS omw_trips_viewer_idx ON omw_trips (viewer_id);
 
+-- Self-heal: if an earlier version of this migration created omw_trips without
+-- these later columns, CREATE TABLE IF NOT EXISTS above won't add them. These
+-- make re-running safe regardless of prior state.
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS traveller_pronoun TEXT NOT NULL DEFAULT 'they';
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS transport         TEXT NOT NULL DEFAULT 'bicycle';
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS route_points      JSONB;
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS eta_seconds       INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS current_lat       DOUBLE PRECISION;
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS current_lng       DOUBLE PRECISION;
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS la_channel_id     TEXT;
+
 -- Single-row feature config. `live_to_partner` = false → a trip loops back to
 -- the traveller (v1 self-test). Flip it true to go two-way: a trip is pushed to
 -- the OTHER user's device instead (David → Katie, Katie → David).
