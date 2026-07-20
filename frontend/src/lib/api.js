@@ -338,6 +338,15 @@ export const api = {
     ping:              (tripId, lat, lng) =>
       request(`/omw/trips/${tripId}/ping`, { method: 'POST', body: JSON.stringify({ lat, lng }) }),
     endTrip:           (tripId) => request(`/omw/trips/${tripId}/end`, { method: 'POST' }),
+    // Admin: manage another user's destinations + transport (David sets Katie's).
+    adminListDestinations: (accountId) => request(`/omw/admin/quick-destinations/${accountId}`),
+    adminSetDestination:   (accountId, position, dest) =>
+      request(`/omw/admin/quick-destinations/${accountId}/${position}`, { method: 'PUT', body: JSON.stringify(dest) }),
+    adminDeleteDestination: (accountId, position) =>
+      request(`/omw/admin/quick-destinations/${accountId}/${position}`, { method: 'DELETE' }),
+    adminGetTransport:     (accountId) => request(`/omw/admin/transport/${accountId}`),
+    adminSetTransport:     (accountId, transport) =>
+      request(`/omw/admin/transport/${accountId}`, { method: 'PUT', body: JSON.stringify({ transport }) }),
   },
   rewatchSearch: (q) => request(`/rewatch/search?q=${encodeURIComponent(q)}`),
   rewatchGet: (id) => request(`/rewatch/${id}`),

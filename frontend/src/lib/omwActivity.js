@@ -52,8 +52,10 @@ export function enableOmwPush() {
     Native.addListener('omwPing', ({ lat, lng }) => forwardPing(lat, lng));
     Native.enablePush();
   } catch { /* plugin unavailable — ignore */ }
-  // Populate the long-press menu with the user's destinations.
+  // Populate the long-press menu + Siri with the user's destinations, and pick
+  // up any journey Siri queued while the app was closed.
   syncOmwShortcuts();
+  consumeOmwPendingTrigger();
 }
 
 function currentPosition() {
@@ -130,14 +132,24 @@ export async function triggerOmwFromUrl(url) {
   }
 }
 
-/** Push the user's quick destinations to the Home-screen long-press menu as one
- *  item each ("On My Way → {label}"). No-op on web. Call after login and after
- *  the destinations change. */
+/** Push the user's quick destinations to the Home-screen long-press menu (one
+ *  item each) AND into the App Group for the Siri intent. No-op on web. Call
+ *  after login and whenever the destinations change. */
 export async function syncOmwShortcuts() {
   if (!Capacitor.isNativePlatform() || !Native) return;
   try {
     const { destinations } = await api.omw.listQuickDestinations();
     const items = (destinations || []).map((d) => ({ id: d.id, label: d.label }));
     Native.setShortcuts({ items });
+  } catch { /* ignore */ }
+}
+
+/** If Siri (or a Shortcut) queued a journey, pick it up and fire it. Call on app
+ *  launch and every time the app returns to the foreground. */
+export async function consumeOmwPendingTrigger() {
+  if (!Capacitor.isNativePlatform() || !Native) return;
+  try {
+    const { dest } = await Native.consumePendingTrigger();
+    if (dest) await triggerOmwFromUrl(`/omw/go?dest=${dest}`);
   } catch { /* ignore */ }
 }

@@ -19,7 +19,7 @@ import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
 import AdminScrollsSection from './AdminScrollsSection.jsx';
 import AdminForecastSection from './AdminForecastSection.jsx';
-import OmwQuickDestinations from '../components/omw/OmwQuickDestinations.jsx';
+import AdminOmwSection from './AdminOmwSection.jsx';
 import AdminFloatingHeadSection from './AdminFloatingHeadSection.jsx';
 import AdminNfcSection from './AdminNfcSection.jsx';
 import AdminCrosswordSection from './AdminCrosswordSection.jsx';
@@ -197,7 +197,7 @@ export default function AdminPage() {
       </AdminCollapsible>
 
       <AdminCollapsible title="On My Way" storageKey="admin::omw">
-        <OmwQuickDestinations />
+        <AdminOmwSection />
       </AdminCollapsible>
 
       <AdminCollapsible title="Floating Head" storageKey="admin::floatinghead">

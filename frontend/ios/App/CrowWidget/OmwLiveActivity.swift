@@ -34,14 +34,13 @@ private func omwBg(_ a: OmwActivityAttributes) -> Color {
     default:        return Color(red: 0.0706, green: 0.1686, blue: 0.1216)  // #122b1f
     }
 }
-private let omwDeepLink = URL(string: "sneakystuff://new-chat")
+private let omwDeepLink = URL(string: "sneakystuff://messages")
 
-// Title is identical for everyone — it uses the traveller's name, so no pronoun
-// baked in.
+// Title is identical for everyone — it uses the traveller's name (no pronoun) and
+// the live ETA, which updates as the journey progresses.
 private func omwTitle(_ a: OmwActivityAttributes, _ s: OmwActivityAttributes.ContentState) -> String {
-    s.arrived
-        ? "\(a.travellerName) has arrived"
-        : "\(a.travellerName) will be with you soon"
+    if s.arrived { return "\(a.travellerName) has arrived" }
+    return "\(a.travellerName) will be with you in \(omwEtaMinutes(s)) min"
 }
 
 // Remaining minutes, derived from the ETA and how far along the route we are
@@ -188,17 +187,6 @@ struct OmwLockScreenView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
-        }
-        // ETA in the top-right corner (hidden once arrived).
-        .overlay(alignment: .topTrailing) {
-            if !context.state.arrived {
-                Text("\(omwEtaMinutes(context.state)) min")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white)
-                    .opacity(0.9)
-                    .padding(.top, 12)
-                    .padding(.trailing, 14)
-            }
         }
         .frame(maxWidth: .infinity)
         .widgetURL(omwDeepLink)

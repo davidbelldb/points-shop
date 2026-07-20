@@ -3,6 +3,9 @@ import UIKit
 import Capacitor
 import ActivityKit
 import CoreLocation
+import AppIntents
+
+private let omwAppGroup = "group.com.david.sneakystuff"
 
 /// Bridges the "On My Way" Live Activity + background location to the web layer.
 ///
@@ -26,13 +29,14 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         CAPPluginMethod(name: "startTracking", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopTracking", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setShortcuts", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "consumePendingTrigger", returnType: CAPPluginReturnPromise),
     ]
 
-    // MARK: - Home-screen quick actions (one per destination)
+    // MARK: - Home-screen quick actions + Siri (one per destination)
 
     /// Replace the app's dynamic Home-screen shortcut items with one per OMW
-    /// destination ("On My Way → {label}"). Each routes to /omw/go?dest=<id>,
-    /// which the web layer fires as a journey (see App.jsx / omwActivity.js).
+    /// destination ("On My Way → {label}"), mirror the destinations into the App
+    /// Group so the Siri intent can list them, and nudge Siri to re-index.
     /// call: OmwActivity.setShortcuts({ items: [{ id, label }] })
     @objc func setShortcuts(_ call: CAPPluginCall) {
         let items = call.getArray("items", [String: Any].self) ?? []
@@ -46,10 +50,28 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
                 icon: UIApplicationShortcutIcon(type: .location),
                 userInfo: ["url": "/omw/go?dest=\(id)" as NSString])
         }
+        // Plain [{id,label}] for the App Group (Siri EntityQuery reads this).
+        let shared: [[String: String]] = items.compactMap { item in
+            guard let id = item["id"] as? String, let label = item["label"] as? String else { return nil }
+            return ["id": id, "label": label]
+        }
+        UserDefaults(suiteName: omwAppGroup)?.set(shared, forKey: "omw.destinations")
+
         DispatchQueue.main.async {
             UIApplication.shared.shortcutItems = shortcuts
+            if #available(iOS 16.0, *) { OmwShortcutsProvider.updateAppShortcutParameters() }
             call.resolve()
         }
+    }
+
+    /// Siri writes the chosen destination id to the App Group and opens the app;
+    /// the web layer calls this on resume to pick it up and fire the journey.
+    /// Returns { dest } ("" if none pending). Clears it on read.
+    @objc func consumePendingTrigger(_ call: CAPPluginCall) {
+        let defaults = UserDefaults(suiteName: omwAppGroup)
+        let dest = defaults?.string(forKey: "omw.pendingTrigger") ?? ""
+        if !dest.isEmpty { defaults?.removeObject(forKey: "omw.pendingTrigger") }
+        call.resolve(["dest": dest])
     }
 
     private lazy var locationManager: CLLocationManager = {

@@ -37,7 +37,7 @@ const WAYPOINT_FRACS = [0.25, 0.5, 0.75];
 // its real average with stops isn't far above cycling). `uber` is Katie's only
 // mode; its effective door-to-door average allows for pickup wait + traffic.
 // Nudge any to taste.
-const TRANSPORT_KMH = { bicycle: 15, scooter: 17, uber: 24 };
+const TRANSPORT_KMH = { bicycle: 16, scooter: 18, uber: 24 };
 const DEFAULT_TRANSPORT = 'bicycle';
 function transportKmh(t) { return TRANSPORT_KMH[t] || TRANSPORT_KMH[DEFAULT_TRANSPORT]; }
 function normTransport(t) { return TRANSPORT_KMH[t] ? t : DEFAULT_TRANSPORT; }
@@ -103,20 +103,46 @@ function alongRouteKm(points, lat, lng) {
   return { alongKm: best ? best.along : 0, totalKm: cum };
 }
 
-// Route start→dest; returns the polyline + road distance. Falls back internally
-// to a straight line if routing is unavailable, so it always yields points.
-async function plotRoute(oLat, oLng, dLat, dLng) {
-  let points = []; let routeKm = 0;
+// Public OSRM instances (FOSSGIS, no API key) with real per-mode profiles.
+// Bicycle/scooter route on the bike profile (cycle paths, contraflows, cut-
+// throughs); Uber on the car profile. The "/driving/" path segment is just
+// OSRM's API shape — the instance sets the profile.
+const OSRM_BIKE = 'https://routing.openstreetmap.de/routed-bike';
+const OSRM_CAR = 'https://routing.openstreetmap.de/routed-car';
+function osrmHostFor(transport) { return transport === 'uber' ? OSRM_CAR : OSRM_BIKE; }
+
+// Route start→dest on the profile for `transport`; returns the polyline + road
+// distance. Falls back to the car OSRM demo, then a straight line, so it always
+// yields points.
+async function plotRoute(oLat, oLng, dLat, dLng, transport = DEFAULT_TRANSPORT) {
+  try {
+    const url = `${osrmHostFor(transport)}/route/v1/driving/${oLng},${oLat};${dLng},${dLat}`
+      + `?overview=full&geometries=geojson`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'SneakyStuff/1.0 (on-my-way)' } });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const route = (await res.json())?.routes?.[0];
+      const coords = route?.geometry?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        const points = coords.map(([lng, lat]) => [lat, lng]);
+        const routeKm = (Number(route.distance) || 0) / 1000 || polylineKm(points);
+        return { points, routeKm };
+      }
+    }
+  } catch { /* fall through */ }
+
+  // Fallback: the crow's car OSRM demo, then a straight line.
   try {
     const path = await buildFlightPath({ originLat: oLat, originLng: oLng, destLat: dLat, destLng: dLng });
-    points = Array.isArray(path?.points) ? path.points : [];
-    routeKm = Number(path?.distanceKm) || 0;
+    if (Array.isArray(path?.points) && path.points.length >= 2) {
+      return { points: path.points, routeKm: Number(path.distanceKm) || polylineKm(path.points) };
+    }
   } catch { /* fall through */ }
-  if (points.length < 2) {
-    points = [[oLat, oLng], [dLat, dLng]];
-  }
-  if (!routeKm) routeKm = polylineKm(points) || haversineKm(oLat, oLng, dLat, dLng) * ROAD_FACTOR;
-  return { points, routeKm };
+
+  const points = [[oLat, oLng], [dLat, dLng]];
+  return { points, routeKm: haversineKm(oLat, oLng, dLat, dLng) * ROAD_FACTOR };
 }
 
 function etaFor(routeKm, transport) {
@@ -357,7 +383,7 @@ export async function startTrip({ travellerId, origin = {}, destId, transport })
   // specific one is passed for this trip.
   const mode = normTransport(transport ?? await getCurrentTransport(travellerId));
   const dest = { label: chosen.label, lat: chosen.lat, lng: chosen.lng };
-  const { points, routeKm } = await plotRoute(origin.lat, origin.lng, dest.lat, dest.lng);
+  const { points, routeKm } = await plotRoute(origin.lat, origin.lng, dest.lat, dest.lng, mode);
   const etaSeconds = etaFor(routeKm, mode);
   const info = await travellerInfo(travellerId);
 

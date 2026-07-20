@@ -55,6 +55,36 @@ export default async function omwRoutes(fastify) {
     return setCurrentTransport(getActualAccountId(req), req.body?.transport);
   });
 
+  // ----- Admin: manage ANY user's destinations + transport (David sets Katie's) -----
+  fastify.get('/api/omw/admin/quick-destinations/:accountId', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return { destinations: await listQuickDestinations(req.params.accountId) };
+  });
+
+  fastify.put('/api/omw/admin/quick-destinations/:accountId/:position', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    try {
+      return await setQuickDestination(req.params.accountId, req.params.position, req.body ?? {});
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  fastify.delete('/api/omw/admin/quick-destinations/:accountId/:position', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return deleteQuickDestination(req.params.accountId, req.params.position);
+  });
+
+  fastify.get('/api/omw/admin/transport/:accountId', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return { transport: await getCurrentTransport(req.params.accountId) };
+  });
+
+  fastify.put('/api/omw/admin/transport/:accountId', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return setCurrentTransport(req.params.accountId, req.body?.transport);
+  });
+
   // ----- Two-way toggle (admin-only): off = loops to self; on = pushes to partner -----
   fastify.get('/api/omw/config', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });

@@ -8,7 +8,7 @@ import { useAuth } from './lib/AuthContext.jsx';
 import { api } from './lib/api.js';
 import { useSettings } from './lib/SettingsContext.jsx';
 import { useTheme } from './lib/ThemeContext.jsx';
-import { triggerOmwFromUrl } from './lib/omwActivity.js';
+import { triggerOmwFromUrl, consumeOmwPendingTrigger } from './lib/omwActivity.js';
 import SurveyBanner from './components/SurveyBanner.jsx';
 import MenuDrawer from './components/MenuDrawer.jsx';
 import SideNav from './components/SideNav.jsx';
@@ -245,7 +245,7 @@ export default function App() {
     if (!Capacitor.isNativePlatform()) return undefined;
     let handle;
     CapApp.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) refreshBasket?.();
+      if (isActive) { refreshBasket?.(); consumeOmwPendingTrigger(); }
     }).then((h) => { handle = h; }).catch(() => {});
     return () => { handle?.remove?.(); };
   }, [refreshBasket]);

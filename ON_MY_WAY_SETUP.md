@@ -75,6 +75,9 @@ Copy shown on the banner:
    - `OmwActivityAttributes.swift` → **App** *and* **CrowWidgetExtension** (both,
      exactly like `CrowActivityAttributes.swift`).
    - `OmwActivityPlugin.swift` → **App** only.
+   - `OmwSiriIntent.swift` → **App** only (Siri / Shortcuts). No capability needed;
+     Xcode auto-runs the "Extract App Intents Metadata" phase. Relies on the App
+     Group already on the App target (`group.com.david.sneakystuff`).
    - `OmwLiveActivity.swift` → **CrowWidgetExtension** only.
 
 3. **Background Location capability**
@@ -118,6 +121,22 @@ Copy shown on the banner:
    Simulator's **Features → Location → City Bicycle Ride**.
 
 ---
+
+## Siri / Shortcuts
+
+Once installed, log in so the app mirrors your destinations into the App Group.
+Then:
+- **Say it:** "Hey Siri, On My Way to Blinco Grove" (any saved destination name
+  works — the phrase reads the live list).
+- **Assign your own phrase per journey:** open the **Shortcuts** app → **+** →
+  add action **Start On My Way** → pick the destination → tap the shortcut's ⋯ →
+  **Add to Siri** and record whatever you like ("off to hers", "leaving now").
+  Each configured journey can have its own custom phrase this way.
+
+Running the phrase opens the app and fires that journey (it hands the choice off
+via the App Group; `omwActivity.js → consumeOmwPendingTrigger` picks it up on
+foreground). If a phrase ever stops listing a new destination, open the app once
+to re-sync the shared list.
 
 ## Next steps (after the self-test signs off)
 
