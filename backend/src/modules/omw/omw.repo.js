@@ -283,9 +283,12 @@ export async function deleteQuickDestination(accountId, position) {
 }
 
 // Current transport — a single per-user setting used by every triggered journey.
+// Fail-safe: if the column isn't there yet (migration lag), default rather than throw.
 export async function getCurrentTransport(accountId) {
-  const { rows } = await query(`SELECT omw_transport FROM accounts WHERE id = $1`, [accountId]);
-  return normTransport(rows[0]?.omw_transport);
+  try {
+    const { rows } = await query(`SELECT omw_transport FROM accounts WHERE id = $1`, [accountId]);
+    return normTransport(rows[0]?.omw_transport);
+  } catch { return DEFAULT_TRANSPORT; }
 }
 
 export async function setCurrentTransport(accountId, transport) {
@@ -299,8 +302,10 @@ export async function setCurrentTransport(accountId, transport) {
 // ---------------------------------------------------------------------------
 
 export async function getOmwConfig() {
-  const { rows } = await query(`SELECT live_to_partner FROM omw_config WHERE id = TRUE`);
-  return rows[0] ?? { live_to_partner: false };
+  try {
+    const { rows } = await query(`SELECT live_to_partner FROM omw_config WHERE id = TRUE`);
+    return rows[0] ?? { live_to_partner: false };
+  } catch { return { live_to_partner: false }; }  // table missing → fail safe to self-loop
 }
 
 export async function setOmwConfig({ liveToPartner }) {
@@ -409,15 +414,22 @@ export async function startTrip({ travellerId, origin = {}, destId, transport })
   );
   const trip = rows[0];
 
-  await startLiveActivityFor(trip).catch(() => {});
+  // Cold-start the Live Activity on the viewer's device via APNs push-to-start
+  // (works with their app closed — the whole point of the feature).
+  await startLiveActivityFor(trip).catch((e) => { console.error('[omw] startLiveActivityFor threw', e); });
   return trip;
 }
 
 async function startLiveActivityFor(trip) {
   try {
-    if (await isMuted(trip.viewer_id)) return;
+    if (await isMuted(trip.viewer_id)) { console.warn(`[omw] viewer ${trip.viewer_id} muted — no push-to-start`); return; }
     const token = await ptsTokenFor(trip.viewer_id);
-    if (!token) return;
+    if (!token) {
+      console.warn(`[omw] NO push-to-start token for viewer ${trip.viewer_id} — activity cannot cold-start. `
+        + `(Device must run the app while signed in, on iOS 17.2+, to register a 'pts' token.)`);
+      return;
+    }
+    console.log(`[omw] push-to-start: trip ${trip.id}, viewer ${trip.viewer_id}, token …${token.slice(-8)}`);
 
     const traveller = await travellerName(trip.traveller_id);
 
@@ -427,8 +439,9 @@ async function startLiveActivityFor(trip) {
       await query(`UPDATE omw_trips SET la_channel_id = $1 WHERE id = $2`, [channelId, trip.id]).catch(() => {});
       trip.la_channel_id = channelId;
     }
+    console.log(`[omw] broadcast channel ${channelId ? 'created' : 'unavailable (token path)'}`);
 
-    await sendLiveActivityPush(token, {
+    const status = await sendLiveActivityPush(token, {
       event: 'start',
       channelId,
       attributesType: ATTR_TYPE,
@@ -444,8 +457,9 @@ async function startLiveActivityFor(trip) {
         body: 'Wait and save? I think not.',
       },
     });
+    console.log(`[omw] push-to-start APNs status: ${status} (200 = accepted)`);
     if (!channelId) setTimeout(() => { sendSilentWake(trip.viewer_id).catch(() => {}); }, 3000);
-  } catch { /* best effort */ }
+  } catch (e) { console.error('[omw] startLiveActivityFor error', e); }
 }
 
 async function finaliseArrival(trip) {
@@ -533,10 +547,20 @@ async function cancelActiveTrips(travellerId) {
 }
 
 async function travellerInfo(accountId) {
-  const { rows } = await query(`SELECT name, username, pronoun FROM accounts WHERE id = $1`, [accountId]);
-  const r = rows[0] || {};
-  return { name: r.name || r.username || 'Someone', pronoun: r.pronoun || 'they' };
+  try {
+    const { rows } = await query(`SELECT name, username, pronoun FROM accounts WHERE id = $1`, [accountId]);
+    const r = rows[0] || {};
+    return { name: r.name || r.username || 'Someone', pronoun: r.pronoun || 'they' };
+  } catch {
+    // pronoun column may be missing pre-migration — fall back without it.
+    try {
+      const { rows } = await query(`SELECT name, username FROM accounts WHERE id = $1`, [accountId]);
+      const r = rows[0] || {};
+      return { name: r.name || r.username || 'Someone', pronoun: 'they' };
+    } catch { return { name: 'Someone', pronoun: 'they' }; }
+  }
 }
+
 
 async function travellerName(accountId) {
   return (await travellerInfo(accountId)).name;

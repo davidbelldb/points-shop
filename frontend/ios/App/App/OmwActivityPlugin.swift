@@ -30,7 +30,45 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         CAPPluginMethod(name: "stopTracking", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setShortcuts", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "consumePendingTrigger", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startLocal", returnType: CAPPluginReturnPromise),
     ]
+
+    // MARK: - Local start (self-loop, reliable — no server push-to-start)
+
+    /// Start the OMW Live Activity directly on THIS device (used when the trip
+    /// loops back to the traveller). Avoids the push-to-start token + budget
+    /// entirely; the server still drives updates via the token we then capture.
+    /// call: OmwActivity.startLocal({ travellerName, destLabel, transport, tripId, etaSeconds, remainingKm, message })
+    @objc func startLocal(_ call: CAPPluginCall) {
+        guard #available(iOS 16.1, *) else { call.resolve(); return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            call.reject("Live Activities are disabled in Settings"); return
+        }
+        let name = call.getString("travellerName") ?? "Someone"
+        let dest = call.getString("destLabel") ?? ""
+        let transport = call.getString("transport") ?? "bicycle"
+        let tripId = call.getString("tripId") ?? ""
+        let etaSeconds = call.getDouble("etaSeconds") ?? 600
+        let remainingKm = call.getDouble("remainingKm") ?? 0
+        let message = call.getString("message") ?? ""
+        Task {
+            // Replace any existing OMW activity so they don't stack.
+            for activity in Activity<OmwActivityAttributes>.activities {
+                await activity.end(dismissalPolicy: .immediate)
+            }
+            let attrs = OmwActivityAttributes(travellerName: name, destLabel: dest, transport: transport, tripId: tripId)
+            let now = Date()
+            let state = OmwActivityAttributes.ContentState(
+                startedAt: now, etaAt: now.addingTimeInterval(etaSeconds),
+                progress: 0, remainingKm: remainingKm, message: message, phase: 0, arrived: false)
+            do {
+                let activity = try Activity.request(attributes: attrs, contentState: state, pushType: .token)
+                call.resolve(["id": activity.id])
+            } catch {
+                call.reject(error.localizedDescription)
+            }
+        }
+    }
 
     // MARK: - Home-screen quick actions + Siri (one per destination)
 

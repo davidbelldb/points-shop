@@ -133,10 +133,16 @@ Then:
   **Add to Siri** and record whatever you like ("off to hers", "leaving now").
   Each configured journey can have its own custom phrase this way.
 
-Running the phrase opens the app and fires that journey (it hands the choice off
-via the App Group; `omwActivity.js → consumeOmwPendingTrigger` picks it up on
-foreground). If a phrase ever stops listing a new destination, open the app once
-to re-sync the shared list.
+Siri runs **fully hands-free — the app never opens**. The intent grabs a
+one-shot location and starts the trip on the server itself, using the widget
+bearer token + API base already in the App Group, then streams background
+location (`OmwNativeTracker`) so the bar advances without the app. Requirements:
+you must have opened the app **once while signed in** (mints the widget token)
+and granted **Location = Always**. If a phrase ever stops listing a new
+destination, open the app once to re-sync the shared list.
+
+(The Home-screen long-press quick action still opens the app — that's an iOS
+rule for shortcut items; only Siri can run in the background.)
 
 ## Next steps (after the self-test signs off)
 
