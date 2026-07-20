@@ -7,28 +7,49 @@ import SwiftUI
 // grey, and its own white waypoint nodes (the crow's are black).
 
 // Pixel sprites in the widget's Assets.xcassets, chosen by the trip's transport.
-// bicycle → david_leave / david_arrive; scooter → david_scoot_leave /
-// david_scoot_arrive. Left departs, right waits (mirrors the crow's pair).
+// bicycle → david_leave/arrive; scooter → david_scoot_leave/arrive;
+// uber → katie_taxi_leave/arrive (Katie's only mode). Left departs, right waits.
 private func spriteLeft(_ a: OmwActivityAttributes) -> String {
-    a.transport == "scooter" ? "david_scoot_leave" : "david_leave"
+    switch a.transport {
+    case "scooter": return "david_scoot_leave"
+    case "uber":    return "katie_taxi_leave"
+    default:        return "david_leave"
+    }
 }
 private func spriteRight(_ a: OmwActivityAttributes) -> String {
-    a.transport == "scooter" ? "david_scoot_arrive" : "david_arrive"
+    switch a.transport {
+    case "scooter": return "david_scoot_arrive"
+    case "uber":    return "katie_taxi_arrive"
+    default:        return "david_arrive"
+    }
 }
 
 // Banner background tint, by transport: bicycle → deep green #122b1f,
-// scooter → coral #d86d61. White text + trail read on both.
+// scooter → coral #d86d61, uber (Katie) → near-black #0d0d0d. White text + trail
+// read on all three.
 private func omwBg(_ a: OmwActivityAttributes) -> Color {
-    a.transport == "scooter"
-        ? Color(red: 0.8471, green: 0.4275, blue: 0.3804)   // #d86d61
-        : Color(red: 0.0706, green: 0.1686, blue: 0.1216)   // #122b1f
+    switch a.transport {
+    case "scooter": return Color(red: 0.8471, green: 0.4275, blue: 0.3804)  // #d86d61
+    case "uber":    return Color(red: 0.0510, green: 0.0510, blue: 0.0510)  // #0d0d0d
+    default:        return Color(red: 0.0706, green: 0.1686, blue: 0.1216)  // #122b1f
+    }
 }
 private let omwDeepLink = URL(string: "sneakystuff://new-chat")
 
+// Title is identical for everyone — it uses the traveller's name, so no pronoun
+// baked in.
 private func omwTitle(_ a: OmwActivityAttributes, _ s: OmwActivityAttributes.ContentState) -> String {
     s.arrived
         ? "\(a.travellerName) has arrived"
         : "\(a.travellerName) will be with you soon"
+}
+
+// Remaining minutes, derived from the ETA and how far along the route we are
+// (distance-driven), so it holds when the traveller stops. Min 1.
+private func omwEtaMinutes(_ s: OmwActivityAttributes.ContentState) -> Int {
+    let total = s.etaAt.timeIntervalSince(s.startedAt)
+    let remaining = max(0, total * (1 - min(1, max(0, s.progress))))
+    return max(1, Int(ceil(remaining / 60)))
 }
 
 // The line under the title: the server-driven narration (progress-banded copy),
@@ -167,6 +188,17 @@ struct OmwLockScreenView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
+        }
+        // ETA in the top-right corner (hidden once arrived).
+        .overlay(alignment: .topTrailing) {
+            if !context.state.arrived {
+                Text("\(omwEtaMinutes(context.state)) min")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                    .opacity(0.9)
+                    .padding(.top, 12)
+                    .padding(.trailing, 14)
+            }
         }
         .frame(maxWidth: .infinity)
         .widgetURL(omwDeepLink)

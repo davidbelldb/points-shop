@@ -325,6 +325,12 @@ export const api = {
       request(`/omw/quick-destinations/${position}`, { method: 'PUT', body: JSON.stringify(dest) }),
     deleteQuickDestination: (position) =>
       request(`/omw/quick-destinations/${position}`, { method: 'DELETE' }),
+    getTransport:      () => request('/omw/transport'),
+    setTransport:      (transport) =>
+      request('/omw/transport', { method: 'PUT', body: JSON.stringify({ transport }) }),
+    getConfig:         () => request('/omw/config'),
+    setConfig:         (liveToPartner) =>
+      request('/omw/config', { method: 'PUT', body: JSON.stringify({ liveToPartner }) }),
     registerToken:     (kind, token, tripId) =>
       request('/omw/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, tripId }) }),
     startTrip:         (origin, destId, transport) =>

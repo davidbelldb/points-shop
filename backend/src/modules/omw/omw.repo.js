@@ -5,6 +5,7 @@ import {
   createBroadcastChannel, deleteBroadcastChannel, sendBroadcast, sendSilentWake,
 } from '../notifications/apns.js';
 import { buildFlightPath } from '../scrolls/flightPath.js';
+import { findOtherUser } from '../chat/chat.repo.js';
 
 /*
  * "On My Way" — live Live Activity.
@@ -33,11 +34,13 @@ const ATTR_TYPE = 'OmwActivityAttributes';
 const WAYPOINT_FRACS = [0.25, 0.5, 0.75];
 // Per-transport speed (km/h) — used only to show an ETA. Tuned so a ~3.5 km ride
 // reads ≈14 min by bike / ≈12 min by e-scooter (scooter is capped ~14 mph, so
-// its real average with stops isn't far above cycling). Nudge to taste.
-const TRANSPORT_KMH = { bicycle: 15, scooter: 17 };
+// its real average with stops isn't far above cycling). `uber` is Katie's only
+// mode; its effective door-to-door average allows for pickup wait + traffic.
+// Nudge any to taste.
+const TRANSPORT_KMH = { bicycle: 15, scooter: 17, uber: 24 };
 const DEFAULT_TRANSPORT = 'bicycle';
 function transportKmh(t) { return TRANSPORT_KMH[t] || TRANSPORT_KMH[DEFAULT_TRANSPORT]; }
-function normTransport(t) { return t === 'scooter' ? 'scooter' : 'bicycle'; }
+function normTransport(t) { return TRANSPORT_KMH[t] ? t : DEFAULT_TRANSPORT; }
 // Straight-line → road padding when routing is unavailable (roads wind).
 const ROAD_FACTOR = 1.3;
 // ETA display floor.
@@ -149,19 +152,28 @@ function currentStreet(tripId, lat, lng) {
   return streetCache.get(tripId)?.street || '';
 }
 
-// Subject contraction for the narration copy, by pronoun.
-function contraction(pronoun) {
-  if (pronoun === 'he') return "he's";
-  if (pronoun === 'she') return "she's";
-  return "they're";
-}
+// Pronoun helpers so the copy reads right for whoever is travelling.
+function contraction(p) { return p === 'he' ? "he's" : p === 'she' ? "she's" : "they're"; }
+function possessive(p) { return p === 'he' ? 'his' : p === 'she' ? 'her' : 'their'; }
+function subjectPronoun(p) { return p === 'he' ? 'he' : p === 'she' ? 'she' : 'they'; }
+function comesVerb(p) { return p === 'they' ? 'come' : 'comes'; }
 
 // The narration line under the title, banded by how far along the route the
-// traveller is. Locations come from the live reverse-geocode; pronoun makes it
-// read right for whoever is travelling.
-function narration(progress, street, pronoun = 'they') {
+// traveller is. Copy is transport-flavoured (active travel vs Uber) and pronoun
+// aware. Locations come from the live reverse-geocode.
+function narration(progress, street, pronoun = 'they', transport = 'bicycle') {
   const loc = street || 'the road';
   const subj = contraction(pronoun);
+
+  if (transport === 'uber') {
+    if (progress >= 0.90) return `Here ${subjectPronoun(pronoun)} ${comesVerb(pronoun)}.. unlatch the door`;
+    if (progress >= 0.75) return `sailing merrily along ${loc}`;
+    if (progress >= 0.50) return `swooshing down ${loc}`;
+    if (progress >= 0.25) return `${subj} tootling along ${loc}`;
+    return `oh boy, ${subj} on ${possessive(pronoun)} way`;
+  }
+
+  // bicycle / scooter (active travel)
   if (progress >= 0.90) return `hold onto your butt cheeks, ${subj} on ${loc}`;
   if (progress >= 0.75) return `a lil' sweaty on ${loc}`;
   if (progress >= 0.50) return `last seen ripping along ${loc}`;
@@ -196,7 +208,7 @@ function buildState(trip, { progress = 0, message = '', arrived = false } = {}) 
 
 export async function listQuickDestinations(accountId) {
   const { rows } = await query(
-    `SELECT id, position, label, lat, lng, transport
+    `SELECT id, position, label, lat, lng
        FROM omw_quick_destinations WHERE account_id = $1 ORDER BY position`,
     [accountId],
   );
@@ -206,7 +218,7 @@ export async function listQuickDestinations(accountId) {
 // A specific quick destination that must belong to the account.
 async function getQuickDestination(accountId, id) {
   const { rows } = await query(
-    `SELECT id, position, label, lat, lng, transport
+    `SELECT id, position, label, lat, lng
        FROM omw_quick_destinations WHERE account_id = $1 AND id = $2`,
     [accountId, id],
   );
@@ -216,7 +228,7 @@ async function getQuickDestination(accountId, id) {
 // The default (position 1) quick destination, or the lowest-positioned one.
 async function defaultQuickDestination(accountId) {
   const { rows } = await query(
-    `SELECT id, position, label, lat, lng, transport
+    `SELECT id, position, label, lat, lng
        FROM omw_quick_destinations WHERE account_id = $1 ORDER BY position LIMIT 1`,
     [accountId],
   );
@@ -224,18 +236,17 @@ async function defaultQuickDestination(accountId) {
 }
 
 // Upsert one of the caller's 3 slots.
-export async function setQuickDestination(accountId, position, { label, lat, lng, transport }) {
+export async function setQuickDestination(accountId, position, { label, lat, lng }) {
   const pos = Number(position);
   if (!(pos >= 1 && pos <= 3)) { const e = new Error('position must be 1–3'); e.statusCode = 400; throw e; }
   if (!label || lat == null || lng == null) { const e = new Error('label, lat and lng are required'); e.statusCode = 400; throw e; }
   const { rows } = await query(
-    `INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng, transport)
-     VALUES ($1,$2,$3,$4,$5,$6)
+    `INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng)
+     VALUES ($1,$2,$3,$4,$5)
      ON CONFLICT (account_id, position) DO UPDATE SET
-       label = EXCLUDED.label, lat = EXCLUDED.lat, lng = EXCLUDED.lng,
-       transport = EXCLUDED.transport, updated_at = NOW()
-     RETURNING id, position, label, lat, lng, transport`,
-    [accountId, pos, label, Number(lat), Number(lng), normTransport(transport)],
+       label = EXCLUDED.label, lat = EXCLUDED.lat, lng = EXCLUDED.lng, updated_at = NOW()
+     RETURNING id, position, label, lat, lng`,
+    [accountId, pos, label, Number(lat), Number(lng)],
   );
   return rows[0];
 }
@@ -243,6 +254,36 @@ export async function setQuickDestination(accountId, position, { label, lat, lng
 export async function deleteQuickDestination(accountId, position) {
   await query(`DELETE FROM omw_quick_destinations WHERE account_id = $1 AND position = $2`, [accountId, Number(position)]);
   return { ok: true };
+}
+
+// Current transport — a single per-user setting used by every triggered journey.
+export async function getCurrentTransport(accountId) {
+  const { rows } = await query(`SELECT omw_transport FROM accounts WHERE id = $1`, [accountId]);
+  return normTransport(rows[0]?.omw_transport);
+}
+
+export async function setCurrentTransport(accountId, transport) {
+  const t = normTransport(transport);
+  await query(`UPDATE accounts SET omw_transport = $1 WHERE id = $2`, [t, accountId]);
+  return { transport: t };
+}
+
+// ---------------------------------------------------------------------------
+// Feature config — the two-way toggle
+// ---------------------------------------------------------------------------
+
+export async function getOmwConfig() {
+  const { rows } = await query(`SELECT live_to_partner FROM omw_config WHERE id = TRUE`);
+  return rows[0] ?? { live_to_partner: false };
+}
+
+export async function setOmwConfig({ liveToPartner }) {
+  const { rows } = await query(
+    `UPDATE omw_config SET live_to_partner = $1, updated_at = NOW() WHERE id = TRUE
+     RETURNING live_to_partner`,
+    [!!liveToPartner],
+  );
+  return rows[0] ?? { live_to_partner: !!liveToPartner };
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +340,7 @@ async function pushTripState(trip, { event = 'update', state, alert, dismissalMs
 // live origin to their destination, so pacing is correct even if they're setting
 // off from somewhere other than their usual start. `transport` overrides the
 // route default for this trip (sprite + ETA). Loops back to traveller for v1.
-export async function startTrip({ travellerId, origin = {}, destId, transport, simulate = true }) {
+export async function startTrip({ travellerId, origin = {}, destId, transport }) {
   const chosen = destId
     ? await getQuickDestination(travellerId, destId)
     : await defaultQuickDestination(travellerId);
@@ -312,12 +353,23 @@ export async function startTrip({ travellerId, origin = {}, destId, transport, s
 
   await cancelActiveTrips(travellerId);
 
-  const mode = normTransport(transport ?? chosen.transport ?? DEFAULT_TRANSPORT);
+  // Transport is the caller's single "current transport" setting, unless a
+  // specific one is passed for this trip.
+  const mode = normTransport(transport ?? await getCurrentTransport(travellerId));
   const dest = { label: chosen.label, lat: chosen.lat, lng: chosen.lng };
   const { points, routeKm } = await plotRoute(origin.lat, origin.lng, dest.lat, dest.lng);
   const etaSeconds = etaFor(routeKm, mode);
-  const viewerId = travellerId; // v1: self-test loop-back.
   const info = await travellerInfo(travellerId);
+
+  // Who sees the activity: self while testing, or the partner once the two-way
+  // toggle is flipped. `simulated` stays true only for a self-loop.
+  const { live_to_partner: liveToPartner } = await getOmwConfig();
+  let viewerId = travellerId;
+  if (liveToPartner) {
+    const other = await findOtherUser(travellerId);
+    if (other) viewerId = other.id;
+  }
+  const simulateTrip = viewerId === travellerId;
 
   const { rows } = await query(
     `INSERT INTO omw_trips
@@ -326,7 +378,7 @@ export async function startTrip({ travellerId, origin = {}, destId, transport, s
         distance_total_km, distance_remaining_km, eta_seconds, progress, phase, status)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$6,$7,$11::jsonb,$12,$12,$13,0,0,'active')
      RETURNING *`,
-    [travellerId, viewerId, !!simulate, info.pronoun, mode, origin.lat, origin.lng,
+    [travellerId, viewerId, simulateTrip, info.pronoun, mode, origin.lat, origin.lng,
       dest.label, dest.lat, dest.lng, JSON.stringify(points), routeKm, etaSeconds],
   );
   const trip = rows[0];
@@ -354,7 +406,7 @@ async function startLiveActivityFor(trip) {
       event: 'start',
       channelId,
       attributesType: ATTR_TYPE,
-      contentState: buildState(trip, { progress: 0, message: narration(0, '', trip.traveller_pronoun) }),
+      contentState: buildState(trip, { progress: 0, message: narration(0, '', trip.traveller_pronoun, trip.transport) }),
       attributes: {
         travellerName: traveller,
         destLabel: trip.dest_label || '',
@@ -410,7 +462,7 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
   const remainingToDest = haversineKm(lat, lng, trip.dest_lat, trip.dest_lng);
   const arrived = remainingToDest <= ARRIVE_KM || progress >= 0.999;
   const phase = arrived ? 4 : phaseFor(progress);
-  const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun);
+  const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport);
 
   await query(
     `UPDATE omw_trips SET current_lat = $1, current_lng = $2, distance_remaining_km = $3,

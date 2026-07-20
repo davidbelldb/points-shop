@@ -1,8 +1,10 @@
 import {
   listQuickDestinations, setQuickDestination, deleteQuickDestination,
+  getCurrentTransport, setCurrentTransport,
+  getOmwConfig, setOmwConfig,
   saveOmwToken, startTrip, recordPing, cancelTrip, sweepStaleTrips,
 } from './omw.repo.js';
-import { getActualAccountId } from '../auth/auth.helpers.js';
+import { getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
 /*
  * "On My Way" API.
@@ -44,6 +46,26 @@ export default async function omwRoutes(fastify) {
     return deleteQuickDestination(accountId, req.params.position);
   });
 
+  // ----- Current transport (each user's own) -----
+  fastify.get('/api/omw/transport', async (req) => {
+    return { transport: await getCurrentTransport(getActualAccountId(req)) };
+  });
+
+  fastify.put('/api/omw/transport', async (req) => {
+    return setCurrentTransport(getActualAccountId(req), req.body?.transport);
+  });
+
+  // ----- Two-way toggle (admin-only): off = loops to self; on = pushes to partner -----
+  fastify.get('/api/omw/config', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return getOmwConfig();
+  });
+
+  fastify.put('/api/omw/config', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return setOmwConfig({ liveToPartner: req.body?.liveToPartner });
+  });
+
   // ----- Live Activity push tokens -----
   // body: { kind: 'pts' | 'update', token, tripId? }
   fastify.post('/api/omw/live-activity-token', async (req, reply) => {
@@ -63,7 +85,7 @@ export default async function omwRoutes(fastify) {
     const travellerId = getActualAccountId(req);
     const { origin, destId, transport } = req.body ?? {};
     try {
-      const trip = await startTrip({ travellerId, origin: origin ?? {}, destId, transport, simulate: true });
+      const trip = await startTrip({ travellerId, origin: origin ?? {}, destId, transport });
       return reply.code(201).send(trip);
     } catch (err) {
       return reply.code(err.statusCode ?? 500).send({ error: err.message });

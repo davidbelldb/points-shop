@@ -8,6 +8,7 @@ import { useAuth } from './lib/AuthContext.jsx';
 import { api } from './lib/api.js';
 import { useSettings } from './lib/SettingsContext.jsx';
 import { useTheme } from './lib/ThemeContext.jsx';
+import { triggerOmwFromUrl } from './lib/omwActivity.js';
 import SurveyBanner from './components/SurveyBanner.jsx';
 import MenuDrawer from './components/MenuDrawer.jsx';
 import SideNav from './components/SideNav.jsx';
@@ -257,8 +258,14 @@ export default function App() {
   }, [theme]);
 
   // Home-screen Quick Actions: the native AppDelegate calls this to deep-link.
+  // An "On My Way" journey shortcut (/omw/go?dest=…) fires the trip directly —
+  // no page to open; everything else just navigates.
   useEffect(() => {
-    window.sneakyQuickAction = (url) => { if (url) navigate(url); };
+    window.sneakyQuickAction = (url) => {
+      if (!url) return;
+      if (url.startsWith('/omw/go')) { triggerOmwFromUrl(url); return; }
+      navigate(url);
+    };
     return () => { window.sneakyQuickAction = undefined; };
   }, [navigate]);
 

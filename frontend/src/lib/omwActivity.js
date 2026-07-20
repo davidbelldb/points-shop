@@ -52,6 +52,8 @@ export function enableOmwPush() {
     Native.addListener('omwPing', ({ lat, lng }) => forwardPing(lat, lng));
     Native.enablePush();
   } catch { /* plugin unavailable — ignore */ }
+  // Populate the long-press menu with the user's destinations.
+  syncOmwShortcuts();
 }
 
 function currentPosition() {
@@ -109,3 +111,33 @@ export async function stopOmwTrip({ silent = false } = {}) {
 }
 
 export function activeOmwTripId() { return activeTripId; }
+
+/**
+ * Fire a journey directly from a quick-action deep link (/omw/go?dest=<id>),
+ * with no test-harness page involved. Gets location, starts the trip (transport
+ * = the account's current setting), and the Live Activity appears. Returns true
+ * on success. Surfaces a minimal alert on failure (e.g. location denied).
+ */
+export async function triggerOmwFromUrl(url) {
+  try {
+    const qs = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
+    const destId = new URLSearchParams(qs).get('dest') || undefined;
+    await startOmwTrip(destId);
+    return true;
+  } catch (e) {
+    try { window.alert(e?.message || 'Could not start your journey — check location access.'); } catch { /* ignore */ }
+    return false;
+  }
+}
+
+/** Push the user's quick destinations to the Home-screen long-press menu as one
+ *  item each ("On My Way → {label}"). No-op on web. Call after login and after
+ *  the destinations change. */
+export async function syncOmwShortcuts() {
+  if (!Capacitor.isNativePlatform() || !Native) return;
+  try {
+    const { destinations } = await api.omw.listQuickDestinations();
+    const items = (destinations || []).map((d) => ({ id: d.id, label: d.label }));
+    Native.setShortcuts({ items });
+  } catch { /* ignore */ }
+}

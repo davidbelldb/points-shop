@@ -19,11 +19,16 @@ CREATE TABLE IF NOT EXISTS omw_quick_destinations (
   label       TEXT NOT NULL,
   lat         DOUBLE PRECISION NOT NULL,
   lng         DOUBLE PRECISION NOT NULL,
-  transport   TEXT NOT NULL DEFAULT 'bicycle' CHECK (transport IN ('bicycle', 'scooter')),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (account_id, position)
 );
 CREATE INDEX IF NOT EXISTS omw_quickdest_account_idx ON omw_quick_destinations (account_id);
+
+-- "Current transport" is a single per-user setting (what you're travelling by),
+-- not per destination. Every triggered journey uses it. bicycle | scooter | uber.
+-- Katie only ever takes an Uber, so default her to it.
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS omw_transport TEXT NOT NULL DEFAULT 'bicycle';
+UPDATE accounts SET omw_transport = 'uber' WHERE username = 'katie' AND omw_transport = 'bicycle';
 
 -- One in-flight (or recently finished) OMW journey.
 --   traveller_id : whose location is being tracked (the person on the move).
@@ -71,6 +76,16 @@ CREATE TABLE IF NOT EXISTS omw_trips (
 CREATE INDEX IF NOT EXISTS omw_trips_traveller_active_idx
   ON omw_trips (traveller_id) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS omw_trips_viewer_idx ON omw_trips (viewer_id);
+
+-- Single-row feature config. `live_to_partner` = false → a trip loops back to
+-- the traveller (v1 self-test). Flip it true to go two-way: a trip is pushed to
+-- the OTHER user's device instead (David → Katie, Katie → David).
+CREATE TABLE IF NOT EXISTS omw_config (
+  id              BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+  live_to_partner BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO omw_config (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
 
 -- ActivityKit push tokens for the OMW activity type. Kept separate from
 -- live_activity_tokens (which is scroll-scoped) so the two never collide:

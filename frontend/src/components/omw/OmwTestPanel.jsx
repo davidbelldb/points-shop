@@ -13,7 +13,7 @@ import { startOmwTrip, stopOmwTrip, activeOmwTripId } from '../../lib/omwActivit
 export default function OmwTestPanel({ dark, autoStart }) {
   const [dests, setDests] = useState([]);
   const [destId, setDestId] = useState('');
-  const [transport, setTransport] = useState('bicycle');
+  const [transport, setTransport] = useState('bicycle'); // current transport (display)
   const [trip, setTrip] = useState(null);
   const [status, setStatus] = useState('idle'); // idle | starting | tracking | error
   const [error, setError] = useState(null);
@@ -25,24 +25,21 @@ export default function OmwTestPanel({ dark, autoStart }) {
       .then((r) => {
         const list = r.destinations || [];
         setDests(list);
-        if (list[0]) { setDestId(list[0].id); setTransport(list[0].transport || 'bicycle'); }
+        if (list[0]) setDestId(list[0].id);
       })
       .catch((e) => setError(e.message));
+    api.omw.getTransport().then((r) => setTransport(r.transport)).catch(() => {});
   }, []);
 
   const selected = useMemo(() => dests.find((d) => d.id === destId) || null, [dests, destId]);
 
-  function pickDest(id) {
-    setDestId(id);
-    const d = dests.find((x) => x.id === id);
-    if (d?.transport) setTransport(d.transport);
-  }
+  function pickDest(id) { setDestId(id); }
 
   async function start() {
     if (!destId) return;
     setError(null); setStatus('starting');
     try {
-      const t = await startOmwTrip(destId, transport);
+      const t = await startOmwTrip(destId); // transport = account's current
       setTrip(t); setStatus('tracking');
     } catch (e) {
       setError(e.message || 'Could not start — location permission?');
@@ -92,18 +89,9 @@ export default function OmwTestPanel({ dark, autoStart }) {
                   </option>
                 ))}
               </select>
-              <div className="flex items-center gap-1">
-                {['bicycle', 'scooter'].map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTransport(t)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${transport === t ? 'bg-sky-600 text-white' : 'bg-neutral-100 text-neutral-600'}`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+              <p className="text-[11px] text-neutral-500">
+                Transport: <span className="font-medium capitalize">{transport}</span> — change it on your Account page.
+              </p>
             </div>
           )}
 

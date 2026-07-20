@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import ActivityKit
 import CoreLocation
@@ -24,7 +25,32 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         CAPPluginMethod(name: "enablePush", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startTracking", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopTracking", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setShortcuts", returnType: CAPPluginReturnPromise),
     ]
+
+    // MARK: - Home-screen quick actions (one per destination)
+
+    /// Replace the app's dynamic Home-screen shortcut items with one per OMW
+    /// destination ("On My Way → {label}"). Each routes to /omw/go?dest=<id>,
+    /// which the web layer fires as a journey (see App.jsx / omwActivity.js).
+    /// call: OmwActivity.setShortcuts({ items: [{ id, label }] })
+    @objc func setShortcuts(_ call: CAPPluginCall) {
+        let items = call.getArray("items", [String: Any].self) ?? []
+        let shortcuts: [UIApplicationShortcutItem] = items.compactMap { item in
+            guard let id = item["id"] as? String,
+                  let label = item["label"] as? String else { return nil }
+            return UIApplicationShortcutItem(
+                type: "com.david.sneakystuff.omw.go",
+                localizedTitle: "On My Way",
+                localizedSubtitle: label,
+                icon: UIApplicationShortcutIcon(type: .location),
+                userInfo: ["url": "/omw/go?dest=\(id)" as NSString])
+        }
+        DispatchQueue.main.async {
+            UIApplication.shared.shortcutItems = shortcuts
+            call.resolve()
+        }
+    }
 
     private lazy var locationManager: CLLocationManager = {
         let m = CLLocationManager()
