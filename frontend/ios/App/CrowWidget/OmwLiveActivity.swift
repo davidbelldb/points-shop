@@ -24,6 +24,14 @@ private func spriteRight(_ a: OmwActivityAttributes) -> String {
     }
 }
 
+// The STATIC left bookend sprite. Bicycle gets its own dedicated pose
+// (david_leave_1); scooter/uber reuse their normal "leave" sprite. The gliding
+// traveller in the trail always uses spriteLeft, so this only swaps the parked
+// figure at the start of the line.
+private func spriteLeftStatic(_ a: OmwActivityAttributes) -> String {
+    a.transport == "bicycle" ? "david_leave_1" : spriteLeft(a)
+}
+
 // Banner background tint, by transport: bicycle → deep green #122b1f,
 // scooter → coral #d86d61, uber (Katie) → near-black #0d0d0d. White text + trail
 // read on all three.
@@ -141,7 +149,7 @@ struct OmwLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
+                    Image(spriteLeftStatic(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
@@ -207,10 +215,10 @@ struct OmwLockScreenView: View {
                 }
 
                 HStack(spacing: 10) {
-                    // Static "leave" sprite bookends the trail on the left; the
-                    // gliding traveller starts from here and the "arrive" sprite
-                    // waits on the right.
-                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
+                    // Static "leave" sprite bookends the trail on the left (bicycle
+                    // gets its dedicated david_leave_1 pose); the gliding traveller
+                    // starts from here and the "arrive" sprite waits on the right.
+                    Image(spriteLeftStatic(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
                     OmwTrail(progress: progress, reached: reached,
                              mover: spriteLeft(context.attributes),
                              arrived: context.state.arrived)
