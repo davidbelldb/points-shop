@@ -74,6 +74,16 @@ export default function OmwMapPage() {
   const mapRef = useRef(null);
   const fittedTrip = useRef(null);
 
+  // Disable pull-to-refresh / rubber-band scroll while the full-screen map is up.
+  useEffect(() => {
+    const html = document.documentElement; const body = document.body;
+    const prev = { h: html.style.overscrollBehavior, bo: body.style.overscrollBehavior, ov: body.style.overflow };
+    html.style.overscrollBehavior = 'none';
+    body.style.overscrollBehavior = 'none';
+    body.style.overflow = 'hidden';
+    return () => { html.style.overscrollBehavior = prev.h; body.style.overscrollBehavior = prev.bo; body.style.overflow = prev.ov; };
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const tick = () => api.omw.activeTrip()
@@ -124,46 +134,60 @@ export default function OmwMapPage() {
     () => (routePts.length >= 2 ? pointAtDistance(routePts, cum, display * total) : null),
     [routePts, cum, total, display],
   );
-  const travelled = split ? routePts.slice(0, split.idx).concat([split.pt]) : [];
+  // Only the road AHEAD — from the sprite's current point to the destination.
   const remaining = split ? [split.pt].concat(routePts.slice(split.idx)) : routePts;
   const dest = trip?.dest_lat != null ? { lat: Number(trip.dest_lat), lng: Number(trip.dest_lng) } : null;
   const spriteAt = split ? split.pt : (trip?.current_lat != null ? { lat: Number(trip.current_lat), lng: Number(trip.current_lng) } : null);
 
   const onLoad = useCallback((m) => { mapRef.current = m; }, []);
+  // Camera: frame the traveller's current position + the destination, and
+  // re-tighten as the gap between them closes (zooms in as they approach).
+  // Runs on each 4s poll (via `trip`), never on the 90ms easing frames.
+  const camRef = useRef({ fitted: false, lastKm: Infinity });
   useEffect(() => {
     const m = mapRef.current;
-    if (!m || !isLoaded || !trip || routePts.length < 2) return;
-    if (fittedTrip.current === trip.id) return;
-    const b = new window.google.maps.LatLngBounds();
-    routePts.forEach((p) => b.extend(p));
-    m.fitBounds(b, 72);
-    fittedTrip.current = trip.id;
-  }, [isLoaded, trip, routePts]);
+    if (!m || !isLoaded || !trip) return;
+    const finite = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
+    const cur = trip.current_lat != null ? { lat: +trip.current_lat, lng: +trip.current_lng }
+      : (trip.origin_lat != null ? { lat: +trip.origin_lat, lng: +trip.origin_lng } : null);
+    const dst = trip.dest_lat != null ? { lat: +trip.dest_lat, lng: +trip.dest_lng } : null;
+    const pts = [cur, dst].filter(finite);
+    if (!pts.length) return;
+    const gapKm = (finite(cur) && finite(dst)) ? haversine(cur, dst) : 0;
+    // Fit on first data, then only when we've closed ~30% of the remaining gap
+    // (progressive zoom-in without re-framing on every poll).
+    if (camRef.current.fitted && gapKm > camRef.current.lastKm * 0.7) return;
+    if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(15); }
+    else {
+      const b = new window.google.maps.LatLngBounds();
+      pts.forEach((p) => b.extend(p));
+      m.fitBounds(b, 90);
+    }
+    camRef.current = { fitted: true, lastKm: gapKm };
+  }, [isLoaded, trip]);
 
+  // Sprite icon at its ORIGINAL portrait ratio (151×202) so it isn't squashed.
   const spriteIcon = useMemo(() => {
     if (!isLoaded || !trip) return undefined;
-    return { url: SPRITE[trip.transport] || SPRITE.bicycle, scaledSize: new window.google.maps.Size(52, 52), anchor: new window.google.maps.Point(26, 26) };
+    const w = 48; const h = Math.round((w * 202) / 151); // ≈ 64
+    return { url: SPRITE[trip.transport] || SPRITE.bicycle, scaledSize: new window.google.maps.Size(w, h), anchor: new window.google.maps.Point(w / 2, h / 2) };
   }, [isLoaded, trip?.transport]);
   const destIcon = useMemo(() => (isLoaded ? {
-    path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: TEAL, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
+    path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: PINK, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
-  const dashRemaining = useMemo(() => (isLoaded ? {
-    strokeOpacity: 0,
-    icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.55, strokeColor: '#6a7b76', scale: 3 }, offset: '0', repeat: '15px' }],
-  } : {}), [isLoaded]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: GREY }}>
+    <div style={{ position: 'fixed', inset: 0, background: GREY, overscrollBehavior: 'none' }}>
       {isLoaded && (
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
-          center={spriteAt || dest || DEFAULT_CENTER}
-          zoom={14}
+          center={DEFAULT_CENTER}
+          zoom={13}
           onLoad={onLoad}
           options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false }}
         >
-          {remaining.length > 1 && <PolylineF path={remaining} options={dashRemaining} />}
-          {travelled.length > 1 && <PolylineF path={travelled} options={{ strokeColor: TEAL, strokeOpacity: 0.95, strokeWeight: 6 }} />}
+          {/* Only the road ahead, as one solid teal line. */}
+          {remaining.length > 1 && <PolylineF path={remaining} options={{ strokeColor: TEAL, strokeOpacity: 0.95, strokeWeight: 6 }} />}
           {dest && destIcon && <MarkerF position={dest} icon={destIcon} />}
           {spriteAt && spriteIcon && <MarkerF position={spriteAt} icon={spriteIcon} zIndex={999} />}
         </GoogleMap>
