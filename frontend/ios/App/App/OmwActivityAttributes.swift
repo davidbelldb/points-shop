@@ -21,6 +21,9 @@ struct OmwActivityAttributes: ActivityAttributes {
         var progress: Double
         /// Straight-line distance still to travel, in km (for a subtitle later).
         var remainingKm: Double
+        /// Live ETA in whole minutes, recomputed server-side from the distance
+        /// still to go (adjusts on reroute). Drives the title.
+        var etaMinutes: Int = 0
         /// Optional server-driven message. "" = use the fixed copy.
         var message: String = ""
         /// How many of the 3 waypoint nodes have been passed (0–3; 4 = arrived).

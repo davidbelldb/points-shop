@@ -34,7 +34,7 @@ private func omwBg(_ a: OmwActivityAttributes) -> Color {
     default:        return Color(red: 0.0706, green: 0.1686, blue: 0.1216)  // #122b1f
     }
 }
-private let omwDeepLink = URL(string: "sneakystuff://messages")
+private let omwDeepLink = URL(string: "sneakystuff://on-my-way")
 
 // Title is identical for everyone — it uses the traveller's name (no pronoun) and
 // the live ETA, which updates as the journey progresses.
@@ -43,12 +43,10 @@ private func omwTitle(_ a: OmwActivityAttributes, _ s: OmwActivityAttributes.Con
     return "\(a.travellerName) will be with you in \(omwEtaMinutes(s)) min"
 }
 
-// Remaining minutes, derived from the ETA and how far along the route we are
-// (distance-driven), so it holds when the traveller stops. Min 1.
+// Live remaining minutes — computed server-side from the distance still to go
+// (adjusts on reroute; holds when stopped). Min 1.
 private func omwEtaMinutes(_ s: OmwActivityAttributes.ContentState) -> Int {
-    let total = s.etaAt.timeIntervalSince(s.startedAt)
-    let remaining = max(0, total * (1 - min(1, max(0, s.progress))))
-    return max(1, Int(ceil(remaining / 60)))
+    max(1, s.etaMinutes)
 }
 
 // The line under the title: the server-driven narration (progress-banded copy),
@@ -104,6 +102,36 @@ struct OmwWaypointNodes: View {
     }
 }
 
+// The trail: dashed line + solid fill + waypoint nodes, with the traveller sprite
+// gliding along at the leading edge of the fill (x = progress). Same 36×36 size
+// and vertical centre as the static "arrive" sprite it travels toward.
+struct OmwTrail: View {
+    var progress: Double
+    var reached: Int
+    var mover: String
+    var arrived: Bool = false
+    var body: some View {
+        let p = max(0, min(1, progress))
+        ZStack {
+            DashedLine(color: .white)
+            OmwProgressFill(progress: p, color: .white)
+            OmwWaypointNodes(reached: reached)
+            // The gliding traveller — kept above the trail + nodes, and hidden
+            // once arrived (the destination sprite says it all).
+            if !arrived {
+                GeometryReader { geo in
+                    Image(mover).resizable().scaledToFit()
+                        .frame(width: 36, height: 36)
+                        .position(x: p * geo.size.width, y: geo.size.height / 2)
+                        .animation(.easeInOut(duration: 1.4), value: progress)
+                }
+                .zIndex(1)
+            }
+        }
+        .frame(height: 12)
+    }
+}
+
 struct OmwLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: OmwActivityAttributes.self) { context in
@@ -113,10 +141,10 @@ struct OmwLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
+                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
+                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 6) {
@@ -127,12 +155,12 @@ struct OmwLiveActivity: Widget {
                         Text(omwLine(context.state))
                             .font(.caption).foregroundColor(.white).opacity(0.85)
                             .lineLimit(1)
-                        ZStack {
-                            DashedLine(color: .white)
-                            OmwProgressFill(progress: context.state.arrived ? 1 : context.state.progress, color: .white)
-                            OmwWaypointNodes(reached: context.state.arrived ? 3 : context.state.phase)
-                        }
-                        .frame(maxWidth: 195, minHeight: 12)
+                        OmwTrail(
+                            progress: context.state.arrived ? 1 : context.state.progress,
+                            reached: context.state.arrived ? 3 : context.state.phase,
+                            mover: spriteLeft(context.attributes),
+                            arrived: context.state.arrived)
+                            .frame(maxWidth: 195)
                     }
                 }
             } compactLeading: {
@@ -179,14 +207,12 @@ struct OmwLockScreenView: View {
                 }
 
                 HStack(spacing: 10) {
-                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
-                    ZStack {
-                        DashedLine(color: .white)
-                        OmwProgressFill(progress: progress, color: .white)
-                        OmwWaypointNodes(reached: reached)
-                    }
-                    .frame(height: 12)
-                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 33, height: 33)
+                    // The traveller sprite now glides along the trail (leading edge
+                    // of the fill); the waiting sprite stays at the destination.
+                    OmwTrail(progress: progress, reached: reached,
+                             mover: spriteLeft(context.attributes),
+                             arrived: context.state.arrived)
+                    Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
                 }
             }
             .padding(.horizontal, 18)

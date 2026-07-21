@@ -140,12 +140,29 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
                 for activity in Activity<OmwActivityAttributes>.activities {
                     self.trackUpdateToken(activity)
                 }
+                self.pruneDuplicateActivities()
                 for await activity in Activity<OmwActivityAttributes>.activityUpdates {
                     self.trackUpdateToken(activity)
+                    // A new activity appeared (e.g. a duplicate push-to-start) —
+                    // enforce a single OMW banner.
+                    self.pruneDuplicateActivities()
                 }
             }
         }
         call.resolve()
+    }
+
+    /// Guarantee only ONE On My Way Live Activity exists: if more than one is
+    /// running, keep the most recently started and end the rest. Catches any
+    /// duplicate however it arose (double trigger, stale banner, etc.).
+    @available(iOS 16.2, *)
+    private func pruneDuplicateActivities() {
+        let activities = Activity<OmwActivityAttributes>.activities
+        guard activities.count > 1 else { return }
+        let newest = activities.max(by: { $0.contentState.startedAt < $1.contentState.startedAt })
+        for activity in activities where activity.id != newest?.id {
+            Task { await activity.end(dismissalPolicy: .immediate) }
+        }
     }
 
     @available(iOS 16.2, *)

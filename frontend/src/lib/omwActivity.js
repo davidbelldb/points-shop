@@ -23,6 +23,8 @@ let wired = false;
 let activeTripId = null;
 let watchId = null;
 let lastPingAt = 0;
+let starting = false;      // guards against concurrent starts
+let lastStartAt = 0;       // debounces rapid double-triggers
 
 // Never ping more than ~once every 4s regardless of source (native + web can
 // both fire); the Live Activity doesn't need finer granularity.
@@ -76,26 +78,34 @@ function currentPosition() {
  * @returns {Promise<object>} the created trip
  */
 export async function startOmwTrip(destId, transport) {
-  const origin = await currentPosition();
-  const trip = await api.omw.startTrip(origin, destId, transport);
-  activeTripId = trip.id;
-  lastPingAt = 0;
+  // Guard against double-fire: ignore a second trigger while one is starting or
+  // within a few seconds of the last (prevents duplicate trips/activities).
+  if (starting || Date.now() - lastStartAt < 6000) return null;
+  starting = true; lastStartAt = Date.now();
+  try {
+    const origin = await currentPosition();
+    const trip = await api.omw.startTrip(origin, destId, transport);
+    activeTripId = trip.id;
+    lastPingAt = 0;
 
   // Native background location (best transport; keeps advancing app-closed).
   try {
     Native?.startTracking({ tripId: trip.id, destLat: trip.dest_lat, destLng: trip.dest_lng });
   } catch { /* native optional */ }
 
-  // Foreground fallback — advances progress while the app is open, and is the
-  // only source on web.
-  if (navigator.geolocation && watchId == null) {
-    watchId = navigator.geolocation.watchPosition(
-      (pos) => forwardPing(pos.coords.latitude, pos.coords.longitude),
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 },
-    );
+    // Foreground fallback — advances progress while the app is open, and is the
+    // only source on web.
+    if (navigator.geolocation && watchId == null) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => forwardPing(pos.coords.latitude, pos.coords.longitude),
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 },
+      );
+    }
+    return trip;
+  } finally {
+    starting = false;
   }
-  return trip;
 }
 
 /** Stop the active trip: clear watchers, tell native to stop, dismiss the

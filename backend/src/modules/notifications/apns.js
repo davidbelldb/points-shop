@@ -113,13 +113,14 @@ export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '
  *  OmwActivityAttributes.ContentState — progress is GPS-driven (0..1), not a
  *  timer, so the widget renders a determinate bar. All keys always present. */
 export function omwContentState({
-  startedAtMs, etaAtMs, progress = 0, remainingKm = 0, message = '', phase = 0, arrived = false,
+  startedAtMs, etaAtMs, progress = 0, remainingKm = 0, etaMinutes = 0, message = '', phase = 0, arrived = false,
 }) {
   return {
     startedAt: toRefDate(startedAtMs),
     etaAt: toRefDate(etaAtMs ?? startedAtMs),
     progress: Math.max(0, Math.min(1, Number(progress) || 0)),
     remainingKm: Math.max(0, Number(remainingKm) || 0),
+    etaMinutes: Math.max(0, Math.round(Number(etaMinutes) || 0)),
     message: message || '',
     phase: Number(phase) || 0,
     arrived: !!arrived,
@@ -133,7 +134,7 @@ export function omwContentState({
  *  - event 'end'    → dismiss the activity
  * Returns the HTTP status (0 on transport failure). Never throws.
  */
-export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs, channelId, attributesType = 'CrowActivityAttributes' } = {}) {
+export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs, channelId, sound, attributesType = 'CrowActivityAttributes' } = {}) {
   if (!enabled || !token) return 0;
   const aps = {
     timestamp: Math.floor(Date.now() / 1000),
@@ -148,6 +149,7 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
     if (channelId) aps['input-push-channel'] = channelId;
   }
   if (alert) aps.alert = alert;
+  if (sound) aps.sound = sound;
   if (event === 'end' && dismissalMs) aps['dismissal-date'] = Math.floor(dismissalMs / 1000);
   const body = JSON.stringify({ aps });
 
@@ -253,10 +255,11 @@ export async function deleteBroadcastChannel(channelId) {
 
 /** Broadcast a Live Activity update/end to every device subscribed to a channel.
  *  No device token needed — works with the recipient's app fully closed. */
-export async function sendBroadcast(channelId, { event, contentState, alert, dismissalMs } = {}) {
+export async function sendBroadcast(channelId, { event, contentState, alert, dismissalMs, sound } = {}) {
   if (!enabled || !channelId) return 0;
   const aps = { timestamp: Math.floor(Date.now() / 1000), event, 'content-state': contentState || {} };
   if (alert) aps.alert = alert;
+  if (sound) aps.sound = sound;
   if (event === 'end' && dismissalMs) aps['dismissal-date'] = Math.floor(dismissalMs / 1000);
   const body = JSON.stringify({ aps });
 

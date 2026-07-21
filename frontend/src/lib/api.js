@@ -332,6 +332,7 @@ export const api = {
     setConfig:         (liveToPartner) =>
       request('/omw/config', { method: 'PUT', body: JSON.stringify({ liveToPartner }) }),
     adminKillAll:      () => request('/omw/admin/kill-all', { method: 'POST' }),
+    activeTrip:        () => request('/omw/active-trip'),
     registerToken:     (kind, token, tripId) =>
       request('/omw/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, tripId }) }),
     startTrip:         (origin, destId, transport) =>

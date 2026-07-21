@@ -1,6 +1,6 @@
 import {
   listQuickDestinations, setQuickDestination, deleteQuickDestination,
-  getCurrentTransport, setCurrentTransport,
+  getCurrentTransport, setCurrentTransport, getActiveViewerTrip,
   getOmwConfig, setOmwConfig,
   saveOmwToken, startTrip, recordPing, cancelTrip, sweepStaleTrips, cancelAllActiveTrips,
 } from './omw.repo.js';
@@ -44,6 +44,11 @@ export default async function omwRoutes(fastify) {
   fastify.delete('/api/omw/quick-destinations/:position', async (req) => {
     const accountId = getActualAccountId(req);
     return deleteQuickDestination(accountId, req.params.position);
+  });
+
+  // The caller's active trip as viewer — powers the in-app live map.
+  fastify.get('/api/omw/active-trip', async (req) => {
+    return { trip: await getActiveViewerTrip(getActualAccountId(req)) };
   });
 
   // ----- Current transport (each user's own) -----

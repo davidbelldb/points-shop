@@ -22,6 +22,7 @@ import RewardsPage from './pages/RewardsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MessagesPage from './pages/MessagesPage.jsx';
 import NewChatPage from './pages/NewChatPage.jsx';
+import OmwMapPage from './pages/OmwMapPage.jsx';
 import SheetIn from './components/SheetIn.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
 
@@ -176,6 +177,7 @@ createRoot(document.getElementById('root')).render(
                   page, intentionally NOT linked in any menu. Merges into
                   /messages when tested. */}
               <Route path="new-chat" element={<NewChatPage />} />
+              <Route path="on-my-way" element={<OmwMapPage />} />
               <Route path="games" element={<GamesPage />} />
               <Route path="games/truth-or-dare" element={<TruthOrDarePage />} />
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />

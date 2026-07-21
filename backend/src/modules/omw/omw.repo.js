@@ -60,11 +60,51 @@ const REROUTE_MIN_MS = 20_000;
 // Coalesce Live Activity pushes to at most this often (Apple throttles frequent
 // pushes → the "hang then jolt" bursts). Band changes + arrival push immediately.
 const PUSH_MIN_MS = 9_000;
+// Treat the traveller as "stopped" after this long without moving.
+const STOP_MS = 150_000;   // 2.5 min
 
 // In-memory caches per trip.
 const streetCache = new Map();       // tripId -> { at, street }
 const lastReroute = new Map();       // tripId -> ms of last replot
 const lastPush = new Map();          // tripId -> { at, band }
+const tripCtx = new Map();           // tripId -> live-signal state
+
+// Drop every in-memory cache entry for a finished trip.
+function clearTripCaches(tripId) {
+  streetCache.delete(tripId);
+  lastReroute.delete(tripId);
+  lastPush.delete(tripId);
+  tripCtx.delete(tripId);
+  for (const band of ['q1', 'q2', 'q3', 'final', 'close', 'detour', 'stopped']) {
+    lastVariant.delete(`${tripId}:${band}`);
+  }
+}
+
+// Per-trip live signal state (speed EMA, last-moved, cached weather).
+function ctxOf(tripId) {
+  let c = tripCtx.get(tripId);
+  if (!c) {
+    c = { lastMoveAt: Date.now(), lastMoveLat: null, lastMoveLng: null, speedEma: 0, weatherAt: 0, raining: false };
+    tripCtx.set(tripId, c);
+  }
+  return c;
+}
+
+// Is it currently raining at a point? Open-Meteo current weather. Best-effort.
+async function fetchRain(lat, lng) {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}`
+      + `&longitude=${encodeURIComponent(lng)}&current=precipitation,weather_code`;
+    const res = await fetch(url);
+    if (!res.ok) return false;
+    const cur = (await res.json())?.current ?? {};
+    const precip = Number(cur.precipitation) || 0;
+    const code = Number(cur.weather_code);
+    // WMO codes for drizzle/rain/showers/thunderstorm.
+    const rainy = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99];
+    return precip > 0 || rainy.includes(code);
+  } catch { return false; }
+}
 
 // ---------------------------------------------------------------------------
 // Geo helpers
@@ -253,6 +293,8 @@ const ACTIVE_BANDS = {
     'hold onto your butt cheeks, {subj} on {loc}',
     'any second now — {subj} on {loc}',
     'almost at the door, {subj} on {loc}',
+    'two streets away…',
+    'rounding the corner now',
   ],
 };
 const UBER_BANDS = {
@@ -275,7 +317,29 @@ const UBER_BANDS = {
   final: [
     'here {name} {comes}.. unlatch the door',
     'pulling up any second — here {name} {comes}',
+    'two streets away…',
+    'nearly at the door now',
   ],
+};
+
+// Situational lines that fire when a context signal is present.
+const CTX_LINES = {
+  active: {
+    close: ['{subj} literally outside!', 'at the door any second!', 'go go go — {subj} here!'],
+    detour: ['ooh, taking the scenic route via {loc}', 'got a bit lost near {loc}, classic', 'gone rogue — detour via {loc}'],
+    stopped: ["hasn't moved in a bit… probably gone to Kanto", 'stationary near {loc} — snack break?', "not budged in a while… everything okay?"],
+    weather: ['getting rained on near {loc} 🌧', 'drowned rat incoming', 'soggy somewhere around {loc}'],
+    slow: ['taking {poss} sweet time on {loc}', 'in no rush along {loc}'],
+    fast: ['absolutely bombing it down {loc}', 'flying along {loc}'],
+  },
+  uber: {
+    close: ['{subj} literally outside!', 'pulling up — unlatch the door!'],
+    detour: ["driver's taking the scenic route via {loc}", 'sat nav had a moment near {loc}'],
+    stopped: ['stuck near {loc}… traffic, probably', 'red-light purgatory near {loc}'],
+    weather: [],
+    slow: ['crawling along {loc}', 'stuck in traffic near {loc}'],
+    fast: ['making great time down {loc}', 'cruising nicely along {loc}'],
+  },
 };
 
 const lastVariant = new Map(); // `${tripId}:${band}` -> last template used
@@ -298,14 +362,34 @@ function bandFor(progress) {
   return 'start';
 }
 
-// The narration line under the title: banded by progress, pronoun aware,
-// capitalised, and varied per update. `tripId` scopes the anti-repeat memory.
-function narration(progress, street, pronoun = 'they', transport = 'bicycle', tripId = '') {
+// The narration line under the title: banded by progress, pronoun + transport
+// aware, capitalised, varied, and now CONTEXT-aware — weather, speed, stops,
+// detours and the home-straight drama all colour the copy. `ctx` carries the
+// live signals computed in recordPing.
+function narration(progress, street, pronoun = 'they', transport = 'bicycle', tripId = '', ctx = {}) {
   const loc = street || 'the road';
-  const bands = transport === 'uber' ? UBER_BANDS : ACTIVE_BANDS;
+  const isUber = transport === 'uber';
+  const bands = isUber ? UBER_BANDS : ACTIVE_BANDS;
+  const lines = isUber ? CTX_LINES.uber : CTX_LINES.active;
   const band = bandFor(progress);
   if (band === 'start') return fillLine(bands.start, loc, pronoun);
-  return fillLine(pickVariant(tripId, band, bands[band]), loc, pronoun);
+
+  const { speedKmh = 0, stoppedMs = 0, detour = false, raining = false, remainingKm = Infinity } = ctx;
+
+  // Situational overrides, highest priority first.
+  if (remainingKm <= 0.15) return fillLine(pickVariant(tripId, 'close', lines.close), loc, pronoun);
+  if (detour && lines.detour.length) return fillLine(pickVariant(tripId, 'detour', lines.detour), loc, pronoun);
+  if (stoppedMs >= STOP_MS && lines.stopped.length) return fillLine(pickVariant(tripId, 'stopped', lines.stopped), loc, pronoun);
+
+  // Otherwise blend the band pool with weather + speed flavour when notable.
+  let pool = bands[band].slice();
+  if (raining && lines.weather.length) pool = pool.concat(lines.weather);
+  if (speedKmh > 1) {
+    const expected = transportKmh(transport);
+    if (speedKmh < expected * 0.55) pool = pool.concat(lines.slow);
+    else if (speedKmh > expected * 1.4) pool = pool.concat(lines.fast);
+  }
+  return fillLine(pickVariant(tripId, band, pool), loc, pronoun);
 }
 
 // How many of the three nodes this progress (0..1) has passed.
@@ -315,17 +399,19 @@ function phaseFor(progress) {
   return phase;
 }
 
-// Assemble the content-state for a trip at a given distance progress.
+// Assemble the content-state for a trip at a given distance progress. The ETA is
+// LIVE — recomputed from the distance still to go and the transport speed — so it
+// adjusts as the journey (and any reroute) changes the remaining distance.
 function buildState(trip, { progress = 0, message = '', arrived = false } = {}) {
   const startedAtMs = new Date(trip.started_at).getTime();
-  const etaAtMs = startedAtMs + (Number(trip.eta_seconds) || MIN_ETA_SECONDS) * 1000;
   const p = arrived ? 1 : Math.max(0, Math.min(1, progress));
   const phase = arrived ? 4 : phaseFor(p);
   const totalKm = Number(trip.distance_total_km) || 0;
+  const remainingKm = Math.max(0, totalKm * (1 - p));
+  const etaMinutes = arrived ? 0 : Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
   return omwContentState({
-    startedAtMs, etaAtMs, progress: p,
-    remainingKm: Math.max(0, totalKm * (1 - p)),
-    message, phase, arrived,
+    startedAtMs, etaAtMs: startedAtMs + etaMinutes * 60_000, progress: p,
+    remainingKm, etaMinutes, message, phase, arrived,
   });
 }
 
@@ -381,6 +467,40 @@ export async function setQuickDestination(accountId, position, { label, lat, lng
 export async function deleteQuickDestination(accountId, position) {
   await query(`DELETE FROM omw_quick_destinations WHERE account_id = $1 AND position = $2`, [accountId, Number(position)]);
   return { ok: true };
+}
+
+// The caller's active trip AS VIEWER (self-loop: their own; two-way: their
+// partner's) — for the in-app live map. Includes the route polyline, current
+// position, live ETA and the current narration line.
+export async function getActiveViewerTrip(accountId) {
+  const { rows } = await query(
+    `SELECT t.id, t.dest_label, t.dest_lat, t.dest_lng, t.origin_lat, t.origin_lng,
+            t.current_lat, t.current_lng, t.route_points, t.progress, t.phase,
+            t.distance_total_km, t.transport, t.traveller_pronoun,
+            a.name AS traveller_name, a.username AS traveller_username
+       FROM omw_trips t JOIN accounts a ON a.id = t.traveller_id
+      WHERE t.viewer_id = $1 AND t.status = 'active'
+      ORDER BY t.started_at DESC LIMIT 1`,
+    [accountId],
+  );
+  const trip = rows[0];
+  if (!trip) return null;
+  const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
+  const remainingKm = Math.max(0, (Number(trip.distance_total_km) || 0) * (1 - progress));
+  const etaMinutes = Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
+  const street = streetCache.get(trip.id)?.street || '';
+  const message = narration(progress, street, trip.traveller_pronoun, trip.transport, trip.id);
+  return {
+    id: trip.id,
+    traveller_name: trip.traveller_name || trip.traveller_username || 'Someone',
+    transport: trip.transport,
+    dest_label: trip.dest_label,
+    dest_lat: trip.dest_lat, dest_lng: trip.dest_lng,
+    origin_lat: trip.origin_lat, origin_lng: trip.origin_lng,
+    current_lat: trip.current_lat, current_lng: trip.current_lng,
+    route_points: trip.route_points || [],
+    progress, eta_minutes: etaMinutes, message,
+  };
 }
 
 // Current transport — a single per-user setting used by every triggered journey.
@@ -451,18 +571,21 @@ async function updateTokensFor(tripId) {
   return rows.map((r) => r.token);
 }
 
-async function pushTripState(trip, { event = 'update', state, alert, dismissalMs } = {}) {
+async function pushTripState(trip, { event = 'update', state, alert, dismissalMs, sound } = {}) {
   if (trip.la_channel_id) {
-    await sendBroadcast(trip.la_channel_id, { event, contentState: state, alert, dismissalMs });
+    await sendBroadcast(trip.la_channel_id, { event, contentState: state, alert, dismissalMs, sound });
     return;
   }
   const tokens = await updateTokensFor(trip.id);
   for (const token of tokens) {
     /* eslint-disable no-await-in-loop */
-    await sendLiveActivityPush(token, { event, contentState: state, alert, dismissalMs, attributesType: ATTR_TYPE });
+    await sendLiveActivityPush(token, { event, contentState: state, alert, dismissalMs, sound, attributesType: ATTR_TYPE });
     /* eslint-enable no-await-in-loop */
   }
 }
+
+// The two arrival sounds (bundled .caf files); one is chosen at random per trip.
+const ARRIVAL_SOUNDS = ['Doorbell.caf', 'Knock.caf'];
 
 // ---------------------------------------------------------------------------
 // Trips
@@ -564,14 +687,14 @@ async function startLiveActivityFor(trip) {
 }
 
 async function finaliseArrival(trip) {
-  streetCache.delete(trip.id); lastReroute.delete(trip.id); lastPush.delete(trip.id);
-  lastVariant.delete(`${trip.id}:q1`); lastVariant.delete(`${trip.id}:q2`);
-  lastVariant.delete(`${trip.id}:q3`); lastVariant.delete(`${trip.id}:final`);
+  clearTripCaches(trip.id);
   const traveller = await travellerName(trip.traveller_id);
   const muted = await isMuted(trip.viewer_id);
   const subtitle = arrivalSubtitle(trip.traveller_pronoun);
   const alert = muted ? undefined : { title: `${traveller} has arrived!`, body: subtitle };
-  await pushTripState(trip, { event: 'update', state: buildState(trip, { arrived: true, message: subtitle }), alert });
+  // Random doorbell/knock on arrival (skip if muted).
+  const sound = muted ? undefined : ARRIVAL_SOUNDS[Math.floor(Math.random() * ARRIVAL_SOUNDS.length)];
+  await pushTripState(trip, { event: 'update', state: buildState(trip, { arrived: true, message: subtitle }), alert, sound });
   await query(`UPDATE omw_trips SET status = 'arrived', progress = 1, phase = 4, ended_at = NOW() WHERE id = $1`, [trip.id]);
   setTimeout(() => { endLiveActivity(trip, Date.now()).catch(() => {}); }, ARRIVE_LINGER_MS);
 }
@@ -597,11 +720,32 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
   let along = proj ? proj.alongKm : 0;
   if (proj && (!total || total <= 0)) total = offset + proj.totalKm;
 
+  // ---- Live context signals (updated every ping) ----
+  const cx = ctxOf(tripId);
+  // Smoothed speed from the previous ping position.
+  if (trip.current_lat != null && trip.current_lng != null && trip.last_ping_at) {
+    const dtH = (now - new Date(trip.last_ping_at).getTime()) / 3_600_000;
+    if (dtH > 0.0005 && dtH < 0.02) {   // ~1.8s..72s apart
+      const inst = haversineKm(trip.current_lat, trip.current_lng, lat, lng) / dtH;
+      cx.speedEma = cx.speedEma ? 0.5 * cx.speedEma + 0.5 * inst : inst;
+    }
+  }
+  // Stationary tracking: reset the "last moved" clock when they shift >25 m.
+  if (cx.lastMoveLat == null || haversineKm(cx.lastMoveLat, cx.lastMoveLng, lat, lng) > 0.025) {
+    cx.lastMoveAt = now; cx.lastMoveLat = lat; cx.lastMoveLng = lng;
+  }
+  // Weather (throttled, background) — result colours later pings.
+  if (now - cx.weatherAt > 5 * 60 * 1000) {
+    cx.weatherAt = now;
+    fetchRain(lat, lng).then((r) => { cx.raining = r; }).catch(() => {});
+  }
+
   // Reroute: gone off the plotted line by more than the threshold → re-plot from
   // here to the destination, carrying the distance already covered so the bar
   // doesn't jump. Skipped near the destination and rate-limited.
   const deviated = proj && proj.deviationKm > REROUTE_DEV_KM;
   const canReroute = now - (lastReroute.get(tripId) || 0) > REROUTE_MIN_MS;
+  let justRerouted = false;
   if (deviated && remainingToDest > ARRIVE_KM * 3 && canReroute) {
     lastReroute.set(tripId, now);
     const covered = offset + along;
@@ -610,6 +754,7 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
     total = covered + replot.routeKm;
     along = 0;
     trip.route_points = replot.points;
+    justRerouted = true;
     await query(
       `UPDATE omw_trips SET route_points = $1::jsonb, route_offset_km = $2, distance_total_km = $3 WHERE id = $4`,
       [JSON.stringify(replot.points), offset, total, tripId],
@@ -644,9 +789,16 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
   // moves steadily instead of hanging then jolting.
   const band = bandFor(progress);
   const prev = lastPush.get(tripId) || { at: 0, band: null };
-  if (band !== prev.band || now - prev.at >= PUSH_MIN_MS) {
+  if (justRerouted || band !== prev.band || now - prev.at >= PUSH_MIN_MS) {
     lastPush.set(tripId, { at: now, band });
-    const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId);
+    const narrationCtx = {
+      speedKmh: cx.speedEma,
+      stoppedMs: now - cx.lastMoveAt,
+      detour: now - (lastReroute.get(tripId) || 0) < 25_000,
+      raining: cx.raining,
+      remainingKm: remainingToDest,
+    };
+    const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
     await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
   }
   return { ok: true, arrived: false, progress };
@@ -664,7 +816,7 @@ export async function cancelTrip({ tripId, travellerId }) {
     [tripId, travellerId],
   );
   const trip = rows[0];
-  if (trip) { streetCache.delete(tripId); await endLiveActivity(trip, Date.now()).catch(() => {}); }
+  if (trip) { clearTripCaches(tripId); await endLiveActivity(trip, Date.now()).catch(() => {}); }
   return { ok: true };
 }
 
@@ -676,7 +828,7 @@ async function cancelActiveTrips(travellerId) {
   );
   for (const trip of rows) {
     /* eslint-disable no-await-in-loop */
-    streetCache.delete(trip.id);
+    clearTripCaches(trip.id);
     await endLiveActivity(trip, Date.now()).catch(() => {});
     /* eslint-enable no-await-in-loop */
   }
@@ -711,7 +863,7 @@ export async function cancelAllActiveTrips() {
   );
   for (const trip of rows) {
     /* eslint-disable no-await-in-loop */
-    streetCache.delete(trip.id);
+    clearTripCaches(trip.id);
     await endLiveActivity(trip, Date.now()).catch(() => {});
     /* eslint-enable no-await-in-loop */
   }
@@ -730,7 +882,7 @@ export async function sweepStaleTrips() {
   );
   for (const trip of rows) {
     /* eslint-disable no-await-in-loop */
-    streetCache.delete(trip.id);
+    clearTripCaches(trip.id);
     await endLiveActivity(trip, Date.now()).catch(() => {});
     /* eslint-enable no-await-in-loop */
   }
