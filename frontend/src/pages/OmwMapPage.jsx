@@ -152,7 +152,15 @@ export default function OmwMapPage() {
   const dest = trip?.dest_lat != null ? { lat: Number(trip.dest_lat), lng: Number(trip.dest_lng) } : null;
   const spriteAt = split ? split.pt : (trip?.current_lat != null ? { lat: Number(trip.current_lat), lng: Number(trip.current_lng) } : null);
 
-  const onLoad = useCallback((m) => { mapRef.current = m; }, []);
+  // Imperatively pin the view over Cambridge the instant the map exists —
+  // options.center/zoom aren't reliably honoured on mount (it falls back to the
+  // zoom-0 world view = "Europe"), and a one-shot set here doesn't fight the
+  // later fitBounds the way controlled center/zoom props would.
+  const onLoad = useCallback((m) => {
+    mapRef.current = m;
+    m.setCenter(DEFAULT_CENTER);
+    m.setZoom(13);
+  }, []);
   // Keep the traveller AND destination framed at all times — re-fit on each 4s
   // poll (padding the bottom so the info card doesn't cover them). As the gap
   // closes it naturally zooms in.
