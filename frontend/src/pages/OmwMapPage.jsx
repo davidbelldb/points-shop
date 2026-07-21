@@ -75,13 +75,26 @@ export default function OmwMapPage() {
   const fittedTrip = useRef(null);
 
   // Disable pull-to-refresh / rubber-band scroll while the full-screen map is up.
+  // The CSS overscroll-behavior isn't enough on its own inside the iOS webview, so
+  // we also swallow any touchmove that ISN'T panning the Google map itself — that
+  // kills the browser pull-to-refresh on the card/edges while leaving map gestures
+  // (which live inside `.gm-style`) fully intact.
   useEffect(() => {
     const html = document.documentElement; const body = document.body;
     const prev = { h: html.style.overscrollBehavior, bo: body.style.overscrollBehavior, ov: body.style.overflow };
     html.style.overscrollBehavior = 'none';
     body.style.overscrollBehavior = 'none';
     body.style.overflow = 'hidden';
-    return () => { html.style.overscrollBehavior = prev.h; body.style.overscrollBehavior = prev.bo; body.style.overflow = prev.ov; };
+    const blockPull = (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest('.gm-style')) return; // let the map pan
+      e.preventDefault();
+    };
+    document.addEventListener('touchmove', blockPull, { passive: false });
+    return () => {
+      html.style.overscrollBehavior = prev.h; body.style.overscrollBehavior = prev.bo; body.style.overflow = prev.ov;
+      document.removeEventListener('touchmove', blockPull, { passive: false });
+    };
   }, []);
 
   useEffect(() => {
@@ -139,10 +152,7 @@ export default function OmwMapPage() {
   const dest = trip?.dest_lat != null ? { lat: Number(trip.dest_lat), lng: Number(trip.dest_lng) } : null;
   const spriteAt = split ? split.pt : (trip?.current_lat != null ? { lat: Number(trip.current_lat), lng: Number(trip.current_lng) } : null);
 
-  const onLoad = useCallback((m) => {
-    mapRef.current = m;
-    m.setCenter(DEFAULT_CENTER); m.setZoom(13);   // sensible start before data lands
-  }, []);
+  const onLoad = useCallback((m) => { mapRef.current = m; }, []);
   // Keep the traveller AND destination framed at all times — re-fit on each 4s
   // poll (padding the bottom so the info card doesn't cover them). As the gap
   // closes it naturally zooms in.
@@ -170,14 +180,16 @@ export default function OmwMapPage() {
   const destIcon = useMemo(() => (isLoaded ? {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: PINK, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
-  // STABLE options object — recreating it each render was making the map reset
-  // its view and fight fitBounds. Memoised once.
+  // STABLE options object — recreating it each render made the map reset its view
+  // and fight fitBounds. Memoised once, with a Cambridge starting view baked in so
+  // it OPENS over the city (no wide/Europe flash) before the fit fine-tunes it.
   const mapOptions = useMemo(() => ({
+    center: DEFAULT_CENTER, zoom: 12,
     disableDefaultUI: true, gestureHandling: 'greedy', styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
   }), []);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: GREY, overscrollBehavior: 'none' }}>
+    <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: GREY, overscrollBehavior: 'none' }}>
       {isLoaded && (
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}

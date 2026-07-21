@@ -207,9 +207,10 @@ struct OmwLockScreenView: View {
                 }
 
                 HStack(spacing: 10) {
-                    // Invisible left margin matching the destination sprite, so the
-                    // trail stays centred (the traveller sprite glides from here).
-                    Color.clear.frame(width: 36, height: 36)
+                    // Static "leave" sprite bookends the trail on the left; the
+                    // gliding traveller starts from here and the "arrive" sprite
+                    // waits on the right.
+                    Image(spriteLeft(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
                     OmwTrail(progress: progress, reached: reached,
                              mover: spriteLeft(context.attributes),
                              arrived: context.state.arrived)

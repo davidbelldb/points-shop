@@ -128,6 +128,11 @@ INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng)
 SELECT id, 1, 'Bishops Court', 52.166806, 0.109139 FROM accounts WHERE username = 'katie'
 ON CONFLICT (account_id, position) DO NOTHING;
 
+--   David slot 2 — Shaftesbury Road (52°11'12.7"N 0°07'55.7"E) = 52.186861, 0.132139
+INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng)
+SELECT id, 2, 'Shaftesbury Road', 52.186861, 0.132139 FROM accounts WHERE role = 'admin'
+ON CONFLICT (account_id, position) DO NOTHING;
+
 -- Pronoun drives the narration copy ("he's" / "she's" / "they're"). Default is
 -- neutral; David and Katie get theirs so the feature reads right in both
 -- directions when we go two-way.
