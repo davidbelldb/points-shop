@@ -189,10 +189,11 @@ export default function OmwMapPage() {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: PINK, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
   // STABLE options object — recreating it each render made the map reset its view
-  // and fight fitBounds. Memoised once, with a Cambridge starting view baked in so
-  // it OPENS over the city (no wide/Europe flash) before the fit fine-tunes it.
+  // and fight fitBounds. Memoised once. The initial Cambridge view is set via the
+  // component's center/zoom PROPS below (not here) so the map is CONSTRUCTED over
+  // the city — options.center/zoom aren't honoured early enough and let a zoom-0
+  // world frame flash first.
   const mapOptions = useMemo(() => ({
-    center: DEFAULT_CENTER, zoom: 12,
     disableDefaultUI: true, gestureHandling: 'greedy', styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
   }), []);
 
@@ -201,6 +202,8 @@ export default function OmwMapPage() {
       {isLoaded && (
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
+          center={DEFAULT_CENTER}
+          zoom={13}
           onLoad={onLoad}
           options={mapOptions}
         >
