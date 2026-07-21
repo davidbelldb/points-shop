@@ -139,11 +139,13 @@ export default function OmwMapPage() {
   const dest = trip?.dest_lat != null ? { lat: Number(trip.dest_lat), lng: Number(trip.dest_lng) } : null;
   const spriteAt = split ? split.pt : (trip?.current_lat != null ? { lat: Number(trip.current_lat), lng: Number(trip.current_lng) } : null);
 
-  const onLoad = useCallback((m) => { mapRef.current = m; }, []);
-  // Camera: frame the traveller's current position + the destination, and
-  // re-tighten as the gap between them closes (zooms in as they approach).
-  // Runs on each 4s poll (via `trip`), never on the 90ms easing frames.
-  const camRef = useRef({ fitted: false, lastKm: Infinity });
+  const onLoad = useCallback((m) => {
+    mapRef.current = m;
+    m.setCenter(DEFAULT_CENTER); m.setZoom(13);   // sensible start before data lands
+  }, []);
+  // Keep the traveller AND destination framed at all times — re-fit on each 4s
+  // poll (padding the bottom so the info card doesn't cover them). As the gap
+  // closes it naturally zooms in.
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !isLoaded || !trip) return;
@@ -153,17 +155,10 @@ export default function OmwMapPage() {
     const dst = trip.dest_lat != null ? { lat: +trip.dest_lat, lng: +trip.dest_lng } : null;
     const pts = [cur, dst].filter(finite);
     if (!pts.length) return;
-    const gapKm = (finite(cur) && finite(dst)) ? haversine(cur, dst) : 0;
-    // Fit on first data, then only when we've closed ~30% of the remaining gap
-    // (progressive zoom-in without re-framing on every poll).
-    if (camRef.current.fitted && gapKm > camRef.current.lastKm * 0.7) return;
-    if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(15); }
-    else {
-      const b = new window.google.maps.LatLngBounds();
-      pts.forEach((p) => b.extend(p));
-      m.fitBounds(b, 90);
-    }
-    camRef.current = { fitted: true, lastKm: gapKm };
+    if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(15); return; }
+    const b = new window.google.maps.LatLngBounds();
+    pts.forEach((p) => b.extend(p));
+    m.fitBounds(b, { top: 90, bottom: 230, left: 60, right: 60 });
   }, [isLoaded, trip]);
 
   // Sprite icon at its ORIGINAL portrait ratio (151×202) so it isn't squashed.
@@ -175,16 +170,19 @@ export default function OmwMapPage() {
   const destIcon = useMemo(() => (isLoaded ? {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: PINK, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
+  // STABLE options object — recreating it each render was making the map reset
+  // its view and fight fitBounds. Memoised once.
+  const mapOptions = useMemo(() => ({
+    disableDefaultUI: true, gestureHandling: 'greedy', styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
+  }), []);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: GREY, overscrollBehavior: 'none' }}>
       {isLoaded && (
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
-          center={DEFAULT_CENTER}
-          zoom={13}
           onLoad={onLoad}
-          options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false }}
+          options={mapOptions}
         >
           {/* Only the road ahead, as one solid teal line. */}
           {remaining.length > 1 && <PolylineF path={remaining} options={{ strokeColor: TEAL, strokeOpacity: 0.95, strokeWeight: 6 }} />}
