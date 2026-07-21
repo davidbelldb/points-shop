@@ -68,6 +68,7 @@ const streetCache = new Map();       // tripId -> { at, street }
 const lastReroute = new Map();       // tripId -> ms of last replot
 const lastPush = new Map();          // tripId -> { at, band }
 const tripCtx = new Map();           // tripId -> live-signal state
+const lastMessage = new Map();       // tripId -> last pushed narration line (for the map)
 
 // Drop every in-memory cache entry for a finished trip.
 function clearTripCaches(tripId) {
@@ -75,6 +76,7 @@ function clearTripCaches(tripId) {
   lastReroute.delete(tripId);
   lastPush.delete(tripId);
   tripCtx.delete(tripId);
+  lastMessage.delete(tripId);
   for (const band of ['q1', 'q2', 'q3', 'final', 'close', 'detour', 'stopped']) {
     lastVariant.delete(`${tripId}:${band}`);
   }
@@ -488,8 +490,16 @@ export async function getActiveViewerTrip(accountId) {
   const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
   const remainingKm = Math.max(0, (Number(trip.distance_total_km) || 0) * (1 - progress));
   const etaMinutes = Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
-  const street = streetCache.get(trip.id)?.street || '';
-  const message = narration(progress, street, trip.traveller_pronoun, trip.transport, trip.id);
+  const distanceKm = Math.round(remainingKm * 10) / 10;
+  // Fraction along the CURRENT polyline (survives a reroute, which swaps the
+  // polyline) — the map uses this to place the sprite; `progress` is the overall bar.
+  let routeProgress = progress;
+  if (trip.current_lat != null && Array.isArray(trip.route_points) && trip.route_points.length >= 2) {
+    const p = alongRouteKm(trip.route_points, Number(trip.current_lat), Number(trip.current_lng));
+    if (p && p.totalKm > 0) routeProgress = Math.max(0, Math.min(1, p.alongKm / p.totalKm));
+  }
+  // The exact line last pushed to the banner (no re-rolling / shared-state churn).
+  const message = lastMessage.get(trip.id) || '';
   return {
     id: trip.id,
     traveller_name: trip.traveller_name || trip.traveller_username || 'Someone',
@@ -499,7 +509,7 @@ export async function getActiveViewerTrip(accountId) {
     origin_lat: trip.origin_lat, origin_lng: trip.origin_lng,
     current_lat: trip.current_lat, current_lng: trip.current_lng,
     route_points: trip.route_points || [],
-    progress, eta_minutes: etaMinutes, message,
+    progress, route_progress: routeProgress, eta_minutes: etaMinutes, distance_km: distanceKm, message,
   };
 }
 
@@ -669,7 +679,7 @@ async function startLiveActivityFor(trip) {
       event: 'start',
       channelId,
       attributesType: ATTR_TYPE,
-      contentState: buildState(trip, { progress: 0, message: narration(0, '', trip.traveller_pronoun, trip.transport, trip.id) }),
+      contentState: buildState(trip, { progress: 0, message: (() => { const m = narration(0, '', trip.traveller_pronoun, trip.transport, trip.id); lastMessage.set(trip.id, m); return m; })() }),
       attributes: {
         travellerName: traveller,
         destLabel: trip.dest_label || '',
@@ -799,6 +809,7 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
       remainingKm: remainingToDest,
     };
     const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
+    lastMessage.set(tripId, message);
     await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
   }
   return { ok: true, arrived: false, progress };

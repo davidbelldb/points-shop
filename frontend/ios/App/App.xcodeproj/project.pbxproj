@@ -22,6 +22,8 @@
 		33C83C41300D36F8000FDAA8 /* sneakywatchwidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33C83C30300D36F7000FDAA8 /* sneakywatchwidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		33C83C6A300D3B18000FDAA8 /* WatchTokenBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C83C69300D3B18000FDAA8 /* WatchTokenBridge.swift */; };
 		33CB9EDD300EC0AF000E56C3 /* OmwSiriIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CB9EDC300EC0AF000E56C3 /* OmwSiriIntent.swift */; };
+		33CB9EE030102701000E56C3 /* Doorbell.caf in Resources */ = {isa = PBXBuildFile; fileRef = 33CB9EDE30102701000E56C3 /* Doorbell.caf */; };
+		33CB9EE130102701000E56C3 /* Knock.caf in Resources */ = {isa = PBXBuildFile; fileRef = 33CB9EDF30102701000E56C3 /* Knock.caf */; };
 		33FD33FF2FEEE5D50008C86C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */; };
 		33FD34012FEEE5D50008C86C /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD34002FEEE5D50008C86C /* SwiftUI.framework */; };
 		33FD34122FEEE5D60008C86C /* CrowWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -119,6 +121,8 @@
 		33C83C67300D398E000FDAA8 /* sneakywatchwidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = sneakywatchwidgetExtension.entitlements; sourceTree = "<group>"; };
 		33C83C69300D3B18000FDAA8 /* WatchTokenBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchTokenBridge.swift; sourceTree = "<group>"; };
 		33CB9EDC300EC0AF000E56C3 /* OmwSiriIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmwSiriIntent.swift; sourceTree = "<group>"; };
+		33CB9EDE30102701000E56C3 /* Doorbell.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Doorbell.caf; sourceTree = "<group>"; };
+		33CB9EDF30102701000E56C3 /* Knock.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Knock.caf; sourceTree = "<group>"; };
 		33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrowWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		33FD34002FEEE5D50008C86C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -257,6 +261,8 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				33CB9EDE30102701000E56C3 /* Doorbell.caf */,
+				33CB9EDF30102701000E56C3 /* Knock.caf */,
 				33CB9EDC300EC0AF000E56C3 /* OmwSiriIntent.swift */,
 				3392FC9C300E0FC200A62D8A /* OmwActivityPlugin.swift */,
 				3392FC99300E0FB900A62D8A /* OmwActivityAttributes.swift */,
@@ -486,6 +492,8 @@
 			files = (
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
+				33CB9EE030102701000E56C3 /* Doorbell.caf in Resources */,
+				33CB9EE130102701000E56C3 /* Knock.caf in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
@@ -598,7 +606,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -639,7 +647,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -682,7 +690,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = "sneakywatch Watch App/sneakywatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -730,7 +738,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = "sneakywatch Watch App/sneakywatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -774,7 +782,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = sneakywatchwidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -820,7 +828,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = sneakywatchwidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -864,7 +872,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = CrowWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -908,7 +916,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = CrowWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -1053,7 +1061,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
@@ -1079,7 +1087,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 110;
 				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_TEAM = 799WF8VK5C;
 				INFOPLIST_FILE = App/Info.plist;
