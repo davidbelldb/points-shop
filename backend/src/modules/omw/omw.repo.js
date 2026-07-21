@@ -45,15 +45,26 @@ function normTransport(t) { return TRANSPORT_KMH[t] ? t : DEFAULT_TRANSPORT; }
 const ROAD_FACTOR = 1.3;
 // ETA display floor.
 const MIN_ETA_SECONDS = 60;
-// Treat the traveller as arrived within this distance of the destination (~80 m).
-const ARRIVE_KM = 0.08;
+// Treat the traveller as arrived within this straight-line distance of the
+// destination COORDINATE (~90 m) — works even if the point isn't on a street.
+const ARRIVE_KM = 0.09;
 // Seconds the "arrived" state lingers before the banner dismisses itself.
 const ARRIVE_LINGER_MS = 6000;
 // Reverse-geocode at most once every 12s per trip (Nominatim asks for ≤1 req/s).
 const GEO_THROTTLE_MS = 12_000;
+// If the traveller strays more than this from the plotted route, re-plot from
+// where they actually are (handles taking a different way).
+const REROUTE_DEV_KM = 0.07;
+// Don't re-plot more than once every 20s (OSRM is a shared public server).
+const REROUTE_MIN_MS = 20_000;
+// Coalesce Live Activity pushes to at most this often (Apple throttles frequent
+// pushes → the "hang then jolt" bursts). Band changes + arrival push immediately.
+const PUSH_MIN_MS = 9_000;
 
-// In-memory street cache per trip: tripId -> { at, street }.
-const streetCache = new Map();
+// In-memory caches per trip.
+const streetCache = new Map();       // tripId -> { at, street }
+const lastReroute = new Map();       // tripId -> ms of last replot
+const lastPush = new Map();          // tripId -> { at, band }
 
 // ---------------------------------------------------------------------------
 // Geo helpers
@@ -79,9 +90,9 @@ function polylineKm(points) {
   return total;
 }
 
-// Project (lat,lng) onto the route polyline and return { alongKm, totalKm }:
-// how far along the route the nearest point to the traveller sits. Handles
-// deviation — an off-route point still snaps to its closest route segment.
+// Project (lat,lng) onto the route polyline and return
+// { alongKm, totalKm, deviationKm }: how far along the route the nearest point
+// sits, and how far off the route the traveller actually is (for reroute checks).
 function alongRouteKm(points, lat, lng) {
   if (!Array.isArray(points) || points.length < 2) return null;
   const k = Math.cos((lat * Math.PI) / 180) || 1;   // local equirectangular scale
@@ -97,10 +108,14 @@ function alongRouteKm(points, lat, lng) {
     const cx = ax + t * dx; const cy = ay + t * dy;
     const d = Math.hypot(px - cx, py - cy);
     const segKm = haversineKm(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
-    if (!best || d < best.d) best = { d, along: cum + segKm * t };
+    if (!best || d < best.d) {
+      best = { d, along: cum + segKm * t, projLat: cy, projLng: cx / k };
+    }
     cum += segKm;
   }
-  return { alongKm: best ? best.along : 0, totalKm: cum };
+  if (!best) return { alongKm: 0, totalKm: cum, deviationKm: 0 };
+  const deviationKm = haversineKm(lat, lng, best.projLat, best.projLng);
+  return { alongKm: best.along, totalKm: cum, deviationKm };
 }
 
 // Public OSRM instances (FOSSGIS, no API key) with real per-mode profiles.
@@ -549,7 +564,7 @@ async function startLiveActivityFor(trip) {
 }
 
 async function finaliseArrival(trip) {
-  streetCache.delete(trip.id);
+  streetCache.delete(trip.id); lastReroute.delete(trip.id); lastPush.delete(trip.id);
   lastVariant.delete(`${trip.id}:q1`); lastVariant.delete(`${trip.id}:q2`);
   lastVariant.delete(`${trip.id}:q3`); lastVariant.delete(`${trip.id}:final`);
   const traveller = await travellerName(trip.traveller_id);
@@ -561,9 +576,10 @@ async function finaliseArrival(trip) {
   setTimeout(() => { endLiveActivity(trip, Date.now()).catch(() => {}); }, ARRIVE_LINGER_MS);
 }
 
-// Record a location ping: project onto the route for distance progress, refresh
-// the street, check arrival, push. Progress is monotonic (never slips back on a
-// deviation). Only the trip's own traveller may ping it.
+// Record a location ping: measure progress along the plotted route, RE-PLOT if
+// the traveller has taken a different way, decide arrival on the destination
+// COORDINATE, and push (coalesced so Apple doesn't throttle us into bursts).
+// Progress is monotonic. Only the trip's own traveller may ping it.
 export async function recordPing({ tripId, travellerId, lat, lng }) {
   const { rows } = await query(
     `SELECT * FROM omw_trips WHERE id = $1 AND traveller_id = $2 AND status = 'active'`,
@@ -573,35 +589,66 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
   if (!trip) return { ok: false };
   if (lat == null || lng == null) return { ok: false };
 
-  // Distance progress from projection onto the route; fall back to straight-line
-  // toward the destination if the route polyline is somehow missing.
-  const totalKm = Number(trip.distance_total_km) || 0;
+  const now = Date.now();
+  const remainingToDest = haversineKm(lat, lng, trip.dest_lat, trip.dest_lng);
+  let offset = Number(trip.route_offset_km) || 0;
+  let total = Number(trip.distance_total_km) || 0;
+  let proj = alongRouteKm(trip.route_points, lat, lng);
+  let along = proj ? proj.alongKm : 0;
+  if (proj && (!total || total <= 0)) total = offset + proj.totalKm;
+
+  // Reroute: gone off the plotted line by more than the threshold → re-plot from
+  // here to the destination, carrying the distance already covered so the bar
+  // doesn't jump. Skipped near the destination and rate-limited.
+  const deviated = proj && proj.deviationKm > REROUTE_DEV_KM;
+  const canReroute = now - (lastReroute.get(tripId) || 0) > REROUTE_MIN_MS;
+  if (deviated && remainingToDest > ARRIVE_KM * 3 && canReroute) {
+    lastReroute.set(tripId, now);
+    const covered = offset + along;
+    const replot = await plotRoute(lat, lng, trip.dest_lat, trip.dest_lng, trip.transport);
+    offset = covered;
+    total = covered + replot.routeKm;
+    along = 0;
+    trip.route_points = replot.points;
+    await query(
+      `UPDATE omw_trips SET route_points = $1::jsonb, route_offset_km = $2, distance_total_km = $3 WHERE id = $4`,
+      [JSON.stringify(replot.points), offset, total, tripId],
+    ).catch(() => {});
+  }
+
+  // Fallback if we have no usable route at all: straight-line toward the dest.
   let progress;
-  const proj = alongRouteKm(trip.route_points, lat, lng);
-  if (proj && proj.totalKm > 0) {
-    progress = proj.alongKm / proj.totalKm;
+  if (total > 0) {
+    progress = (offset + along) / total;
   } else {
-    const straight = haversineKm(trip.origin_lat, trip.origin_lng, trip.dest_lat, trip.dest_lng) || totalKm;
-    progress = straight > 0 ? 1 - haversineKm(lat, lng, trip.dest_lat, trip.dest_lng) / straight : 0;
+    const straight = haversineKm(trip.origin_lat, trip.origin_lng, trip.dest_lat, trip.dest_lng) || 1;
+    progress = 1 - remainingToDest / straight;
   }
   progress = Math.max(0, Math.min(1, progress));
-  // Monotonic: keep the furthest-reached progress even if a wobble projects back.
-  progress = Math.max(progress, Number(trip.progress) || 0);
+  progress = Math.max(progress, Number(trip.progress) || 0);   // monotonic
 
-  const remainingToDest = haversineKm(lat, lng, trip.dest_lat, trip.dest_lng);
+  // Arrival is purely proximity to the destination coordinate (no street needed).
   const arrived = remainingToDest <= ARRIVE_KM || progress >= 0.999;
   const phase = arrived ? 4 : phaseFor(progress);
-  const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId);
 
   await query(
     `UPDATE omw_trips SET current_lat = $1, current_lng = $2, distance_remaining_km = $3,
             progress = $4, phase = $5, last_ping_at = NOW() WHERE id = $6`,
-    [lat, lng, Math.max(0, totalKm * (1 - progress)), arrived ? 1 : progress, phase, tripId],
+    [lat, lng, Math.max(0, total * (1 - progress)), arrived ? 1 : progress, phase, tripId],
   );
 
   if (arrived) { await finaliseArrival(trip); return { ok: true, arrived: true, progress: 1 }; }
 
-  await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
+  // Coalesce pushes: only when the phase band changes, or every PUSH_MIN_MS,
+  // whichever comes first. This keeps us under Apple's update throttle so the bar
+  // moves steadily instead of hanging then jolting.
+  const band = bandFor(progress);
+  const prev = lastPush.get(tripId) || { at: 0, band: null };
+  if (band !== prev.band || now - prev.at >= PUSH_MIN_MS) {
+    lastPush.set(tripId, { at: now, band });
+    const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId);
+    await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
+  }
   return { ok: true, arrived: false, progress };
 }
 

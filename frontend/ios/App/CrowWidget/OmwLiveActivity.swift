@@ -60,15 +60,19 @@ private func omwLine(_ s: OmwActivityAttributes.ContentState) -> String {
 }
 
 // A solid trail that fills left→right to `progress` (0…1), drawn over the dashes.
+// Animates between pushed values so sparse/irregular location updates glide
+// instead of jolting.
 struct OmwProgressFill: View {
     var progress: Double
     var color: Color
     var body: some View {
         GeometryReader { geo in
+            let p = max(0, min(1, progress))
             Capsule()
                 .fill(color)
-                .frame(width: max(0, min(1, progress)) * geo.size.width, height: 3)
-                .position(x: (max(0, min(1, progress)) * geo.size.width) / 2, y: geo.size.height / 2)
+                .frame(width: p * geo.size.width, height: 3)
+                .position(x: (p * geo.size.width) / 2, y: geo.size.height / 2)
+                .animation(.easeInOut(duration: 1.4), value: progress)
         }
         .frame(height: 12)
     }

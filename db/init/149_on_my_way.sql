@@ -87,6 +87,9 @@ ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS eta_seconds       INTEGER NOT NUL
 ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS current_lat       DOUBLE PRECISION;
 ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS current_lng       DOUBLE PRECISION;
 ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS la_channel_id     TEXT;
+-- Distance already covered before the current (possibly re-routed) polyline, so
+-- progress survives a mid-journey reroute: progress = (offset + along) / total.
+ALTER TABLE omw_trips ADD COLUMN IF NOT EXISTS route_offset_km   DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 -- Single-row feature config. `live_to_partner` = false → a trip loops back to
 -- the traveller (v1 self-test). Flip it true to go two-way: a trip is pushed to
@@ -115,9 +118,14 @@ CREATE INDEX IF NOT EXISTS omw_tok_trip_idx ON omw_activity_tokens (trip_id);
 
 -- Seed David's first quick destination (Blinco Grove) so there's something to
 -- fire on day one. Idempotent. Users add/edit their three on /account.
---   Blinco Grove, Cambridge ≈ 52.1893, 0.1387
+--   Blinco Grove, Cambridge (52°11'09.6"N 0°08'31.8"E) = 52.186000, 0.142167
 INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng)
-SELECT id, 1, 'Blinco Grove', 52.1893, 0.1387 FROM accounts WHERE role = 'admin'
+SELECT id, 1, 'Blinco Grove', 52.186000, 0.142167 FROM accounts WHERE role = 'admin'
+ON CONFLICT (account_id, position) DO NOTHING;
+
+--   Bishops Court, Cambridge (52°10'00.5"N 0°06'32.9"E) = 52.166806, 0.109139
+INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng)
+SELECT id, 1, 'Bishops Court', 52.166806, 0.109139 FROM accounts WHERE username = 'katie'
 ON CONFLICT (account_id, position) DO NOTHING;
 
 -- Pronoun drives the narration copy ("he's" / "she's" / "they're"). Default is
