@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { GoogleMap, MarkerF, PolylineF, useJsApiLoader } from '@react-google-maps/api';
 import { api } from '../lib/api.js';
 
@@ -105,7 +104,6 @@ function computeView(a, b, wPx, hPx) {
 }
 
 export default function OmwMapPage() {
-  const navigate = useNavigate();
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trip, setTrip] = useState(undefined);
   const [display, setDisplay] = useState(0);   // eased progress
@@ -263,19 +261,6 @@ export default function OmwMapPage() {
           </GoogleMap>
         </div>
       )}
-
-      <button
-        type="button"
-        onClick={() => navigate('/messages')}
-        aria-label="Close"
-        style={{
-          position: 'absolute', top: 'max(16px, env(safe-area-inset-top))', left: 16, zIndex: 10,
-          width: 40, height: 40, borderRadius: 20, border: 'none',
-          background: 'rgba(31,31,31,0.85)', color: '#fff', fontSize: 20, backdropFilter: 'blur(6px)',
-        }}
-      >
-        ×
-      </button>
 
       <div style={{
         position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
