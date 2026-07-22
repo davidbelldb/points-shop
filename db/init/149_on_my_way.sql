@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS omw_quick_destinations (
 );
 CREATE INDEX IF NOT EXISTS omw_quickdest_account_idx ON omw_quick_destinations (account_id);
 
+-- Optional friendly display name. `label` is the place/street name from the
+-- Cambridge search; `alias` (e.g. "Katie's", "Home", "The Office") overrides what
+-- shows in the app + Live Activity. NULL/blank → fall back to `label`.
+ALTER TABLE omw_quick_destinations ADD COLUMN IF NOT EXISTS alias TEXT;
+
 -- "Current transport" is a single per-user setting (what you're travelling by),
 -- not per destination. Every triggered journey uses it. bicycle | scooter | uber.
 -- Katie only ever takes an Uber, so default her to it.

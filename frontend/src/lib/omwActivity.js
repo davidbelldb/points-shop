@@ -149,7 +149,8 @@ export async function syncOmwShortcuts() {
   if (!Capacitor.isNativePlatform() || !Native) return;
   try {
     const { destinations } = await api.omw.listQuickDestinations();
-    const items = (destinations || []).map((d) => ({ id: d.id, label: d.label }));
+    // Show the alias in the menu/Siri when set, else the place/street label.
+    const items = (destinations || []).map((d) => ({ id: d.id, label: (d.alias || '').trim() || d.label }));
     Native.setShortcuts({ items });
   } catch { /* ignore */ }
 }

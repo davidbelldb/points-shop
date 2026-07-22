@@ -14,6 +14,33 @@ function transportOptionsFor(username) {
   return username === 'katie' ? ['uber'] : ['bicycle', 'scooter'];
 }
 
+// Optional friendly name for a slot. Blank clears it (the app then shows the
+// street/place label). Saves on Enter or the Save button.
+function AliasInput({ dest, disabled, onSave }) {
+  const [val, setVal] = useState(dest.alias || '');
+  useEffect(() => { setVal(dest.alias || ''); }, [dest.alias]);
+  const dirty = val.trim() !== (dest.alias || '').trim();
+  return (
+    <div className="mt-1 flex items-center gap-2">
+      <input
+        type="text"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && dirty) onSave(val.trim()); }}
+        placeholder={`Name (optional) — defaults to “${dest.label}”`}
+        disabled={disabled}
+        className="flex-1 rounded-md border border-neutral-200 px-2 py-1 text-xs"
+      />
+      {dirty && (
+        <button type="button" onClick={() => onSave(val.trim())} disabled={disabled}
+          className="shrink-0 rounded-md bg-sky-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-60">
+          Save name
+        </button>
+      )}
+    </div>
+  );
+}
+
 function UserOmwEditor({ account }) {
   const [dests, setDests] = useState(null);
   const [transport, setTransport] = useState(null);
@@ -31,7 +58,12 @@ function UserOmwEditor({ account }) {
 
   async function save(pos, patch) {
     const cur = bySlot(pos) || {};
-    const body = { label: patch.label ?? cur.label, lat: patch.lat ?? cur.lat, lng: patch.lng ?? cur.lng };
+    const body = {
+      label: patch.label ?? cur.label,
+      alias: patch.alias !== undefined ? patch.alias : cur.alias,
+      lat: patch.lat ?? cur.lat,
+      lng: patch.lng ?? cur.lng,
+    };
     if (!body.label || body.lat == null) { setError('Pick a place first.'); return; }
     setBusy(true); setError(null);
     try {
@@ -91,7 +123,8 @@ function UserOmwEditor({ account }) {
             </div>
             <p className="text-sm">
               {d
-                ? <><span className="font-medium">{d.label}</span>
+                ? <><span className="font-medium">{(d.alias || '').trim() || d.label}</span>
+                    {(d.alias || '').trim() && <span className="ml-1 text-[11px] text-neutral-500">· {d.label}</span>}
                     <span className="ml-1 text-[10px] text-neutral-400">({Number(d.lat).toFixed(4)}, {Number(d.lng).toFixed(4)})</span></>
                 : <span className="text-neutral-400">empty</span>}
             </p>
@@ -102,6 +135,7 @@ function UserOmwEditor({ account }) {
                   className="shrink-0 text-xs text-neutral-400 hover:text-red-600">Clear</button>
               )}
             </div>
+            {d && <AliasInput dest={d} disabled={busy} onSave={(alias) => save(pos, { alias })} />}
           </div>
         );
       })}

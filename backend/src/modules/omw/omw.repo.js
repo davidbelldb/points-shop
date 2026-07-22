@@ -423,7 +423,7 @@ function buildState(trip, { progress = 0, message = '', arrived = false } = {}) 
 
 export async function listQuickDestinations(accountId) {
   const { rows } = await query(
-    `SELECT id, position, label, lat, lng
+    `SELECT id, position, label, alias, lat, lng
        FROM omw_quick_destinations WHERE account_id = $1 ORDER BY position`,
     [accountId],
   );
@@ -433,7 +433,7 @@ export async function listQuickDestinations(accountId) {
 // A specific quick destination that must belong to the account.
 async function getQuickDestination(accountId, id) {
   const { rows } = await query(
-    `SELECT id, position, label, lat, lng
+    `SELECT id, position, label, alias, lat, lng
        FROM omw_quick_destinations WHERE account_id = $1 AND id = $2`,
     [accountId, id],
   );
@@ -443,25 +443,34 @@ async function getQuickDestination(accountId, id) {
 // The default (position 1) quick destination, or the lowest-positioned one.
 async function defaultQuickDestination(accountId) {
   const { rows } = await query(
-    `SELECT id, position, label, lat, lng
+    `SELECT id, position, label, alias, lat, lng
        FROM omw_quick_destinations WHERE account_id = $1 ORDER BY position LIMIT 1`,
     [accountId],
   );
   return rows[0] ?? null;
 }
 
-// Upsert one of the caller's 3 slots.
-export async function setQuickDestination(accountId, position, { label, lat, lng }) {
+// The name that shows in the app / Live Activity: the alias if one's set, else
+// the place/street label.
+export function destDisplayName(d) {
+  const a = (d?.alias ?? '').trim();
+  return a || d?.label || '';
+}
+
+// Upsert one of the caller's 3 slots. `alias` is optional; a blank one clears it
+// (falls back to the label).
+export async function setQuickDestination(accountId, position, { label, alias, lat, lng }) {
   const pos = Number(position);
   if (!(pos >= 1 && pos <= 3)) { const e = new Error('position must be 1–3'); e.statusCode = 400; throw e; }
   if (!label || lat == null || lng == null) { const e = new Error('label, lat and lng are required'); e.statusCode = 400; throw e; }
+  const cleanAlias = (alias ?? '').trim() || null;
   const { rows } = await query(
-    `INSERT INTO omw_quick_destinations (account_id, position, label, lat, lng)
-     VALUES ($1,$2,$3,$4,$5)
+    `INSERT INTO omw_quick_destinations (account_id, position, label, alias, lat, lng)
+     VALUES ($1,$2,$3,$4,$5,$6)
      ON CONFLICT (account_id, position) DO UPDATE SET
-       label = EXCLUDED.label, lat = EXCLUDED.lat, lng = EXCLUDED.lng, updated_at = NOW()
-     RETURNING id, position, label, lat, lng`,
-    [accountId, pos, label, Number(lat), Number(lng)],
+       label = EXCLUDED.label, alias = EXCLUDED.alias, lat = EXCLUDED.lat, lng = EXCLUDED.lng, updated_at = NOW()
+     RETURNING id, position, label, alias, lat, lng`,
+    [accountId, pos, label, cleanAlias, Number(lat), Number(lng)],
   );
   return rows[0];
 }
@@ -621,7 +630,8 @@ export async function startTrip({ travellerId, origin = {}, destId, transport })
   // Transport is the caller's single "current transport" setting, unless a
   // specific one is passed for this trip.
   const mode = normTransport(transport ?? await getCurrentTransport(travellerId));
-  const dest = { label: chosen.label, lat: chosen.lat, lng: chosen.lng };
+  // Show the alias in the app + Live Activity when one's set, else the street/place label.
+  const dest = { label: destDisplayName(chosen), lat: chosen.lat, lng: chosen.lng };
   const { points, routeKm } = await plotRoute(origin.lat, origin.lng, dest.lat, dest.lng, mode);
   const etaSeconds = etaFor(routeKm, mode);
   const info = await travellerInfo(travellerId);
