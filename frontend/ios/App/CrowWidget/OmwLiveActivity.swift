@@ -24,12 +24,16 @@ private func spriteRight(_ a: OmwActivityAttributes) -> String {
     }
 }
 
-// The STATIC left bookend sprite. Bicycle gets its own dedicated pose
-// (david_leave_1); scooter/uber reuse their normal "leave" sprite. The gliding
-// traveller in the trail always uses spriteLeft, so this only swaps the parked
-// figure at the start of the line.
+// The STATIC left bookend sprite, with dedicated parked poses per transport:
+// bicycle → david_leave_1, scooter → david_leave_0; uber reuses its normal
+// "leave" sprite. The gliding traveller in the trail always uses spriteLeft, so
+// this only swaps the parked figure at the start of the line.
 private func spriteLeftStatic(_ a: OmwActivityAttributes) -> String {
-    a.transport == "bicycle" ? "david_leave_1" : spriteLeft(a)
+    switch a.transport {
+    case "bicycle": return "david_leave_1"
+    case "scooter": return "david_leave_0"
+    default:        return spriteLeft(a)
+    }
 }
 
 // Banner background tint, by transport: bicycle → deep green #122b1f,
