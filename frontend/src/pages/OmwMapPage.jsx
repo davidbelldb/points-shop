@@ -14,7 +14,8 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const GREY = '#1f1f1f';
 const TEAL = '#15b8a6';
 const PINK = '#ee70bd';
-const DEFAULT_CENTER = { lat: 52.2053, lng: 0.1218 };
+// Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E.
+const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 
 const DARK_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#1f1f1f' }] },
@@ -230,10 +231,13 @@ export default function OmwMapPage() {
   const destIcon = useMemo(() => (isLoaded ? {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: PINK, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
-  // STABLE options object — memoised once. The camera (center/zoom) is CONTROLLED
-  // via props below (our own computed, Cambridge-clamped values), so it isn't set
-  // here.
+  // STABLE options object — memoised once. center/zoom are ALSO given here so the
+  // map is CONSTRUCTED over Cambridge and paints the city instantly, before any
+  // async trip data arrives (without this the constructor briefly shows its world
+  // default). The live camera is then driven by the controlled center/zoom props
+  // below (our own Cambridge-clamped values).
   const mapOptions = useMemo(() => ({
+    center: DEFAULT_CENTER, zoom: 13,
     disableDefaultUI: true, keyboardShortcuts: false, gestureHandling: 'greedy',
     styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
   }), []);
