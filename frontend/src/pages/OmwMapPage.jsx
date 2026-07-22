@@ -65,12 +65,50 @@ function pointAtDistance(points, cum, dist) {
   return { pt, idx: i };
 }
 
+// Only accept coordinates that are actually in the Cambridge / UK area. A null or
+// 0 coordinate coerces to (…,0)/(0,0) via `+null` and would otherwise blow a fit
+// out to the "Europe" world view. This box rejects any such stray point.
+const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+  && p.lat > 49 && p.lat < 56 && p.lng > -6 && p.lng < 2;
+
+// Deterministically compute a {center, zoom} that frames points a…b inside the
+// visible area (minus the header/card padding), CLAMPED to a Cambridge-sane zoom
+// range so it can never resolve to a continent-wide view. We compute this
+// ourselves instead of using map.fitBounds, whose async races with map init were
+// intermittently leaving the camera stuck zoomed out over Europe.
+const WORLD_PX = 256;
+const latRad = (lat) => {
+  const s = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
+  return Math.log((1 + s) / (1 - s)) / 2;
+};
+function computeView(a, b, wPx, hPx) {
+  const midLat = (a.lat + b.lat) / 2;
+  const midLng = (a.lng + b.lng) / 2;
+  // Usable area after the top inset and the bottom info card.
+  const padTop = 90; const padBottom = 240; const padX = 70;
+  const usableW = Math.max(120, wPx - padX * 2);
+  const usableH = Math.max(120, hPx - padTop - padBottom);
+  const latFraction = Math.abs(latRad(b.lat) - latRad(a.lat)) / Math.PI || 1e-7;
+  const lngFraction = Math.abs(b.lng - a.lng) / 360 || 1e-7;
+  const latZoom = Math.log2(usableH / WORLD_PX / latFraction);
+  const lngZoom = Math.log2(usableW / WORLD_PX / lngFraction);
+  let zoom = Math.min(latZoom, lngZoom);
+  if (!Number.isFinite(zoom)) zoom = 13;
+  zoom = Math.max(12, Math.min(16.5, zoom));
+  // Bias the centre south so the framed content sits ABOVE the bottom card. The
+  // usable band's centre is ~75px above the screen centre; convert that to a lat
+  // shift at the chosen zoom and drop the centre by it.
+  const metresPerPx = (156543.03392 * Math.cos((midLat * Math.PI) / 180)) / 2 ** zoom;
+  const shiftLat = (75 * metresPerPx) / 111320;
+  return { center: { lat: midLat - shiftLat, lng: midLng }, zoom };
+}
+
 export default function OmwMapPage() {
   const navigate = useNavigate();
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trip, setTrip] = useState(undefined);
   const [display, setDisplay] = useState(0);   // eased progress
-  const [ready, setReady] = useState(false);   // map has hit its first 'idle'
+  const [cam, setCam] = useState({ center: DEFAULT_CENTER, zoom: 13 }); // controlled camera
   const targetRef = useRef(0);
   const mapRef = useRef(null);
   const fittedTrip = useRef(null);
@@ -153,29 +191,18 @@ export default function OmwMapPage() {
   const dest = trip?.dest_lat != null ? { lat: Number(trip.dest_lat), lng: Number(trip.dest_lng) } : null;
   const spriteAt = split ? split.pt : (trip?.current_lat != null ? { lat: Number(trip.current_lat), lng: Number(trip.current_lng) } : null);
 
-  // The map is constructed over Cambridge (center/zoom in mapOptions below). We do
-  // NOT fit to the route until the map fires its first 'idle' — calling fitBounds
-  // on a not-yet-initialised map is what throws it to the zoom-0 world view for a
-  // few seconds before snapping back. Waiting for idle keeps it on Cambridge, then
-  // fits cleanly.
-  const onLoad = useCallback((m) => {
-    mapRef.current = m;
-    m.setCenter(DEFAULT_CENTER);
-    m.setZoom(13);
-    window.google.maps.event.addListenerOnce(m, 'idle', () => setReady(true));
-  }, []);
-  // Keep the traveller AND destination framed at all times — re-fit on each 4s
-  // poll (padding the bottom so the info card doesn't cover them). As the gap
-  // closes it naturally zooms in.
+  const onLoad = useCallback((m) => { mapRef.current = m; }, []);
+
+  // Recompute the controlled camera on each 4s poll so the traveller AND
+  // destination stay framed, tightening as the gap closes. We derive center/zoom
+  // ourselves (clamped to a Cambridge-sane range) and drive the map via controlled
+  // props — no fitBounds, so there is no init race that can strand it over Europe.
   useEffect(() => {
+    if (!isLoaded || !trip) return;
     const m = mapRef.current;
-    if (!m || !isLoaded || !trip || !ready) return;
-    // Only accept coordinates that are actually in the Cambridge / UK area. A null
-    // or 0 coordinate coerces to (…,0)/(0,0) via `+null` and passes a naive
-    // isFinite check — fitting Cambridge→(0,0) is exactly what blows the view out
-    // to the zoom-0 "Europe" world map. This box rejects any such stray point.
-    const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
-      && p.lat > 49 && p.lat < 56 && p.lng > -6 && p.lng < 2;
+    const div = m && m.getDiv ? m.getDiv() : null;
+    const wPx = div?.offsetWidth || window.innerWidth || 390;
+    const hPx = div?.offsetHeight || window.innerHeight || 780;
     const rp = (Array.isArray(trip.route_points) ? trip.route_points.map(toLatLng) : []).filter(inUK);
     // Traveller point: live position → origin → first plotted route point.
     const cur = [
@@ -188,13 +215,11 @@ export default function OmwMapPage() {
       trip.dest_lat != null ? { lat: +trip.dest_lat, lng: +trip.dest_lng } : null,
       rp[rp.length - 1],
     ].find(inUK) || null;
-    const pts = [cur, dst].filter(inUK);
-    if (!pts.length) return;   // nothing valid — leave it on the Cambridge view
-    if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(15); return; }
-    const b = new window.google.maps.LatLngBounds();
-    pts.forEach((p) => b.extend(p));
-    m.fitBounds(b, { top: 90, bottom: 230, left: 60, right: 60 });
-  }, [isLoaded, trip, ready]);
+    if (cur && dst) { setCam(computeView(cur, dst, wPx, hPx)); return; }
+    const one = cur || dst;
+    if (one) setCam({ center: one, zoom: 15 });
+    // else: nothing valid — keep the current Cambridge view.
+  }, [isLoaded, trip]);
 
   // Sprite icon at its ORIGINAL portrait ratio (151×202) so it isn't squashed.
   const spriteIcon = useMemo(() => {
@@ -205,12 +230,10 @@ export default function OmwMapPage() {
   const destIcon = useMemo(() => (isLoaded ? {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: PINK, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
-  // STABLE options object — recreating it each render made the map reset its view
-  // and fight fitBounds. Memoised once, with the Cambridge view baked into the
-  // CONSTRUCTOR options so the map is built over the city (no world flash). The
-  // route fit waits for the first 'idle' (see onLoad) so it never fires early.
+  // STABLE options object — memoised once. The camera (center/zoom) is CONTROLLED
+  // via props below (our own computed, Cambridge-clamped values), so it isn't set
+  // here.
   const mapOptions = useMemo(() => ({
-    center: DEFAULT_CENTER, zoom: 13,
     disableDefaultUI: true, keyboardShortcuts: false, gestureHandling: 'greedy',
     styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
   }), []);
@@ -224,6 +247,8 @@ export default function OmwMapPage() {
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: 'calc(100% + 34px)' }}
+            center={cam.center}
+            zoom={cam.zoom}
             onLoad={onLoad}
             options={mapOptions}
           >
