@@ -70,6 +70,7 @@ export default function OmwMapPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trip, setTrip] = useState(undefined);
   const [display, setDisplay] = useState(0);   // eased progress
+  const [ready, setReady] = useState(false);   // map has hit its first 'idle'
   const targetRef = useRef(0);
   const mapRef = useRef(null);
   const fittedTrip = useRef(null);
@@ -152,21 +153,23 @@ export default function OmwMapPage() {
   const dest = trip?.dest_lat != null ? { lat: Number(trip.dest_lat), lng: Number(trip.dest_lng) } : null;
   const spriteAt = split ? split.pt : (trip?.current_lat != null ? { lat: Number(trip.current_lat), lng: Number(trip.current_lng) } : null);
 
-  // Imperatively pin the view over Cambridge the instant the map exists —
-  // options.center/zoom aren't reliably honoured on mount (it falls back to the
-  // zoom-0 world view = "Europe"), and a one-shot set here doesn't fight the
-  // later fitBounds the way controlled center/zoom props would.
+  // The map is constructed over Cambridge (center/zoom in mapOptions below). We do
+  // NOT fit to the route until the map fires its first 'idle' — calling fitBounds
+  // on a not-yet-initialised map is what throws it to the zoom-0 world view for a
+  // few seconds before snapping back. Waiting for idle keeps it on Cambridge, then
+  // fits cleanly.
   const onLoad = useCallback((m) => {
     mapRef.current = m;
     m.setCenter(DEFAULT_CENTER);
     m.setZoom(13);
+    window.google.maps.event.addListenerOnce(m, 'idle', () => setReady(true));
   }, []);
   // Keep the traveller AND destination framed at all times — re-fit on each 4s
   // poll (padding the bottom so the info card doesn't cover them). As the gap
   // closes it naturally zooms in.
   useEffect(() => {
     const m = mapRef.current;
-    if (!m || !isLoaded || !trip) return;
+    if (!m || !isLoaded || !trip || !ready) return;
     const finite = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
     const cur = trip.current_lat != null ? { lat: +trip.current_lat, lng: +trip.current_lng }
       : (trip.origin_lat != null ? { lat: +trip.origin_lat, lng: +trip.origin_lng } : null);
@@ -177,7 +180,7 @@ export default function OmwMapPage() {
     const b = new window.google.maps.LatLngBounds();
     pts.forEach((p) => b.extend(p));
     m.fitBounds(b, { top: 90, bottom: 230, left: 60, right: 60 });
-  }, [isLoaded, trip]);
+  }, [isLoaded, trip, ready]);
 
   // Sprite icon at its ORIGINAL portrait ratio (151×202) so it isn't squashed.
   const spriteIcon = useMemo(() => {
@@ -189,11 +192,11 @@ export default function OmwMapPage() {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: PINK, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
   // STABLE options object — recreating it each render made the map reset its view
-  // and fight fitBounds. Memoised once. The initial Cambridge view is set via the
-  // component's center/zoom PROPS below (not here) so the map is CONSTRUCTED over
-  // the city — options.center/zoom aren't honoured early enough and let a zoom-0
-  // world frame flash first.
+  // and fight fitBounds. Memoised once, with the Cambridge view baked into the
+  // CONSTRUCTOR options so the map is built over the city (no world flash). The
+  // route fit waits for the first 'idle' (see onLoad) so it never fires early.
   const mapOptions = useMemo(() => ({
+    center: DEFAULT_CENTER, zoom: 13,
     disableDefaultUI: true, gestureHandling: 'greedy', styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
   }), []);
 
@@ -202,8 +205,6 @@ export default function OmwMapPage() {
       {isLoaded && (
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '100%' }}
-          center={DEFAULT_CENTER}
-          zoom={13}
           onLoad={onLoad}
           options={mapOptions}
         >
