@@ -170,12 +170,26 @@ export default function OmwMapPage() {
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !isLoaded || !trip || !ready) return;
-    const finite = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
-    const cur = trip.current_lat != null ? { lat: +trip.current_lat, lng: +trip.current_lng }
-      : (trip.origin_lat != null ? { lat: +trip.origin_lat, lng: +trip.origin_lng } : null);
-    const dst = trip.dest_lat != null ? { lat: +trip.dest_lat, lng: +trip.dest_lng } : null;
-    const pts = [cur, dst].filter(finite);
-    if (!pts.length) return;
+    // Only accept coordinates that are actually in the Cambridge / UK area. A null
+    // or 0 coordinate coerces to (…,0)/(0,0) via `+null` and passes a naive
+    // isFinite check — fitting Cambridge→(0,0) is exactly what blows the view out
+    // to the zoom-0 "Europe" world map. This box rejects any such stray point.
+    const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+      && p.lat > 49 && p.lat < 56 && p.lng > -6 && p.lng < 2;
+    const rp = (Array.isArray(trip.route_points) ? trip.route_points.map(toLatLng) : []).filter(inUK);
+    // Traveller point: live position → origin → first plotted route point.
+    const cur = [
+      trip.current_lat != null ? { lat: +trip.current_lat, lng: +trip.current_lng } : null,
+      trip.origin_lat != null ? { lat: +trip.origin_lat, lng: +trip.origin_lng } : null,
+      rp[0],
+    ].find(inUK) || null;
+    // Destination: stored dest → last plotted route point.
+    const dst = [
+      trip.dest_lat != null ? { lat: +trip.dest_lat, lng: +trip.dest_lng } : null,
+      rp[rp.length - 1],
+    ].find(inUK) || null;
+    const pts = [cur, dst].filter(inUK);
+    if (!pts.length) return;   // nothing valid — leave it on the Cambridge view
     if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(15); return; }
     const b = new window.google.maps.LatLngBounds();
     pts.forEach((p) => b.extend(p));
