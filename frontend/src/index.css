@@ -691,3 +691,16 @@ html .ht-theme-main-dark .wtBorder.corner {
   font-display: swap;
 }
 
+
+/* ── Google Maps attribution ─────────────────────────────────────────────────
+   Hide the "Map data / Terms / Report a map error" footer links on our Google
+   maps (OMW live tracker + relationship timeline). The Google logo bottom-left
+   is handled separately (clipped) on the OMW map.
+
+   Heads-up: Google's Maps Platform Terms of Service require this attribution to
+   remain visible. Hiding it is technically a ToS violation; enforcement risk for
+   a small private/personal app is low, but keep this in mind if this ever
+   becomes a public-facing product. */
+.gm-style-cc {
+  display: none !important;
+}
