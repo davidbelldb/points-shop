@@ -211,22 +211,28 @@ export default function OmwMapPage() {
   // route fit waits for the first 'idle' (see onLoad) so it never fires early.
   const mapOptions = useMemo(() => ({
     center: DEFAULT_CENTER, zoom: 13,
-    disableDefaultUI: true, gestureHandling: 'greedy', styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
+    disableDefaultUI: true, keyboardShortcuts: false, gestureHandling: 'greedy',
+    styles: DARK_STYLE, backgroundColor: GREY, clickableIcons: false,
   }), []);
 
   return (
     <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: GREY, overscrollBehavior: 'none' }}>
+      {/* The map is oversized below the visible area and this wrapper clips the
+          overflow, pushing Google's bottom badge + "Map data / Terms" row off the
+          bottom edge (the "Keyboard shortcuts" link is removed via options). */}
       {isLoaded && (
-        <GoogleMap
-          mapContainerStyle={{ width: '100%', height: '100%' }}
-          onLoad={onLoad}
-          options={mapOptions}
-        >
-          {/* Only the road ahead, as one solid teal line. */}
-          {remaining.length > 1 && <PolylineF path={remaining} options={{ strokeColor: TEAL, strokeOpacity: 0.95, strokeWeight: 6 }} />}
-          {dest && destIcon && <MarkerF position={dest} icon={destIcon} />}
-          {spriteAt && spriteIcon && <MarkerF position={spriteAt} icon={spriteIcon} zIndex={999} />}
-        </GoogleMap>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          <GoogleMap
+            mapContainerStyle={{ width: '100%', height: 'calc(100% + 34px)' }}
+            onLoad={onLoad}
+            options={mapOptions}
+          >
+            {/* Only the road ahead, as one solid teal line. */}
+            {remaining.length > 1 && <PolylineF path={remaining} options={{ strokeColor: TEAL, strokeOpacity: 0.95, strokeWeight: 6 }} />}
+            {dest && destIcon && <MarkerF position={dest} icon={destIcon} />}
+            {spriteAt && spriteIcon && <MarkerF position={spriteAt} icon={spriteIcon} zIndex={999} />}
+          </GoogleMap>
+        </div>
       )}
 
       <button
