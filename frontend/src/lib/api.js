@@ -340,6 +340,15 @@ export const api = {
     ping:              (tripId, lat, lng) =>
       request(`/omw/trips/${tripId}/ping`, { method: 'POST', body: JSON.stringify({ lat, lng }) }),
     endTrip:           (tripId) => request(`/omw/trips/${tripId}/end`, { method: 'POST' }),
+    // Reply phrases (tap-to-send presets shown on the live map).
+    listReplyPhrases:  () => request('/omw/reply-phrases'),
+    sendReply:         (tripId, text) =>
+      request(`/omw/trips/${tripId}/reply`, { method: 'POST', body: JSON.stringify({ text }) }),
+    adminListReplyPhrases: (accountId) => request(`/omw/admin/reply-phrases/${accountId}`),
+    adminSetReplyPhrase:   (accountId, position, text) =>
+      request(`/omw/admin/reply-phrases/${accountId}/${position}`, { method: 'PUT', body: JSON.stringify({ text }) }),
+    adminDeleteReplyPhrase: (accountId, position) =>
+      request(`/omw/admin/reply-phrases/${accountId}/${position}`, { method: 'DELETE' }),
     // Admin: manage another user's destinations + transport (David sets Katie's).
     adminListDestinations: (accountId) => request(`/omw/admin/quick-destinations/${accountId}`),
     adminSetDestination:   (accountId, position, dest) =>

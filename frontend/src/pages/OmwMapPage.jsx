@@ -108,9 +108,27 @@ export default function OmwMapPage() {
   const [trip, setTrip] = useState(undefined);
   const [display, setDisplay] = useState(0);   // eased progress
   const [cam, setCam] = useState({ center: DEFAULT_CENTER, zoom: 13 }); // controlled camera
+  const [phrases, setPhrases] = useState([]);   // this user's tap-to-send reply presets
+  const [sending, setSending] = useState(false);
+  const [sentText, setSentText] = useState(null);
   const targetRef = useRef(0);
   const mapRef = useRef(null);
   const fittedTrip = useRef(null);
+
+  // Load the logged-in user's reply phrases once.
+  useEffect(() => {
+    api.omw.listReplyPhrases().then((r) => setPhrases(r.phrases || [])).catch(() => {});
+  }, []);
+
+  const sendReply = useCallback((text) => {
+    const id = trip?.id;
+    if (!id || sending) return;
+    setSending(true); setSentText(text);
+    api.omw.sendReply(id, text).catch(() => {}).finally(() => {
+      setTimeout(() => setSending(false), 1200);
+      setTimeout(() => setSentText(null), 2200);
+    });
+  }, [trip, sending]);
 
   // Disable pull-to-refresh / rubber-band scroll while the full-screen map is up.
   // The CSS overscroll-behavior isn't enough on its own inside the iOS webview, so
@@ -265,6 +283,35 @@ export default function OmwMapPage() {
 
       <div style={{
         position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        {/* Tap-to-send reply phrases — this user's presets, above the info card. */}
+        {trip && !trip.arrived && phrases.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+            {phrases.map((p) => {
+              const isSent = sentText === p.text;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={sending}
+                  onClick={() => sendReply(p.text)}
+                  style={{
+                    border: 'none', borderRadius: 999, padding: '9px 15px',
+                    background: PINK, color: '#fff', fontSize: 13, fontWeight: 600,
+                    opacity: sending && !isSent ? 0.45 : 1,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.45)', cursor: 'pointer',
+                    transition: 'opacity 0.15s',
+                  }}
+                >
+                  {isSent ? 'Sent' : p.text}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+      <div style={{
         background: 'rgba(31,31,31,0.94)', borderRadius: 22, padding: '16px 18px',
         boxShadow: '0 10px 34px rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', color: '#fff',
       }}>
@@ -298,6 +345,7 @@ export default function OmwMapPage() {
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

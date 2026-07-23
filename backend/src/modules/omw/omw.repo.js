@@ -69,6 +69,13 @@ const lastReroute = new Map();       // tripId -> ms of last replot
 const lastPush = new Map();          // tripId -> { at, band }
 const tripCtx = new Map();           // tripId -> live-signal state
 const lastMessage = new Map();       // tripId -> last pushed narration line (for the map)
+const replyOverride = new Map();     // tripId -> { text, until, id } — a tapped reply phrase
+const lastReplyAt = new Map();       // tripId -> ms of last reply (send rate-limit)
+
+// A tapped reply phrase holds the subtitle for this long before the route
+// narration resumes.
+const REPLY_HOLD_MS = 20_000;
+let replySeq = 0;
 
 // Drop every in-memory cache entry for a finished trip.
 function clearTripCaches(tripId) {
@@ -77,6 +84,8 @@ function clearTripCaches(tripId) {
   lastPush.delete(tripId);
   tripCtx.delete(tripId);
   lastMessage.delete(tripId);
+  replyOverride.delete(tripId);
+  lastReplyAt.delete(tripId);
   for (const band of ['q1', 'q2', 'q3', 'final', 'close', 'detour', 'stopped']) {
     lastVariant.delete(`${tripId}:${band}`);
   }
@@ -487,6 +496,97 @@ export async function deleteQuickDestination(accountId, position) {
   return { ok: true };
 }
 
+// ---------------------------------------------------------------------------
+// Reply phrases (up to 5 per user) — tapped during a live journey to flash a
+// line in the Live Activity subtitle on both devices. Admin-managed.
+// ---------------------------------------------------------------------------
+
+export async function listReplyPhrases(accountId) {
+  const { rows } = await query(
+    `SELECT id, position, text FROM omw_reply_phrases WHERE account_id = $1 ORDER BY position`,
+    [accountId],
+  );
+  return rows;
+}
+
+export async function setReplyPhrase(accountId, position, { text }) {
+  const pos = Number(position);
+  if (!(pos >= 1 && pos <= 5)) { const e = new Error('position must be 1–5'); e.statusCode = 400; throw e; }
+  const clean = (text ?? '').trim();
+  if (!clean) { const e = new Error('text is required'); e.statusCode = 400; throw e; }
+  const { rows } = await query(
+    `INSERT INTO omw_reply_phrases (account_id, position, text)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (account_id, position) DO UPDATE SET text = EXCLUDED.text, updated_at = NOW()
+     RETURNING id, position, text`,
+    [accountId, pos, clean.slice(0, 120)],
+  );
+  return rows[0];
+}
+
+export async function deleteReplyPhrase(accountId, position) {
+  await query(`DELETE FROM omw_reply_phrases WHERE account_id = $1 AND position = $2`, [accountId, Number(position)]);
+  return { ok: true };
+}
+
+// Re-push the live route narration for a trip (used to resume after a reply
+// phrase's hold window ends, in case no location ping lands in the meantime).
+async function resumeNarration(tripId) {
+  const { rows } = await query(`SELECT * FROM omw_trips WHERE id = $1 AND status = 'active'`, [tripId]);
+  const trip = rows[0];
+  if (!trip) return;
+  const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
+  const cx = ctxOf(tripId);
+  const curLat = trip.current_lat ?? trip.origin_lat;
+  const curLng = trip.current_lng ?? trip.origin_lng;
+  const remainingKm = haversineKm(curLat, curLng, trip.dest_lat, trip.dest_lng);
+  const ctx = {
+    speedKmh: cx.speedEma, stoppedMs: Date.now() - (cx.lastMoveAt || Date.now()),
+    detour: false, raining: cx.raining, remainingKm,
+  };
+  const message = narration(progress, currentStreet(tripId, curLat, curLng), trip.traveller_pronoun, trip.transport, tripId, ctx);
+  lastMessage.set(tripId, message);
+  await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
+}
+
+// Send a tapped reply phrase: flash `text` in the Live Activity subtitle on both
+// devices for REPLY_HOLD_MS, then resume the route narration. Only a participant
+// (traveller or viewer) of an ACTIVE trip may send.
+export async function sendReply({ tripId, senderId, text }) {
+  const clean = (text ?? '').trim().slice(0, 120);
+  if (!clean) return { ok: false };
+  const { rows } = await query(
+    `SELECT * FROM omw_trips
+      WHERE id = $1 AND status = 'active' AND (traveller_id = $2 OR viewer_id = $2)`,
+    [tripId, senderId],
+  );
+  const trip = rows[0];
+  if (!trip) return { ok: false };
+
+  // Light rate-limit so rapid taps don't spam Apple's throttle.
+  const now = Date.now();
+  if (now - (lastReplyAt.get(tripId) || 0) < 3000) return { ok: false, throttled: true };
+  lastReplyAt.set(tripId, now);
+
+  const id = ++replySeq;
+  replyOverride.set(tripId, { text: clean, until: now + REPLY_HOLD_MS, id });
+  lastMessage.set(tripId, clean);   // the in-app map reflects it immediately too
+
+  const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
+  await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message: clean }) });
+
+  // Resume the route narration once the hold window ends — unless a newer reply
+  // has since taken over.
+  setTimeout(() => {
+    const cur = replyOverride.get(tripId);
+    if (!cur || cur.id !== id) return;
+    replyOverride.delete(tripId);
+    resumeNarration(tripId).catch(() => {});
+  }, REPLY_HOLD_MS);
+
+  return { ok: true };
+}
+
 // The caller's active trip AS VIEWER (self-loop: their own; two-way: their
 // partner's) — for the in-app live map. Includes the route polyline, current
 // position, live ETA and the current narration line.
@@ -863,7 +963,12 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
       raining: cx.raining,
       remainingKm: remainingToDest,
     };
-    const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
+    // While a tapped reply phrase is on screen, hold it as the subtitle (the bar
+    // still advances); otherwise use the live route narration.
+    const ov = replyOverride.get(tripId);
+    const message = (ov && now < ov.until)
+      ? ov.text
+      : narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
     lastMessage.set(tripId, message);
     await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
   }

@@ -41,9 +41,37 @@ function AliasInput({ dest, disabled, onSave }) {
   );
 }
 
+// One tap-to-send reply phrase slot. Blank clears it. Saves on Enter / Save.
+function ReplyPhraseInput({ phrase, disabled, onSave }) {
+  const [val, setVal] = useState(phrase?.text || '');
+  useEffect(() => { setVal(phrase?.text || ''); }, [phrase?.text]);
+  const dirty = val.trim() !== (phrase?.text || '').trim();
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="text"
+        value={val}
+        maxLength={120}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && dirty) onSave(val); }}
+        placeholder="Phrase (e.g. Put the kettle on)"
+        disabled={disabled}
+        className="flex-1 rounded-md border border-neutral-200 px-2 py-1 text-xs"
+      />
+      {dirty && (
+        <button type="button" onClick={() => onSave(val)} disabled={disabled}
+          className="shrink-0 rounded-md bg-sky-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-60">
+          {val.trim() ? 'Save' : 'Clear'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function UserOmwEditor({ account }) {
   const [dests, setDests] = useState(null);
   const [transport, setTransport] = useState(null);
+  const [phrases, setPhrases] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [savedPos, setSavedPos] = useState(null);
@@ -52,7 +80,23 @@ function UserOmwEditor({ account }) {
   useEffect(() => {
     api.omw.adminListDestinations(account.id).then((r) => setDests(r.destinations)).catch((e) => setError(e.message));
     api.omw.adminGetTransport(account.id).then((r) => setTransport(r.transport)).catch(() => {});
+    api.omw.adminListReplyPhrases(account.id).then((r) => setPhrases(r.phrases || [])).catch(() => {});
   }, [account.id]);
+
+  function phraseAt(pos) { return (phrases || []).find((p) => p.position === pos) || null; }
+
+  async function savePhrase(pos, text) {
+    setBusy(true); setError(null);
+    try {
+      if (!text.trim()) {
+        await api.omw.adminDeleteReplyPhrase(account.id, pos);
+        setPhrases((prev) => (prev || []).filter((p) => p.position !== pos));
+      } else {
+        const updated = await api.omw.adminSetReplyPhrase(account.id, pos, text.trim());
+        setPhrases((prev) => [...(prev || []).filter((p) => p.position !== pos), updated].sort((a, b) => a.position - b.position));
+      }
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
 
   function bySlot(pos) { return (dests || []).find((d) => d.position === pos) || null; }
 
@@ -139,6 +183,22 @@ function UserOmwEditor({ account }) {
           </div>
         );
       })}
+
+      {/* Tap-to-send reply phrases (up to 5) — shown as pink pills on this user's
+          live map during a journey. */}
+      <div className="rounded-lg border border-neutral-200 p-2">
+        <span className="text-[11px] uppercase tracking-wide text-neutral-500">Reply phrases (up to 5)</span>
+        <div className="mt-1 space-y-1.5">
+          {[1, 2, 3, 4, 5].map((pos) => (
+            <ReplyPhraseInput
+              key={pos}
+              phrase={phraseAt(pos)}
+              disabled={busy}
+              onSave={(text) => savePhrase(pos, text)}
+            />
+          ))}
+        </div>
+      </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>

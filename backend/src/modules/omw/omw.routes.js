@@ -3,6 +3,7 @@ import {
   getCurrentTransport, setCurrentTransport, getActiveViewerTrip,
   getOmwConfig, setOmwConfig,
   saveOmwToken, startTrip, recordPing, cancelTrip, sweepStaleTrips, cancelAllActiveTrips,
+  listReplyPhrases, setReplyPhrase, deleteReplyPhrase, sendReply,
 } from './omw.repo.js';
 import { getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
@@ -88,6 +89,39 @@ export default async function omwRoutes(fastify) {
   fastify.put('/api/omw/admin/transport/:accountId', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
     return setCurrentTransport(req.params.accountId, req.body?.transport);
+  });
+
+  // ----- Reply phrases (each user's own tap-to-send presets) -----
+  fastify.get('/api/omw/reply-phrases', async (req) => {
+    return { phrases: await listReplyPhrases(getActualAccountId(req)) };
+  });
+
+  // Send a tapped reply phrase into an active trip's Live Activity. body: { text }
+  fastify.post('/api/omw/trips/:id/reply', async (req, reply) => {
+    const senderId = getActualAccountId(req);
+    const text = (req.body?.text ?? '').toString();
+    if (!text.trim()) return reply.code(400).send({ error: 'text required' });
+    return sendReply({ tripId: req.params.id, senderId, text });
+  });
+
+  // Admin: manage ANY user's reply phrases (David sets both users').
+  fastify.get('/api/omw/admin/reply-phrases/:accountId', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return { phrases: await listReplyPhrases(req.params.accountId) };
+  });
+
+  fastify.put('/api/omw/admin/reply-phrases/:accountId/:position', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    try {
+      return await setReplyPhrase(req.params.accountId, req.params.position, req.body ?? {});
+    } catch (err) {
+      return reply.code(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  fastify.delete('/api/omw/admin/reply-phrases/:accountId/:position', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return deleteReplyPhrase(req.params.accountId, req.params.position);
   });
 
   // ----- Two-way toggle (admin-only): off = loops to self; on = pushes to partner -----
