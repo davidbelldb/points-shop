@@ -495,7 +495,9 @@ export async function getActiveViewerTrip(accountId) {
             t.distance_total_km, t.transport, t.traveller_pronoun, t.status, t.ended_at,
             a.name AS traveller_name, a.username AS traveller_username
        FROM omw_trips t JOIN accounts a ON a.id = t.traveller_id
-      WHERE t.viewer_id = $1
+      -- Both the partner (viewer) and the traveller can open the map for a trip,
+      -- so tapping either person's Live Activity resolves to the same journey.
+      WHERE (t.viewer_id = $1 OR t.traveller_id = $1)
         AND (t.status = 'active'
              OR (t.status = 'arrived'
                  AND t.ended_at > NOW() - make_interval(mins => $2)))
@@ -685,17 +687,15 @@ export async function startTrip({ travellerId, origin = {}, destId, transport })
 
 async function startLiveActivityFor(trip) {
   try {
-    if (await isMuted(trip.viewer_id)) { console.warn(`[omw] viewer ${trip.viewer_id} muted — no push-to-start`); return; }
-    const token = await ptsTokenFor(trip.viewer_id);
-    if (!token) {
-      console.warn(`[omw] NO push-to-start token for viewer ${trip.viewer_id} — activity cannot cold-start. `
-        + `(Device must run the app while signed in, on iOS 17.2+, to register a 'pts' token.)`);
-      return;
-    }
-    console.log(`[omw] push-to-start: trip ${trip.id}, viewer ${trip.viewer_id}, token …${token.slice(-8)}`);
+    // Both people see the journey: the traveller watches their own progress AND
+    // the partner watches them. Dedupe so a self-loop (viewer == traveller, used
+    // while testing) still cold-starts just the one device.
+    const audience = [...new Set([trip.traveller_id, trip.viewer_id].filter(Boolean))];
 
     const traveller = await travellerName(trip.traveller_id);
 
+    // One broadcast channel shared by every subscriber (Apple Sports style); the
+    // per-device token path is the fallback when broadcast isn't available.
     let channelId = null;
     try { channelId = await createBroadcastChannel(); } catch { /* fall back to tokens */ }
     if (channelId) {
@@ -704,24 +704,40 @@ async function startLiveActivityFor(trip) {
     }
     console.log(`[omw] broadcast channel ${channelId ? 'created' : 'unavailable (token path)'}`);
 
-    const status = await sendLiveActivityPush(token, {
-      event: 'start',
-      channelId,
-      attributesType: ATTR_TYPE,
-      contentState: buildState(trip, { progress: 0, message: (() => { const m = narration(0, '', trip.traveller_pronoun, trip.transport, trip.id); lastMessage.set(trip.id, m); return m; })() }),
-      attributes: {
-        travellerName: traveller,
-        destLabel: trip.dest_label || '',
-        transport: normTransport(trip.transport),
-        tripId: trip.id,
-      },
-      alert: {
-        title: `${traveller} will be with you soon`,
-        body: 'Wait and save? I think not.',
-      },
-    });
-    console.log(`[omw] push-to-start APNs status: ${status} (200 = accepted)`);
-    if (!channelId) setTimeout(() => { sendSilentWake(trip.viewer_id).catch(() => {}); }, 3000);
+    // Opening content-state + attributes are identical for every subscriber.
+    const contentState = buildState(trip, { progress: 0, message: (() => { const m = narration(0, '', trip.traveller_pronoun, trip.transport, trip.id); lastMessage.set(trip.id, m); return m; })() });
+    const attributes = {
+      travellerName: traveller,
+      destLabel: trip.dest_label || '',
+      transport: normTransport(trip.transport),
+      tripId: trip.id,
+    };
+
+    for (const accountId of audience) {
+      /* eslint-disable no-await-in-loop */
+      if (await isMuted(accountId)) { console.warn(`[omw] viewer ${accountId} muted — no push-to-start`); continue; }
+      const token = await ptsTokenFor(accountId);
+      if (!token) {
+        console.warn(`[omw] NO push-to-start token for viewer ${accountId} — activity cannot cold-start. `
+          + `(Device must run the app while signed in, on iOS 17.2+, to register a 'pts' token.)`);
+        continue;
+      }
+      console.log(`[omw] push-to-start: trip ${trip.id}, viewer ${accountId}, token …${token.slice(-8)}`);
+      const status = await sendLiveActivityPush(token, {
+        event: 'start',
+        channelId,
+        attributesType: ATTR_TYPE,
+        contentState,
+        attributes,
+        alert: {
+          title: `${traveller} will be with you soon`,
+          body: 'Wait and save? I think not.',
+        },
+      });
+      console.log(`[omw] push-to-start APNs status for ${accountId}: ${status} (200 = accepted)`);
+      if (!channelId) setTimeout(() => { sendSilentWake(accountId).catch(() => {}); }, 3000);
+      /* eslint-enable no-await-in-loop */
+    }
   } catch (e) { console.error('[omw] startLiveActivityFor error', e); }
 }
 
