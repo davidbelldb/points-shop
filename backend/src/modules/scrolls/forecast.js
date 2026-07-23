@@ -4,7 +4,7 @@
 //
 //   Forecast Today: Overcast
 //   H:26, L:16, Uv:8
-//   Precipitation: 0%
+//   0%
 
 // WMO weather codes → short condition words (kept ≤13 chars so line 1 stays tidy).
 const WMO = {
@@ -24,7 +24,7 @@ const round = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n)) : 0);
 export function buildForecastBody({ code, hi, lo, uv, precip }) {
   let condition = WMO[code] ?? 'Mixed';
   const line2 = `H:${round(hi)}, L:${round(lo)}, Uv:${round(uv)}`;
-  const line3 = `Precipitation: ${round(precip)}%`;
+  const line3 = `${round(precip)}%`;
   const compose = (c) => `Forecast Today: ${c}\n${line2}\n${line3}`;
   // Guarantee the whole thing fits in 70 characters.
   while (compose(condition).length > 70 && condition.length > 3) {
