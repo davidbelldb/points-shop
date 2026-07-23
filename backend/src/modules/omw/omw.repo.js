@@ -69,7 +69,7 @@ const lastReroute = new Map();       // tripId -> ms of last replot
 const lastPush = new Map();          // tripId -> { at, band }
 const tripCtx = new Map();           // tripId -> live-signal state
 const lastMessage = new Map();       // tripId -> last pushed narration line (for the map)
-const replyOverride = new Map();     // tripId -> { text, until, id } — a tapped reply phrase
+const replyOverride = new Map();     // tripId -> { until, id, routeTargets } — a held reply phrase
 const lastReplyAt = new Map();       // tripId -> ms of last reply (send rate-limit)
 
 // A tapped reply phrase holds the subtitle for this long before the route
@@ -587,15 +587,21 @@ export async function sendReply({ tripId, senderId, text }) {
   const sender = await travellerInfo(senderId);
   const message = fillReply(raw, sender.name, sender.pronoun).slice(0, 160);
 
+  // The reply shows ONLY on the receiver's device(s) — everyone in the trip except
+  // the sender. (Self-loop test: fall back to showing it to the sender.)
+  const participants = [...new Set([trip.traveller_id, trip.viewer_id].filter(Boolean))];
+  let recipients = participants.filter((a) => a !== senderId);
+  if (!recipients.length) recipients = [senderId];
+  const routeTargets = participants.filter((a) => !recipients.includes(a)); // keep these on the live route
+
   const id = ++replySeq;
-  replyOverride.set(tripId, { text: message, until: now + REPLY_HOLD_MS, id });
-  lastMessage.set(tripId, message);   // the in-app map reflects it immediately too
+  replyOverride.set(tripId, { until: now + REPLY_HOLD_MS, id, routeTargets });
 
   const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
-  await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
+  await pushToAccounts(trip, recipients, { event: 'update', state: buildState(trip, { progress, message }) });
 
-  // Resume the route narration once the hold window ends — unless a newer reply
-  // has since taken over.
+  // When the hold ends, broadcast the live route to everyone (restores the
+  // receiver) — unless a newer reply has since taken over.
   setTimeout(() => {
     const cur = replyOverride.get(tripId);
     if (!cur || cur.id !== id) return;
@@ -735,6 +741,30 @@ async function updateTokensFor(tripId) {
     [tripId],
   );
   return rows.map((r) => r.token);
+}
+
+// Update tokens for a trip, restricted to specific account(s) — lets us target
+// ONE device (e.g. only the receiver of a reply phrase) rather than the whole
+// broadcast channel.
+async function updateTokensForAccounts(tripId, accountIds) {
+  if (!accountIds || !accountIds.length) return [];
+  const { rows } = await query(
+    `SELECT token FROM omw_activity_tokens
+      WHERE trip_id = $1 AND kind = 'update' AND account_id = ANY($2::uuid[])`,
+    [tripId, accountIds],
+  );
+  return rows.map((r) => r.token);
+}
+
+// Push a content-state to specific account(s)' devices only (token path), so it
+// never reaches the shared broadcast channel / the other person.
+async function pushToAccounts(trip, accountIds, { event = 'update', state, alert, sound } = {}) {
+  const tokens = await updateTokensForAccounts(trip.id, accountIds);
+  for (const token of tokens) {
+    /* eslint-disable no-await-in-loop */
+    await sendLiveActivityPush(token, { event, contentState: state, alert, sound, attributesType: ATTR_TYPE });
+    /* eslint-enable no-await-in-loop */
+  }
 }
 
 async function pushTripState(trip, { event = 'update', state, alert, dismissalMs, sound } = {}) {
@@ -982,14 +1012,17 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
       raining: cx.raining,
       remainingKm: remainingToDest,
     };
-    // While a tapped reply phrase is on screen, hold it as the subtitle (the bar
-    // still advances); otherwise use the live route narration.
+    const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
+    lastMessage.set(tripId, message);   // the in-app map always tracks the route
     const ov = replyOverride.get(tripId);
-    const message = (ov && now < ov.until)
-      ? ov.text
-      : narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
-    lastMessage.set(tripId, message);
-    await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
+    if (ov && now < ov.until) {
+      // A reply phrase is being held on the RECEIVER's banner. Keep the live route
+      // flowing only to the other device(s) (the sender), via targeted pushes, so
+      // the reply isn't overwritten on the receiver before its hold ends.
+      await pushToAccounts(trip, ov.routeTargets || [], { event: 'update', state: buildState(trip, { progress, message }) });
+    } else {
+      await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
+    }
   }
   return { ok: true, arrived: false, progress };
 }
