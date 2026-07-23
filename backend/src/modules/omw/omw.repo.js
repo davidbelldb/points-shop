@@ -483,40 +483,59 @@ export async function deleteQuickDestination(accountId, position) {
 // The caller's active trip AS VIEWER (self-loop: their own; two-way: their
 // partner's) — for the in-app live map. Includes the route polyline, current
 // position, live ETA and the current narration line.
+// How long an arrived journey lingers on the in-app /on-my-way map after it
+// completes (so opening the app shortly after arrival still shows the trip, e.g.
+// if the final "arrived" update was missed on a flaky connection).
+const MAP_ARRIVED_LINGER_MIN = 15;
+
 export async function getActiveViewerTrip(accountId) {
   const { rows } = await query(
     `SELECT t.id, t.dest_label, t.dest_lat, t.dest_lng, t.origin_lat, t.origin_lng,
             t.current_lat, t.current_lng, t.route_points, t.progress, t.phase,
-            t.distance_total_km, t.transport, t.traveller_pronoun,
+            t.distance_total_km, t.transport, t.traveller_pronoun, t.status, t.ended_at,
             a.name AS traveller_name, a.username AS traveller_username
        FROM omw_trips t JOIN accounts a ON a.id = t.traveller_id
-      WHERE t.viewer_id = $1 AND t.status = 'active'
-      ORDER BY t.started_at DESC LIMIT 1`,
-    [accountId],
+      WHERE t.viewer_id = $1
+        AND (t.status = 'active'
+             OR (t.status = 'arrived'
+                 AND t.ended_at > NOW() - make_interval(mins => $2)))
+      ORDER BY (t.status = 'active') DESC, COALESCE(t.ended_at, t.started_at) DESC
+      LIMIT 1`,
+    [accountId, MAP_ARRIVED_LINGER_MIN],
   );
   const trip = rows[0];
   if (!trip) return null;
-  const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
-  const remainingKm = Math.max(0, (Number(trip.distance_total_km) || 0) * (1 - progress));
-  const etaMinutes = Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
-  const distanceKm = Math.round(remainingKm * 10) / 10;
+  const arrived = trip.status === 'arrived';
+  const name = trip.traveller_name || trip.traveller_username || 'Someone';
+  const progress = arrived ? 1 : Math.max(0, Math.min(1, Number(trip.progress) || 0));
+  const remainingKm = arrived ? 0 : Math.max(0, (Number(trip.distance_total_km) || 0) * (1 - progress));
+  const etaMinutes = arrived ? 0 : Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
+  const distanceKm = arrived ? 0 : Math.round(remainingKm * 10) / 10;
   // Fraction along the CURRENT polyline (survives a reroute, which swaps the
   // polyline) — the map uses this to place the sprite; `progress` is the overall bar.
   let routeProgress = progress;
-  if (trip.current_lat != null && Array.isArray(trip.route_points) && trip.route_points.length >= 2) {
+  if (!arrived && trip.current_lat != null && Array.isArray(trip.route_points) && trip.route_points.length >= 2) {
     const p = alongRouteKm(trip.route_points, Number(trip.current_lat), Number(trip.current_lng));
     if (p && p.totalKm > 0) routeProgress = Math.max(0, Math.min(1, p.alongKm / p.totalKm));
   }
-  // The exact line last pushed to the banner (no re-rolling / shared-state churn).
-  const message = lastMessage.get(trip.id) || '';
+  if (arrived) routeProgress = 1;
+  // The exact line last pushed to the banner (no re-rolling / shared-state churn);
+  // on an arrived trip this is the arrival subtitle, with a plain fallback.
+  const message = lastMessage.get(trip.id) || (arrived ? `${name} has arrived!` : '');
+  // On arrival, snap the reported position onto the destination so the map frames
+  // and marks the end point cleanly.
+  const curLat = arrived ? trip.dest_lat : trip.current_lat;
+  const curLng = arrived ? trip.dest_lng : trip.current_lng;
   return {
     id: trip.id,
-    traveller_name: trip.traveller_name || trip.traveller_username || 'Someone',
+    traveller_name: name,
     transport: trip.transport,
+    status: trip.status,
+    arrived,
     dest_label: trip.dest_label,
     dest_lat: trip.dest_lat, dest_lng: trip.dest_lng,
     origin_lat: trip.origin_lat, origin_lng: trip.origin_lng,
-    current_lat: trip.current_lat, current_lng: trip.current_lng,
+    current_lat: curLat, current_lng: curLng,
     route_points: trip.route_points || [],
     progress, route_progress: routeProgress, eta_minutes: etaMinutes, distance_km: distanceKm, message,
   };
@@ -716,6 +735,9 @@ async function finaliseArrival(trip) {
   const sound = muted ? undefined : ARRIVAL_SOUNDS[Math.floor(Math.random() * ARRIVAL_SOUNDS.length)];
   await pushTripState(trip, { event: 'update', state: buildState(trip, { arrived: true, message: subtitle }), alert, sound });
   await query(`UPDATE omw_trips SET status = 'arrived', progress = 1, phase = 4, ended_at = NOW() WHERE id = $1`, [trip.id]);
+  // Keep the arrival line for the in-app map's post-arrival linger window (the
+  // rest of the trip's caches were just cleared above).
+  lastMessage.set(trip.id, subtitle);
   setTimeout(() => { endLiveActivity(trip, Date.now()).catch(() => {}); }, ARRIVE_LINGER_MS);
 }
 

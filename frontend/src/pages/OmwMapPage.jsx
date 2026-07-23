@@ -257,7 +257,8 @@ export default function OmwMapPage() {
             {/* Only the road ahead, as one solid teal line. */}
             {remaining.length > 1 && <PolylineF path={remaining} options={{ strokeColor: TEAL, strokeOpacity: 0.95, strokeWeight: 6 }} />}
             {dest && destIcon && <MarkerF position={dest} icon={destIcon} />}
-            {spriteAt && spriteIcon && <MarkerF position={spriteAt} icon={spriteIcon} zIndex={999} />}
+            {/* Hide the travelling sprite once arrived — the pink dot marks the end. */}
+            {!trip?.arrived && spriteAt && spriteIcon && <MarkerF position={spriteAt} icon={spriteIcon} zIndex={999} />}
           </GoogleMap>
         </div>
       )}
@@ -281,8 +282,14 @@ export default function OmwMapPage() {
                 {trip.traveller_name} <span style={{ opacity: 0.55, fontWeight: 500 }}>→ {trip.dest_label || 'destination'}</span>
               </p>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: PINK }}>{trip.eta_minutes} min</p>
-                {trip.distance_km != null && <p style={{ margin: 0, fontSize: 11, opacity: 0.55 }}>{trip.distance_km} km to go</p>}
+                {trip.arrived ? (
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: TEAL }}>Arrived</p>
+                ) : (
+                  <>
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: PINK }}>{trip.eta_minutes} min</p>
+                    {trip.distance_km != null && <p style={{ margin: 0, fontSize: 11, opacity: 0.55 }}>{trip.distance_km} km to go</p>}
+                  </>
+                )}
               </div>
             </div>
             {trip.message && <p style={{ margin: '6px 0 0', opacity: 0.85, fontSize: 13 }}>{trip.message}</p>}
