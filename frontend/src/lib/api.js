@@ -345,8 +345,8 @@ export const api = {
     sendReply:         (tripId, text) =>
       request(`/omw/trips/${tripId}/reply`, { method: 'POST', body: JSON.stringify({ text }) }),
     adminListReplyPhrases: (accountId) => request(`/omw/admin/reply-phrases/${accountId}`),
-    adminSetReplyPhrase:   (accountId, position, text) =>
-      request(`/omw/admin/reply-phrases/${accountId}/${position}`, { method: 'PUT', body: JSON.stringify({ text }) }),
+    adminSetReplyPhrase:   (accountId, position, phrase) =>
+      request(`/omw/admin/reply-phrases/${accountId}/${position}`, { method: 'PUT', body: JSON.stringify(phrase) }),
     adminDeleteReplyPhrase: (accountId, position) =>
       request(`/omw/admin/reply-phrases/${accountId}/${position}`, { method: 'DELETE' }),
     // Admin: manage another user's destinations + transport (David sets Katie's).

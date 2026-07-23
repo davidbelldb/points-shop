@@ -16,3 +16,11 @@ CREATE TABLE IF NOT EXISTS omw_reply_phrases (
   UNIQUE (account_id, position)
 );
 CREATE INDEX IF NOT EXISTS omw_reply_phrases_account_idx ON omw_reply_phrases (account_id);
+
+-- `text` is the short PILL LABEL the sender taps (e.g. "cuddle me"). `sent_template`
+-- is the line broadcast to both banners, with variables filled from the SENDER:
+--   {name} → sender's first name,  {obj} → her/him/them,
+--   {subj} → she's/he's/they're,   {poss} → her/his/their.
+-- e.g. "{name} wants you to cuddle {obj}" → "Katie wants you to cuddle her".
+-- Blank template → the pill label is sent as-is.
+ALTER TABLE omw_reply_phrases ADD COLUMN IF NOT EXISTS sent_template TEXT;

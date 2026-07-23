@@ -120,11 +120,13 @@ export default function OmwMapPage() {
     api.omw.listReplyPhrases().then((r) => setPhrases(r.phrases || [])).catch(() => {});
   }, []);
 
-  const sendReply = useCallback((text) => {
+  const sendReply = useCallback((phrase) => {
     const id = trip?.id;
     if (!id || sending) return;
-    setSending(true); setSentText(text);
-    api.omw.sendReply(id, text).catch(() => {}).finally(() => {
+    setSending(true); setSentText(phrase.text);
+    // Send the expandable template (backend fills {name}/{obj} from the sender);
+    // fall back to the pill label if no template is set.
+    api.omw.sendReply(id, (phrase.sent_template || '').trim() || phrase.text).catch(() => {}).finally(() => {
       setTimeout(() => setSending(false), 1200);
       setTimeout(() => setSentText(null), 2200);
     });
@@ -285,9 +287,13 @@ export default function OmwMapPage() {
         position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
         display: 'flex', flexDirection: 'column', gap: 10,
       }}>
-        {/* Tap-to-send reply phrases — this user's presets, above the info card. */}
+        {/* Tap-to-send reply phrases — this user's presets. Small pills, flowing
+            left→right, capped at ~two rows (scrolls if it overflows). */}
         {trip && !trip.arrived && phrases.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-start',
+            maxHeight: 68, overflowY: 'auto',
+          }}>
             {phrases.map((p) => {
               const isSent = sentText === p.text;
               return (
@@ -295,12 +301,13 @@ export default function OmwMapPage() {
                   key={p.id}
                   type="button"
                   disabled={sending}
-                  onClick={() => sendReply(p.text)}
+                  onClick={() => sendReply(p)}
                   style={{
-                    border: 'none', borderRadius: 999, padding: '9px 15px',
-                    background: PINK, color: '#fff', fontSize: 13, fontWeight: 600,
+                    border: 'none', borderRadius: 999, padding: '6px 11px',
+                    background: PINK, color: '#fff', fontSize: 12, fontWeight: 600,
+                    lineHeight: 1.2, whiteSpace: 'nowrap',
                     opacity: sending && !isSent ? 0.45 : 1,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.45)', cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.4)', cursor: 'pointer',
                     transition: 'opacity 0.15s',
                   }}
                 >

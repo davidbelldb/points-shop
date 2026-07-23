@@ -41,27 +41,34 @@ function AliasInput({ dest, disabled, onSave }) {
   );
 }
 
-// One tap-to-send reply phrase slot. Blank clears it. Saves on Enter / Save.
+// One reply-phrase slot: the short PILL the user taps + the SENT line that shows
+// on both banners (with {name}/{obj}/{poss} filled from the sender). Blank pill
+// clears the slot. Saves on Enter (either field) or the Save button.
 function ReplyPhraseInput({ phrase, disabled, onSave }) {
-  const [val, setVal] = useState(phrase?.text || '');
-  useEffect(() => { setVal(phrase?.text || ''); }, [phrase?.text]);
-  const dirty = val.trim() !== (phrase?.text || '').trim();
+  const [label, setLabel] = useState(phrase?.text || '');
+  const [tmpl, setTmpl] = useState(phrase?.sent_template || '');
+  useEffect(() => { setLabel(phrase?.text || ''); setTmpl(phrase?.sent_template || ''); }, [phrase?.text, phrase?.sent_template]);
+  const dirty = label.trim() !== (phrase?.text || '').trim() || tmpl.trim() !== (phrase?.sent_template || '').trim();
+  const save = () => onSave({ text: label, template: tmpl });
+  const onEnter = (e) => { if (e.key === 'Enter' && dirty) save(); };
   return (
-    <div className="flex items-center gap-2">
+    <div className="space-y-1 rounded-md border border-neutral-200 p-1.5">
       <input
-        type="text"
-        value={val}
-        maxLength={120}
-        onChange={(e) => setVal(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && dirty) onSave(val); }}
-        placeholder="Phrase (e.g. Put the kettle on)"
-        disabled={disabled}
-        className="flex-1 rounded-md border border-neutral-200 px-2 py-1 text-xs"
+        type="text" value={label} maxLength={120} disabled={disabled}
+        onChange={(e) => setLabel(e.target.value)} onKeyDown={onEnter}
+        placeholder="Pill (e.g. cuddle me)"
+        className="w-full rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium"
+      />
+      <input
+        type="text" value={tmpl} maxLength={160} disabled={disabled}
+        onChange={(e) => setTmpl(e.target.value)} onKeyDown={onEnter}
+        placeholder="Sent: {name} wants you to cuddle {obj}"
+        className="w-full rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-600"
       />
       {dirty && (
-        <button type="button" onClick={() => onSave(val)} disabled={disabled}
-          className="shrink-0 rounded-md bg-sky-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-60">
-          {val.trim() ? 'Save' : 'Clear'}
+        <button type="button" onClick={save} disabled={disabled}
+          className="rounded-md bg-sky-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-60">
+          {label.trim() ? 'Save' : 'Clear'}
         </button>
       )}
     </div>
@@ -85,14 +92,14 @@ function UserOmwEditor({ account }) {
 
   function phraseAt(pos) { return (phrases || []).find((p) => p.position === pos) || null; }
 
-  async function savePhrase(pos, text) {
+  async function savePhrase(pos, { text, template }) {
     setBusy(true); setError(null);
     try {
       if (!text.trim()) {
         await api.omw.adminDeleteReplyPhrase(account.id, pos);
         setPhrases((prev) => (prev || []).filter((p) => p.position !== pos));
       } else {
-        const updated = await api.omw.adminSetReplyPhrase(account.id, pos, text.trim());
+        const updated = await api.omw.adminSetReplyPhrase(account.id, pos, { text: text.trim(), template: (template || '').trim() });
         setPhrases((prev) => [...(prev || []).filter((p) => p.position !== pos), updated].sort((a, b) => a.position - b.position));
       }
     } catch (e) { setError(e.message); } finally { setBusy(false); }
@@ -188,6 +195,11 @@ function UserOmwEditor({ account }) {
           live map during a journey. */}
       <div className="rounded-lg border border-neutral-200 p-2">
         <span className="text-[11px] uppercase tracking-wide text-neutral-500">Reply phrases (up to 5)</span>
+        <p className="mt-0.5 text-[10px] text-neutral-400">
+          Top box = the pill this person taps. Bottom = what both banners show, using{' '}
+          <code>{'{name}'}</code> (their name), <code>{'{obj}'}</code> (her/him/them),{' '}
+          <code>{'{poss}'}</code> (her/his/their). e.g. “{'{name}'} wants you to cuddle {'{obj}'}”.
+        </p>
         <div className="mt-1 space-y-1.5">
           {[1, 2, 3, 4, 5].map((pos) => (
             <ReplyPhraseInput

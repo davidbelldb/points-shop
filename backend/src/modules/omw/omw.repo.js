@@ -271,6 +271,18 @@ function arrivalSubtitle(pronoun = 'they') {
   return options[Math.floor(Math.random() * options.length)];
 }
 
+// Fill a REPLY-phrase template from the SENDER's identity. Unlike fillLine,
+// {name} here is the sender's actual first name (not a pronoun). Pronoun tokens:
+// {obj} her/him/them, {subj} she's/he's/they're, {poss} her/his/their.
+function fillReply(t, name, pronoun) {
+  const s = (t || '')
+    .replaceAll('{name}', name || 'Someone')
+    .replaceAll('{obj}', objectPronoun(pronoun))
+    .replaceAll('{subj}', contraction(pronoun))
+    .replaceAll('{poss}', possessive(pronoun));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 // Fill a narration template (pronoun + location), then capitalise the first
 // letter so every line reads as a proper sentence.
 function fillLine(t, loc, pronoun) {
@@ -503,23 +515,25 @@ export async function deleteQuickDestination(accountId, position) {
 
 export async function listReplyPhrases(accountId) {
   const { rows } = await query(
-    `SELECT id, position, text FROM omw_reply_phrases WHERE account_id = $1 ORDER BY position`,
+    `SELECT id, position, text, sent_template FROM omw_reply_phrases WHERE account_id = $1 ORDER BY position`,
     [accountId],
   );
   return rows;
 }
 
-export async function setReplyPhrase(accountId, position, { text }) {
+export async function setReplyPhrase(accountId, position, { text, template }) {
   const pos = Number(position);
   if (!(pos >= 1 && pos <= 5)) { const e = new Error('position must be 1–5'); e.statusCode = 400; throw e; }
-  const clean = (text ?? '').trim();
-  if (!clean) { const e = new Error('text is required'); e.statusCode = 400; throw e; }
+  const label = (text ?? '').trim();
+  if (!label) { const e = new Error('text is required'); e.statusCode = 400; throw e; }
+  const tmpl = (template ?? '').trim() || null;
   const { rows } = await query(
-    `INSERT INTO omw_reply_phrases (account_id, position, text)
-     VALUES ($1,$2,$3)
-     ON CONFLICT (account_id, position) DO UPDATE SET text = EXCLUDED.text, updated_at = NOW()
-     RETURNING id, position, text`,
-    [accountId, pos, clean.slice(0, 120)],
+    `INSERT INTO omw_reply_phrases (account_id, position, text, sent_template)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (account_id, position) DO UPDATE SET
+       text = EXCLUDED.text, sent_template = EXCLUDED.sent_template, updated_at = NOW()
+     RETURNING id, position, text, sent_template`,
+    [accountId, pos, label.slice(0, 120), tmpl ? tmpl.slice(0, 160) : null],
   );
   return rows[0];
 }
@@ -553,8 +567,8 @@ async function resumeNarration(tripId) {
 // devices for REPLY_HOLD_MS, then resume the route narration. Only a participant
 // (traveller or viewer) of an ACTIVE trip may send.
 export async function sendReply({ tripId, senderId, text }) {
-  const clean = (text ?? '').trim().slice(0, 120);
-  if (!clean) return { ok: false };
+  const raw = (text ?? '').trim().slice(0, 160);
+  if (!raw) return { ok: false };
   const { rows } = await query(
     `SELECT * FROM omw_trips
       WHERE id = $1 AND status = 'active' AND (traveller_id = $2 OR viewer_id = $2)`,
@@ -568,12 +582,17 @@ export async function sendReply({ tripId, senderId, text }) {
   if (now - (lastReplyAt.get(tripId) || 0) < 3000) return { ok: false, throttled: true };
   lastReplyAt.set(tripId, now);
 
+  // Expand the template from the SENDER's name + pronoun (e.g.
+  // "{name} wants you to cuddle {obj}" → "Katie wants you to cuddle her").
+  const sender = await travellerInfo(senderId);
+  const message = fillReply(raw, sender.name, sender.pronoun).slice(0, 160);
+
   const id = ++replySeq;
-  replyOverride.set(tripId, { text: clean, until: now + REPLY_HOLD_MS, id });
-  lastMessage.set(tripId, clean);   // the in-app map reflects it immediately too
+  replyOverride.set(tripId, { text: message, until: now + REPLY_HOLD_MS, id });
+  lastMessage.set(tripId, message);   // the in-app map reflects it immediately too
 
   const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
-  await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message: clean }) });
+  await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
 
   // Resume the route narration once the hold window ends — unless a newer reply
   // has since taken over.
