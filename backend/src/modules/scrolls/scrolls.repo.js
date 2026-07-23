@@ -553,6 +553,10 @@ export async function createScroll({
 }
 
 // Recipient's received scrolls (only those whose crow has actually arrived).
+// Forecast scrolls (from_label set — "the Three-Eyed Crow") are intentionally
+// excluded: they live only as a Live Activity notification and must never show
+// up as an unread scroll in /messages. Standard scrolls (from_label NULL) list
+// as normal.
 export async function listReceived(recipientId) {
   const { rows } = await query(
     `SELECT s.*, a.name AS sender_name, a.username AS sender_username, a.photo_url AS sender_photo
@@ -560,6 +564,7 @@ export async function listReceived(recipientId) {
        JOIN accounts a ON a.id = s.sender_id
       WHERE s.recipient_id = $1
         AND s.deliver_at <= NOW()
+        AND s.from_label IS NULL
       ORDER BY s.deliver_at DESC`,
     [recipientId],
   );
@@ -583,11 +588,14 @@ export async function listIncoming(recipientId) {
 }
 
 // Count of arrived-but-unread scrolls (drives the "crow has arrived" badge).
+// Forecast scrolls (from_label set) are excluded so the daily weather crow never
+// raises an unread badge — it lives only as a Live Activity notification.
 export async function unreadCount(recipientId) {
   const { rows } = await query(
     `SELECT COUNT(*)::int AS n
        FROM scrolls
-      WHERE recipient_id = $1 AND deliver_at <= NOW() AND read_at IS NULL`,
+      WHERE recipient_id = $1 AND deliver_at <= NOW() AND read_at IS NULL
+        AND from_label IS NULL`,
     [recipientId],
   );
   return rows[0]?.n ?? 0;
