@@ -245,12 +245,19 @@ function comesVerb(p) { return p === 'they' ? 'come' : 'comes'; }
 // A random subtitle shown once they've arrived. Pronoun-aware.
 function arrivalSubtitle(pronoun = 'they') {
   const subj = contraction(pronoun);
+  const Subj = subj.charAt(0).toUpperCase() + subj.slice(1); // sentence-start form
   const name = subjectPronoun(pronoun);
   const obj = objectPronoun(pronoun);
   const options = [
     `What are you waiting for? Let ${obj} in already.`,
     `I bet ${subj} dying for a cup of tea...`,
     `I bet ${name} can't wait to give you a good sniff...`,
+    `Right, ${subj} at the door — go go go.`,
+    `That'll be ${obj} — go on, let ${obj} in.`,
+    `Put the kettle on, ${subj} pulling up.`,
+    `${Subj} just pulling up, but won't be pulling out.`,
+    `Ding dong! Best get naked.`,
+    `${Subj} outside. You better not be wearing any knickers.`,
   ];
   return options[Math.floor(Math.random() * options.length)];
 }
@@ -275,13 +282,13 @@ const ACTIVE_BANDS = {
   start: 'wait and save? I think not.',
   q1: [
     'okay, {subj} currently on {loc}',
-    'underway, somewhere near {loc}',
-    'rolling out along {loc}',
+    'on the way, somewhere near {loc}',
+    'rolling along {loc}',
     'just spotted around {loc}',
   ],
   q2: [
     'last seen ripping along {loc}',
-    'swooshing past {loc}',
+    'swooshing down {loc}',
     'making good time down {loc}',
     'somewhere near {loc}',
   ],
@@ -328,8 +335,8 @@ const UBER_BANDS = {
 const CTX_LINES = {
   active: {
     close: ['{subj} literally outside!', 'at the door any second!', 'go go go — {subj} here!'],
-    detour: ['ooh, taking the scenic route via {loc}', 'got a bit lost near {loc}, classic', 'gone rogue — detour via {loc}'],
-    stopped: ["hasn't moved in a bit… probably gone to Kanto", 'stationary near {loc} — snack break?', "not budged in a while… everything okay?"],
+    detour: ['taking the scenic route via {loc}', 'got a bit lost near {loc}, classic', 'gone rogue — detour via {loc}'],
+    stopped: ["hasn't moved in a bit… probably gone to Kanto", 'stationary near {loc}'],
     weather: ['getting rained on near {loc} 🌧', 'drowned rat incoming', 'soggy somewhere around {loc}'],
     slow: ['taking {poss} sweet time on {loc}', 'in no rush along {loc}'],
     fast: ['absolutely bombing it down {loc}', 'flying along {loc}'],
