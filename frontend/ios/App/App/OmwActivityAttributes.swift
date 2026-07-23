@@ -26,6 +26,10 @@ struct OmwActivityAttributes: ActivityAttributes {
         var etaMinutes: Int = 0
         /// Optional server-driven message. "" = use the fixed copy.
         var message: String = ""
+        /// Server-driven title. Lets each device show a different one (the waiting
+        /// person sees "X will be with you…"; the traveller sees "Y has been
+        /// notified…"). "" = fall back to the name+ETA title computed in the widget.
+        var title: String = ""
         /// How many of the 3 waypoint nodes have been passed (0–3; 4 = arrived).
         var phase: Int = 0
         /// Flips true when the traveller reaches the destination.

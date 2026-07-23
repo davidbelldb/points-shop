@@ -113,7 +113,7 @@ export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '
  *  OmwActivityAttributes.ContentState — progress is GPS-driven (0..1), not a
  *  timer, so the widget renders a determinate bar. All keys always present. */
 export function omwContentState({
-  startedAtMs, etaAtMs, progress = 0, remainingKm = 0, etaMinutes = 0, message = '', phase = 0, arrived = false,
+  startedAtMs, etaAtMs, progress = 0, remainingKm = 0, etaMinutes = 0, message = '', title = '', phase = 0, arrived = false,
 }) {
   return {
     startedAt: toRefDate(startedAtMs),
@@ -122,6 +122,9 @@ export function omwContentState({
     remainingKm: Math.max(0, Number(remainingKm) || 0),
     etaMinutes: Math.max(0, Math.round(Number(etaMinutes) || 0)),
     message: message || '',
+    // Server-driven title so each device can show a different one (the waiting
+    // person sees "X will be with you…"; the traveller sees "Y has been notified…").
+    title: title || '',
     phase: Number(phase) || 0,
     arrived: !!arrived,
   };

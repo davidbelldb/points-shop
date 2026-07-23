@@ -48,9 +48,12 @@ private func omwBg(_ a: OmwActivityAttributes) -> Color {
 }
 private let omwDeepLink = URL(string: "sneakystuff://on-my-way")
 
-// Title is identical for everyone — it uses the traveller's name (no pronoun) and
-// the live ETA, which updates as the journey progresses.
+// Title is now server-driven and PER DEVICE — the waiting person sees
+// "{name} will be with you in {eta}", the traveller sees "{partner} has been
+// notified of your ETA". Fall back to the name+ETA form for any older push that
+// didn't carry a title.
 private func omwTitle(_ a: OmwActivityAttributes, _ s: OmwActivityAttributes.ContentState) -> String {
+    if !s.title.isEmpty { return s.title }
     if s.arrived { return "\(a.travellerName) has arrived!" }
     return "\(a.travellerName) will be with you in \(omwEtaMinutes(s)) min"
 }

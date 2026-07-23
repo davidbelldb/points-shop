@@ -69,13 +69,26 @@ const lastReroute = new Map();       // tripId -> ms of last replot
 const lastPush = new Map();          // tripId -> { at, band }
 const tripCtx = new Map();           // tripId -> live-signal state
 const lastMessage = new Map();       // tripId -> last pushed narration line (for the map)
-const replyOverride = new Map();     // tripId -> { until, id, routeTargets } — a held reply phrase
+const replyOverride = new Map();     // tripId -> { until, id, holdAccounts } — a held reply phrase
 const lastReplyAt = new Map();       // tripId -> ms of last reply (send rate-limit)
+const teaserState = new Map();       // tripId -> the traveller's current teaser subtitle
+const tripNames = new Map();         // tripId -> { traveller, partner } display names
 
-// A tapped reply phrase holds the subtitle for this long before the route
-// narration resumes.
+// A tapped reply phrase holds the subtitle for this long before the resting copy
+// (route narration for the watcher / the last teaser for the traveller) resumes.
 const REPLY_HOLD_MS = 20_000;
 let replySeq = 0;
+
+// The traveller sees a light teaser sequence instead of the route narration
+// (which is written for the person waiting). Opener shows at start; the three
+// lines step in ~10s apart; the last one rests until a reply lands.
+const TEASER_OPENER = "You're on your way!";
+const TEASERS = [
+  "I'm sure they can't wait to see you..",
+  'Stay tuned for any sneaky updates..',
+  "I'm sure they'll pop up at some point..",
+];
+const TEASER_STEP_MS = 10_000;
 
 // Drop every in-memory cache entry for a finished trip.
 function clearTripCaches(tripId) {
@@ -86,9 +99,43 @@ function clearTripCaches(tripId) {
   lastMessage.delete(tripId);
   replyOverride.delete(tripId);
   lastReplyAt.delete(tripId);
+  teaserState.delete(tripId);
+  tripNames.delete(tripId);
   for (const band of ['q1', 'q2', 'q3', 'final', 'close', 'detour', 'stopped']) {
     lastVariant.delete(`${tripId}:${band}`);
   }
+}
+
+// Two-way = the traveller and the watcher are different devices (self-loop test
+// has them equal → the single device is treated as the watcher).
+function isTwoWay(trip) { return trip.viewer_id && trip.viewer_id !== trip.traveller_id; }
+// A device's role: only a DISTINCT traveller device is a 'traveller'; everyone
+// else (the viewer, or the single self-loop device) is a 'watcher'.
+function roleOf(trip, accountId) {
+  return (isTwoWay(trip) && accountId === trip.traveller_id) ? 'traveller' : 'watcher';
+}
+function etaMinutesFor(trip, progress, arrived) {
+  if (arrived) return 0;
+  const remainingKm = Math.max(0, (Number(trip.distance_total_km) || 0) * (1 - progress));
+  return Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
+}
+// The per-device title. Watcher: "{traveller} will be with you in {eta}" /
+// "{traveller} has arrived!". Traveller: "{partner} has been notified of your
+// ETA" / "You've arrived!".
+function titleFor(role, names, etaMinutes, arrived) {
+  if (role === 'traveller') return arrived ? "You've arrived!" : `${names.partner} has been notified of your ETA`;
+  return arrived ? `${names.traveller} has arrived!` : `${names.traveller} will be with you in ${etaMinutes} min`;
+}
+// Cache the two display names for a trip (traveller + the waiting partner).
+async function namesFor(trip) {
+  let n = tripNames.get(trip.id);
+  if (!n) {
+    const t = await travellerInfo(trip.traveller_id);
+    const p = isTwoWay(trip) ? await travellerInfo(trip.viewer_id) : t;
+    n = { traveller: t.name, partner: p.name };
+    tripNames.set(trip.id, n);
+  }
+  return n;
 }
 
 // Per-trip live signal state (speed EMA, last-moved, cached weather).
@@ -432,7 +479,7 @@ function phaseFor(progress) {
 // Assemble the content-state for a trip at a given distance progress. The ETA is
 // LIVE — recomputed from the distance still to go and the transport speed — so it
 // adjusts as the journey (and any reroute) changes the remaining distance.
-function buildState(trip, { progress = 0, message = '', arrived = false } = {}) {
+function buildState(trip, { progress = 0, message = '', title = '', arrived = false } = {}) {
   const startedAtMs = new Date(trip.started_at).getTime();
   const p = arrived ? 1 : Math.max(0, Math.min(1, progress));
   const phase = arrived ? 4 : phaseFor(p);
@@ -441,7 +488,7 @@ function buildState(trip, { progress = 0, message = '', arrived = false } = {}) 
   const etaMinutes = arrived ? 0 : Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
   return omwContentState({
     startedAtMs, etaAtMs: startedAtMs + etaMinutes * 60_000, progress: p,
-    remainingKm, etaMinutes, message, phase, arrived,
+    remainingKm, etaMinutes, message, title, phase, arrived,
   });
 }
 
@@ -543,29 +590,27 @@ export async function deleteReplyPhrase(accountId, position) {
   return { ok: true };
 }
 
-// Re-push the live route narration for a trip (used to resume after a reply
-// phrase's hold window ends, in case no location ping lands in the meantime).
-async function resumeNarration(tripId) {
+// Restore specific device(s) to their resting content once a reply hold ends:
+// the watcher back to the live route, the traveller back to the current teaser.
+async function restoreDevices(tripId, accounts) {
   const { rows } = await query(`SELECT * FROM omw_trips WHERE id = $1 AND status = 'active'`, [tripId]);
   const trip = rows[0];
   if (!trip) return;
+  const names = await namesFor(trip);
   const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
-  const cx = ctxOf(tripId);
-  const curLat = trip.current_lat ?? trip.origin_lat;
-  const curLng = trip.current_lng ?? trip.origin_lng;
-  const remainingKm = haversineKm(curLat, curLng, trip.dest_lat, trip.dest_lng);
-  const ctx = {
-    speedKmh: cx.speedEma, stoppedMs: Date.now() - (cx.lastMoveAt || Date.now()),
-    detour: false, raining: cx.raining, remainingKm,
-  };
-  const message = narration(progress, currentStreet(tripId, curLat, curLng), trip.traveller_pronoun, trip.transport, tripId, ctx);
-  lastMessage.set(tripId, message);
-  await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
+  const routeMessage = lastMessage.get(tripId)
+    || narration(progress, currentStreet(tripId, trip.current_lat, trip.current_lng), trip.traveller_pronoun, trip.transport, tripId, {});
+  for (const acct of accounts) {
+    /* eslint-disable no-await-in-loop */
+    const state = stateForRole(trip, roleOf(trip, acct), { progress, routeMessage, names });
+    await pushToAccounts(trip, [acct], { event: 'update', state });
+    /* eslint-enable no-await-in-loop */
+  }
 }
 
-// Send a tapped reply phrase: flash `text` in the Live Activity subtitle on both
-// devices for REPLY_HOLD_MS, then resume the route narration. Only a participant
-// (traveller or viewer) of an ACTIVE trip may send.
+// Send a tapped reply phrase: flash it on the RECEIVER's banner only (the sender
+// never sees it), keeping that device's own title, for REPLY_HOLD_MS — then it
+// returns to its resting copy. Only a participant of an ACTIVE trip may send.
 export async function sendReply({ tripId, senderId, text }) {
   const raw = (text ?? '').trim().slice(0, 160);
   if (!raw) return { ok: false };
@@ -587,26 +632,34 @@ export async function sendReply({ tripId, senderId, text }) {
   const sender = await travellerInfo(senderId);
   const message = fillReply(raw, sender.name, sender.pronoun).slice(0, 160);
 
-  // The reply shows ONLY on the receiver's device(s) — everyone in the trip except
-  // the sender. (Self-loop test: fall back to showing it to the sender.)
+  // Recipients = everyone in the trip except the sender. (Self-loop test: show it
+  // to the sender so it can still be verified on one device.)
   const participants = [...new Set([trip.traveller_id, trip.viewer_id].filter(Boolean))];
   let recipients = participants.filter((a) => a !== senderId);
   if (!recipients.length) recipients = [senderId];
-  const routeTargets = participants.filter((a) => !recipients.includes(a)); // keep these on the live route
+
+  const names = await namesFor(trip);
+  const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
 
   const id = ++replySeq;
-  replyOverride.set(tripId, { until: now + REPLY_HOLD_MS, id, routeTargets });
+  replyOverride.set(tripId, { until: now + REPLY_HOLD_MS, id, holdAccounts: recipients });
 
-  const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
-  await pushToAccounts(trip, recipients, { event: 'update', state: buildState(trip, { progress, message }) });
+  // Show the reply on each recipient, keeping that device's own title (so the
+  // traveller still reads "…notified…" above it, the watcher "…will be with you…").
+  for (const acct of recipients) {
+    /* eslint-disable no-await-in-loop */
+    const title = titleFor(roleOf(trip, acct), names, etaMinutesFor(trip, progress, false), false);
+    await pushToAccounts(trip, [acct], { event: 'update', state: buildState(trip, { progress, message, title }) });
+    /* eslint-enable no-await-in-loop */
+  }
 
-  // When the hold ends, broadcast the live route to everyone (restores the
-  // receiver) — unless a newer reply has since taken over.
+  // When the hold ends, restore each recipient to its resting copy — unless a
+  // newer reply has since taken over.
   setTimeout(() => {
     const cur = replyOverride.get(tripId);
     if (!cur || cur.id !== id) return;
     replyOverride.delete(tripId);
-    resumeNarration(tripId).catch(() => {});
+    restoreDevices(tripId, recipients).catch(() => {});
   }, REPLY_HOLD_MS);
 
   return { ok: true };
@@ -735,14 +788,6 @@ async function ptsTokenFor(accountId) {
   return rows[0]?.token || null;
 }
 
-async function updateTokensFor(tripId) {
-  const { rows } = await query(
-    `SELECT token FROM omw_activity_tokens WHERE trip_id = $1 AND kind = 'update'`,
-    [tripId],
-  );
-  return rows.map((r) => r.token);
-}
-
 // Update tokens for a trip, restricted to specific account(s) — lets us target
 // ONE device (e.g. only the receiver of a reply phrase) rather than the whole
 // broadcast channel.
@@ -758,26 +803,67 @@ async function updateTokensForAccounts(tripId, accountIds) {
 
 // Push a content-state to specific account(s)' devices only (token path), so it
 // never reaches the shared broadcast channel / the other person.
-async function pushToAccounts(trip, accountIds, { event = 'update', state, alert, sound } = {}) {
+async function pushToAccounts(trip, accountIds, { event = 'update', state, alert, sound, dismissalMs } = {}) {
   const tokens = await updateTokensForAccounts(trip.id, accountIds);
   for (const token of tokens) {
     /* eslint-disable no-await-in-loop */
-    await sendLiveActivityPush(token, { event, contentState: state, alert, sound, attributesType: ATTR_TYPE });
+    await sendLiveActivityPush(token, { event, contentState: state, alert, sound, dismissalMs, attributesType: ATTR_TYPE });
     /* eslint-enable no-await-in-loop */
   }
 }
 
-async function pushTripState(trip, { event = 'update', state, alert, dismissalMs, sound } = {}) {
-  if (trip.la_channel_id) {
-    await sendBroadcast(trip.la_channel_id, { event, contentState: state, alert, dismissalMs, sound });
-    return;
+// Build the content-state for one device by its role — watcher gets the route
+// narration + "{name} will be with you…" title; traveller gets the resting teaser
+// + "{partner} has been notified…" title.
+function stateForRole(trip, role, { progress, arrived = false, routeMessage = '', names }) {
+  const eta = etaMinutesFor(trip, progress, arrived);
+  const title = titleFor(role, names, eta, arrived);
+  const message = role === 'traveller'
+    ? (arrived ? '' : (teaserState.get(trip.id) || TEASER_OPENER))
+    : routeMessage;
+  return buildState(trip, { progress, message, title, arrived });
+}
+
+// The core update fan-out: route narration to the WATCHER via the broadcast
+// channel (only watchers subscribe), teasers to the TRAVELLER via a targeted
+// token push. Any device currently holding a reply phrase is skipped.
+async function pushJourney(trip, { progress, arrived = false, routeMessage = '', names, alert, sound, held = [] }) {
+  if (!held.includes(trip.viewer_id)) {
+    const wState = stateForRole(trip, 'watcher', { progress, arrived, routeMessage, names });
+    if (trip.la_channel_id) {
+      await sendBroadcast(trip.la_channel_id, { event: 'update', contentState: wState, alert, sound });
+    } else {
+      await pushToAccounts(trip, [trip.viewer_id], { event: 'update', state: wState, alert, sound });
+    }
   }
-  const tokens = await updateTokensFor(trip.id);
-  for (const token of tokens) {
-    /* eslint-disable no-await-in-loop */
-    await sendLiveActivityPush(token, { event, contentState: state, alert, dismissalMs, sound, attributesType: ATTR_TYPE });
-    /* eslint-enable no-await-in-loop */
+  if (isTwoWay(trip) && !held.includes(trip.traveller_id)) {
+    const tState = stateForRole(trip, 'traveller', { progress, arrived, routeMessage, names });
+    await pushToAccounts(trip, [trip.traveller_id], { event: 'update', state: tState });
   }
+}
+
+// Step the traveller's teaser subtitle forward (timer-driven, ~10s apart). Skips
+// the push while the traveller is holding a reply, but still records the line so
+// the reply resumes to the latest teaser.
+async function advanceTeaser(tripId, line) {
+  teaserState.set(tripId, line);
+  const { rows } = await query(`SELECT * FROM omw_trips WHERE id = $1 AND status = 'active'`, [tripId]);
+  const trip = rows[0];
+  if (!trip || !isTwoWay(trip)) return;
+  const ov = replyOverride.get(tripId);
+  if (ov && Date.now() < ov.until && (ov.holdAccounts || []).includes(trip.traveller_id)) return;
+  const names = await namesFor(trip);
+  const progress = Math.max(0, Math.min(1, Number(trip.progress) || 0));
+  const tState = stateForRole(trip, 'traveller', { progress, routeMessage: '', names });
+  await pushToAccounts(trip, [trip.traveller_id], { event: 'update', state: tState });
+}
+
+// Schedule the three teaser lines for the traveller (~10s apart).
+function scheduleTeasers(trip) {
+  if (!isTwoWay(trip)) return;
+  TEASERS.forEach((line, i) => {
+    setTimeout(() => { advanceTeaser(trip.id, line).catch(() => {}); }, TEASER_STEP_MS * (i + 1));
+  });
 }
 
 // The two arrival sounds (bundled .caf files); one is chosen at random per trip.
@@ -843,15 +929,14 @@ export async function startTrip({ travellerId, origin = {}, destId, transport })
 
 async function startLiveActivityFor(trip) {
   try {
-    // Both people see the journey: the traveller watches their own progress AND
-    // the partner watches them. Dedupe so a self-loop (viewer == traveller, used
-    // while testing) still cold-starts just the one device.
-    const audience = [...new Set([trip.traveller_id, trip.viewer_id].filter(Boolean))];
+    const names = await namesFor(trip);
+    teaserState.set(trip.id, TEASER_OPENER);
+    const openingRoute = narration(0, '', trip.traveller_pronoun, trip.transport, trip.id);
+    lastMessage.set(trip.id, openingRoute);
 
-    const traveller = await travellerName(trip.traveller_id);
-
-    // One broadcast channel shared by every subscriber (Apple Sports style); the
-    // per-device token path is the fallback when broadcast isn't available.
+    // ONE broadcast channel — only the WATCHER subscribes (route narration). A
+    // distinct traveller device is started token-only so it can carry its own
+    // teaser subtitle + "notified" title, independent of the watcher.
     let channelId = null;
     try { channelId = await createBroadcastChannel(); } catch { /* fall back to tokens */ }
     if (channelId) {
@@ -860,55 +945,57 @@ async function startLiveActivityFor(trip) {
     }
     console.log(`[omw] broadcast channel ${channelId ? 'created' : 'unavailable (token path)'}`);
 
-    // Opening content-state + attributes are identical for every subscriber.
-    const contentState = buildState(trip, { progress: 0, message: (() => { const m = narration(0, '', trip.traveller_pronoun, trip.transport, trip.id); lastMessage.set(trip.id, m); return m; })() });
     const attributes = {
-      travellerName: traveller,
+      travellerName: names.traveller,
       destLabel: trip.dest_label || '',
       transport: normTransport(trip.transport),
       tripId: trip.id,
     };
 
-    for (const accountId of audience) {
+    // Watcher (viewer) → channel + route; distinct traveller → token + teaser.
+    const starts = [{ accountId: trip.viewer_id, role: 'watcher', channel: channelId }];
+    if (isTwoWay(trip)) starts.push({ accountId: trip.traveller_id, role: 'traveller', channel: null });
+
+    for (const s of starts) {
       /* eslint-disable no-await-in-loop */
-      if (await isMuted(accountId)) { console.warn(`[omw] viewer ${accountId} muted — no push-to-start`); continue; }
-      const token = await ptsTokenFor(accountId);
+      if (await isMuted(s.accountId)) { console.warn(`[omw] ${s.role} ${s.accountId} muted — no push-to-start`); continue; }
+      const token = await ptsTokenFor(s.accountId);
       if (!token) {
-        console.warn(`[omw] NO push-to-start token for viewer ${accountId} — activity cannot cold-start. `
+        console.warn(`[omw] NO push-to-start token for ${s.role} ${s.accountId} — activity cannot cold-start. `
           + `(Device must run the app while signed in, on iOS 17.2+, to register a 'pts' token.)`);
         continue;
       }
-      console.log(`[omw] push-to-start: trip ${trip.id}, viewer ${accountId}, token …${token.slice(-8)}`);
+      const eta = etaMinutesFor(trip, 0, false);
+      const title = titleFor(s.role, names, eta, false);
+      const message = s.role === 'traveller' ? TEASER_OPENER : openingRoute;
+      const contentState = buildState(trip, { progress: 0, message, title });
+      const alert = s.role === 'traveller'
+        ? { title: `${names.partner} has been notified of your ETA`, body: TEASER_OPENER }
+        : { title: `${names.traveller} will be with you soon`, body: 'Wait and save? I think not.' };
       const status = await sendLiveActivityPush(token, {
-        event: 'start',
-        channelId,
-        attributesType: ATTR_TYPE,
-        contentState,
-        attributes,
-        alert: {
-          title: `${traveller} will be with you soon`,
-          body: 'Wait and save? I think not.',
-        },
+        event: 'start', channelId: s.channel, attributesType: ATTR_TYPE, contentState, attributes, alert,
       });
-      console.log(`[omw] push-to-start APNs status for ${accountId}: ${status} (200 = accepted)`);
-      if (!channelId) setTimeout(() => { sendSilentWake(accountId).catch(() => {}); }, 3000);
+      console.log(`[omw] push-to-start ${s.role} ${s.accountId}: ${status} (200 = accepted)`);
+      if (!s.channel) setTimeout(() => { sendSilentWake(s.accountId).catch(() => {}); }, 3000);
       /* eslint-enable no-await-in-loop */
     }
+
+    scheduleTeasers(trip);
   } catch (e) { console.error('[omw] startLiveActivityFor error', e); }
 }
 
 async function finaliseArrival(trip) {
   clearTripCaches(trip.id);
-  const traveller = await travellerName(trip.traveller_id);
+  const names = await namesFor(trip);
   const muted = await isMuted(trip.viewer_id);
   const subtitle = arrivalSubtitle(trip.traveller_pronoun);
-  const alert = muted ? undefined : { title: `${traveller} has arrived!`, body: subtitle };
-  // Random doorbell/knock on arrival (skip if muted).
+  // Doorbell/knock + "has arrived!" go to the WATCHER; the traveller just gets
+  // "You've arrived!" with no sound (handled inside pushJourney via role).
+  const alert = muted ? undefined : { title: `${names.traveller} has arrived!`, body: subtitle };
   const sound = muted ? undefined : ARRIVAL_SOUNDS[Math.floor(Math.random() * ARRIVAL_SOUNDS.length)];
-  await pushTripState(trip, { event: 'update', state: buildState(trip, { arrived: true, message: subtitle }), alert, sound });
+  await pushJourney(trip, { progress: 1, arrived: true, routeMessage: subtitle, names, alert, sound });
   await query(`UPDATE omw_trips SET status = 'arrived', progress = 1, phase = 4, ended_at = NOW() WHERE id = $1`, [trip.id]);
-  // Keep the arrival line for the in-app map's post-arrival linger window (the
-  // rest of the trip's caches were just cleared above).
+  // Keep the arrival line for the in-app map's post-arrival linger window.
   lastMessage.set(trip.id, subtitle);
   setTimeout(() => { endLiveActivity(trip, Date.now()).catch(() => {}); }, ARRIVE_LINGER_MS);
 }
@@ -1012,23 +1099,31 @@ export async function recordPing({ tripId, travellerId, lat, lng }) {
       raining: cx.raining,
       remainingKm: remainingToDest,
     };
-    const message = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
-    lastMessage.set(tripId, message);   // the in-app map always tracks the route
+    const routeMessage = narration(progress, currentStreet(tripId, lat, lng), trip.traveller_pronoun, trip.transport, tripId, narrationCtx);
+    lastMessage.set(tripId, routeMessage);   // the in-app map always tracks the route
+    const names = await namesFor(trip);
     const ov = replyOverride.get(tripId);
-    if (ov && now < ov.until) {
-      // A reply phrase is being held on the RECEIVER's banner. Keep the live route
-      // flowing only to the other device(s) (the sender), via targeted pushes, so
-      // the reply isn't overwritten on the receiver before its hold ends.
-      await pushToAccounts(trip, ov.routeTargets || [], { event: 'update', state: buildState(trip, { progress, message }) });
-    } else {
-      await pushTripState(trip, { event: 'update', state: buildState(trip, { progress, message }) });
-    }
+    const held = (ov && now < ov.until) ? (ov.holdAccounts || []) : [];
+    // Watcher gets the live route; the traveller gets the teaser; whichever device
+    // is currently holding a reply phrase is skipped so it isn't overwritten.
+    await pushJourney(trip, { progress, routeMessage, names, held });
   }
   return { ok: true, arrived: false, progress };
 }
 
 async function endLiveActivity(trip, dismissalMs) {
-  await pushTripState(trip, { event: 'end', state: buildState(trip, { arrived: true }), dismissalMs });
+  const names = tripNames.get(trip.id) || await namesFor(trip);
+  // End the watcher (channel) and, in two-way, the traveller (token) separately.
+  const wState = stateForRole(trip, 'watcher', { progress: 1, arrived: true, routeMessage: '', names });
+  if (trip.la_channel_id) {
+    await sendBroadcast(trip.la_channel_id, { event: 'end', contentState: wState, dismissalMs });
+  } else {
+    await pushToAccounts(trip, [trip.viewer_id], { event: 'end', state: wState, dismissalMs });
+  }
+  if (isTwoWay(trip)) {
+    const tState = stateForRole(trip, 'traveller', { progress: 1, arrived: true, routeMessage: '', names });
+    await pushToAccounts(trip, [trip.traveller_id], { event: 'end', state: tState, dismissalMs });
+  }
   if (trip.la_channel_id) deleteBroadcastChannel(trip.la_channel_id).catch(() => {});
 }
 
@@ -1072,10 +1167,6 @@ async function travellerInfo(accountId) {
   }
 }
 
-
-async function travellerName(accountId) {
-  return (await travellerInfo(accountId)).name;
-}
 
 // Admin "kill switch": cancel EVERY active trip (all users), dismiss their Live
 // Activities, and tear down their broadcast channels. Use to clear zombie trips.
