@@ -570,7 +570,7 @@ export async function listReplyPhrases(accountId) {
 
 export async function setReplyPhrase(accountId, position, { text, template }) {
   const pos = Number(position);
-  if (!(pos >= 1 && pos <= 5)) { const e = new Error('position must be 1–5'); e.statusCode = 400; throw e; }
+  if (!(pos >= 1 && pos <= 7)) { const e = new Error('position must be 1–7'); e.statusCode = 400; throw e; }
   const label = (text ?? '').trim();
   if (!label) { const e = new Error('text is required'); e.statusCode = 400; throw e; }
   const tmpl = (template ?? '').trim() || null;

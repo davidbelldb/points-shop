@@ -10,12 +10,17 @@
 CREATE TABLE IF NOT EXISTS omw_reply_phrases (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id  UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  position    INTEGER NOT NULL CHECK (position BETWEEN 1 AND 5),
+  position    INTEGER NOT NULL CHECK (position BETWEEN 1 AND 7),
   text        TEXT NOT NULL,
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (account_id, position)
 );
 CREATE INDEX IF NOT EXISTS omw_reply_phrases_account_idx ON omw_reply_phrases (account_id);
+
+-- Relax the position range on any DB that created this table when the cap was 5,
+-- so up to 7 slots are allowed. Idempotent.
+ALTER TABLE omw_reply_phrases DROP CONSTRAINT IF EXISTS omw_reply_phrases_position_check;
+ALTER TABLE omw_reply_phrases ADD  CONSTRAINT omw_reply_phrases_position_check CHECK (position BETWEEN 1 AND 7);
 
 -- `text` is the short PILL LABEL the sender taps (e.g. "cuddle me"). `sent_template`
 -- is the line broadcast to both banners, with variables filled from the SENDER:

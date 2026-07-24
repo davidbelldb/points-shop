@@ -392,7 +392,7 @@ export default function OmwMapPage() {
                 ) : (
                   <>
                     <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: PINK }}>{trip.eta_minutes} min</p>
-                    {trip.distance_km != null && <p style={{ margin: 0, fontSize: 11, opacity: 0.55 }}>{trip.distance_km} km to go</p>}
+                    {trip.distance_km != null && <p style={{ margin: 0, fontSize: 11, opacity: 0.55 }}>{trip.distance_km} km</p>}
                   </>
                 )}
               </div>

@@ -194,14 +194,14 @@ function UserOmwEditor({ account }) {
       {/* Tap-to-send reply phrases (up to 5) — shown as pink pills on this user's
           live map during a journey. */}
       <div className="rounded-lg border border-neutral-200 p-2">
-        <span className="text-[11px] uppercase tracking-wide text-neutral-500">Reply phrases (up to 5)</span>
+        <span className="text-[11px] uppercase tracking-wide text-neutral-500">Reply phrases (up to 7)</span>
         <p className="mt-0.5 text-[10px] text-neutral-400">
           Top box = the pill this person taps. Bottom = what both banners show, using{' '}
           <code>{'{name}'}</code> (their name), <code>{'{obj}'}</code> (her/him/them),{' '}
           <code>{'{poss}'}</code> (her/his/their). e.g. “{'{name}'} wants you to cuddle {'{obj}'}”.
         </p>
         <div className="mt-1 space-y-1.5">
-          {[1, 2, 3, 4, 5].map((pos) => (
+          {[1, 2, 3, 4, 5, 6, 7].map((pos) => (
             <ReplyPhraseInput
               key={pos}
               phrase={phraseAt(pos)}
