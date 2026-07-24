@@ -603,7 +603,7 @@ async function restoreDevices(tripId, accounts) {
   for (const acct of accounts) {
     /* eslint-disable no-await-in-loop */
     const state = stateForRole(trip, roleOf(trip, acct), { progress, routeMessage, names });
-    await pushToAccounts(trip, [acct], { event: 'update', state });
+    await deliverToAccount(trip, acct, { event: 'update', state });
     /* eslint-enable no-await-in-loop */
   }
 }
@@ -649,7 +649,7 @@ export async function sendReply({ tripId, senderId, text }) {
   for (const acct of recipients) {
     /* eslint-disable no-await-in-loop */
     const title = titleFor(roleOf(trip, acct), names, etaMinutesFor(trip, progress, false), false);
-    await pushToAccounts(trip, [acct], { event: 'update', state: buildState(trip, { progress, message, title }) });
+    await deliverToAccount(trip, acct, { event: 'update', state: buildState(trip, { progress, message, title }) });
     /* eslint-enable no-await-in-loop */
   }
 
@@ -839,6 +839,19 @@ async function pushJourney(trip, { progress, arrived = false, routeMessage = '',
   if (isTwoWay(trip) && !held.includes(trip.traveller_id)) {
     const tState = stateForRole(trip, 'traveller', { progress, arrived, routeMessage, names });
     await pushToAccounts(trip, [trip.traveller_id], { event: 'update', state: tState });
+  }
+}
+
+// Deliver a content-state to a SINGLE participant over the transport their
+// activity actually listens on. A watcher (and the self-loop test device) is
+// cold-started on the broadcast channel and may have no individual update token,
+// so target the channel; the traveller is token-only. This is what makes a tapped
+// reply appear immediately on the receiver's banner.
+async function deliverToAccount(trip, accountId, { event = 'update', state, alert, sound, dismissalMs } = {}) {
+  if (roleOf(trip, accountId) === 'watcher' && trip.la_channel_id) {
+    await sendBroadcast(trip.la_channel_id, { event, contentState: state, alert, sound, dismissalMs });
+  } else {
+    await pushToAccounts(trip, [accountId], { event, state, alert, sound, dismissalMs });
   }
 }
 
