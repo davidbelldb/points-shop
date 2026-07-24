@@ -106,6 +106,10 @@ CREATE TABLE IF NOT EXISTS omw_config (
 );
 INSERT INTO omw_config (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
 
+-- Max length of a free-text message sent from the /on-my-way map. Kept short so
+-- it never truncates in the one-line Live Activity subtitle; admin-tunable.
+ALTER TABLE omw_config ADD COLUMN IF NOT EXISTS message_char_limit INTEGER NOT NULL DEFAULT 60;
+
 -- ActivityKit push tokens for the OMW activity type. Kept separate from
 -- live_activity_tokens (which is scroll-scoped) so the two never collide:
 --   kind = 'pts'    : push-to-start token per traveller device.

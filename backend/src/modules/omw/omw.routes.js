@@ -47,9 +47,14 @@ export default async function omwRoutes(fastify) {
     return deleteQuickDestination(accountId, req.params.position);
   });
 
-  // The caller's active trip as viewer — powers the in-app live map.
+  // The caller's active trip as viewer — powers the in-app live map. Also returns
+  // the message char limit so the map composer can cap free-text length.
   fastify.get('/api/omw/active-trip', async (req) => {
-    return { trip: await getActiveViewerTrip(getActualAccountId(req)) };
+    const [trip, cfg] = await Promise.all([
+      getActiveViewerTrip(getActualAccountId(req)),
+      getOmwConfig(),
+    ]);
+    return { trip, messageCharLimit: cfg.message_char_limit };
   });
 
   // ----- Current transport (each user's own) -----
@@ -132,7 +137,10 @@ export default async function omwRoutes(fastify) {
 
   fastify.put('/api/omw/config', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
-    return setOmwConfig({ liveToPartner: req.body?.liveToPartner });
+    return setOmwConfig({
+      liveToPartner: req.body?.liveToPartner,
+      messageCharLimit: req.body?.messageCharLimit,
+    });
   });
 
   // Admin kill switch: cancel every active trip + dismiss their activities.

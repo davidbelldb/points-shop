@@ -329,8 +329,8 @@ export const api = {
     setTransport:      (transport) =>
       request('/omw/transport', { method: 'PUT', body: JSON.stringify({ transport }) }),
     getConfig:         () => request('/omw/config'),
-    setConfig:         (liveToPartner) =>
-      request('/omw/config', { method: 'PUT', body: JSON.stringify({ liveToPartner }) }),
+    setConfig:         (liveToPartner, messageCharLimit) =>
+      request('/omw/config', { method: 'PUT', body: JSON.stringify({ liveToPartner, messageCharLimit }) }),
     adminKillAll:      () => request('/omw/admin/kill-all', { method: 'POST' }),
     activeTrip:        () => request('/omw/active-trip'),
     registerToken:     (kind, token, tripId) =>

@@ -111,6 +111,8 @@ export default function OmwMapPage() {
   const [phrases, setPhrases] = useState([]);   // this user's tap-to-send reply presets
   const [sending, setSending] = useState(false);
   const [sentText, setSentText] = useState(null);
+  const [charLimit, setCharLimit] = useState(60);   // admin-set free-text length cap
+  const [composeText, setComposeText] = useState('');
   const targetRef = useRef(0);
   const mapRef = useRef(null);
   const fittedTrip = useRef(null);
@@ -120,17 +122,31 @@ export default function OmwMapPage() {
     api.omw.listReplyPhrases().then((r) => setPhrases(r.phrases || [])).catch(() => {});
   }, []);
 
-  const sendReply = useCallback((phrase) => {
+  // Fire a message (a tapped pill's template, or a typed one-and-done line).
+  const fireMessage = useCallback((text, tag) => {
     const id = trip?.id;
-    if (!id || sending) return;
-    setSending(true); setSentText(phrase.text);
-    // Send the expandable template (backend fills {name}/{obj} from the sender);
-    // fall back to the pill label if no template is set.
-    api.omw.sendReply(id, (phrase.sent_template || '').trim() || phrase.text).catch(() => {}).finally(() => {
+    const body = (text || '').trim();
+    if (!id || sending || !body) return;
+    setSending(true); setSentText(tag ?? body);
+    api.omw.sendReply(id, body).catch(() => {}).finally(() => {
       setTimeout(() => setSending(false), 1200);
       setTimeout(() => setSentText(null), 2200);
     });
   }, [trip, sending]);
+
+  // Tap a preset pill: send its template (backend fills {name}/{obj}), fall back
+  // to the pill label if no template is set.
+  const sendReply = useCallback((phrase) => {
+    fireMessage((phrase.sent_template || '').trim() || phrase.text, phrase.text);
+  }, [fireMessage]);
+
+  // Send the typed one-and-done message, then clear the box.
+  const sendComposed = useCallback(() => {
+    const body = composeText.trim();
+    if (!body) return;
+    fireMessage(body);
+    setComposeText('');
+  }, [composeText, fireMessage]);
 
   // Disable pull-to-refresh / rubber-band scroll while the full-screen map is up.
   // The CSS overscroll-behavior isn't enough on its own inside the iOS webview, so
@@ -158,7 +174,7 @@ export default function OmwMapPage() {
   useEffect(() => {
     let alive = true;
     const tick = () => api.omw.activeTrip()
-      .then((r) => { if (alive) setTrip(r.trip ?? null); })
+      .then((r) => { if (alive) { setTrip(r.trip ?? null); if (r.messageCharLimit) setCharLimit(r.messageCharLimit); } })
       .catch(() => { if (alive) setTrip((t) => (t === undefined ? null : t)); });
     tick();
     const id = setInterval(tick, 4000);
@@ -280,6 +296,41 @@ export default function OmwMapPage() {
             {/* Hide the travelling sprite once arrived — the pink dot marks the end. */}
             {!trip?.arrived && spriteAt && spriteIcon && <MarkerF position={spriteAt} icon={spriteIcon} zIndex={999} />}
           </GoogleMap>
+        </div>
+      )}
+
+      {/* Free-text one-and-done message bar at the top (Messages-composer style).
+          Only while a trip is active; sends on Enter / the send button, then clears.
+          Length capped by the admin setting so it can't truncate on the banner. */}
+      {trip && !trip.arrived && (
+        <div style={{ position: 'absolute', top: 10, left: 12, right: 12, zIndex: 10, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <input
+            type="text"
+            value={composeText}
+            maxLength={charLimit}
+            onChange={(e) => setComposeText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendComposed(); } }}
+            placeholder="Say something…"
+            style={{
+              flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 14,
+              background: 'rgba(31,31,31,0.92)', color: '#fff', outline: 'none',
+              boxShadow: '0 6px 20px rgba(0,0,0,0.4)', backdropFilter: 'blur(10px)',
+            }}
+          />
+          <button
+            type="button"
+            onClick={sendComposed}
+            disabled={sending || !composeText.trim()}
+            aria-label="Send"
+            style={{
+              width: 40, height: 40, flexShrink: 0, borderRadius: 20, border: 'none',
+              background: TEAL, color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer',
+              opacity: sending || !composeText.trim() ? 0.5 : 1,
+              boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+            }}
+          >
+            ↑
+          </button>
         </div>
       )}
 

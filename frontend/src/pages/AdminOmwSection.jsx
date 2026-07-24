@@ -220,13 +220,15 @@ function UserOmwEditor({ account }) {
 export default function AdminOmwSection() {
   const [users, setUsers] = useState(null);
   const [liveToPartner, setLiveToPartner] = useState(null);
+  const [charLimit, setCharLimit] = useState(null);
+  const [charSaved, setCharSaved] = useState(false);
   const [error, setError] = useState(null);
   const [killing, setKilling] = useState(false);
   const [killMsg, setKillMsg] = useState(null);
 
   useEffect(() => {
     api.admin.listUsers().then(setUsers).catch((e) => setError(e.message));
-    api.omw.getConfig().then((c) => setLiveToPartner(!!c.live_to_partner)).catch(() => {});
+    api.omw.getConfig().then((c) => { setLiveToPartner(!!c.live_to_partner); setCharLimit(c.message_char_limit ?? 60); }).catch(() => {});
   }, []);
 
   async function toggleLive() {
@@ -234,6 +236,16 @@ export default function AdminOmwSection() {
     setLiveToPartner(next);
     try { const c = await api.omw.setConfig(next); setLiveToPartner(!!c.live_to_partner); }
     catch (e) { setError(e.message); setLiveToPartner(!next); }
+  }
+
+  async function saveCharLimit(v) {
+    const n = Math.max(10, Math.min(200, Math.round(Number(v) || 60)));
+    setCharLimit(n);
+    try {
+      const c = await api.omw.setConfig(undefined, n);
+      setCharLimit(c.message_char_limit ?? n);
+      setCharSaved(true); setTimeout(() => setCharSaved(false), 1400);
+    } catch (e) { setError(e.message); }
   }
 
   async function killAll() {
@@ -267,6 +279,26 @@ export default function AdminOmwSection() {
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${liveToPartner ? 'bg-emerald-600 text-white' : 'bg-neutral-200 text-neutral-700'}`}>
             {liveToPartner ? 'On' : 'Off'}
           </button>
+        </div>
+      )}
+
+      {/* Free-text message length cap (keeps the map message from truncating in
+          the one-line Live Activity subtitle). */}
+      {charLimit !== null && (
+        <div className="flex items-center justify-between rounded-xl border border-neutral-200 p-3">
+          <div className="pr-3">
+            <p className="text-sm font-medium">Message character limit</p>
+            <p className="text-[11px] text-neutral-500">
+              Max length of a typed map message so it doesn’t truncate on the banner.
+              {charSaved && <span className="ml-1 text-emerald-600">Saved ✓</span>}
+            </p>
+          </div>
+          <input
+            type="number" min={10} max={200} defaultValue={charLimit}
+            onBlur={(e) => saveCharLimit(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+            className="w-20 shrink-0 rounded-md border border-neutral-200 px-2 py-1 text-sm"
+          />
         </div>
       )}
 

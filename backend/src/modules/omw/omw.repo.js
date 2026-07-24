@@ -646,10 +646,17 @@ export async function sendReply({ tripId, senderId, text }) {
 
   // Show the reply on each recipient, keeping that device's own title (so the
   // traveller still reads "…notified…" above it, the watcher "…will be with you…").
+  // Carry an alert + sound so the phone WAKES and surfaces it (not a silent swap),
+  // unless that person has muted.
   for (const acct of recipients) {
     /* eslint-disable no-await-in-loop */
     const title = titleFor(roleOf(trip, acct), names, etaMinutesFor(trip, progress, false), false);
-    await deliverToAccount(trip, acct, { event: 'update', state: buildState(trip, { progress, message, title }) });
+    const muted = await isMuted(acct);
+    const alert = muted ? undefined : { title: sender.name, body: message };
+    const alertSound = muted ? undefined : 'default';
+    await deliverToAccount(trip, acct, {
+      event: 'update', state: buildState(trip, { progress, message, title }), alert, sound: alertSound,
+    });
     /* eslint-enable no-await-in-loop */
   }
 
@@ -747,20 +754,40 @@ export async function setCurrentTransport(accountId, transport) {
 // Feature config — the two-way toggle
 // ---------------------------------------------------------------------------
 
+const DEFAULT_MSG_CHAR_LIMIT = 60;
+
 export async function getOmwConfig() {
   try {
-    const { rows } = await query(`SELECT live_to_partner FROM omw_config WHERE id = TRUE`);
-    return rows[0] ?? { live_to_partner: false };
-  } catch { return { live_to_partner: false }; }  // table missing → fail safe to self-loop
+    const { rows } = await query(`SELECT live_to_partner, message_char_limit FROM omw_config WHERE id = TRUE`);
+    const r = rows[0] ?? {};
+    return {
+      live_to_partner: !!r.live_to_partner,
+      message_char_limit: Number(r.message_char_limit) || DEFAULT_MSG_CHAR_LIMIT,
+    };
+  } catch {
+    // table/column missing → fail safe to self-loop + default limit
+    return { live_to_partner: false, message_char_limit: DEFAULT_MSG_CHAR_LIMIT };
+  }
 }
 
-export async function setOmwConfig({ liveToPartner }) {
+// Partial update — pass either field; the other is left unchanged (COALESCE).
+export async function setOmwConfig({ liveToPartner, messageCharLimit } = {}) {
+  const limit = messageCharLimit == null ? null : Math.max(10, Math.min(200, Math.round(Number(messageCharLimit))));
+  const live = liveToPartner == null ? null : !!liveToPartner;
   const { rows } = await query(
-    `UPDATE omw_config SET live_to_partner = $1, updated_at = NOW() WHERE id = TRUE
-     RETURNING live_to_partner`,
-    [!!liveToPartner],
+    `UPDATE omw_config SET
+       live_to_partner = COALESCE($1, live_to_partner),
+       message_char_limit = COALESCE($2, message_char_limit),
+       updated_at = NOW()
+     WHERE id = TRUE
+     RETURNING live_to_partner, message_char_limit`,
+    [live, limit],
   );
-  return rows[0] ?? { live_to_partner: !!liveToPartner };
+  const r = rows[0] ?? {};
+  return {
+    live_to_partner: !!r.live_to_partner,
+    message_char_limit: Number(r.message_char_limit) || DEFAULT_MSG_CHAR_LIMIT,
+  };
 }
 
 // ---------------------------------------------------------------------------
