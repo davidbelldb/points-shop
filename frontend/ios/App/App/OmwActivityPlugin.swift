@@ -123,6 +123,13 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
     }()
 
     private var tracking = false
+    // Native ping state — lets the plugin POST location straight to the backend so
+    // the trip keeps advancing while the app is backgrounded / the JS webview is
+    // suspended, and survives a connection blip (retries on the next fix).
+    private var pingTripId: String?
+    private var pingToken: String?
+    private var pingApiBase = "https://sneakypoints.com"
+    private var lastNativePing = Date.distantPast
 
     // MARK: - Push tokens
 
@@ -179,7 +186,16 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
     // MARK: - Location tracking
 
     @objc func startTracking(_ call: CAPPluginCall) {
+        let tripId = call.getString("tripId")
         DispatchQueue.main.async {
+            // Capture what we need to POST pings natively (independent of the JS
+            // webview, which is suspended in the background).
+            let defaults = UserDefaults(suiteName: omwAppGroup)
+            self.pingTripId = tripId
+            self.pingToken = defaults?.string(forKey: "widgetToken")
+            self.pingApiBase = defaults?.string(forKey: "apiBase") ?? "https://sneakypoints.com"
+            self.lastNativePing = .distantPast
+
             let mgr = self.locationManager
             // Always-authorization is what allows updates while the app is
             // backgrounded/closed. Request it lazily on first trip.
@@ -202,8 +218,38 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
             self.locationManager.stopUpdatingLocation()
             self.locationManager.allowsBackgroundLocationUpdates = false
             self.tracking = false
+            self.pingTripId = nil
             call.resolve()
         }
+    }
+
+    // POST a location fix straight to the backend. Throttled ~4s; a short timeout
+    // so a connection blip can't wedge the request; failures are ignored so the
+    // next fix simply retries once the network is back.
+    private func postNativePing(_ loc: CLLocation) {
+        guard let tripId = pingTripId, let token = pingToken else { return }
+        if Date().timeIntervalSince(lastNativePing) < 4 { return }
+        lastNativePing = Date()
+        guard let url = URL(string: pingApiBase + "/api/omw/trips/\(tripId)/ping") else { return }
+        var req = URLRequest(url: url, timeoutInterval: 15)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "lat": loc.coordinate.latitude, "lng": loc.coordinate.longitude,
+        ])
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            guard let data = data,
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            if (obj["arrived"] as? Bool) == true {
+                DispatchQueue.main.async {
+                    self.locationManager.stopUpdatingLocation()
+                    self.locationManager.allowsBackgroundLocationUpdates = false
+                    self.tracking = false
+                    self.pingTripId = nil
+                }
+            }
+        }.resume()
     }
 
     // Once the user upgrades to "Always", enable background updates so the trip
@@ -216,6 +262,10 @@ public class OmwActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
 
     public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard tracking, let loc = locations.last else { return }
+        // Native POST — the reliable path (survives backgrounding + connection blips).
+        postNativePing(loc)
+        // Foreground JS path too (in-app map / web fallback); the server coalesces
+        // and progress is monotonic, so a duplicate ping is harmless.
         notifyListeners("omwPing", data: [
             "lat": loc.coordinate.latitude,
             "lng": loc.coordinate.longitude,

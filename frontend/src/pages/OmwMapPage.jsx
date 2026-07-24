@@ -89,6 +89,8 @@ export default function OmwMapPage() {
   const programmaticRef = useRef(false);  // true while WE move the map (ignore our own zoom events)
   const recenterTimerRef = useRef(null);  // post-interaction re-frame timer
   const fitPointsRef = useRef([]);        // current whole-remaining-route points to frame
+  const composerRef = useRef(null);       // top message bar (for fit padding)
+  const bottomRef = useRef(null);         // bottom pills + tracker card (for fit padding)
   const [phrases, setPhrases] = useState([]);   // this user's tap-to-send reply presets
   const [sending, setSending] = useState(false);
   const [sentText, setSentText] = useState(null);
@@ -218,6 +220,24 @@ export default function OmwMapPage() {
     fitPointsRef.current = pts;
   }, [remaining, dest, spriteAt]);
 
+  // Padding that frames the route in the clear band BETWEEN the top message bar
+  // and the bottom pills/card — measured live so the full sprite (64px tall) never
+  // hides behind either. Falls back to the constant if the elements aren't up yet.
+  const fitPadding = useCallback(() => {
+    const m = mapRef.current;
+    const div = m && m.getDiv ? m.getDiv() : null;
+    if (!div) return FIT_PADDING;
+    const map = div.getBoundingClientRect();
+    const SPRITE_HALF = 34;  // half the 64px sprite, so it clears the pills fully
+    let top = FIT_PADDING.top;
+    let bottom = FIT_PADDING.bottom;
+    const cr = composerRef.current?.getBoundingClientRect();
+    if (cr) top = Math.max(70, cr.bottom - map.top + 14);
+    const br = bottomRef.current?.getBoundingClientRect();
+    if (br) bottom = Math.max(140, map.bottom - br.top + 14 + SPRITE_HALF);
+    return { top, bottom, left: FIT_PADDING.left, right: FIT_PADDING.right };
+  }, []);
+
   // Imperatively frame the whole remaining route (re-centres AND zooms to fit).
   const recenter = useCallback(() => {
     const m = mapRef.current;
@@ -228,11 +248,11 @@ export default function OmwMapPage() {
     else {
       const b = new window.google.maps.LatLngBounds();
       pts.forEach((p) => b.extend(p));
-      m.fitBounds(b, FIT_PADDING);
+      m.fitBounds(b, fitPadding());
     }
     // Ignore the zoom_changed events our own fit fires.
     window.setTimeout(() => { programmaticRef.current = false; }, 800);
-  }, []);
+  }, [fitPadding]);
 
   // A manual pan/zoom pauses auto-framing, then re-frames RECENTER_DELAY_MS after
   // the last interaction (covers both the pan and the zoom).
@@ -309,7 +329,7 @@ export default function OmwMapPage() {
           Only while a trip is active; sends on Enter / the send button, then clears.
           Length capped by the admin setting so it can't truncate on the banner. */}
       {trip && !trip.arrived && (
-        <div style={{ position: 'absolute', top: 10, left: 12, right: 12, zIndex: 10, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <div ref={composerRef} style={{ position: 'absolute', top: 10, left: 12, right: 12, zIndex: 10, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
           <input
             type="text"
             value={composeText}
@@ -340,7 +360,7 @@ export default function OmwMapPage() {
         </div>
       )}
 
-      <div style={{
+      <div ref={bottomRef} style={{
         position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
         display: 'flex', flexDirection: 'column', gap: 10,
       }}>
