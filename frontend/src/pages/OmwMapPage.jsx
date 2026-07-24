@@ -71,43 +71,24 @@ function pointAtDistance(points, cum, dist) {
 const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
   && p.lat > 49 && p.lat < 56 && p.lng > -6 && p.lng < 2;
 
-// Deterministically compute a {center, zoom} that frames points a…b inside the
-// visible area (minus the header/card padding), CLAMPED to a Cambridge-sane zoom
-// range so it can never resolve to a continent-wide view. We compute this
-// ourselves instead of using map.fitBounds, whose async races with map init were
-// intermittently leaving the camera stuck zoomed out over Europe.
-const WORLD_PX = 256;
-const latRad = (lat) => {
-  const s = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
-  return Math.log((1 + s) / (1 - s)) / 2;
-};
-function computeView(a, b, wPx, hPx) {
-  const midLat = (a.lat + b.lat) / 2;
-  const midLng = (a.lng + b.lng) / 2;
-  // Usable area after the top inset and the bottom info card.
-  const padTop = 90; const padBottom = 240; const padX = 70;
-  const usableW = Math.max(120, wPx - padX * 2);
-  const usableH = Math.max(120, hPx - padTop - padBottom);
-  const latFraction = Math.abs(latRad(b.lat) - latRad(a.lat)) / Math.PI || 1e-7;
-  const lngFraction = Math.abs(b.lng - a.lng) / 360 || 1e-7;
-  const latZoom = Math.log2(usableH / WORLD_PX / latFraction);
-  const lngZoom = Math.log2(usableW / WORLD_PX / lngFraction);
-  let zoom = Math.min(latZoom, lngZoom);
-  if (!Number.isFinite(zoom)) zoom = 13;
-  zoom = Math.max(12, Math.min(16.5, zoom));
-  // Bias the centre south so the framed content sits ABOVE the bottom card. The
-  // usable band's centre is ~75px above the screen centre; convert that to a lat
-  // shift at the chosen zoom and drop the centre by it.
-  const metresPerPx = (156543.03392 * Math.cos((midLat * Math.PI) / 180)) / 2 ** zoom;
-  const shiftLat = (75 * metresPerPx) / 111320;
-  return { center: { lat: midLat - shiftLat, lng: midLng }, zoom };
-}
+// Padding kept around the fitted route so the traveller/destination sit clear of
+// the top composer and bottom info card.
+const FIT_PADDING = { top: 96, bottom: 240, left: 56, right: 56 };
+// How long to leave the user's manual pan/zoom alone before re-framing the route.
+const RECENTER_DELAY_MS = 5000;
 
 export default function OmwMapPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trip, setTrip] = useState(undefined);
   const [display, setDisplay] = useState(0);   // eased progress
-  const [cam, setCam] = useState({ center: DEFAULT_CENTER, zoom: 13 }); // controlled camera
+  // Frozen initial view — the map is CONSTRUCTED over Cambridge; all re-framing
+  // afterwards is imperative (fitBounds), so these props never change and never
+  // fight the imperative camera.
+  const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: 13 }), []);
+  const lastInteractRef = useRef(0);      // ms of the user's last manual pan/zoom
+  const programmaticRef = useRef(false);  // true while WE move the map (ignore our own zoom events)
+  const recenterTimerRef = useRef(null);  // post-interaction re-frame timer
+  const fitPointsRef = useRef([]);        // current whole-remaining-route points to frame
   const [phrases, setPhrases] = useState([]);   // this user's tap-to-send reply presets
   const [sending, setSending] = useState(false);
   const [sentText, setSentText] = useState(null);
@@ -226,35 +207,60 @@ export default function OmwMapPage() {
   const dest = trip?.dest_lat != null ? { lat: Number(trip.dest_lat), lng: Number(trip.dest_lng) } : null;
   const spriteAt = split ? split.pt : (trip?.current_lat != null ? { lat: Number(trip.current_lat), lng: Number(trip.current_lng) } : null);
 
-  const onLoad = useCallback((m) => { mapRef.current = m; }, []);
+  // Keep the fit target up to date: the whole REMAINING route (road ahead) plus
+  // the traveller + destination, all UK-filtered so a stray coord can't blow the
+  // view out to Europe.
+  useEffect(() => {
+    const pts = [];
+    (remaining || []).forEach((p) => { if (inUK(p)) pts.push(p); });
+    if (inUK(dest)) pts.push(dest);
+    if (inUK(spriteAt)) pts.push(spriteAt);
+    fitPointsRef.current = pts;
+  }, [remaining, dest, spriteAt]);
 
-  // Recompute the controlled camera on each 4s poll so the traveller AND
-  // destination stay framed, tightening as the gap closes. We derive center/zoom
-  // ourselves (clamped to a Cambridge-sane range) and drive the map via controlled
-  // props — no fitBounds, so there is no init race that can strand it over Europe.
+  // Imperatively frame the whole remaining route (re-centres AND zooms to fit).
+  const recenter = useCallback(() => {
+    const m = mapRef.current;
+    const pts = fitPointsRef.current;
+    if (!m || !window.google || !pts.length) return;
+    programmaticRef.current = true;
+    if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(15); }
+    else {
+      const b = new window.google.maps.LatLngBounds();
+      pts.forEach((p) => b.extend(p));
+      m.fitBounds(b, FIT_PADDING);
+    }
+    // Ignore the zoom_changed events our own fit fires.
+    window.setTimeout(() => { programmaticRef.current = false; }, 800);
+  }, []);
+
+  // A manual pan/zoom pauses auto-framing, then re-frames RECENTER_DELAY_MS after
+  // the last interaction (covers both the pan and the zoom).
+  const noteInteraction = useCallback(() => {
+    lastInteractRef.current = Date.now();
+    if (recenterTimerRef.current) clearTimeout(recenterTimerRef.current);
+    recenterTimerRef.current = setTimeout(() => {
+      if (Date.now() - lastInteractRef.current >= RECENTER_DELAY_MS - 100) recenter();
+    }, RECENTER_DELAY_MS);
+  }, [recenter]);
+
+  const onLoad = useCallback((m) => {
+    mapRef.current = m;
+    m.setCenter(DEFAULT_CENTER); m.setZoom(13);
+    m.addListener('dragstart', noteInteraction);
+    // Only count a zoom the USER made (not our own fitBounds).
+    m.addListener('zoom_changed', () => { if (!programmaticRef.current) noteInteraction(); });
+    // Frame the route as soon as the map + points are ready.
+    window.setTimeout(() => { if (Date.now() - lastInteractRef.current >= RECENTER_DELAY_MS) recenter(); }, 400);
+  }, [noteInteraction, recenter]);
+
+  // Follow the journey on each poll — but hold off while the user is exploring
+  // (within RECENTER_DELAY_MS of their last manual pan/zoom).
   useEffect(() => {
     if (!isLoaded || !trip) return;
-    const m = mapRef.current;
-    const div = m && m.getDiv ? m.getDiv() : null;
-    const wPx = div?.offsetWidth || window.innerWidth || 390;
-    const hPx = div?.offsetHeight || window.innerHeight || 780;
-    const rp = (Array.isArray(trip.route_points) ? trip.route_points.map(toLatLng) : []).filter(inUK);
-    // Traveller point: live position → origin → first plotted route point.
-    const cur = [
-      trip.current_lat != null ? { lat: +trip.current_lat, lng: +trip.current_lng } : null,
-      trip.origin_lat != null ? { lat: +trip.origin_lat, lng: +trip.origin_lng } : null,
-      rp[0],
-    ].find(inUK) || null;
-    // Destination: stored dest → last plotted route point.
-    const dst = [
-      trip.dest_lat != null ? { lat: +trip.dest_lat, lng: +trip.dest_lng } : null,
-      rp[rp.length - 1],
-    ].find(inUK) || null;
-    if (cur && dst) { setCam(computeView(cur, dst, wPx, hPx)); return; }
-    const one = cur || dst;
-    if (one) setCam({ center: one, zoom: 15 });
-    // else: nothing valid — keep the current Cambridge view.
-  }, [isLoaded, trip]);
+    if (Date.now() - lastInteractRef.current < RECENTER_DELAY_MS) return;
+    recenter();
+  }, [isLoaded, trip, recenter]);
 
   // Sprite icon at its ORIGINAL portrait ratio (151×202) so it isn't squashed.
   const spriteIcon = useMemo(() => {
