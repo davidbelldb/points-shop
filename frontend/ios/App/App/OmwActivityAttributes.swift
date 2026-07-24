@@ -41,4 +41,7 @@ struct OmwActivityAttributes: ActivityAttributes {
     var destLabel: String      // e.g. "Blinco Grove"
     var transport: String = "bicycle"  // "bicycle" | "scooter" — picks the sprite pair
     var tripId: String = ""    // maps a per-activity update token back to the trip
+    /// This device owner's slot-1 reply-phrase label, shown on the one-tap
+    /// quick-reply button. "" = no phrase set → button hidden.
+    var quickReplyLabel: String = ""
 }

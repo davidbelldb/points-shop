@@ -3,7 +3,7 @@ import {
   getCurrentTransport, setCurrentTransport, getActiveViewerTrip,
   getOmwConfig, setOmwConfig,
   saveOmwToken, startTrip, recordPing, cancelTrip, sweepStaleTrips, cancelAllActiveTrips,
-  listReplyPhrases, setReplyPhrase, deleteReplyPhrase, sendReply,
+  listReplyPhrases, setReplyPhrase, deleteReplyPhrase, sendReply, sendQuickReply,
 } from './omw.repo.js';
 import { getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
@@ -107,6 +107,12 @@ export default async function omwRoutes(fastify) {
     const text = (req.body?.text ?? '').toString();
     if (!text.trim()) return reply.code(400).send({ error: 'text required' });
     return sendReply({ tripId: req.params.id, senderId, text });
+  });
+
+  // One-tap quick reply from the Live Activity button — sends the caller's slot-1
+  // phrase back to the other person. No body.
+  fastify.post('/api/omw/trips/:id/quick-reply', async (req) => {
+    return sendQuickReply({ tripId: req.params.id, senderId: getActualAccountId(req) });
   });
 
   // Admin: manage ANY user's reply phrases (David sets both users').

@@ -147,6 +147,27 @@ struct OmwTrail: View {
     }
 }
 
+// One-tap quick-reply button (iOS 17+). Fires this device owner's slot-1 phrase
+// back to the other person straight from the banner — no app open. Hidden if no
+// phrase is set for them, or once arrived.
+@available(iOS 16.0, *)
+struct OmwQuickReplyButton: View {
+    let attributes: OmwActivityAttributes
+    var arrived: Bool
+    var body: some View {
+        if #available(iOS 17.0, *), !arrived, !attributes.quickReplyLabel.isEmpty {
+            Button(intent: OmwQuickReplyIntent(tripId: attributes.tripId)) {
+                Text(attributes.quickReplyLabel)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color(red: 0.9333, green: 0.4392, blue: 0.7412))  // pink #ee70bd
+        }
+    }
+}
+
 struct OmwLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: OmwActivityAttributes.self) { context in
@@ -176,6 +197,7 @@ struct OmwLiveActivity: Widget {
                             mover: spriteLeft(context.attributes),
                             arrived: context.state.arrived)
                             .frame(maxWidth: 195)
+                        OmwQuickReplyButton(attributes: context.attributes, arrived: context.state.arrived)
                     }
                 }
             } compactLeading: {
@@ -231,6 +253,10 @@ struct OmwLockScreenView: View {
                              arrived: context.state.arrived)
                     Image(spriteRight(context.attributes)).resizable().scaledToFit().frame(width: 36, height: 36)
                 }
+
+                // One-tap quick reply back to the other person — straight from the
+                // banner, no app open (iOS 17+).
+                OmwQuickReplyButton(attributes: context.attributes, arrived: context.state.arrived)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
