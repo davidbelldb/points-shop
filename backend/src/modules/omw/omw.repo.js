@@ -79,6 +79,11 @@ const tripNames = new Map();         // tripId -> { traveller, partner } display
 const REPLY_HOLD_MS = 20_000;
 let replySeq = 0;
 
+// Show the one-tap quick-reply button in the Live Activity? Off for now — flip to
+// true (no app rebuild needed; the widget hides the button when the label is
+// empty) to bring it back.
+const QUICK_REPLY_BUTTON_ENABLED = false;
+
 // The traveller sees a light teaser sequence instead of the route narration
 // (which is written for the person waiting). Opener shows at start; the three
 // lines step in ~10s apart; the last one rests until a reply lands.
@@ -1039,7 +1044,7 @@ async function startLiveActivityFor(trip) {
         destLabel: trip.dest_label || '',
         transport: normTransport(trip.transport),
         tripId: trip.id,
-        quickReplyLabel: await quickReplyLabelFor(s.accountId),
+        quickReplyLabel: QUICK_REPLY_BUTTON_ENABLED ? await quickReplyLabelFor(s.accountId) : '',
       };
       const eta = etaMinutesFor(trip, 0, false);
       const title = titleFor(s.role, names, eta, false);
