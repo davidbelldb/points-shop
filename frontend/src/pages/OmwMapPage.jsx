@@ -75,7 +75,7 @@ const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
 // the top composer and bottom info card. Top/bottom are deliberately asymmetric
 // (their SUM sets the zoom; the split nudges the route ~10px up without changing
 // zoom).
-const FIT_PADDING = { top: 86, bottom: 250, left: 56, right: 56 };
+const FIT_PADDING = { top: 71, bottom: 265, left: 56, right: 56 };
 // How long to leave the user's manual pan/zoom alone before re-framing the route.
 const RECENTER_DELAY_MS = 5000;
 
