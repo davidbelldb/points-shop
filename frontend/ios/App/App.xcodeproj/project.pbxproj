@@ -24,6 +24,8 @@
 		33CB9EDD300EC0AF000E56C3 /* OmwSiriIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CB9EDC300EC0AF000E56C3 /* OmwSiriIntent.swift */; };
 		33CB9EE030102701000E56C3 /* Doorbell.caf in Resources */ = {isa = PBXBuildFile; fileRef = 33CB9EDE30102701000E56C3 /* Doorbell.caf */; };
 		33CB9EE130102701000E56C3 /* Knock.caf in Resources */ = {isa = PBXBuildFile; fileRef = 33CB9EDF30102701000E56C3 /* Knock.caf */; };
+		33E5C10D30137E68001451AD /* OmwQuickReplyIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33E5C10C30137E68001451AD /* OmwQuickReplyIntent.swift */; };
+		33E5C10E30137E68001451AD /* OmwQuickReplyIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33E5C10C30137E68001451AD /* OmwQuickReplyIntent.swift */; };
 		33FD33FF2FEEE5D50008C86C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */; };
 		33FD34012FEEE5D50008C86C /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33FD34002FEEE5D50008C86C /* SwiftUI.framework */; };
 		33FD34122FEEE5D60008C86C /* CrowWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -123,6 +125,7 @@
 		33CB9EDC300EC0AF000E56C3 /* OmwSiriIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmwSiriIntent.swift; sourceTree = "<group>"; };
 		33CB9EDE30102701000E56C3 /* Doorbell.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Doorbell.caf; sourceTree = "<group>"; };
 		33CB9EDF30102701000E56C3 /* Knock.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Knock.caf; sourceTree = "<group>"; };
+		33E5C10C30137E68001451AD /* OmwQuickReplyIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmwQuickReplyIntent.swift; sourceTree = "<group>"; };
 		33FD33FC2FEEE5D50008C86C /* CrowWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrowWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33FD33FE2FEEE5D50008C86C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		33FD34002FEEE5D50008C86C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -261,6 +264,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				33E5C10C30137E68001451AD /* OmwQuickReplyIntent.swift */,
 				33CB9EDE30102701000E56C3 /* Doorbell.caf */,
 				33CB9EDF30102701000E56C3 /* Knock.caf */,
 				33CB9EDC300EC0AF000E56C3 /* OmwSiriIntent.swift */,
@@ -530,6 +534,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				33634C8B2FEEE97D00071ADD /* CrowActivityAttributes.swift in Sources */,
+				33E5C10E30137E68001451AD /* OmwQuickReplyIntent.swift in Sources */,
 				3392FC9B300E0FB900A62D8A /* OmwActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -548,6 +553,7 @@
 				33634C932FEFF90F00071ADD /* MainViewController.swift in Sources */,
 				3392FC9D300E0FC200A62D8A /* OmwActivityPlugin.swift in Sources */,
 				33C83C16300D2F4C000FDAA8 /* WidgetBridgePlugin.swift in Sources */,
+				33E5C10D30137E68001451AD /* OmwQuickReplyIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

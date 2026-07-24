@@ -1,6 +1,7 @@
 import ActivityKit
 import WidgetKit
 import SwiftUI
+import AppIntents   // for Button(intent:) on the quick-reply control
 
 // "On My Way" Live Activity. Reuses DashedLine from CrowWidgetLiveActivity.swift
 // (same widget-extension target). Standard iOS font, white text on the app's
