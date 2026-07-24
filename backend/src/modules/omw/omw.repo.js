@@ -79,11 +79,6 @@ const tripNames = new Map();         // tripId -> { traveller, partner } display
 const REPLY_HOLD_MS = 20_000;
 let replySeq = 0;
 
-// Show the one-tap quick-reply button in the Live Activity? Off for now — flip to
-// true (no app rebuild needed; the widget hides the button when the label is
-// empty) to bring it back.
-const QUICK_REPLY_BUTTON_ENABLED = false;
-
 // The traveller sees a light teaser sequence instead of the route narration
 // (which is written for the person waiting). Opener shows at start; the three
 // lines step in ~10s apart; the last one rests until a reply lands.
@@ -677,32 +672,6 @@ export async function sendReply({ tripId, senderId, text }) {
   return { ok: true };
 }
 
-// One-tap "quick reply" from the Live Activity button: send the tapper's slot-1
-// reply phrase back to the other person (reuses the reply delivery, so it's
-// receiver-only + wakes their phone). No text comes from the client.
-export async function sendQuickReply({ tripId, senderId }) {
-  const { rows } = await query(
-    `SELECT text, sent_template FROM omw_reply_phrases WHERE account_id = $1 ORDER BY position LIMIT 1`,
-    [senderId],
-  );
-  const p = rows[0];
-  if (!p) return { ok: false, reason: 'no reply phrase set' };
-  const text = (p.sent_template || '').trim() || p.text;
-  return sendReply({ tripId, senderId, text });
-}
-
-// The slot-1 reply phrase LABEL for an account — shown on its Live Activity
-// quick-reply button. Empty string if none set (button is then hidden).
-async function quickReplyLabelFor(accountId) {
-  try {
-    const { rows } = await query(
-      `SELECT text FROM omw_reply_phrases WHERE account_id = $1 ORDER BY position LIMIT 1`,
-      [accountId],
-    );
-    return rows[0]?.text || '';
-  } catch { return ''; }
-}
-
 // The caller's active trip AS VIEWER (self-loop: their own; two-way: their
 // partner's) — for the in-app live map. Includes the route polyline, current
 // position, live ETA and the current narration line.
@@ -1037,14 +1006,11 @@ async function startLiveActivityFor(trip) {
           + `(Device must run the app while signed in, on iOS 17.2+, to register a 'pts' token.)`);
         continue;
       }
-      // Per-device attributes so each banner's quick-reply button sends THAT
-      // person's own slot-1 phrase back to the other.
       const attributes = {
         travellerName: names.traveller,
         destLabel: trip.dest_label || '',
         transport: normTransport(trip.transport),
         tripId: trip.id,
-        quickReplyLabel: QUICK_REPLY_BUTTON_ENABLED ? await quickReplyLabelFor(s.accountId) : '',
       };
       const eta = etaMinutesFor(trip, 0, false);
       const title = titleFor(s.role, names, eta, false);
