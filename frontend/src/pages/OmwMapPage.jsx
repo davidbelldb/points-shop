@@ -349,7 +349,6 @@ export default function OmwMapPage() {
         {trip && !trip.arrived && phrases.length > 0 && (
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-start',
-            maxHeight: 68, overflowY: 'auto',
           }}>
             {phrases.map((p) => {
               const isSent = sentText === p.text;
