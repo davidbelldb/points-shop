@@ -71,9 +71,9 @@ function pointAtDistance(points, cum, dist) {
 const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
   && p.lat > 49 && p.lat < 56 && p.lng > -6 && p.lng < 2;
 
-// Padding kept around the fitted route so the traveller/destination sit clear of
-// the top composer and bottom info card.
-const FIT_PADDING = { top: 96, bottom: 240, left: 56, right: 56 };
+// Fallback padding (used until the overlays are measured) — generous at the
+// bottom so the route clears the pills + card even before the live measurement.
+const FIT_PADDING = { top: 100, bottom: 340, left: 50, right: 50 };
 // How long to leave the user's manual pan/zoom alone before re-framing the route.
 const RECENTER_DELAY_MS = 5000;
 
@@ -229,12 +229,13 @@ export default function OmwMapPage() {
     if (!div) return FIT_PADDING;
     const map = div.getBoundingClientRect();
     const SPRITE_HALF = 34;  // half the 64px sprite, so it clears the pills fully
+    const MARGIN = 24;       // extra breathing room beyond the overlays
     let top = FIT_PADDING.top;
     let bottom = FIT_PADDING.bottom;
     const cr = composerRef.current?.getBoundingClientRect();
-    if (cr) top = Math.max(70, cr.bottom - map.top + 14);
+    if (cr && cr.height) top = Math.max(70, cr.bottom - map.top + MARGIN);
     const br = bottomRef.current?.getBoundingClientRect();
-    if (br) bottom = Math.max(140, map.bottom - br.top + 14 + SPRITE_HALF);
+    if (br && br.height) bottom = Math.max(160, map.bottom - br.top + MARGIN + SPRITE_HALF);
     return { top, bottom, left: FIT_PADDING.left, right: FIT_PADDING.right };
   }, []);
 
