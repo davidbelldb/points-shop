@@ -74,6 +74,36 @@ const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
 // Fallback padding (used until the overlays are measured) — generous at the
 // bottom so the route clears the pills + card even before the live measurement.
 const FIT_PADDING = { top: 100, bottom: 340, left: 50, right: 50 };
+
+// Compute a {center, zoom} that tightly fills the usable band (map minus padding)
+// with `pts`, biasing the centre so content sits between the top/bottom overlays.
+// Fractional zoom avoids fitBounds' snap-to-a-coarser-level slack (which was
+// leaving the route too small).
+const _latRad = (lat) => {
+  const s = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
+  return Math.log((1 + s) / (1 - s)) / 2;
+};
+function computeFit(pts, wPx, hPx, pad) {
+  let minLat = 90; let maxLat = -90; let minLng = 180; let maxLng = -180;
+  pts.forEach((p) => {
+    minLat = Math.min(minLat, p.lat); maxLat = Math.max(maxLat, p.lat);
+    minLng = Math.min(minLng, p.lng); maxLng = Math.max(maxLng, p.lng);
+  });
+  const midLat = (minLat + maxLat) / 2; const midLng = (minLng + maxLng) / 2;
+  const usableW = Math.max(60, wPx - pad.left - pad.right);
+  const usableH = Math.max(60, hPx - pad.top - pad.bottom);
+  const WORLD = 256;
+  const latFrac = Math.abs(_latRad(maxLat) - _latRad(minLat)) / Math.PI || 1e-7;
+  const lngFrac = Math.abs(maxLng - minLng) / 360 || 1e-7;
+  let zoom = Math.min(Math.log2(usableH / WORLD / latFrac), Math.log2(usableW / WORLD / lngFrac));
+  if (!Number.isFinite(zoom)) zoom = 14;
+  zoom = Math.max(11, Math.min(17, zoom));
+  // Shift the centre south by half the padding difference so the framed content
+  // lands in the usable band (bottom padding is larger than top).
+  const metresPerPx = (156543.03392 * Math.cos((midLat * Math.PI) / 180)) / 2 ** zoom;
+  const shiftLat = (((pad.bottom - pad.top) / 2) * metresPerPx) / 111320;
+  return { center: { lat: midLat - shiftLat, lng: midLng }, zoom };
+}
 // How long to leave the user's manual pan/zoom alone before re-framing the route.
 const RECENTER_DELAY_MS = 5000;
 
@@ -247,9 +277,12 @@ export default function OmwMapPage() {
     programmaticRef.current = true;
     if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(15); }
     else {
-      const b = new window.google.maps.LatLngBounds();
-      pts.forEach((p) => b.extend(p));
-      m.fitBounds(b, fitPadding());
+      const div = m.getDiv ? m.getDiv() : null;
+      const wPx = div?.offsetWidth || window.innerWidth || 390;
+      const hPx = div?.offsetHeight || window.innerHeight || 780;
+      const view = computeFit(pts, wPx, hPx, fitPadding());
+      m.setCenter(view.center);
+      m.setZoom(view.zoom);
     }
     // Ignore the zoom_changed events our own fit fires.
     window.setTimeout(() => { programmaticRef.current = false; }, 800);
@@ -337,7 +370,7 @@ export default function OmwMapPage() {
             maxLength={charLimit}
             onChange={(e) => setComposeText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendComposed(); } }}
-            placeholder={`Send ${trip.recipient_name || 'them'} a quick message…`}
+            placeholder={`Send ${trip.recipient_name || 'them'} a live message…`}
             style={{
               flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 14,
               background: 'rgba(31,31,31,0.92)', color: '#fff', outline: 'none',
