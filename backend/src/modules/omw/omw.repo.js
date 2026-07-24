@@ -711,8 +711,11 @@ export async function getActiveViewerTrip(accountId) {
     `SELECT t.id, t.dest_label, t.dest_lat, t.dest_lng, t.origin_lat, t.origin_lng,
             t.current_lat, t.current_lng, t.route_points, t.progress, t.phase,
             t.distance_total_km, t.transport, t.traveller_pronoun, t.status, t.ended_at,
-            a.name AS traveller_name, a.username AS traveller_username
+            t.traveller_id, t.viewer_id,
+            a.name AS traveller_name, a.username AS traveller_username,
+            v.name AS viewer_name, v.username AS viewer_username
        FROM omw_trips t JOIN accounts a ON a.id = t.traveller_id
+       LEFT JOIN accounts v ON v.id = t.viewer_id
       -- Both the partner (viewer) and the traveller can open the map for a trip,
       -- so tapping either person's Live Activity resolves to the same journey.
       WHERE (t.viewer_id = $1 OR t.traveller_id = $1)
@@ -727,6 +730,10 @@ export async function getActiveViewerTrip(accountId) {
   if (!trip) return null;
   const arrived = trip.status === 'arrived';
   const name = trip.traveller_name || trip.traveller_username || 'Someone';
+  // The OTHER person relative to the caller — who a typed map message goes to.
+  const recipientName = (accountId === trip.traveller_id)
+    ? (trip.viewer_name || trip.viewer_username || 'them')
+    : (trip.traveller_name || trip.traveller_username || 'them');
   const progress = arrived ? 1 : Math.max(0, Math.min(1, Number(trip.progress) || 0));
   const remainingKm = arrived ? 0 : Math.max(0, (Number(trip.distance_total_km) || 0) * (1 - progress));
   const etaMinutes = arrived ? 0 : Math.max(1, Math.ceil((remainingKm / transportKmh(trip.transport)) * 60));
@@ -749,6 +756,7 @@ export async function getActiveViewerTrip(accountId) {
   return {
     id: trip.id,
     traveller_name: name,
+    recipient_name: recipientName,
     transport: trip.transport,
     status: trip.status,
     arrived,

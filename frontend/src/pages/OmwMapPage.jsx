@@ -310,7 +310,7 @@ export default function OmwMapPage() {
             maxLength={charLimit}
             onChange={(e) => setComposeText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendComposed(); } }}
-            placeholder="Say something…"
+            placeholder={`Send ${trip.recipient_name || 'them'} a quick message…`}
             style={{
               flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 14,
               background: 'rgba(31,31,31,0.92)', color: '#fff', outline: 'none',
