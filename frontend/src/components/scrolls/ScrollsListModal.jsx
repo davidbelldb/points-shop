@@ -14,7 +14,7 @@ function formatSent(ts) {
 
 /* The "scrolls" pop-out — standard site modal chrome (rounded card over a dimmed
    page, light/dark). Tapping a scroll opens the full-size reader. */
-export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, onClose, title = 'Scrolls', light = false }) {
+export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, onClose, title = 'Scrolls', light = false, cardBg }) {
   const { theme } = useTheme();
   // `light` forces the pale card + black chrome regardless of the app theme (used by
   // the crow tracker, whose parchment map wants a light modal with black text).
@@ -22,7 +22,8 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
   const [openScroll, setOpenScroll] = useState(null);
   const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
 
-  const cardBg = isDark ? '#171717' : '#ffffff';
+  // `cardBg` prop overrides the themed default (the crow tracker passes its parchment).
+  const cardBackground = cardBg ?? (isDark ? '#171717' : '#ffffff');
   const rowBg = isDark ? '#262626' : '#f5f5f5';
   const closedUrl = assetUrl(settings.scroll_closed_file || 'scroll_closed_1.png');
   const sealUrl = assetUrl(settings.seal_stamped_file);
@@ -46,7 +47,7 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
       >
         <div
           className="flex max-h-[85vh] w-full max-w-md flex-col rounded-3xl p-6 shadow-2xl"
-          style={{ background: cardBg }}
+          style={{ background: cardBackground }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex shrink-0 items-center justify-between">

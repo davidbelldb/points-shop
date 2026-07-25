@@ -22,7 +22,7 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // tiles load); the route line + destination node use the deep oxblood red.
 const PARCHMENT = '#ebc876';  // page + map fallback background (matches the map's land)
 const ROUTE = '#5e1a13';   // map route line + end node
-const CARD_BG = '#f7db9b'; // journey tile (card) background only
+const CARD_BG = '#f7db9b'; // journey tile + "Unread scrolls" modal background
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 // Flapping-flight loop: alternate the two send wing poses (wings up / wings down)
@@ -459,6 +459,7 @@ export default function CrowTrackerPage() {
           settings={scrollSettings}
           title="Unread scrolls"
           light
+          cardBg={CARD_BG}
           onRead={scrolls.markRead}
           onClose={() => { setOpenLocKey(null); scrolls.refresh(); fetchFlights(); }}
         />

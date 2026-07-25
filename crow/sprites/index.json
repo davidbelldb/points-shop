@@ -1,0 +1,65 @@
+{
+  "generated": "2026-07-25T21:21:41.157Z",
+  "canvas": {
+    "authored": [
+      104,
+      124
+    ],
+    "watch46mm": [
+      416,
+      496
+    ],
+    "watch42mm": [
+      374,
+      446
+    ],
+    "scale": 4
+  },
+  "sprites": [
+    {
+      "id": "crow_adult_idle",
+      "group": "crow",
+      "size": [
+        48,
+        48
+      ],
+      "file": "crow/crow_adult_idle.png"
+    },
+    {
+      "id": "chick_idle",
+      "group": "crow",
+      "size": [
+        48,
+        48
+      ],
+      "file": "crow/chick_idle.png"
+    },
+    {
+      "id": "adult_happy",
+      "group": "crow",
+      "size": [
+        48,
+        48
+      ],
+      "file": "crow/adult_happy.png"
+    },
+    {
+      "id": "adult_twig_hold",
+      "group": "crow",
+      "size": [
+        48,
+        48
+      ],
+      "file": "crow/adult_twig_hold.png"
+    },
+    {
+      "id": "adult_twig_toss",
+      "group": "crow",
+      "size": [
+        48,
+        48
+      ],
+      "file": "crow/adult_twig_toss.png"
+    }
+  ]
+}

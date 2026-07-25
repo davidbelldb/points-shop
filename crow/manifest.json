@@ -1,0 +1,85 @@
+{
+  "$comment": "Crow tamagotchi sprite manifest. Every entry is one PixelLab generation. 'ref' names another sprite id used as init_image, which is what keeps the whole set looking like one bird. Build order is resolved from refs automatically.",
+  "style": {
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "detail": "medium detail",
+    "view": "side",
+    "direction": "east",
+    "negative_description": "text, watermark, logo, UI, border, frame, blurry, photorealistic, 3d render, drop shadow, cast shadow, ground, dirt, soil, floor, terrain, grass, base, platform, pedestal"
+  },
+  "palette": "glossy blue-black and deep purple-black feathers, muted earthy palette, limited palette retro game sprite",
+
+  "sprites": [
+    {
+      "id": "crow_adult_idle",
+      "group": "crow",
+      "size": [48, 48],
+      "seed": 303,
+      "prompt": "side view of a small chubby black crow standing, glossy blue-black feathers, stout grey beak, single visible round eye with a white highlight, sturdy grey feet, idle standing pose facing right, cute tamagotchi pet"
+    },
+
+    { "id": "egg_idle", "group": "crow", "size": [32, 32], "seed": 1001, "prompt": "a single speckled pale bird egg resting upright, smooth cream shell with small brown speckles, cute game item" },
+    { "id": "egg_wobble", "group": "crow", "size": [32, 32], "seed": 1002, "ref": "egg_idle", "strength": 500, "prompt": "the same speckled pale bird egg tilted slightly to one side as it wobbles, small motion lines either side" },
+    { "id": "egg_cracked", "group": "crow", "size": [32, 32], "seed": 1003, "ref": "egg_idle", "strength": 450, "prompt": "the same speckled pale bird egg with a jagged crack across the upper shell, a small dark gap opening" },
+    { "id": "egg_hatching", "group": "crow", "size": [32, 32], "seed": 1004, "ref": "egg_cracked", "strength": 400, "prompt": "the speckled egg broken open at the top with a tiny black crow chick head poking out, shell fragments" },
+
+    { "id": "chick_idle", "group": "crow", "size": [48, 48], "seed": 1101, "ref": "crow_adult_idle", "strength": 250, "prompt": "side view of a tiny newly hatched crow chick, oversized head, huge round eye, wispy sparse dark grey down feathers, stubby pale beak, tiny weak legs, sitting" },
+    { "id": "chick_sick", "group": "crow", "size": [48, 48], "seed": 1102, "ref": "chick_idle", "strength": 500, "prompt": "the same tiny crow chick looking unwell, drooping head, dull ruffled down, half closed sad eye, slumped posture" },
+
+    { "id": "fledgling_idle", "group": "crow", "size": [48, 48], "seed": 1201, "ref": "crow_adult_idle", "strength": 300, "prompt": "side view of a young fledgling crow, small body, patchy short black feathers with tufts of grey down still showing, short beak, standing awkwardly" },
+    { "id": "fledgling_sick", "group": "crow", "size": [48, 48], "seed": 1202, "ref": "fledgling_idle", "strength": 500, "prompt": "the same fledgling crow looking unwell, drooping head, dull ruffled patchy feathers, half closed sad eye" },
+
+    { "id": "juvenile_idle", "group": "crow", "size": [48, 48], "seed": 1301, "ref": "crow_adult_idle", "strength": 380, "prompt": "side view of a juvenile crow, slimmer and slightly smaller than an adult, sleek but slightly dull black feathers, standing alert" },
+    { "id": "juvenile_sick", "group": "crow", "size": [48, 48], "seed": 1302, "ref": "juvenile_idle", "strength": 500, "prompt": "the same juvenile crow looking unwell, drooping head, dull ruffled feathers, half closed sad eye, slumped" },
+
+    { "id": "elder_idle", "group": "crow", "size": [48, 48], "seed": 1401, "ref": "crow_adult_idle", "strength": 330, "prompt": "side view of an old elderly crow, slightly hunched, a few scruffy grey and white flecked feathers among the black, worn pale beak, wise heavy lidded eye, standing" },
+    { "id": "elder_sick", "group": "crow", "size": [48, 48], "seed": 1402, "ref": "elder_idle", "strength": 500, "prompt": "the same old elderly crow looking frail and unwell, deeply hunched, very ruffled dull feathers, closed weary eye" },
+
+    { "id": "adult_idle_b", "group": "crow", "size": [48, 48], "seed": 2001, "ref": "crow_adult_idle", "strength": 620, "prompt": "the same standing crow, identical pose, head lifted very slightly higher, eye open, breathing idle frame" },
+    { "id": "adult_idle_c", "group": "crow", "size": [48, 48], "seed": 2002, "ref": "crow_adult_idle", "strength": 620, "prompt": "the same standing crow, identical pose, eye closed in a blink" },
+    { "id": "adult_sick", "group": "crow", "size": [48, 48], "seed": 2003, "ref": "crow_adult_idle", "strength": 480, "prompt": "the same crow looking unwell, drooping head, dull ruffled feathers, half closed sad eye, slumped posture, small green sickness tinge" },
+    { "id": "adult_sleep", "group": "crow", "size": [48, 48], "seed": 2004, "ref": "crow_adult_idle", "strength": 400, "prompt": "the same crow asleep, curled into a rounded fluffy ball, head tucked into its back feathers, eye closed" },
+    { "id": "adult_happy", "group": "crow", "size": [48, 48], "seed": 2005, "ref": "crow_adult_idle", "strength": 480, "prompt": "the same crow happy and excited, beak open mid caw, bright wide eye, chest puffed, tail lifted" },
+    { "id": "adult_sad", "group": "crow", "size": [48, 48], "seed": 2006, "ref": "crow_adult_idle", "strength": 480, "prompt": "the same crow looking sad and lonely, head lowered, beak closed, downturned drooping eye, tail down" },
+    { "id": "adult_eating", "group": "crow", "size": [48, 48], "seed": 2007, "ref": "crow_adult_idle", "strength": 450, "prompt": "the same crow leaning down pecking at food, head lowered to the ground, beak open and touching down" },
+    { "id": "adult_begging", "group": "crow", "size": [48, 48], "seed": 2008, "ref": "crow_adult_idle", "strength": 450, "prompt": "the same crow begging for food, head tilted up, beak wide open pointing upward, eager wide eye" },
+    { "id": "adult_twig_hold", "group": "crow", "size": [48, 48], "seed": 2009, "ref": "crow_adult_idle", "strength": 430, "prompt": "the same crow holding a small brown twig crosswise in its beak, standing, playful" },
+    { "id": "adult_twig_toss", "group": "crow", "size": [48, 48], "seed": 2010, "ref": "adult_twig_hold", "strength": 480, "prompt": "the same crow flicking its head upward to toss a small brown twig into the air, twig above the open beak, motion lines" },
+    { "id": "adult_preen", "group": "crow", "size": [48, 48], "seed": 2011, "ref": "crow_adult_idle", "strength": 450, "prompt": "the same crow preening and cleaning itself, head twisted back to nibble its own wing feathers, a few loose feather flecks" },
+    { "id": "adult_petted", "group": "crow", "size": [48, 48], "seed": 2012, "ref": "crow_adult_idle", "strength": 480, "prompt": "the same crow being petted and enjoying it, eye closed contentedly, head tilted up, feathers relaxed and fluffed" },
+
+    { "id": "food_earthworm", "group": "food", "size": [32, 32], "seed": 3001, "prompt": "a single pink earthworm curled into a loose coil, small game item icon" },
+    { "id": "food_earthworm_half", "group": "food", "size": [32, 32], "seed": 3002, "ref": "food_earthworm", "strength": 500, "prompt": "a shorter half eaten pink earthworm, one small piece remaining, game item icon" },
+    { "id": "food_mealworm", "group": "food", "size": [32, 32], "seed": 3003, "ref": "food_earthworm", "strength": 300, "prompt": "a small pale yellow brown segmented mealworm grub, game item icon" },
+    { "id": "food_crouton", "group": "food", "size": [32, 32], "seed": 3004, "prompt": "a single cube of toasted golden brown bread crouton, crusty edges, game item icon" },
+    { "id": "food_crouton_pile", "group": "food", "size": [32, 32], "seed": 3005, "ref": "food_crouton", "strength": 400, "prompt": "a small pile of three toasted golden bread crouton cubes, game item icon" },
+    { "id": "food_sunflower_seed", "group": "food", "size": [32, 32], "seed": 3006, "prompt": "a single striped black and grey sunflower seed, teardrop shape, game item icon" },
+    { "id": "food_seed_pile", "group": "food", "size": [32, 32], "seed": 3007, "ref": "food_sunflower_seed", "strength": 400, "prompt": "a small scattered pile of mixed birdseed, striped sunflower seeds and tiny golden grains, game item icon" },
+    { "id": "food_corn_kernel", "group": "food", "size": [32, 32], "seed": 3008, "prompt": "a single glossy golden yellow corn kernel, rounded wedge shape, game item icon" },
+    { "id": "food_berry", "group": "food", "size": [32, 32], "seed": 3009, "prompt": "a small round dark red wild berry with a tiny green stem, game item icon" },
+
+    { "id": "twig_single", "group": "nest", "size": [32, 32], "seed": 4001, "prompt": "a single short thin brown twig, slightly bent, bare with no leaves, game item icon" },
+    { "id": "twig_long", "group": "nest", "size": [48, 32], "seed": 4002, "ref": "twig_single", "strength": 450, "prompt": "one longer straight brown stick with a small side branch, bare, game item icon" },
+    { "id": "twig_bundle", "group": "nest", "size": [48, 32], "seed": 4003, "ref": "twig_single", "strength": 350, "prompt": "a small loose bundle of five crossed brown twigs stacked together, game item icon" },
+    { "id": "straw_loose", "group": "nest", "size": [32, 32], "seed": 4004, "prompt": "a small wisp of dry golden straw and grass stems, game item icon" },
+    { "id": "nest_partial", "group": "nest", "size": [48, 32], "seed": 4005, "ref": "twig_bundle", "strength": 350, "prompt": "a half built birds nest, a rough incomplete ring of woven brown twigs, gap on one side, game item icon" },
+    { "id": "nest_complete", "group": "nest", "size": [48, 32], "seed": 4006, "ref": "nest_partial", "strength": 450, "prompt": "a finished round birds nest, neatly woven brown twigs with a soft straw lined hollow centre, game item icon" },
+
+    { "id": "shiny_bottle_cap", "group": "shiny", "size": [32, 32], "seed": 5001, "prompt": "a small crimped metal bottle cap seen at an angle, dull silver with a red painted top, a tiny sparkle, game item icon" },
+    { "id": "shiny_coin", "group": "shiny", "size": [32, 32], "seed": 5002, "prompt": "a small round gold coin with a worn rim, a tiny sparkle glint, game item icon" },
+    { "id": "shiny_key", "group": "shiny", "size": [32, 32], "seed": 5003, "prompt": "a small old brass key with a round bow and simple teeth, a tiny sparkle, game item icon" },
+    { "id": "shiny_marble", "group": "shiny", "size": [32, 32], "seed": 5004, "prompt": "a small glass marble, clear blue with a white swirl inside and a bright highlight, game item icon" },
+    { "id": "shiny_foil", "group": "shiny", "size": [32, 32], "seed": 5005, "prompt": "a small crumpled scrap of silver tin foil catching the light, a tiny sparkle, game item icon" },
+    { "id": "shiny_bead", "group": "shiny", "size": [32, 32], "seed": 5006, "prompt": "a small round turquoise glass bead with a hole through the middle, glossy highlight, game item icon" },
+
+    { "id": "icon_hungry", "group": "icon", "size": [24, 24], "seed": 6001, "prompt": "simple flat game UI status icon of a pink worm curled into a C shape, bold and readable at tiny size, no background" },
+    { "id": "icon_bored", "group": "icon", "size": [24, 24], "seed": 6002, "prompt": "simple flat game UI status icon of a round grey face with a flat straight neutral mouth and half closed eyes, bored expression, bold and readable at tiny size, no background" },
+    { "id": "icon_sleepy", "group": "icon", "size": [24, 24], "seed": 6003, "prompt": "simple flat game UI status icon of two blue letter Z shapes rising diagonally, sleep symbol, bold and readable at tiny size, no background" },
+    { "id": "icon_sick", "group": "icon", "size": [24, 24], "seed": 6004, "prompt": "simple flat game UI status icon of a round green queasy face with a wavy unhappy mouth, sickness symbol, bold and readable at tiny size, no background" },
+    { "id": "icon_heart", "group": "icon", "size": [24, 24], "seed": 6005, "prompt": "simple flat game UI status icon of a bright red heart, health symbol, bold and readable at tiny size, no background" },
+    { "id": "icon_poo", "group": "icon", "size": [24, 24], "seed": 6006, "prompt": "simple flat game UI icon of a small brown coiled bird dropping, cartoon, bold and readable at tiny size, no background" },
+    { "id": "icon_water", "group": "icon", "size": [24, 24], "seed": 6007, "prompt": "simple flat game UI status icon of a single blue water droplet with a white highlight, bold and readable at tiny size, no background" },
+    { "id": "icon_sparkle", "group": "icon", "size": [24, 24], "seed": 6008, "prompt": "simple flat game UI icon of a four pointed yellow sparkle star with two small twinkles, bold and readable at tiny size, no background" }
+  ]
+}
