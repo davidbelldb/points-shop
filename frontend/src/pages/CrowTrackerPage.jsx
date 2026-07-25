@@ -20,9 +20,9 @@ import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // Marauder's Map palette. Parchment is painted under the map (no grey flash before
 // tiles load); the route line + destination node use the deep oxblood red.
-const PARCHMENT = '#f7db9b';  // page + map land background
+const PARCHMENT = '#ebc876';  // page + map fallback background (matches the map's land)
 const ROUTE = '#5e1a13';   // map route line + end node
-const CARD_BG = '#f7db9b'; // journey card background
+const CARD_BG = '#f7db9b'; // journey tile (card) background only
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 // Flapping-flight loop: alternate the two send wing poses (wings up / wings down)
@@ -36,7 +36,7 @@ const PERCH_SPRITE = '/scrolls/crow_land_10.png';
 // borders, cream roads. Applied to the crow tracker only (OMW keeps its dark map).
 const MARAUDERS_STYLE = [
   { featureType: 'all', elementType: 'all', stylers: [{ color: '#4b0202' }, { gamma: '2.38' }, { saturation: '0' }, { visibility: 'simplified' }] },
-  { featureType: 'all', elementType: 'geometry', stylers: [{ color: '#f7db9b' }] },
+  { featureType: 'all', elementType: 'geometry', stylers: [{ color: '#ebc876' }] },
   { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ gamma: 0.01 }, { lightness: 20 }] },
   { featureType: 'all', elementType: 'labels.text.stroke', stylers: [{ saturation: -31 }, { lightness: -33 }, { weight: 2 }, { gamma: 0.8 }] },
   { featureType: 'all', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
