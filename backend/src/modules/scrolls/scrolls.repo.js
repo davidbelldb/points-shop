@@ -587,9 +587,11 @@ export async function listIncoming(recipientId) {
   return rows;
 }
 
-// How long a just-landed crow lingers on the in-app tracker so the page can show
-// its "Arrived" state before going quiet.
-const CROW_TRACKER_LINGER_MIN = 2;
+// How long a completed journey (route line + "Arrived" card) lingers on the in-app
+// tracker before it reverts to "no crow in flight". The perched unread crows are a
+// separate, persistent layer (they stay at their locations until the scroll is
+// read), so this only governs the active-journey view.
+const CROW_TRACKER_LINGER_MIN = 5;
 
 // The caller's active crow flight — powers the in-app /crow-tracker live map
 // (the scroll equivalent of OMW's active-trip). Returns the crow currently in

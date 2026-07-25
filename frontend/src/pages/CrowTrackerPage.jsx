@@ -23,8 +23,13 @@ const PARCHMENT = '#ebc876';
 const ROUTE = '#5e1a13';   // map route line + end node + journey card background
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
-// The in-flight crow sprite shown on the map. Faces right; drawn at its natural ratio.
-const CROW_SPRITE = '/scrolls/crow_map.png';
+// Flapping-flight loop: crow_land_00 → 09 are all in-flight wing poses (10 is the
+// perched/landed frame, so it's excluded). Cycled while the crow is travelling to
+// animate it flying — the same sprite set the send/land animations use.
+const FLY_FRAMES = Array.from({ length: 10 }, (_, i) => `/scrolls/crow_land_0${i}.png`);
+// The perched crow (final landing frame) that sits at a destination holding an
+// unread scroll, until it's opened.
+const PERCH_SPRITE = '/scrolls/crow_land_10.png';
 
 // "The Marauder's Map" — Snazzy Maps #101918 (Tomas): parchment land, oxblood
 // borders, cream roads. Applied to the crow tracker only (OMW keeps its dark map).
@@ -104,7 +109,7 @@ export default function CrowTrackerPage() {
   const scrollSettings = scrolls.config.settings || {};
   const scrollsEnabled = !!scrollSettings.enabled;   // admin launch toggle
   const [composeOpen, setComposeOpen] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
+  const [openLocKey, setOpenLocKey] = useState(null); // "lat,lng" of a tapped perched crow
   const [stamped, setStamped] = useState(false);     // Pen-scroll seal press illusion
 
   // Press the seal → flip it to the stamped graphic for a beat, then open the composer.
@@ -133,16 +138,19 @@ export default function CrowTrackerPage() {
   }, []);
 
   // Poll the active flight (existence / landed / ETA). Position itself is driven
-  // by the local clock below, so this can stay a lazy 5s poll.
+  // by the local clock below, so this can stay a lazy 5s poll. Exposed as a stable
+  // callback so reading a scroll can refetch immediately (a read scroll is deleted,
+  // so its completed journey clears at once rather than lingering the full 5 min).
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+  const fetchFlight = useCallback(() => api.scrolls.activeFlight()
+    .then((r) => { if (mountedRef.current) setFlight(r.flight ?? null); })
+    .catch(() => { if (mountedRef.current) setFlight((f) => (f === undefined ? null : f)); }), []);
   useEffect(() => {
-    let alive = true;
-    const tick = () => api.scrolls.activeFlight()
-      .then((r) => { if (alive) setFlight(r.flight ?? null); })
-      .catch(() => { if (alive) setFlight((f) => (f === undefined ? null : f)); });
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
+    fetchFlight();
+    const id = setInterval(fetchFlight, 5000);
+    return () => clearInterval(id);
+  }, [fetchFlight]);
 
   // Keep the progress clock in sync with the latest flight timestamps.
   useEffect(() => {
@@ -166,6 +174,43 @@ export default function CrowTrackerPage() {
     return () => clearInterval(id);
   }, []);
 
+  // Flap the crow: cycle the flight frames while it's actually travelling. Keyed
+  // on a stable boolean so the flap timer doesn't reset on every 5s data poll.
+  const inFlight = !!flight && !flight.arrived;
+  const [frameIdx, setFrameIdx] = useState(0);
+  useEffect(() => {
+    if (!inFlight) { setFrameIdx(0); return undefined; }
+    const id = setInterval(() => setFrameIdx((i) => (i + 1) % FLY_FRAMES.length), 90);
+    return () => clearInterval(id);
+  }, [inFlight]);
+  // Preload the frames once so the first wingbeat doesn't flicker.
+  useEffect(() => { FLY_FRAMES.forEach((src) => { const im = new Image(); im.src = src; }); }, []);
+
+  // Every unread scroll waiting for this user, grouped by the destination it was
+  // sent to. Each group becomes ONE perched crow (crow_land_10) sitting on that
+  // location with a count badge, persisting until the scroll(s) there are read —
+  // independent of the 5-minute journey linger. `scrolls.scrolls` is exactly the
+  // set of delivered-but-unread scrolls (reading deletes them).
+  const locKey = (lat, lng) => `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
+  const unreadPerches = useMemo(() => {
+    const groups = new Map();
+    for (const s of (scrolls.scrolls || [])) {
+      const lat = Number(s.dest_lat); const lng = Number(s.dest_lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const key = locKey(lat, lng);
+      if (!groups.has(key)) groups.set(key, { key, lat, lng, label: s.dest_label, count: 0 });
+      groups.get(key).count += 1;
+    }
+    return [...groups.values()];
+  }, [scrolls.scrolls]);
+
+  // Live list of scrolls at the tapped location (derived, so it shrinks as they're
+  // read and the reader closes itself once the location is cleared).
+  const openLocScrolls = useMemo(() => {
+    if (!openLocKey) return null;
+    return (scrolls.scrolls || []).filter((s) => locKey(s.dest_lat, s.dest_lng) === openLocKey);
+  }, [openLocKey, scrolls.scrolls]);
+
   // Straight origin → destination line ("as the crow flies") — no road routing.
   const routePts = useMemo(() => {
     if (!flight) return [];
@@ -185,15 +230,21 @@ export default function CrowTrackerPage() {
   const remaining = split ? [split.pt].concat(routePts.slice(split.idx)) : routePts;
   const dest = flight?.dest_lat != null ? { lat: Number(flight.dest_lat), lng: Number(flight.dest_lng) } : null;
   const crowAt = split ? split.pt : (flight?.current_lat != null ? { lat: Number(flight.current_lat), lng: Number(flight.current_lng) } : null);
+  // While flying, draw only the road AHEAD; once landed, keep the WHOLE completed
+  // journey line on screen for the 5-minute linger.
+  const linePath = flight?.arrived ? routePts : remaining;
 
-  // Keep the fit target current: the whole remaining line + the crow + destination.
+  // Fit target: the active journey (line + crow + destination) PLUS every perched
+  // unread crow, so the default framing always shows all of a user's waiting crows
+  // at once — whether they're at one location or spread across several.
   useEffect(() => {
     const pts = [];
-    (remaining || []).forEach((p) => { if (inUK(p)) pts.push(p); });
+    (linePath || []).forEach((p) => { if (inUK(p)) pts.push(p); });
     if (inUK(dest)) pts.push(dest);
-    if (inUK(crowAt)) pts.push(crowAt);
+    if (!flight?.arrived && inUK(crowAt)) pts.push(crowAt);
+    unreadPerches.forEach((p) => { if (inUK(p)) pts.push({ lat: p.lat, lng: p.lng }); });
     fitPointsRef.current = pts;
-  }, [remaining, dest, crowAt]);
+  }, [linePath, dest, crowAt, flight?.arrived, unreadPerches]);
 
   const recenter = useCallback(() => {
     const m = mapRef.current;
@@ -230,19 +281,12 @@ export default function CrowTrackerPage() {
   // polls while the camera settles once per poll (as the OMW map does), rather than
   // re-fitting 10×/second.
   useEffect(() => {
-    if (!isLoaded || !flight) return;
+    if (!isLoaded) return;
+    if (!flight && unreadPerches.length === 0) return;   // nothing to frame
     if (Date.now() - lastInteractRef.current < RECENTER_DELAY_MS) return;
     recenter();
-  }, [isLoaded, flight, recenter]);
+  }, [isLoaded, flight, unreadPerches, recenter]);
 
-  // Crow sprite at its natural ratio (230×198). Constant, so it's built once the
-  // Maps SDK is ready (not rebuilt each poll); the marker itself is only rendered
-  // while a crow is in flight.
-  const crowIcon = useMemo(() => {
-    if (!isLoaded) return undefined;
-    const w = 54; const h = Math.round((w * 198) / 222); // ≈ 48 (crow_map.png is 222×198)
-    return { url: CROW_SPRITE, scaledSize: new window.google.maps.Size(w, h), anchor: new window.google.maps.Point(w / 2, h / 2) };
-  }, [isLoaded]);
   const destIcon = useMemo(() => (isLoaded ? {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: ROUTE, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
   } : undefined), [isLoaded]);
@@ -281,33 +325,46 @@ export default function CrowTrackerPage() {
             onLoad={onLoad}
             options={mapOptions}
           >
-            {/* The flight still ahead, one solid oxblood line, straight as the crow flies. */}
-            {remaining.length > 1 && <PolylineF path={remaining} options={{ strokeColor: ROUTE, strokeOpacity: 0.95, strokeWeight: 6 }} />}
+            {/* The journey line, straight as the crow flies — the road ahead while
+                flying, the whole completed line during the post-arrival linger. */}
+            {linePath.length > 1 && <PolylineF path={linePath} options={{ strokeColor: ROUTE, strokeOpacity: 0.95, strokeWeight: 6 }} />}
             {dest && destIcon && <MarkerF position={dest} icon={destIcon} />}
-            {/* In flight: the gliding crow as a plain marker. */}
-            {!flight?.arrived && crowAt && crowIcon && <MarkerF position={crowAt} icon={crowIcon} zIndex={999} />}
-            {/* Landed: the perched crow at the destination, carrying an unread badge
-                (count of scrolls waiting) exactly like /messages. Tapping it opens
-                the scrolls list → the full reader. */}
-            {flight?.arrived && crowAt && (
+            {/* In flight: the flapping crow, cycling crow_land_00 → 09 for a flying
+                animation. Non-interactive (pointer-through) so it never blocks the
+                map, and drawn in a fixed box so the slightly-varied frame canvases
+                don't make it jitter in size. */}
+            {inFlight && crowAt && (
               <OverlayViewF position={crowAt} mapPaneName="overlayMouseTarget"
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
-                <div
-                  onClick={() => scrollsEnabled && scrolls.unread > 0 && setListOpen(true)}
-                  style={{ position: 'relative', width: 54, height: 48, cursor: scrolls.unread > 0 ? 'pointer' : 'default' }}
-                >
-                  <img src={CROW_SPRITE} alt="" draggable={false} style={{ width: 54, height: 48, display: 'block' }} />
-                  {scrollsEnabled && scrolls.unread > 0 && (
-                    <span style={{
-                      position: 'absolute', top: -7, right: -7, minWidth: 20, height: 20, boxSizing: 'border-box',
-                      padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
-                      fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
-                      border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                    }}>{scrolls.unread}</span>
-                  )}
+                <div style={{ width: 56, height: 50, pointerEvents: 'none' }}>
+                  <img src={FLY_FRAMES[frameIdx]} alt="" draggable={false}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                 </div>
               </OverlayViewF>
             )}
+            {/* Perched crows: one per destination with unread scrolls waiting, each
+                with a count badge (#5e1a13). They persist until that location's
+                scroll(s) are read — independent of the journey linger — so a user
+                always sees a crow over every place a scroll is waiting for them.
+                Tapping one opens just that location's scrolls in the reader. */}
+            {scrollsEnabled && unreadPerches.map((p) => (
+              <OverlayViewF key={p.key} position={{ lat: p.lat, lng: p.lng }} mapPaneName="overlayMouseTarget"
+                getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
+                <div
+                  onClick={() => setOpenLocKey(p.key)}
+                  style={{ position: 'relative', width: 52, height: 52, cursor: 'pointer' }}
+                >
+                  <img src={PERCH_SPRITE} alt="" draggable={false}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                  <span style={{
+                    position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, boxSizing: 'border-box',
+                    padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
+                    fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
+                    border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                  }}>{p.count}</span>
+                </div>
+              </OverlayViewF>
+            ))}
           </GoogleMap>
         </div>
       )}
@@ -358,7 +415,13 @@ export default function CrowTrackerPage() {
         {flight === null && (
           <>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>No crow in flight</p>
-            <p style={{ margin: '4px 0 0', opacity: 0.65, fontSize: 13 }}>This opens live when a scroll is on its way.</p>
+            {unreadPerches.length > 0 ? (
+              <p style={{ margin: '4px 0 0', opacity: 0.65, fontSize: 13 }}>
+                {scrolls.unread} scroll{scrolls.unread === 1 ? '' : 's'} waiting — tap a crow to open.
+              </p>
+            ) : (
+              <p style={{ margin: '4px 0 0', opacity: 0.65, fontSize: 13 }}>This opens live when a scroll is on its way.</p>
+            )}
           </>
         )}
         {flight && (
@@ -398,13 +461,15 @@ export default function CrowTrackerPage() {
         />
       )}
 
-      {/* Read received scrolls (reused from /messages) — list → full-size reader. */}
-      {scrollsEnabled && listOpen && (
+      {/* Read the scrolls waiting at a tapped location (reused from /messages) —
+          list → full-size reader. The list is live, so it empties as they're read;
+          closing it refetches the flight so a now-read journey clears at once. */}
+      {scrollsEnabled && openLocKey && (
         <ScrollsListModal
-          scrolls={scrolls.scrolls}
+          scrolls={openLocScrolls || []}
           settings={scrollSettings}
           onRead={scrolls.markRead}
-          onClose={() => { setListOpen(false); scrolls.refresh(); }}
+          onClose={() => { setOpenLocKey(null); scrolls.refresh(); fetchFlight(); }}
         />
       )}
     </div>
