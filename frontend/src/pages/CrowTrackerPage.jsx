@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GoogleMap, MarkerF, PolylineF, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, PolylineF, OverlayViewF, useJsApiLoader } from '@react-google-maps/api';
 import { api } from '../lib/api.js';
+import { useScrolls } from '../components/scrolls/useScrolls.js';
+import ScrollComposeModal from '../components/scrolls/ScrollComposeModal.jsx';
+import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
 
 /*
  * "Crow Tracker" live map — the scroll-delivery twin of the On My Way tracker.
@@ -94,6 +97,21 @@ export default function CrowTrackerPage() {
   const mapRef = useRef(null);
   // Flight timing for the smooth progress clock (avoids re-subscribing the timer).
   const clockRef = useRef(null);   // { startedMs, arrivesMs, landed }
+
+  // Scrolls (raven messages) — the same feature that powers /messages, reused here
+  // so you can read the scroll that just landed and pen a new one to send back.
+  const scrolls = useScrolls();
+  const scrollSettings = scrolls.config.settings || {};
+  const scrollsEnabled = !!scrollSettings.enabled;   // admin launch toggle
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [stamped, setStamped] = useState(false);     // Pen-scroll seal press illusion
+
+  // Press the seal → flip it to the stamped graphic for a beat, then open the composer.
+  const openCompose = useCallback(() => {
+    setStamped(true);
+    setTimeout(() => { setStamped(false); setComposeOpen(true); }, 240);
+  }, []);
 
   // Disable pull-to-refresh / rubber-band scroll while the full-screen map is up.
   useEffect(() => {
@@ -248,10 +266,67 @@ export default function CrowTrackerPage() {
             {/* The flight still ahead, one solid oxblood line, straight as the crow flies. */}
             {remaining.length > 1 && <PolylineF path={remaining} options={{ strokeColor: ROUTE, strokeOpacity: 0.95, strokeWeight: 6 }} />}
             {dest && destIcon && <MarkerF position={dest} icon={destIcon} />}
-            {/* Hide the crow once landed — the pink dot marks the destination. */}
+            {/* In flight: the gliding crow as a plain marker. */}
             {!flight?.arrived && crowAt && crowIcon && <MarkerF position={crowAt} icon={crowIcon} zIndex={999} />}
+            {/* Landed: the perched crow at the destination, carrying an unread badge
+                (count of scrolls waiting) exactly like /messages. Tapping it opens
+                the scrolls list → the full reader. */}
+            {flight?.arrived && crowAt && (
+              <OverlayViewF position={crowAt} mapPaneName="overlayMouseTarget"
+                getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
+                <div
+                  onClick={() => scrollsEnabled && scrolls.unread > 0 && setListOpen(true)}
+                  style={{ position: 'relative', width: 54, height: 48, cursor: scrolls.unread > 0 ? 'pointer' : 'default' }}
+                >
+                  <img src={CROW_SPRITE} alt="" draggable={false} style={{ width: 54, height: 48, display: 'block' }} />
+                  {scrollsEnabled && scrolls.unread > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -7, right: -7, minWidth: 20, height: 20, boxSizing: 'border-box',
+                      padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
+                      fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
+                      border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                    }}>{scrolls.unread}</span>
+                  )}
+                </div>
+              </OverlayViewF>
+            )}
           </GoogleMap>
         </div>
+      )}
+
+      {/* Pen scroll — top-centred wax seal. Pressing it flips the seal from
+          unstamped → stamped (the stamping illusion) and opens the composer. */}
+      {scrollsEnabled && (
+        <button
+          type="button"
+          onClick={openCompose}
+          aria-label="Pen a scroll"
+          style={{
+            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
+            width: 84, height: 84, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <img
+            src={`/scrolls/${stamped ? 'seal_stamped' : 'seal_unstamped'}.png`}
+            alt="" draggable={false}
+            style={{
+              width: '100%', height: '100%', objectFit: 'contain', display: 'block',
+              filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.45))',
+              transform: stamped ? 'scale(0.94)' : 'none', transition: 'transform 0.12s ease-out',
+            }}
+          />
+          <span style={{
+            position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', lineHeight: 1.02, pointerEvents: 'none',
+            fontFamily: 'ImperialBlack', color: '#fff', fontSize: 15, letterSpacing: '0.02em',
+            textShadow: '0 1px 3px rgba(60,15,5,0.7)',
+            transform: stamped ? 'scale(0.94)' : 'none', transition: 'transform 0.12s ease-out',
+          }}>
+            <span>Pen</span>
+            <span>scroll</span>
+          </span>
+        </button>
       )}
 
       <div style={{
@@ -292,6 +367,26 @@ export default function CrowTrackerPage() {
           </>
         )}
       </div>
+
+      {/* Compose a scroll (reused from /messages) — the seal-and-send parchment. */}
+      {scrollsEnabled && composeOpen && (
+        <ScrollComposeModal
+          settings={scrollSettings}
+          onSend={(p) => scrolls.send(p)}
+          onSent={() => setComposeOpen(false)}
+          onClose={() => setComposeOpen(false)}
+        />
+      )}
+
+      {/* Read received scrolls (reused from /messages) — list → full-size reader. */}
+      {scrollsEnabled && listOpen && (
+        <ScrollsListModal
+          scrolls={scrolls.scrolls}
+          settings={scrollSettings}
+          onRead={scrolls.markRead}
+          onClose={() => { setListOpen(false); scrolls.refresh(); }}
+        />
+      )}
     </div>
   );
 }
