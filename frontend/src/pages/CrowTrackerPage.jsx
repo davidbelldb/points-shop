@@ -198,11 +198,30 @@ export default function CrowTrackerPage() {
       const lat = Number(s.dest_lat); const lng = Number(s.dest_lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const key = locKey(lat, lng);
-      if (!groups.has(key)) groups.set(key, { key, lat, lng, label: s.dest_label, count: 0 });
+      if (!groups.has(key)) groups.set(key, { key, lat, lng, label: s.dest_label, count: 0, openable: true });
       groups.get(key).count += 1;
     }
     return [...groups.values()];
   }, [scrolls.scrolls]);
+
+  // Perched crows to draw = the unread scrolls above, PLUS a just-arrived forecast
+  // ("Three-Eyed Crow"): forecasts aren't readable/unread scrolls, so they aren't
+  // in the list, but on the tracker they still perch at their location with a badge
+  // for the duration of the arrived-journey window (they can't be opened, so this
+  // one clears when the 5-minute linger ends rather than on read).
+  const perches = useMemo(() => {
+    const list = unreadPerches.map((p) => ({ ...p }));
+    if (flight && flight.arrived && flight.kind === 'forecast') {
+      const lat = Number(flight.dest_lat); const lng = Number(flight.dest_lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        const key = locKey(lat, lng);
+        if (!list.some((p) => p.key === key)) {
+          list.push({ key, lat, lng, label: flight.dest_label, count: 1, openable: false });
+        }
+      }
+    }
+    return list;
+  }, [unreadPerches, flight]);
 
   // Live list of scrolls at the tapped location (derived, so it shrinks as they're
   // read and the reader closes itself once the location is cleared).
@@ -230,21 +249,26 @@ export default function CrowTrackerPage() {
   const remaining = split ? [split.pt].concat(routePts.slice(split.idx)) : routePts;
   const dest = flight?.dest_lat != null ? { lat: Number(flight.dest_lat), lng: Number(flight.dest_lng) } : null;
   const crowAt = split ? split.pt : (flight?.current_lat != null ? { lat: Number(flight.current_lat), lng: Number(flight.current_lng) } : null);
-  // While flying, draw only the road AHEAD; once landed, keep the WHOLE completed
-  // journey line on screen for the 5-minute linger.
-  const linePath = flight?.arrived ? routePts : remaining;
+  // The route line is drawn only while the crow is actually flying; once it lands
+  // the line is hidden (the perched crow marks where it went), leaving just the
+  // "Arrived" card.
+  const linePath = (flight && !flight.arrived) ? remaining : [];
 
-  // Fit target: the active journey (line + crow + destination) PLUS every perched
-  // unread crow, so the default framing always shows all of a user's waiting crows
-  // at once — whether they're at one location or spread across several.
+  // Fit target. While a crow is actively flying, follow the journey (line + crow +
+  // destination). Once it's arrived — or when there's no flight at all — frame the
+  // map around ALL perched crows at once, so the user always sees every location a
+  // scroll is waiting at, be it one or many.
   useEffect(() => {
     const pts = [];
-    (linePath || []).forEach((p) => { if (inUK(p)) pts.push(p); });
-    if (inUK(dest)) pts.push(dest);
-    if (!flight?.arrived && inUK(crowAt)) pts.push(crowAt);
-    unreadPerches.forEach((p) => { if (inUK(p)) pts.push({ lat: p.lat, lng: p.lng }); });
+    if (flight && !flight.arrived) {
+      (linePath || []).forEach((p) => { if (inUK(p)) pts.push(p); });
+      if (inUK(crowAt)) pts.push(crowAt);
+      if (inUK(dest)) pts.push(dest);
+    } else {
+      perches.forEach((p) => { if (inUK(p)) pts.push({ lat: p.lat, lng: p.lng }); });
+    }
     fitPointsRef.current = pts;
-  }, [linePath, dest, crowAt, flight?.arrived, unreadPerches]);
+  }, [flight?.arrived, flight, linePath, crowAt, dest, perches]);
 
   const recenter = useCallback(() => {
     const m = mapRef.current;
@@ -282,10 +306,10 @@ export default function CrowTrackerPage() {
   // re-fitting 10×/second.
   useEffect(() => {
     if (!isLoaded) return;
-    if (!flight && unreadPerches.length === 0) return;   // nothing to frame
+    if (!flight && perches.length === 0) return;   // nothing to frame
     if (Date.now() - lastInteractRef.current < RECENTER_DELAY_MS) return;
     recenter();
-  }, [isLoaded, flight, unreadPerches, recenter]);
+  }, [isLoaded, flight, perches, recenter]);
 
   const destIcon = useMemo(() => (isLoaded ? {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: ROUTE, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
@@ -347,12 +371,12 @@ export default function CrowTrackerPage() {
                 scroll(s) are read — independent of the journey linger — so a user
                 always sees a crow over every place a scroll is waiting for them.
                 Tapping one opens just that location's scrolls in the reader. */}
-            {scrollsEnabled && unreadPerches.map((p) => (
+            {scrollsEnabled && perches.map((p) => (
               <OverlayViewF key={p.key} position={{ lat: p.lat, lng: p.lng }} mapPaneName="overlayMouseTarget"
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
                 <div
-                  onClick={() => setOpenLocKey(p.key)}
-                  style={{ position: 'relative', width: 52, height: 52, cursor: 'pointer' }}
+                  onClick={() => p.openable && setOpenLocKey(p.key)}
+                  style={{ position: 'relative', width: 52, height: 52, cursor: p.openable ? 'pointer' : 'default' }}
                 >
                   <img src={PERCH_SPRITE} alt="" draggable={false}
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
