@@ -39,7 +39,8 @@ const { style, palette, sprites } = manifest;
 const byId = new Map(sprites.map((s) => [s.id, s]));
 
 const pathFor = (s) => join(SPRITES, s.group, `${s.id}.png`);
-const done = (s) => existsSync(pathFor(s)) && !REDO.includes(s.id);
+const REDO_ALL = REDO.includes('all');
+const done = (s) => existsSync(pathFor(s)) && !REDO_ALL && !REDO.includes(s.id);
 
 /* ---------------------------------------------------------------- *
  * Build order: a sprite with a `ref` must come after its reference.

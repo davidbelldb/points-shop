@@ -14,7 +14,7 @@ private let crowRight = "crow_land_10"
 // The in-flight crow that glides along the trail (faces right, toward the
 // destination). Shown only while the scroll is still travelling — it vanishes
 // once landed, leaving just the two static bookend crows.
-private let crowMover = "crow_land_xx"
+private let crowMover = "crow_land_00"
 
 // Where the gliding crow sits, as a fraction of the trail, for each flight phase.
 // It rides just off the left crow at take-off (0.06), lands on each of the three
