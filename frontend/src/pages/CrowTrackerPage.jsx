@@ -17,9 +17,7 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // Marauder's Map palette. Parchment is painted under the map (no grey flash before
 // tiles load); the route line + destination node use the deep oxblood red.
 const PARCHMENT = '#ebc876';
-const ROUTE = '#5e1a13';   // map route line + end node
-const TEAL = '#15b8a6';    // info-card "Arrived" + progress bar fill
-const PINK = '#ee70bd';    // info-card ETA
+const ROUTE = '#5e1a13';   // map route line + end node + journey card background
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 // The in-flight crow sprite shown on the map. Faces right; drawn at its natural ratio.
@@ -258,8 +256,8 @@ export default function CrowTrackerPage() {
 
       <div style={{
         position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
-        background: 'rgba(31,31,31,0.94)', borderRadius: 22, padding: '11px 16px',
-        boxShadow: '0 10px 34px rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', color: '#fff',
+        background: ROUTE, borderRadius: 22, padding: '11px 16px',
+        boxShadow: '0 10px 34px rgba(0,0,0,0.55)', color: '#fff',
       }}>
         {flight === undefined && <p style={{ margin: 0, opacity: 0.7 }}>Loading…</p>}
         {flight === null && (
@@ -276,18 +274,20 @@ export default function CrowTrackerPage() {
               </p>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 {flight.arrived ? (
-                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: TEAL }}>Arrived</p>
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#fff' }}>Arrived</p>
                 ) : (
                   <>
-                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: PINK }}>{flight.eta_minutes} min</p>
-                    {flight.distance_km != null && <p style={{ margin: 0, fontSize: 11, opacity: 0.55 }}>{flight.distance_km} km</p>}
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#fff' }}>{flight.eta_minutes} min</p>
+                    {/* Distance remaining — lower-opacity white. */}
+                    {flight.distance_km != null && <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{flight.distance_km} km</p>}
                   </>
                 )}
               </div>
             </div>
-            {flight.message && <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: 13 }}>{flight.message}</p>}
-            <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round((display || 0) * 100)}%`, background: TEAL, transition: 'width 0.2s linear' }} />
+            {flight.message && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#fff' }}>{flight.message}</p>}
+            {/* Journey bar: travelled portion solid white; untravelled track lower-opacity white. */}
+            <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round((display || 0) * 100)}%`, background: '#fff', transition: 'width 0.2s linear' }} />
             </div>
           </>
         )}
