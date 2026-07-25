@@ -125,6 +125,8 @@ export const api = {
     list:     () => request('/scrolls'),
     unread:   () => request('/scrolls/unread'),
     incoming: () => request('/scrolls/incoming'),
+    // The caller's active crow flight (in flight / just landed) for /crow-tracker.
+    activeFlight: () => request('/scrolls/active-flight'),
     send:     (payload) => request('/scrolls', { method: 'POST', body: JSON.stringify(payload) }),
     markRead: (id) => request(`/scrolls/${id}/read`, { method: 'POST' }),
     config:   () => request('/scrolls/config'),

@@ -23,6 +23,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import MessagesPage from './pages/MessagesPage.jsx';
 import NewChatPage from './pages/NewChatPage.jsx';
 import OmwMapPage from './pages/OmwMapPage.jsx';
+import CrowTrackerPage from './pages/CrowTrackerPage.jsx';
 import SheetIn from './components/SheetIn.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
 
@@ -178,6 +179,9 @@ createRoot(document.getElementById('root')).render(
                   /messages when tested. */}
               <Route path="new-chat" element={<NewChatPage />} />
               <Route path="on-my-way" element={<OmwMapPage />} />
+              {/* Crow-delivery live tracker — opened by tapping a crow / weather
+                  Live Activity (sneakystuff://crow-tracker). Straight-line flight. */}
+              <Route path="crow-tracker" element={<CrowTrackerPage />} />
               <Route path="games" element={<GamesPage />} />
               <Route path="games/truth-or-dare" element={<TruthOrDarePage />} />
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />

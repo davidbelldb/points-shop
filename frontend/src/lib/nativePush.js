@@ -54,7 +54,7 @@ export async function initNativePush(onOpenUrl) {
     });
 
     // Deep links into the app:
-    //  • custom scheme (crow Live Activity → sneakystuff://messages)
+    //  • custom scheme (crow / weather Live Activity → sneakystuff://crow-tracker)
     //  • https universal links (NFC tag / shared link → https://sneakypoints.com/s/<token>)
     // Both are reduced to an in-app path and handed to the router.
     CapApp.addListener('appUrlOpen', ({ url }) => {

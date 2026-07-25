@@ -3,12 +3,32 @@ import WidgetKit
 import SwiftUI
 
 private let bg = Color(red: 0.122, green: 0.122, blue: 0.118)      // #1f1f1e background
-private let deepLink = URL(string: "sneakystuff://messages")
+// Tapping the crow / weather Live Activity opens the in-app straight-line flight
+// tracker (both normal scrolls and forecast scrolls use this same activity).
+private let deepLink = URL(string: "sneakystuff://crow-tracker")
 
 // A crow at each end of the journey: crow_land_00 departs on the left,
 // crow_land_10 waits (perched) on the right. Both are shown at all times.
 private let crowLeft = "crow_land_00"
 private let crowRight = "crow_land_10"
+// The in-flight crow that glides along the trail (faces right, toward the
+// destination). Shown only while the scroll is still travelling — it vanishes
+// once landed, leaving just the two static bookend crows.
+private let crowMover = "crow_move"
+
+// Where the gliding crow sits, as a fraction of the trail, for each flight phase.
+// It rides just off the left crow at take-off (0.06), lands on each of the three
+// waypoint nodes (0.25 / 0.50 / 0.75) as it's "spotted" over them, then eases in
+// for landing (0.92) before the delivered state hides it.
+private func crowMoverFrac(_ phase: Int) -> CGFloat {
+    switch phase {
+    case 0:  return 0.06
+    case 1:  return 0.25
+    case 2:  return 0.50
+    case 3:  return 0.75
+    default: return 0.92
+    }
+}
 
 private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     s.landed
@@ -43,18 +63,15 @@ struct CrowWidgetLiveActivity: Widget {
                     VStack(spacing: 6) {
                         Text(title(context.state, context.attributes))
                             .font(.headline).foregroundColor(.white)
-                        // White so it's visible on the black Dynamic Island.
-                        // Stays put once landed (shown full), just no longer animates.
-                        Group {
-                            if context.state.landed {
-                                Capsule().fill(Color.white).frame(height: 4)
-                            } else {
-                                ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
-                                             countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
-                                    .tint(.white)
-                            }
-                        }
-                        .frame(maxWidth: 195)
+                        // The same flight trail as the banner, but tinted for the
+                        // black Dynamic Island: white line/fill/nodes with the
+                        // gliding crow riding along, gone once landed.
+                        CrowTrail(startedAt: context.state.startedAt,
+                                  arrivesAt: context.state.arrivesAt,
+                                  landed: context.state.landed,
+                                  phase: context.state.phase,
+                                  tint: .white)
+                            .frame(maxWidth: 195)
                     }
                 }
             } compactLeading: {
@@ -90,6 +107,7 @@ struct DashedLine: View {
 // progress arrives at that point.
 struct WaypointNodes: View {
     var reached: Int   // how many nodes have been passed (0–3)
+    var color: Color = .black   // black on the banner, white on the Dynamic Island
     private let fracs: [CGFloat] = [0.25, 0.5, 0.75]
     var body: some View {
         GeometryReader { geo in
@@ -98,18 +116,62 @@ struct WaypointNodes: View {
                 ZStack {
                     // Soft translucent halo appears once the crow reaches the node.
                     Circle()
-                        .fill(Color.black.opacity(0.22))
+                        .fill(color.opacity(0.22))
                         .frame(width: 20, height: 20)
                         .scaleEffect(isOn ? 1 : 0.3)
                         .opacity(isOn ? 1 : 0)
                     // Inner dot — same size whether reached or not.
-                    Circle().fill(Color.black).frame(width: 8, height: 8)
+                    Circle().fill(color).frame(width: 8, height: 8)
                 }
                 .position(x: geo.size.width * frac, y: geo.size.height / 2)
             }
         }
         .frame(height: 20)
         .animation(.spring(response: 0.35, dampingFraction: 0.45), value: reached)
+    }
+}
+
+// The crow's flight trail: the dashed line, the solid time-driven fill, the three
+// waypoint nodes, and the gliding crow that rides along above them. The gliding
+// crow is hidden once landed (the perched crow on the right says it all), leaving
+// only the static bookend sprites — mirroring the "On My Way" trail. Shared by the
+// lock-screen banner and the Dynamic Island so both surfaces animate identically.
+struct CrowTrail: View {
+    var startedAt: Date
+    var arrivesAt: Date
+    var landed: Bool
+    var phase: Int
+    var tint: Color = .black    // black on the tile banner, white on the Dynamic Island
+    var body: some View {
+        let reached = landed ? 3 : phase
+        ZStack {
+            DashedLine(color: tint)
+            // Solid fill: full colour once arrived, otherwise the auto-advancing
+            // timer bar (draws the fill; dashes show ahead of it).
+            if landed {
+                Capsule().fill(tint).frame(height: 3)
+            } else {
+                ProgressView(timerInterval: startedAt...arrivesAt, countsDown: false) {
+                    EmptyView()
+                } currentValueLabel: { EmptyView() }
+                    .tint(tint)
+            }
+            WaypointNodes(reached: reached, color: tint)
+            // The gliding crow — above the trail + nodes, hidden once delivered.
+            // Its position steps between waypoints as phase updates arrive, easing
+            // between them so it appears to fly rather than teleport.
+            if !landed {
+                GeometryReader { geo in
+                    Image(crowMover).resizable().scaledToFit()
+                        .frame(width: 30, height: 30)
+                        .position(x: crowMoverFrac(phase) * geo.size.width,
+                                  y: geo.size.height / 2)
+                        .animation(.easeInOut(duration: 1.2), value: phase)
+                }
+                .zIndex(1)
+            }
+        }
+        .frame(height: 12)
     }
 }
 
@@ -137,24 +199,15 @@ struct CrowLockScreenView: View {
                     .padding(.horizontal, 20)     // truncate ~6 chars sooner, off the edge
 
                 HStack(spacing: 10) {
+                    // Static "leave" crow bookends the trail on the left; the
+                    // gliding crow flies out from here and the perched crow waits
+                    // on the right. The trail fills solid black left → right as the
+                    // crow flies, its three waypoint nodes popping as it passes.
                     Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
-                    // Dashed trail that fills in solid black, left → right, as the
-                    // crow flies. The auto-advancing ProgressView draws the solid
-                    // fill; the dashes show ahead of it.
-                    ZStack {
-                        DashedLine(color: .black)
-                        if context.state.landed {
-                            Capsule().fill(Color.black).frame(height: 3)   // arrived → full solid
-                        } else {
-                            ProgressView(timerInterval: context.state.startedAt...context.state.arrivesAt,
-                                         countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
-                                .tint(.black)
-                        }
-                        // Three evenly-spaced waypoint nodes (centre + one either
-                        // side). Each "pops" as the crow's progress reaches it.
-                        WaypointNodes(reached: context.state.landed ? 3 : context.state.phase)
-                    }
-                    .frame(height: 12)
+                    CrowTrail(startedAt: context.state.startedAt,
+                              arrivesAt: context.state.arrivesAt,
+                              landed: context.state.landed,
+                              phase: context.state.phase)
                     Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
                 }
             }

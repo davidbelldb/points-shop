@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "crow_move.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

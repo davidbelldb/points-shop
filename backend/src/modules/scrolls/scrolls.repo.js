@@ -587,6 +587,87 @@ export async function listIncoming(recipientId) {
   return rows;
 }
 
+// How long a just-landed crow lingers on the in-app tracker so the page can show
+// its "Arrived" state before going quiet.
+const CROW_TRACKER_LINGER_MIN = 2;
+
+// The caller's active crow flight — powers the in-app /crow-tracker live map
+// (the scroll equivalent of OMW's active-trip). Returns the crow currently in
+// flight to them (soonest arrival first), or one that landed in the last couple
+// of minutes so the tracker can show "Arrived". Everything is derived from the
+// flight's timestamps (deliver_at / flight_seconds), so progress is purely
+// time-based — the crow flies a STRAIGHT LINE from origin to destination, "as
+// the crow flies", with no road/street routing. Works for both normal scrolls
+// and forecast ("Three-Eyed Crow") scrolls.
+export async function getActiveCrowFlight(recipientId) {
+  const { rows } = await query(
+    `SELECT s.id, s.origin_label, s.dest_label, s.from_label, s.body,
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng,
+            s.deliver_at, s.flight_seconds, s.delivered, s.delivered_at,
+            a.name AS sender_name
+       FROM scrolls s JOIN accounts a ON a.id = s.sender_id
+      WHERE s.recipient_id = $1
+        AND (
+          s.deliver_at > NOW()                                       -- still in flight
+          OR (s.delivered = TRUE AND s.delivered_at > NOW() - make_interval(mins => $2))
+        )
+      ORDER BY (s.deliver_at > NOW()) DESC,
+               CASE WHEN s.deliver_at > NOW() THEN s.deliver_at END ASC,
+               s.delivered_at DESC
+      LIMIT 1`,
+    [recipientId, CROW_TRACKER_LINGER_MIN],
+  );
+  const s = rows[0];
+  if (!s) return null;
+
+  const arrivesMs = new Date(s.deliver_at).getTime();
+  const startedMs = arrivesMs - (Number(s.flight_seconds) || 0) * 1000;
+  const now = Date.now();
+  const landed = !!s.delivered || now >= arrivesMs;
+  const total = Math.max(1, arrivesMs - startedMs);
+  const progress = landed ? 1 : Math.max(0, Math.min(1, (now - startedMs) / total));
+
+  const isForecast = !!s.from_label;
+  const distanceKm = haversineKm(s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng) || 0;
+  const remainingKm = landed ? 0 : distanceKm * (1 - progress);
+  const etaMinutes = landed ? 0 : Math.max(1, Math.ceil(Math.max(0, arrivesMs - now) / 60000));
+
+  // Straight-line interpolation of the crow's current point (fallback for the
+  // client; the map itself re-derives it from progress along the origin→dest line).
+  const lerp = (a, b) => Number(a) + (Number(b) - Number(a)) * progress;
+  const currentLat = landed ? Number(s.dest_lat) : lerp(s.origin_lat, s.dest_lat);
+  const currentLng = landed ? Number(s.dest_lng) : lerp(s.origin_lng, s.dest_lng);
+
+  // Subtitle: in flight → "dispatched from …"; landed → the forecast text (weather
+  // scrolls only — a normal scroll keeps its reading ceremony in the scroll reader,
+  // so we never spill its body here).
+  const from = s.from_label || s.origin_label || 'afar';
+  let message = '';
+  if (landed) message = isForecast ? (s.body || '').replace(/\s+/g, ' ').trim() : 'Your scroll has landed.';
+  else message = `A crow is on its way from ${from}`;
+
+  return {
+    id: s.id,
+    kind: isForecast ? 'forecast' : 'scroll',
+    traveller_name: isForecast ? 'The Three-Eyed Crow' : 'A crow',
+    origin_label: s.origin_label,
+    dest_label: s.dest_label,
+    from_label: s.from_label,
+    arrived: landed,
+    origin_lat: Number(s.origin_lat), origin_lng: Number(s.origin_lng),
+    dest_lat: Number(s.dest_lat), dest_lng: Number(s.dest_lng),
+    current_lat: currentLat, current_lng: currentLng,
+    // Empty route_points → the client draws a single straight origin→dest line.
+    route_points: [],
+    progress, route_progress: progress,
+    eta_minutes: etaMinutes,
+    distance_km: Math.round(remainingKm * 10) / 10,
+    message,
+    started_at: new Date(startedMs).toISOString(),
+    arrives_at: new Date(arrivesMs).toISOString(),
+  };
+}
+
 // Count of arrived-but-unread scrolls (drives the "crow has arrived" badge).
 // Forecast scrolls (from_label set) are excluded so the daily weather crow never
 // raises an unread badge — it lives only as a Live Activity notification.
@@ -663,10 +744,12 @@ export async function resolveDueScrolls() {
           }
         } else {
           // No Live Activity reachable — fall back to the classic alert push.
+          // Forecast (Three-Eyed Crow) scrolls live only on the tracker, so send
+          // there; a normal scroll opens the reader in /messages.
           await sendPush(s.recipient_id, {
             title: arrivedTitle,
             body: preview || 'A crow has arrived',
-            url: '/messages?scrolls=1',
+            url: s.from_label ? '/crow-tracker' : '/messages?scrolls=1',
             tag: 'scroll-arrival',
           });
         }

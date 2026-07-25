@@ -1,6 +1,7 @@
 import {
   getSettings, getFrames, updateSettings, replaceFrames,
   createScroll, listReceived, listIncoming, unreadCount, markRead, resolveDueScrolls,
+  getActiveCrowFlight,
   pushStreetSubtitleUpdates, saveLiveActivityToken,
   getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
@@ -91,6 +92,14 @@ export default async function scrollRoutes(fastify) {
   fastify.get('/api/scrolls/incoming', async (req) => {
     const accountId = getEffectiveAccountId(req);
     return { incoming: await listIncoming(accountId) };
+  });
+
+  // The caller's active crow flight — powers the in-app /crow-tracker live map
+  // (opened by tapping the crow / weather Live Activity). Straight-line route,
+  // time-based progress; null when nothing is in flight or recently landed.
+  fastify.get('/api/scrolls/active-flight', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    return { flight: await getActiveCrowFlight(accountId) };
   });
 
   // Register a Live Activity push token (push-to-start or per-scroll update).
