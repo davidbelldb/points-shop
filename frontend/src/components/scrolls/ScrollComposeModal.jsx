@@ -45,6 +45,15 @@ const CUSTOM_PLACES = [
     lat: 52.2053, lng: 0.1192, // Cambridge fallback; refined on select
     aliases: ['bishop', 'bishops', "bishop's", 'bishops court', "bishop's court"],
   },
+  {
+    // Home. Pinned to exact coords (52°11'09.0"N 0°08'31.0"E) — `fixed` skips the
+    // on-select Nominatim refine so it always lands on this precise spot.
+    road: 'Blinco Grove',
+    query: 'Blinco Grove, Cambridge, UK',
+    lat: 52.185833, lng: 0.141944,
+    aliases: ['blinco', 'blinco grove'],
+    fixed: true,
+  },
 ];
 
 function customMatches(query) {
@@ -52,7 +61,7 @@ function customMatches(query) {
   if (!ql) return [];
   return CUSTOM_PLACES
     .filter((p) => p.road.toLowerCase().includes(ql) || p.aliases.some((a) => a.startsWith(ql)))
-    .map((p) => ({ custom: true, road: p.road, query: p.query, lat: p.lat, lng: p.lng, place_id: `custom-${p.road}` }));
+    .map((p) => ({ custom: true, fixed: p.fixed, road: p.road, query: p.query, lat: p.lat, lng: p.lng, place_id: `custom-${p.road}` }));
 }
 
 function DestinationPicker({ value, onPick, font }) {
@@ -101,7 +110,7 @@ function DestinationPicker({ value, onPick, font }) {
     const lbl = r.road || r.display_name?.split(',')[0].trim() || r.display_name;
     let lat = Number(r.lat);
     let lng = Number(r.lon ?? r.lng);
-    if (r.custom) {
+    if (r.custom && !r.fixed) {
       // Resolve precise coords for the curated address in the browser.
       try {
         const res = await fetch(

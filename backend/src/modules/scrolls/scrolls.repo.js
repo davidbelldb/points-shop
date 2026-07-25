@@ -593,35 +593,11 @@ export async function listIncoming(recipientId) {
 // read), so this only governs the active-journey view.
 const CROW_TRACKER_LINGER_MIN = 5;
 
-// The caller's active crow flight — powers the in-app /crow-tracker live map
-// (the scroll equivalent of OMW's active-trip). Returns the crow currently in
-// flight to them (soonest arrival first), or one that landed in the last couple
-// of minutes so the tracker can show "Arrived". Everything is derived from the
-// flight's timestamps (deliver_at / flight_seconds), so progress is purely
-// time-based — the crow flies a STRAIGHT LINE from origin to destination, "as
-// the crow flies", with no road/street routing. Works for both normal scrolls
-// and forecast ("Three-Eyed Crow") scrolls.
-export async function getActiveCrowFlight(recipientId) {
-  const { rows } = await query(
-    `SELECT s.id, s.origin_label, s.dest_label, s.from_label, s.body,
-            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets,
-            s.deliver_at, s.flight_seconds, s.delivered, s.delivered_at,
-            a.name AS sender_name
-       FROM scrolls s JOIN accounts a ON a.id = s.sender_id
-      WHERE s.recipient_id = $1
-        AND (
-          s.deliver_at > NOW()                                       -- still in flight
-          OR (s.delivered = TRUE AND s.delivered_at > NOW() - make_interval(mins => $2))
-        )
-      ORDER BY (s.deliver_at > NOW()) DESC,
-               CASE WHEN s.deliver_at > NOW() THEN s.deliver_at END ASC,
-               s.delivered_at DESC
-      LIMIT 1`,
-    [recipientId, CROW_TRACKER_LINGER_MIN],
-  );
-  const s = rows[0];
-  if (!s) return null;
-
+// Build one tracker flight object from a scroll row. Everything is derived from
+// the flight's timestamps (deliver_at / flight_seconds), so progress is purely
+// time-based — the crow flies a STRAIGHT LINE from origin to destination, "as the
+// crow flies", with no road/street routing.
+function buildCrowFlight(s) {
   const arrivesMs = new Date(s.deliver_at).getTime();
   const startedMs = arrivesMs - (Number(s.flight_seconds) || 0) * 1000;
   const now = Date.now();
@@ -680,6 +656,29 @@ export async function getActiveCrowFlight(recipientId) {
     started_at: new Date(startedMs).toISOString(),
     arrives_at: new Date(arrivesMs).toISOString(),
   };
+}
+
+// The caller's active crow flights — powers the in-app /crow-tracker live map (the
+// scroll equivalent of OMW's active-trip). Returns ALL crows currently in flight to
+// them, plus any that landed in the last few minutes (so the map can show several
+// journeys at once + the just-arrived "Arrived" card). Recipient-scoped: a person
+// only ever sees scrolls addressed to them.
+export async function getActiveCrowFlights(recipientId) {
+  const { rows } = await query(
+    `SELECT s.id, s.origin_label, s.dest_label, s.from_label, s.body,
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets,
+            s.deliver_at, s.flight_seconds, s.delivered, s.delivered_at,
+            a.name AS sender_name
+       FROM scrolls s JOIN accounts a ON a.id = s.sender_id
+      WHERE s.recipient_id = $1
+        AND (
+          s.deliver_at > NOW()                                       -- still in flight
+          OR (s.delivered = TRUE AND s.delivered_at > NOW() - make_interval(mins => $2))
+        )
+      ORDER BY s.deliver_at ASC`,
+    [recipientId, CROW_TRACKER_LINGER_MIN],
+  );
+  return rows.map(buildCrowFlight);
 }
 
 // Count of arrived-but-unread scrolls (drives the "crow has arrived" badge).

@@ -9,11 +9,12 @@ import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
  * "Crow Tracker" live map — the scroll-delivery twin of the On My Way tracker.
  * Opened by tapping a crow / weather Live Activity (sneakystuff://crow-tracker).
  *
- * The crow flies a STRAIGHT LINE — "as the crow flies" — from where the scroll was
- * dispatched to where it lands (no roads / streets). The route ahead is drawn as a
- * solid teal line; the crow sprite rides at the head of it and glides smoothly,
- * driven purely by the flight's timestamps (so it's buttery even between the 5s
- * polls). Deliberately read-only: no reply pills, no "send a live message" bar.
+ * Every crow flies a STRAIGHT LINE — "as the crow flies" — from where a scroll was
+ * dispatched to where it lands (no roads / streets), driven purely by the flight's
+ * timestamps so motion is buttery between the 5s polls. Multiple journeys can be in
+ * the air at once; the bottom card follows the latest still-flying one. Read-only:
+ * no reply pills, no "send a live message" bar — but you can read landed scrolls
+ * and pen new ones. Recipient-scoped: you only ever see scrolls sent to you.
  */
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -21,6 +22,7 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // tiles load); the route line + destination node use the deep oxblood red.
 const PARCHMENT = '#ebc876';
 const ROUTE = '#5e1a13';   // map route line + end node
+const CARD_BG = '#efcb72'; // journey card background
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 // Flapping-flight loop: alternate the two send wing poses (wings up / wings down)
@@ -54,33 +56,6 @@ const MARAUDERS_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#d6a95d' }] },
 ];
 
-function haversine(a, b) {
-  const R = 6371;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat); const dLng = toRad(b.lng - a.lng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-function cumulative(points) {
-  const cum = [0];
-  for (let i = 1; i < points.length; i += 1) cum.push(cum[i - 1] + haversine(points[i - 1], points[i]));
-  return cum;
-}
-// Point at `dist` km along the polyline, plus the index of the first point after it.
-function pointAtDistance(points, cum, dist) {
-  if (points.length < 2) return { pt: points[0], idx: 1 };
-  const total = cum[cum.length - 1];
-  if (dist <= 0) return { pt: points[0], idx: 1 };
-  if (dist >= total) return { pt: points[points.length - 1], idx: points.length };
-  let i = 1; while (i < points.length && cum[i] < dist) i += 1;
-  const t = cum[i] > cum[i - 1] ? (dist - cum[i - 1]) / (cum[i] - cum[i - 1]) : 0;
-  const pt = {
-    lat: points[i - 1].lat + (points[i].lat - points[i - 1].lat) * t,
-    lng: points[i - 1].lng + (points[i].lng - points[i - 1].lng) * t,
-  };
-  return { pt, idx: i };
-}
-
 // Reject stray / null coordinates (they coerce to 0 and would blow the fit out to
 // the "Europe" world view). Cambridge / UK bounding box.
 const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
@@ -88,19 +63,18 @@ const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
 
 const FIT_PADDING = { top: 71, bottom: 210, left: 56, right: 56 };
 const RECENTER_DELAY_MS = 5000;
+const ts = (x) => new Date(x).getTime();
 
 export default function CrowTrackerPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
-  const [flight, setFlight] = useState(undefined);
-  const [display, setDisplay] = useState(0);   // live progress 0…1, time-derived
+  const [flights, setFlights] = useState(undefined);   // undefined = loading, else array
+  const [now, setNow] = useState(Date.now());          // ticks so time-based motion is smooth
   const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: 13 }), []);
   const lastInteractRef = useRef(0);
   const programmaticRef = useRef(false);
   const recenterTimerRef = useRef(null);
   const fitPointsRef = useRef([]);
   const mapRef = useRef(null);
-  // Flight timing for the smooth progress clock (avoids re-subscribing the timer).
-  const clockRef = useRef(null);   // { startedMs, arrivesMs, landed }
 
   // Scrolls (raven messages) — the same feature that powers /messages, reused here
   // so you can read the scroll that just landed and pen a new one to send back.
@@ -136,52 +110,55 @@ export default function CrowTrackerPage() {
     };
   }, []);
 
-  // Poll the active flight (existence / landed / ETA). Position itself is driven
-  // by the local clock below, so this can stay a lazy 5s poll. Exposed as a stable
-  // callback so reading a scroll can refetch immediately (a read scroll is deleted,
-  // so its completed journey clears at once rather than lingering the full 5 min).
+  // Poll the active flights (existence / landed / ETA). Positions are driven by the
+  // local clock below, so this stays a lazy 5s poll. Exposed as a stable callback so
+  // reading a scroll can refetch immediately (a read scroll is deleted, so its
+  // completed journey clears at once rather than lingering the full 5 min).
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
-  const fetchFlight = useCallback(() => api.scrolls.activeFlight()
-    .then((r) => { if (mountedRef.current) setFlight(r.flight ?? null); })
-    .catch(() => { if (mountedRef.current) setFlight((f) => (f === undefined ? null : f)); }), []);
+  const fetchFlights = useCallback(() => api.scrolls.activeFlight()
+    .then((r) => { if (mountedRef.current) setFlights(r.flights ?? []); })
+    .catch(() => { if (mountedRef.current) setFlights((f) => (f === undefined ? [] : f)); }), []);
   useEffect(() => {
-    fetchFlight();
-    const id = setInterval(fetchFlight, 5000);
+    fetchFlights();
+    const id = setInterval(fetchFlights, 5000);
     return () => clearInterval(id);
-  }, [fetchFlight]);
+  }, [fetchFlights]);
 
-  // Keep the progress clock in sync with the latest flight timestamps.
+  // A single 100ms clock that all time-based motion reads from.
   useEffect(() => {
-    if (!flight) { clockRef.current = null; return; }
-    clockRef.current = {
-      startedMs: new Date(flight.started_at).getTime(),
-      arrivesMs: new Date(flight.arrives_at).getTime(),
-      landed: !!flight.arrived,
-    };
-  }, [flight?.id, flight?.started_at, flight?.arrives_at, flight?.arrived]);
-
-  // The smooth progress clock — recomputes the fraction from real time every 100ms.
-  useEffect(() => {
-    const id = setInterval(() => {
-      const c = clockRef.current;
-      if (!c) { setDisplay(0); return; }
-      if (c.landed) { setDisplay(1); return; }
-      const total = Math.max(1, c.arrivesMs - c.startedMs);
-      setDisplay(Math.max(0, Math.min(1, (Date.now() - c.startedMs) / total)));
-    }, 100);
+    const id = setInterval(() => setNow(Date.now()), 100);
     return () => clearInterval(id);
   }, []);
 
-  // Flap the crow: cycle the flight frames while it's actually travelling. Keyed
-  // on a stable boolean so the flap timer doesn't reset on every 5s data poll.
-  const inFlight = !!flight && !flight.arrived;
+  // A flight's live 0…1 progress, from real time between dispatch and arrival.
+  const progressOf = useCallback((f) => {
+    if (!f) return 0;
+    if (f.arrived) return 1;
+    const started = ts(f.started_at); const arrives = ts(f.arrives_at);
+    return Math.max(0, Math.min(1, (now - started) / Math.max(1, arrives - started)));
+  }, [now]);
+
+  // The flight the CARD follows: the most-recently-dispatched crow that's still in
+  // the air. When it lands it drops out of the in-flight set, so the card falls back
+  // to the next-latest still flying (the "original despatch"). With nothing flying,
+  // it shows the most-recently-arrived crow for its "Arrived" linger.
+  const focusFlight = useMemo(() => {
+    if (flights === undefined) return undefined;
+    if (!flights.length) return null;
+    const inflight = flights.filter((f) => !f.arrived);
+    if (inflight.length) return inflight.reduce((a, b) => (ts(b.started_at) > ts(a.started_at) ? b : a));
+    return flights.reduce((a, b) => (ts(b.arrives_at) > ts(a.arrives_at) ? b : a));
+  }, [flights]);
+
+  // Flap the crows while any are travelling (shared frame — they beat in sync).
+  const anyFlying = Array.isArray(flights) && flights.some((f) => !f.arrived);
   const [frameIdx, setFrameIdx] = useState(0);
   useEffect(() => {
-    if (!inFlight) { setFrameIdx(0); return undefined; }
+    if (!anyFlying) { setFrameIdx(0); return undefined; }
     const id = setInterval(() => setFrameIdx((i) => (i + 1) % FLY_FRAMES.length), 160);
     return () => clearInterval(id);
-  }, [inFlight]);
+  }, [anyFlying]);
   // Preload the frames once so the first wingbeat doesn't flicker.
   useEffect(() => { FLY_FRAMES.forEach((src) => { const im = new Image(); im.src = src; }); }, []);
 
@@ -203,24 +180,21 @@ export default function CrowTrackerPage() {
     return [...groups.values()];
   }, [scrolls.scrolls]);
 
-  // Perched crows to draw = the unread scrolls above, PLUS a just-arrived forecast
-  // ("Three-Eyed Crow"): forecasts aren't readable/unread scrolls, so they aren't
-  // in the list, but on the tracker they still perch at their location with a badge
-  // for the duration of the arrived-journey window (they can't be opened, so this
-  // one clears when the 5-minute linger ends rather than on read).
+  // Perched crows to draw = the unread scrolls above, PLUS any just-arrived forecast
+  // ("Three-Eyed Crow"): forecasts aren't readable/unread scrolls, so they aren't in
+  // the list, but on the tracker they still perch with a badge for the arrived
+  // window (they can't be opened, so they clear when their 5-min linger ends).
   const perches = useMemo(() => {
     const list = unreadPerches.map((p) => ({ ...p }));
-    if (flight && flight.arrived && flight.kind === 'forecast') {
-      const lat = Number(flight.dest_lat); const lng = Number(flight.dest_lng);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        const key = locKey(lat, lng);
-        if (!list.some((p) => p.key === key)) {
-          list.push({ key, lat, lng, label: flight.dest_label, count: 1, openable: false });
-        }
-      }
+    for (const f of (Array.isArray(flights) ? flights : [])) {
+      if (!(f.arrived && f.kind === 'forecast')) continue;
+      const lat = Number(f.dest_lat); const lng = Number(f.dest_lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const key = locKey(lat, lng);
+      if (!list.some((p) => p.key === key)) list.push({ key, lat, lng, label: f.dest_label, count: 1, openable: false });
     }
     return list;
-  }, [unreadPerches, flight]);
+  }, [unreadPerches, flights]);
 
   // Live list of scrolls at the tapped location (derived, so it shrinks as they're
   // read and the reader closes itself once the location is cleared).
@@ -229,45 +203,33 @@ export default function CrowTrackerPage() {
     return (scrolls.scrolls || []).filter((s) => locKey(s.dest_lat, s.dest_lng) === openLocKey);
   }, [openLocKey, scrolls.scrolls]);
 
-  // Straight origin → destination line ("as the crow flies") — no road routing.
-  const routePts = useMemo(() => {
-    if (!flight) return [];
-    const o = { lat: Number(flight.origin_lat), lng: Number(flight.origin_lng) };
-    const d = { lat: Number(flight.dest_lat), lng: Number(flight.dest_lng) };
-    return [o, d].filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-  }, [flight?.origin_lat, flight?.origin_lng, flight?.dest_lat, flight?.dest_lng]);
+  // On-map geometry for each crow STILL IN FLIGHT: its straight-line position (from
+  // progress) and the road ahead to its destination. Arrived crows drop out here
+  // (their route hides; they become a perched crow instead). Recomputes on the clock
+  // so the crows glide.
+  const flightViews = useMemo(() => {
+    const out = [];
+    for (const f of (Array.isArray(flights) ? flights : [])) {
+      if (f.arrived) continue;
+      const o = { lat: Number(f.origin_lat), lng: Number(f.origin_lng) };
+      const d = { lat: Number(f.dest_lat), lng: Number(f.dest_lng) };
+      if (![o.lat, o.lng, d.lat, d.lng].every(Number.isFinite)) continue;
+      const t = progressOf(f);
+      const crowAt = { lat: o.lat + (d.lat - o.lat) * t, lng: o.lng + (d.lng - o.lng) * t };
+      out.push({ id: f.id, crowAt, dest: d, line: [crowAt, d] });
+    }
+    return out;
+  }, [flights, progressOf]);
 
-  const cum = useMemo(() => cumulative(routePts), [routePts]);
-  const total = cum.length ? cum[cum.length - 1] : 0;
-
-  const split = useMemo(
-    () => (routePts.length >= 2 ? pointAtDistance(routePts, cum, display * total) : null),
-    [routePts, cum, total, display],
-  );
-  // The line still AHEAD of the crow — from its current point to the destination.
-  const remaining = split ? [split.pt].concat(routePts.slice(split.idx)) : routePts;
-  const dest = flight?.dest_lat != null ? { lat: Number(flight.dest_lat), lng: Number(flight.dest_lng) } : null;
-  const crowAt = split ? split.pt : (flight?.current_lat != null ? { lat: Number(flight.current_lat), lng: Number(flight.current_lng) } : null);
-  // The route line is drawn only while the crow is actually flying; once it lands
-  // the line is hidden (the perched crow marks where it went), leaving just the
-  // "Arrived" card.
-  const linePath = (flight && !flight.arrived) ? remaining : [];
-
-  // Fit target. While a crow is actively flying, follow the journey (line + crow +
-  // destination). Once it's arrived — or when there's no flight at all — frame the
-  // map around ALL perched crows at once, so the user always sees every location a
-  // scroll is waiting at, be it one or many.
+  // Fit target: every in-flight crow (position + destination) AND every perched
+  // crow, so the map always frames all journeys and all waiting crows at once —
+  // be it one location or many.
   useEffect(() => {
     const pts = [];
-    if (flight && !flight.arrived) {
-      (linePath || []).forEach((p) => { if (inUK(p)) pts.push(p); });
-      if (inUK(crowAt)) pts.push(crowAt);
-      if (inUK(dest)) pts.push(dest);
-    } else {
-      perches.forEach((p) => { if (inUK(p)) pts.push({ lat: p.lat, lng: p.lng }); });
-    }
+    for (const fv of flightViews) { if (inUK(fv.crowAt)) pts.push(fv.crowAt); if (inUK(fv.dest)) pts.push(fv.dest); }
+    perches.forEach((p) => { if (inUK(p)) pts.push({ lat: p.lat, lng: p.lng }); });
     fitPointsRef.current = pts;
-  }, [flight?.arrived, flight, linePath, crowAt, dest, perches]);
+  }, [flightViews, perches]);
 
   const recenter = useCallback(() => {
     const m = mapRef.current;
@@ -299,16 +261,15 @@ export default function CrowTrackerPage() {
     window.setTimeout(() => { if (Date.now() - lastInteractRef.current >= RECENTER_DELAY_MS) recenter(); }, 400);
   }, [noteInteraction, recenter]);
 
-  // Re-frame on each poll (a fresh `flight` object), unless the user is exploring
-  // the map. Deliberately NOT tied to `display` — the crow glides smoothly between
-  // polls while the camera settles once per poll (as the OMW map does), rather than
-  // re-fitting 10×/second.
+  // Re-frame on each poll (a fresh `flights` array) or when the perches change —
+  // NOT on the 100ms clock, so the crows glide while the camera settles per poll.
   useEffect(() => {
     if (!isLoaded) return;
-    if (!flight && perches.length === 0) return;   // nothing to frame
+    const nothing = !(Array.isArray(flights) && flights.length) && perches.length === 0;
+    if (nothing) return;
     if (Date.now() - lastInteractRef.current < RECENTER_DELAY_MS) return;
     recenter();
-  }, [isLoaded, flight, perches, recenter]);
+  }, [isLoaded, flights, perches, recenter]);
 
   const destIcon = useMemo(() => (isLoaded ? {
     path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: ROUTE, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5,
@@ -319,23 +280,24 @@ export default function CrowTrackerPage() {
     styles: MARAUDERS_STYLE, backgroundColor: PARCHMENT, clickableIcons: false,
   }), []);
 
-  // Live street narration — the same per-waypoint lines the iOS Live Activity
-  // shows ("Probably somewhere over X" … "Coming in to land at DEST"). The backend
-  // sends the phase lines + the progress marks; we pick the current one from the
-  // crow's smooth on-map progress, so the subtitle flips exactly as it passes each
-  // Cambridge street. Falls back to the opening / landed message otherwise.
+  // Live street narration for the focused flight — the same per-waypoint lines the
+  // iOS Live Activity shows ("Probably somewhere over X" … "Coming in to land at
+  // DEST"), swapped as that crow's smooth progress passes each waypoint.
   const cardMessage = useMemo(() => {
-    if (!flight) return '';
-    if (flight.arrived) return flight.message;
-    const lines = flight.narration;
-    const marks = flight.narration_marks;
+    const f = focusFlight;
+    if (!f) return '';
+    if (f.arrived) return f.message;
+    const lines = f.narration; const marks = f.narration_marks;
     if (Array.isArray(lines) && lines.length && Array.isArray(marks)) {
+      const t = progressOf(f);
       let phase = 0;
-      for (const m of marks) { if (display >= m) phase += 1; }
+      for (const m of marks) { if (t >= m) phase += 1; }
       if (phase >= 1 && lines[phase - 1]) return lines[phase - 1];
     }
-    return flight.message;   // opening line, before the first waypoint
-  }, [flight, display]);
+    return f.message;   // opening line, before the first waypoint
+  }, [focusFlight, progressOf]);
+
+  const focusProgress = progressOf(focusFlight);
 
   return (
     <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
@@ -348,23 +310,27 @@ export default function CrowTrackerPage() {
             onLoad={onLoad}
             options={mapOptions}
           >
-            {/* The journey line, straight as the crow flies — the road ahead while
-                flying, the whole completed line during the post-arrival linger. */}
-            {linePath.length > 1 && <PolylineF path={linePath} options={{ strokeColor: ROUTE, strokeOpacity: 0.95, strokeWeight: 6 }} />}
-            {dest && destIcon && <MarkerF position={dest} icon={destIcon} />}
-            {/* In flight: the flapping crow, cycling crow_land_00 → 09 for a flying
-                animation. Non-interactive (pointer-through) so it never blocks the
-                map, and drawn in a fixed box so the slightly-varied frame canvases
-                don't make it jitter in size. */}
-            {inFlight && crowAt && (
-              <OverlayViewF position={crowAt} mapPaneName="overlayMouseTarget"
+            {/* One oxblold "as the crow flies" line per in-flight journey — the road
+                ahead of each crow. Arrived crows have no line (route hidden). */}
+            {flightViews.map((fv) => (
+              <PolylineF key={`line-${fv.id}`} path={fv.line} options={{ strokeColor: ROUTE, strokeOpacity: 0.95, strokeWeight: 6 }} />
+            ))}
+            {/* A destination node per in-flight journey. */}
+            {destIcon && flightViews.map((fv) => (
+              <MarkerF key={`dest-${fv.id}`} position={fv.dest} icon={destIcon} />
+            ))}
+            {/* A flapping crow per in-flight journey (crow_send_03/04). Non-interactive
+                (pointer-through) so it never blocks the map, in a fixed box so the
+                slightly-varied frame canvases don't make it jitter in size. */}
+            {flightViews.map((fv) => (
+              <OverlayViewF key={`crow-${fv.id}`} position={fv.crowAt} mapPaneName="overlayMouseTarget"
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
                 <div style={{ width: 56, height: 50, pointerEvents: 'none' }}>
                   <img src={FLY_FRAMES[frameIdx]} alt="" draggable={false}
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                 </div>
               </OverlayViewF>
-            )}
+            ))}
             {/* Perched crows: one per destination with unread scrolls waiting, each
                 with a count badge (#5e1a13). They persist until that location's
                 scroll(s) are read — independent of the journey linger — so a user
@@ -431,12 +397,11 @@ export default function CrowTrackerPage() {
 
       <div style={{
         position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
-        backgroundImage: "url('/scrolls/tile.png')", backgroundSize: 'cover', backgroundPosition: 'center',
-        borderRadius: 22, padding: '11px 16px', overflow: 'hidden',
+        background: CARD_BG, borderRadius: 22, padding: '11px 16px',
         boxShadow: '0 10px 34px rgba(0,0,0,0.55)', color: '#000',
       }}>
-        {flight === undefined && <p style={{ margin: 0, opacity: 0.7 }}>Loading…</p>}
-        {flight === null && (
+        {focusFlight === undefined && <p style={{ margin: 0, opacity: 0.7 }}>Loading…</p>}
+        {focusFlight === null && (
           <>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>No crow in flight</p>
             {unreadPerches.length > 0 ? (
@@ -448,20 +413,20 @@ export default function CrowTrackerPage() {
             )}
           </>
         )}
-        {flight && (
+        {focusFlight && (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: 17 }}>
-                {flight.traveller_name} <span style={{ opacity: 0.55, fontWeight: 500 }}>→ {flight.dest_label || 'destination'}</span>
+                {focusFlight.traveller_name} <span style={{ opacity: 0.55, fontWeight: 500 }}>→ {focusFlight.dest_label || 'destination'}</span>
               </p>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                {flight.arrived ? (
+                {focusFlight.arrived ? (
                   <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>Arrived</p>
                 ) : (
                   <>
-                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>{flight.eta_minutes} min</p>
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>{focusFlight.eta_minutes} min</p>
                     {/* Distance remaining — lower-opacity black. */}
-                    {flight.distance_km != null && <p style={{ margin: 0, fontSize: 11, color: 'rgba(0,0,0,0.55)' }}>{flight.distance_km} km</p>}
+                    {focusFlight.distance_km != null && <p style={{ margin: 0, fontSize: 11, color: 'rgba(0,0,0,0.55)' }}>{focusFlight.distance_km} km</p>}
                   </>
                 )}
               </div>
@@ -469,7 +434,7 @@ export default function CrowTrackerPage() {
             {cardMessage && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#000' }}>{cardMessage}</p>}
             {/* Journey bar: travelled portion solid black; untravelled track lower-opacity black. */}
             <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.22)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round((display || 0) * 100)}%`, background: '#000', transition: 'width 0.2s linear' }} />
+              <div style={{ height: '100%', width: `${Math.round((focusProgress || 0) * 100)}%`, background: '#000', transition: 'width 0.2s linear' }} />
             </div>
           </>
         )}
@@ -487,13 +452,13 @@ export default function CrowTrackerPage() {
 
       {/* Read the scrolls waiting at a tapped location (reused from /messages) —
           list → full-size reader. The list is live, so it empties as they're read;
-          closing it refetches the flight so a now-read journey clears at once. */}
+          closing it refetches the flights so a now-read journey clears at once. */}
       {scrollsEnabled && openLocKey && (
         <ScrollsListModal
           scrolls={openLocScrolls || []}
           settings={scrollSettings}
           onRead={scrolls.markRead}
-          onClose={() => { setOpenLocKey(null); scrolls.refresh(); fetchFlight(); }}
+          onClose={() => { setOpenLocKey(null); scrolls.refresh(); fetchFlights(); }}
         />
       )}
     </div>
