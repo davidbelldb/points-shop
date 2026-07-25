@@ -111,6 +111,14 @@ export default function AccountPage() {
             <span aria-hidden>&rarr;</span>
           </Pressable>
 
+          {/* Crow Tracker — live map of a scroll's flight; also opened by tapping a
+              crow / weather Live Activity. Handy manual entry point for testing. */}
+          <Pressable as={Link} to="/crow-tracker"
+            className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm font-medium text-amber-700">
+            <span>Crow Tracker</span>
+            <span aria-hidden>&rarr;</span>
+          </Pressable>
+
           <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center gap-3">
               <label className="relative cursor-pointer">
