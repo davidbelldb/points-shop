@@ -252,6 +252,24 @@ export default function CrowTrackerPage() {
     styles: MARAUDERS_STYLE, backgroundColor: PARCHMENT, clickableIcons: false,
   }), []);
 
+  // Live street narration — the same per-waypoint lines the iOS Live Activity
+  // shows ("Probably somewhere over X" … "Coming in to land at DEST"). The backend
+  // sends the phase lines + the progress marks; we pick the current one from the
+  // crow's smooth on-map progress, so the subtitle flips exactly as it passes each
+  // Cambridge street. Falls back to the opening / landed message otherwise.
+  const cardMessage = useMemo(() => {
+    if (!flight) return '';
+    if (flight.arrived) return flight.message;
+    const lines = flight.narration;
+    const marks = flight.narration_marks;
+    if (Array.isArray(lines) && lines.length && Array.isArray(marks)) {
+      let phase = 0;
+      for (const m of marks) { if (display >= m) phase += 1; }
+      if (phase >= 1 && lines[phase - 1]) return lines[phase - 1];
+    }
+    return flight.message;   // opening line, before the first waypoint
+  }, [flight, display]);
+
   return (
     <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
       {isLoaded && (
@@ -294,15 +312,17 @@ export default function CrowTrackerPage() {
         </div>
       )}
 
-      {/* Pen scroll — top-centred wax seal. Pressing it flips the seal from
-          unstamped → stamped (the stamping illusion) and opens the composer. */}
+      {/* Pen scroll — floating wax-seal button, bottom-right (above the info card).
+          Pressing it flips the seal from unstamped → stamped (the stamping illusion)
+          and opens the composer. */}
       {scrollsEnabled && (
         <button
           type="button"
           onClick={openCompose}
           aria-label="Pen a scroll"
           style={{
-            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
+            position: 'absolute', right: 16,
+            bottom: 'calc(max(20px, env(safe-area-inset-bottom)) + 122px)', zIndex: 11,
             width: 84, height: 84, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
             WebkitTapHighlightColor: 'transparent',
           }}
@@ -359,7 +379,7 @@ export default function CrowTrackerPage() {
                 )}
               </div>
             </div>
-            {flight.message && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#fff' }}>{flight.message}</p>}
+            {cardMessage && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#fff' }}>{cardMessage}</p>}
             {/* Journey bar: travelled portion solid white; untravelled track lower-opacity white. */}
             <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.round((display || 0) * 100)}%`, background: '#fff', transition: 'width 0.2s linear' }} />

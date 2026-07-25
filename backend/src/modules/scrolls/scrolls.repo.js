@@ -602,7 +602,7 @@ const CROW_TRACKER_LINGER_MIN = 2;
 export async function getActiveCrowFlight(recipientId) {
   const { rows } = await query(
     `SELECT s.id, s.origin_label, s.dest_label, s.from_label, s.body,
-            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng,
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets,
             s.deliver_at, s.flight_seconds, s.delivered, s.delivered_at,
             a.name AS sender_name
        FROM scrolls s JOIN accounts a ON a.id = s.sender_id
@@ -642,9 +642,17 @@ export async function getActiveCrowFlight(recipientId) {
   // scrolls only — a normal scroll keeps its reading ceremony in the scroll reader,
   // so we never spill its body here).
   const from = s.from_label || s.origin_label || 'afar';
+
+  // Live street narration — the SAME per-waypoint copy the iOS Live Activity shows
+  // ("Probably somewhere over X" → … → "Coming in to land at DEST"), built from the
+  // scroll's phases via the shared streetMessage(). The client swaps between these
+  // as the crow's smooth progress passes each waypoint (25 / 50 / 75 / 92%), so the
+  // in-app tracker narrates identically to the lock-screen activity.
+  const narration = landed ? [] : [1, 2, 3, 4].map((ph) => streetMessage(ph, s));
+
   let message = '';
   if (landed) message = isForecast ? (s.body || '').replace(/\s+/g, ' ').trim() : 'Your scroll has landed.';
-  else message = `A crow is on its way from ${from}`;
+  else message = `A crow is on its way from ${from}`;   // opening line, before waypoint 1
 
   return {
     id: s.id,
@@ -663,6 +671,10 @@ export async function getActiveCrowFlight(recipientId) {
     eta_minutes: etaMinutes,
     distance_km: Math.round(remainingKm * 10) / 10,
     message,
+    // Per-waypoint narration + the progress marks at which the client should swap
+    // to each line (matches the crow's on-map position and the Live Activity).
+    narration,
+    narration_marks: [...WAYPOINT_FRACS, LANDING_FRAC],
     started_at: new Date(startedMs).toISOString(),
     arrives_at: new Date(arrivesMs).toISOString(),
   };
