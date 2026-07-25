@@ -46,12 +46,13 @@ const CUSTOM_PLACES = [
     aliases: ['bishop', 'bishops', "bishop's", 'bishops court', "bishop's court"],
   },
   {
-    // Home. Pinned to exact coords (52°11'09.0"N 0°08'31.0"E) — `fixed` skips the
-    // on-select Nominatim refine so it always lands on this precise spot.
-    road: 'Blinco Grove',
+    // Katie's house (Blinco Grove). Pinned to exact coords (52°11'09.0"N
+    // 0°08'31.0"E) — `fixed` skips the on-select Nominatim refine so it always
+    // lands on this precise spot.
+    road: "Katie's House",
     query: 'Blinco Grove, Cambridge, UK',
     lat: 52.185833, lng: 0.141944,
-    aliases: ['blinco', 'blinco grove'],
+    aliases: ['katie', 'katies', "katie's", 'katies house', "katie's house", 'blinco', 'blinco grove'],
     fixed: true,
   },
 ];

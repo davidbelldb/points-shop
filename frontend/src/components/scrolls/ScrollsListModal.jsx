@@ -14,9 +14,11 @@ function formatSent(ts) {
 
 /* The "scrolls" pop-out — standard site modal chrome (rounded card over a dimmed
    page, light/dark). Tapping a scroll opens the full-size reader. */
-export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, onClose }) {
+export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, onClose, title = 'Scrolls', light = false }) {
   const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  // `light` forces the pale card + black chrome regardless of the app theme (used by
+  // the crow tracker, whose parchment map wants a light modal with black text).
+  const isDark = light ? false : theme === 'dark';
   const [openScroll, setOpenScroll] = useState(null);
   const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
 
@@ -48,7 +50,7 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex shrink-0 items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: isDark ? '#fafafa' : '#171717' }}>Scrolls</h2>
+            <h2 className="text-lg font-semibold" style={{ color: isDark ? '#fafafa' : '#000' }}>{title}</h2>
             <button onClick={onClose} className="text-2xl leading-none text-neutral-400 hover:text-neutral-600" aria-label="Close">×</button>
           </div>
 
