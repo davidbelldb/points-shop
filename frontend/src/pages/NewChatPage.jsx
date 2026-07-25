@@ -225,8 +225,19 @@ export default function NewChatPage() {
             </button>
           </div>
           <p className="mt-2 text-xs text-neutral-500">
-            Tip: set <code>scrolls_settings.speed_multiplier</code> high so test crows arrive in seconds.
+            Tip: for a flight you can watch, keep <code>scrolls_settings.speed_multiplier</code> low so the
+            crow takes its time (crank it high if you just want a near-instant arrival).
           </p>
+
+          {/* Ping a simulated scroll above, then jump here to watch that same crow
+              fly in on the live map. The self-loop makes YOU the recipient, so the
+              tracker shows it (real sends to Katie only show on her device). */}
+          <Link
+            to="/crow-tracker"
+            className="mt-3 flex items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition active:scale-[0.99]"
+          >
+            Watch it fly on Crow Tracker →
+          </Link>
         </div>
 
         {/* ── On My Way (below the scrolls area) ── */}
