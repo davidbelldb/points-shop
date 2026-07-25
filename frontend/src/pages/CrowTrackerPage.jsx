@@ -20,13 +20,12 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // Marauder's Map palette. Parchment is painted under the map (no grey flash before
 // tiles load); the route line + destination node use the deep oxblood red.
 const PARCHMENT = '#ebc876';
-const ROUTE = '#5e1a13';   // map route line + end node + journey card background
+const ROUTE = '#5e1a13';   // map route line + end node
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
-// Flapping-flight loop: crow_land_00 → 09 are all in-flight wing poses (10 is the
-// perched/landed frame, so it's excluded). Cycled while the crow is travelling to
-// animate it flying — the same sprite set the send/land animations use.
-const FLY_FRAMES = Array.from({ length: 10 }, (_, i) => `/scrolls/crow_land_0${i}.png`);
+// Flapping-flight loop: alternate the two send wing poses (wings up / wings down)
+// while the crow is travelling, to animate it flying.
+const FLY_FRAMES = ['/scrolls/crow_send_03.png', '/scrolls/crow_send_04.png'];
 // The perched crow (final landing frame) that sits at a destination holding an
 // unread scroll, until it's opened.
 const PERCH_SPRITE = '/scrolls/crow_land_10.png';
@@ -180,7 +179,7 @@ export default function CrowTrackerPage() {
   const [frameIdx, setFrameIdx] = useState(0);
   useEffect(() => {
     if (!inFlight) { setFrameIdx(0); return undefined; }
-    const id = setInterval(() => setFrameIdx((i) => (i + 1) % FLY_FRAMES.length), 90);
+    const id = setInterval(() => setFrameIdx((i) => (i + 1) % FLY_FRAMES.length), 160);
     return () => clearInterval(id);
   }, [inFlight]);
   // Preload the frames once so the first wingbeat doesn't flicker.
@@ -432,8 +431,9 @@ export default function CrowTrackerPage() {
 
       <div style={{
         position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
-        background: ROUTE, borderRadius: 22, padding: '11px 16px',
-        boxShadow: '0 10px 34px rgba(0,0,0,0.55)', color: '#fff',
+        backgroundImage: "url('/scrolls/tile.png')", backgroundSize: 'cover', backgroundPosition: 'center',
+        borderRadius: 22, padding: '11px 16px', overflow: 'hidden',
+        boxShadow: '0 10px 34px rgba(0,0,0,0.55)', color: '#000',
       }}>
         {flight === undefined && <p style={{ margin: 0, opacity: 0.7 }}>Loading…</p>}
         {flight === null && (
@@ -456,20 +456,20 @@ export default function CrowTrackerPage() {
               </p>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 {flight.arrived ? (
-                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#fff' }}>Arrived</p>
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>Arrived</p>
                 ) : (
                   <>
-                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#fff' }}>{flight.eta_minutes} min</p>
-                    {/* Distance remaining — lower-opacity white. */}
-                    {flight.distance_km != null && <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{flight.distance_km} km</p>}
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>{flight.eta_minutes} min</p>
+                    {/* Distance remaining — lower-opacity black. */}
+                    {flight.distance_km != null && <p style={{ margin: 0, fontSize: 11, color: 'rgba(0,0,0,0.55)' }}>{flight.distance_km} km</p>}
                   </>
                 )}
               </div>
             </div>
-            {cardMessage && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#fff' }}>{cardMessage}</p>}
-            {/* Journey bar: travelled portion solid white; untravelled track lower-opacity white. */}
-            <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round((display || 0) * 100)}%`, background: '#fff', transition: 'width 0.2s linear' }} />
+            {cardMessage && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#000' }}>{cardMessage}</p>}
+            {/* Journey bar: travelled portion solid black; untravelled track lower-opacity black. */}
+            <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round((display || 0) * 100)}%`, background: '#000', transition: 'width 0.2s linear' }} />
             </div>
           </>
         )}
