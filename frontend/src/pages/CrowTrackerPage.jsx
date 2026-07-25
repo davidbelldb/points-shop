@@ -216,7 +216,10 @@ export default function CrowTrackerPage() {
       if (![o.lat, o.lng, d.lat, d.lng].every(Number.isFinite)) continue;
       const t = progressOf(f);
       const crowAt = { lat: o.lat + (d.lat - o.lat) * t, lng: o.lng + (d.lng - o.lng) * t };
-      out.push({ id: f.id, crowAt, dest: d, line: [crowAt, d] });
+      // The sprite is drawn facing right (east). If the journey heads west, flip it
+      // horizontally so the crow faces its direction of travel rather than flying
+      // backwards.
+      out.push({ id: f.id, crowAt, dest: d, line: [crowAt, d], facingLeft: d.lng < o.lng });
     }
     return out;
   }, [flights, progressOf]);
@@ -327,7 +330,8 @@ export default function CrowTrackerPage() {
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
                 <div style={{ width: 56, height: 50, pointerEvents: 'none' }}>
                   <img src={FLY_FRAMES[frameIdx]} alt="" draggable={false}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block',
+                             transform: fv.facingLeft ? 'scaleX(-1)' : undefined }} />
                 </div>
               </OverlayViewF>
             ))}
