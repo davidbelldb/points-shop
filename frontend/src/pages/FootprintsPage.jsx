@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, OverlayViewF, useJsApiLoader } from '@react-google-maps/api';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle.js';
@@ -18,11 +18,9 @@ import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 const MODE = 'outdoor';
-const RECENTER_DELAY_MS = 6000;
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
-const MIN_OPACITY = 0.06;       // faintest a footprint gets before it's dropped
 const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
-const TEXTURE_URL = '/marauders_texture.jpg';
+const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const FOOT_REAL_M = 0.7;        // stylised footprint length in metres (fixed; scales
                                 // with zoom, NOT with spacing, so spacing = density)
@@ -77,10 +75,6 @@ export default function FootprintsPage() {
   const [now, setNow] = useState(Date.now());
   const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);
   const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM }), []);
-  const lastInteractRef = useRef(0);
-  const programmaticRef = useRef(false);
-  const recenterTimerRef = useRef(null);
-  const fitPointsRef = useRef([]);
   const mapRef = useRef(null);
   const textureRef = useRef(null);
   const mountedRef = useRef(true);
@@ -104,7 +98,8 @@ export default function FootprintsPage() {
     return () => clearInterval(id);
   }, []);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    // Only drives the "X min ago" label now (the fade is pure CSS), so a lazy tick.
+    const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
   }, []);
 
@@ -188,35 +183,21 @@ export default function FootprintsPage() {
     };
   }, []);
 
-  // Keep the follow target = the newest footprint (the walker).
+  // Centre ONCE on the latest footprint when the page (or a fresh simulation) first
+  // has a trail, then leave the map alone — no per-step re-centering. The user pans
+  // freely; the walker may wander out of view, which is intended.
+  const didCenterRef = useRef(false);
+  useEffect(() => { didCenterRef.current = false; }, [sim]);   // re-centre once when sim toggles
   useEffect(() => {
-    fitPointsRef.current = feet.filter(inUK).map((p) => ({ lat: p.lat, lng: p.lng }));
-  }, [feet]);
-
-  // Stay zoomed right in and glide smoothly to the walker (panTo animates, so it
-  // doesn't jolt like setCenter), rather than fitting the whole trail into a blob.
-  const recenter = useCallback(() => {
-    const m = mapRef.current; const pts = fitPointsRef.current;
-    if (!m || !window.google || !pts.length) return;
-    programmaticRef.current = true;
-    if (m.getZoom() !== FOLLOW_ZOOM) m.setZoom(FOLLOW_ZOOM);
-    m.panTo(pts[pts.length - 1]);
-    window.setTimeout(() => { programmaticRef.current = false; }, 700);
-  }, []);
-
-  const noteInteraction = useCallback(() => {
-    lastInteractRef.current = Date.now();
-    if (recenterTimerRef.current) clearTimeout(recenterTimerRef.current);
-    recenterTimerRef.current = setTimeout(() => {
-      if (Date.now() - lastInteractRef.current >= RECENTER_DELAY_MS - 100) recenter();
-    }, RECENTER_DELAY_MS);
-  }, [recenter]);
+    if (!isLoaded || didCenterRef.current || !feet.length) return;
+    const m = mapRef.current; const h = feet[feet.length - 1];
+    if (m && h && inUK(h)) { m.setZoom(FOLLOW_ZOOM); m.setCenter({ lat: h.lat, lng: h.lng }); didCenterRef.current = true; }
+  }, [isLoaded, feet, sim]);
 
   const onLoad = useCallback((m) => {
     mapRef.current = m;
     m.setCenter(DEFAULT_CENTER); m.setZoom(FOLLOW_ZOOM);
-    m.addListener('dragstart', noteInteraction);
-    m.addListener('zoom_changed', () => { setMapZoom(m.getZoom()); if (!programmaticRef.current) noteInteraction(); });
+    m.addListener('zoom_changed', () => setMapZoom(m.getZoom()));
 
     // Parchment texture laid over the map at 40%, in the overlayLayer pane — which
     // sits BELOW the marker pane, so the footprints render on top of the texture.
@@ -247,31 +228,34 @@ export default function FootprintsPage() {
       ov.setMap(m);
       textureRef.current = ov;
     }
-  }, [noteInteraction]);
-
-  // Follow the walker as new footprints land, unless the user is exploring.
-  useEffect(() => {
-    if (!isLoaded || !feet.length) return;
-    if (Date.now() - lastInteractRef.current < RECENTER_DELAY_MS) return;
-    recenter();
-  }, [isLoaded, feet, recenter]);
+  }, []);
 
   const mapOptions = useMemo(() => ({
     center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM,
     disableDefaultUI: true, keyboardShortcuts: false, gestureHandling: 'greedy',
     styles: MARAUDERS_STYLE, backgroundColor: PARCHMENT, clickableIcons: false,
   }), []);
-  const anchor = useMemo(() => (isLoaded ? new window.google.maps.Point(0, 0) : undefined), [isLoaded]);
-
-  // Footprints are a real-world size that scales with zoom, so the trail looks the
-  // same proportionally at any zoom (foot ≈ 1.35× the stride, so the overlap is
-  // constant) — instead of clumping into a blob when zoomed out.
-  const footScale = useMemo(() => {
+  // Footprint size in PIXELS — a fixed real-world length that scales with zoom, so
+  // the trail looks the same proportionally at every zoom (no blob).
+  const footPx = useMemo(() => {
     const lat = feet.length ? feet[feet.length - 1].lat : DEFAULT_CENTER.lat;
     const mpp = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / (2 ** mapZoom);
-    const px = FOOT_REAL_M / mpp;   // fixed real-world foot length → pixels
-    return Math.max(0.06, Math.min(3.5, px / 12.2));   // foot path spans ~12.2 units
+    return Math.max(8, Math.min(140, FOOT_REAL_M / mpp));
   }, [feet, mapZoom]);
+
+  // Each footprint fades out via a pure CSS animation (GPU, 60fps — buttery), set
+  // ONCE when its element mounts. A negative delay = its current age, so a print
+  // that's already half-faded starts half-faded and continues smoothly. Read fadeMs
+  // from a ref so the callback stays stable (re-renders never restart the fade).
+  const fadeMsRef = useRef(fadeMs);
+  fadeMsRef.current = fadeMs;
+  const applyFade = useCallback((el, t) => {
+    if (!el || el.dataset.mmf) return;
+    el.dataset.mmf = '1';
+    const age = Math.max(0, Date.now() - t);
+    el.style.animation = `mmFootFade ${fadeMsRef.current}ms linear both`;
+    el.style.animationDelay = `-${age}ms`;
+  }, []);
 
   // Simulator: seed a meandering path (timestamps spread across the fade window so
   // you see the fade gradient at once), then keep walking a live head that drops a
@@ -323,6 +307,7 @@ export default function FootprintsPage() {
 
   return (
     <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
+      <style>{'@keyframes mmFootFade{from{opacity:1}to{opacity:0}}'}</style>
       {isLoaded && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           <GoogleMap
@@ -332,25 +317,23 @@ export default function FootprintsPage() {
             onLoad={onLoad}
             options={mapOptions}
           >
-            {anchor && feet.map((p, i) => {
-              const opacity = Math.max(MIN_OPACITY, Math.min(1, 1 - (now - p.t) / fadeMs));
-              return (
-                <MarkerF
-                  key={p.id}
-                  position={{ lat: p.lat, lng: p.lng }}
-                  zIndex={i}
-                  icon={{
-                    path: p.side < 0 ? FOOT_L : FOOT_R,
-                    anchor,
-                    rotation: p.angle,
-                    scale: footScale,
-                    fillColor: ROUTE,
-                    fillOpacity: opacity,
-                    strokeWeight: 0,
-                  }}
-                />
-              );
-            })}
+            {feet.map((p) => (
+              <OverlayViewF
+                key={p.id}
+                position={{ lat: p.lat, lng: p.lng }}
+                mapPaneName="markerLayer"
+                getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}
+              >
+                <div
+                  ref={(el) => applyFade(el, p.t)}
+                  style={{ width: footPx * 0.55, height: footPx, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none' }}
+                >
+                  <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
+                    <path d={p.side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
+                  </svg>
+                </div>
+              </OverlayViewF>
+            ))}
           </GoogleMap>
         </div>
       )}
