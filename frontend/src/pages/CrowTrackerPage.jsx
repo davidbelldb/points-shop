@@ -444,6 +444,23 @@ export default function CrowTrackerPage() {
         )}
       </div>
 
+      {/* Aged-parchment texture laid over the ENTIRE view — the map, the crow, the
+          flight-path route lines, the progress card and the pen-scroll seal all read
+          as ink on one sheet of paper. 40% opacity + boosted saturation (same as the
+          footprints map). pointer-events:none so everything beneath stays fully
+          interactive: map panning/zooming, tapping perched crows, the card, the seal.
+          zIndex 12 sits above the card (10) and seal (11) but below the modals (80),
+          so an open composer / reader still shows cleanly on top. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0, zIndex: 12, pointerEvents: 'none',
+          backgroundImage: 'url("/marauders_texture.jpg?v=2")',
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          opacity: 0.4, filter: 'saturate(1.6)',
+        }}
+      />
+
       {/* Compose a scroll (reused from /messages) — the seal-and-send parchment. */}
       {scrollsEnabled && composeOpen && (
         <ScrollComposeModal
