@@ -323,7 +323,7 @@ export default function FootprintsPage() {
               <OverlayViewF
                 key={p.id}
                 position={{ lat: p.lat, lng: p.lng }}
-                mapPaneName="markerLayer"
+                mapPaneName="mapPane"
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}
               >
                 {/* Outer div = quick fade-IN; inner div = long fade-OUT. Nesting
@@ -352,7 +352,7 @@ export default function FootprintsPage() {
           position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
           width: 'min(90%, 440px)', height: 'auto', pointerEvents: 'none',
           filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.35))',
-          animation: 'mmFootIn 2s ease-out 1s both',
+          animation: 'mmFootIn 2s ease-out 2s both',
         }}
       />
 
