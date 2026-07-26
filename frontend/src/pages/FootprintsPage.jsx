@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { GoogleMap, OverlayViewF, useJsApiLoader } from '@react-google-maps/api';
 import { api } from '../lib/api.js';
@@ -42,6 +42,35 @@ const FOOT_SOLE = 'M0,-6.5 C2.6,-6.5 3.2,-3 2.6,-0.3 C2.1,1.8 -2.1,1.8 -2.6,-0.3
 // at the bottom (≈20% larger than the plain oval).
 const FOOT_R = `${FOOT_SOLE} M0.1,2.1 L1.7,2.1 C2.3,2.1 2.55,2.4 2.55,3 C2.55,4.4 2.1,5.7 0.9,5.8 C-0.3,5.7 -0.75,4.4 -0.75,3 C-0.75,2.4 -0.5,2.1 0.1,2.1 Z`;
 const FOOT_L = `${FOOT_SOLE} M-0.1,2.1 L-1.7,2.1 C-2.3,2.1 -2.55,2.4 -2.55,3 C-2.55,4.4 -2.1,5.7 -0.9,5.8 C0.3,5.7 0.75,4.4 0.75,3 C0.75,2.4 0.5,2.1 -0.1,2.1 Z`;
+
+// STABLE reference — passing an inline arrow here makes OverlayViewF tear down and
+// re-mount the DOM on every render, which restarted the fade-in on the whole trail
+// each time a new print dropped (the flicker). One shared function = no remounts.
+const CENTER_OFFSET = (w, h) => ({ x: -(w / 2), y: -(h / 2) });
+
+// One footprint, memoised on its (stable) print object. When a new print is added
+// the parent re-renders, but every EXISTING footprint's props are referentially
+// unchanged, so React skips them entirely — no remount, no fade restart. Each print
+// therefore fades in exactly once, when it first appears. Slick.
+const Footprint = memo(function Footprint({ p, applyFade }) {
+  return (
+    <OverlayViewF
+      position={{ lat: p.lat, lng: p.lng }}
+      mapPaneName="mapPane"
+      getPixelPositionOffset={CENTER_OFFSET}
+    >
+      {/* Outer div = quick fade-IN; inner div = long fade-OUT. Nesting multiplies
+          the opacities so both are smooth and don't fight. */}
+      <div style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 1000ms ease-out both' }}>
+        <div ref={(el) => applyFade(el, p.t)} style={{ width: '100%', height: '100%' }}>
+          <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
+            <path d={p.side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
+          </svg>
+        </div>
+      </div>
+    </OverlayViewF>
+  );
+});
 
 const toRad = (d) => (d * Math.PI) / 180;
 const toDeg = (r) => (r * 180) / Math.PI;
@@ -311,24 +340,7 @@ export default function FootprintsPage() {
             options={mapOptions}
           >
             {feet.map((p) => (
-              <OverlayViewF
-                key={p.id}
-                position={{ lat: p.lat, lng: p.lng }}
-                mapPaneName="mapPane"
-                getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}
-              >
-                {/* Outer div = quick fade-IN; inner div = long fade-OUT. Nesting
-                    multiplies the opacities so both are smooth and don't fight. */}
-                <div
-                  style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 1000ms ease-out both' }}
-                >
-                  <div ref={(el) => applyFade(el, p.t)} style={{ width: '100%', height: '100%' }}>
-                    <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
-                      <path d={p.side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
-                    </svg>
-                  </div>
-                </div>
-              </OverlayViewF>
+              <Footprint key={p.id} p={p} applyFade={applyFade} />
             ))}
           </GoogleMap>
         </div>
