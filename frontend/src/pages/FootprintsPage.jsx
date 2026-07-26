@@ -22,15 +22,16 @@ const RECENTER_DELAY_MS = 6000;
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const MIN_OPACITY = 0.06;       // faintest a footprint gets before it's dropped
 const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
-const FOOT_SCALE = 1.5;
+const TEXTURE_URL = '/marauders_texture.jpg';
+const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 
 // A shoe print = a big sole/ball oval + a small heel oval, pointing "up" (toward
 // −y = north at rotation 0); Google Maps rotates it clockwise by the travel
 // bearing. Left / right feet mirror the heel to opposite sides so a walking gait
 // reads as alternating prints.
 const FOOT_SOLE = 'M0,-6.5 C2.6,-6.5 3.2,-3 2.6,-0.3 C2.1,1.8 -2.1,1.8 -2.6,-0.3 C-3.2,-3 -2.6,-6.5 0,-6.5 Z';
-const FOOT_R = `${FOOT_SOLE} M1,2.8 C1.9,2.8 2.2,3.9 1.9,4.8 C1.6,5.6 0.4,5.6 0.1,4.8 C-0.2,3.9 0.1,2.8 1,2.8 Z`;
-const FOOT_L = `${FOOT_SOLE} M-1,2.8 C-1.9,2.8 -2.2,3.9 -1.9,4.8 C-1.6,5.6 -0.4,5.6 -0.1,4.8 C0.2,3.9 -0.1,2.8 -1,2.8 Z`;
+const FOOT_R = `${FOOT_SOLE} M0.9,2.1 C1.784,2.1 2.5,2.906 2.5,3.9 C2.5,4.894 1.784,5.7 0.9,5.7 C0.016,5.7 -0.7,4.894 -0.7,3.9 C-0.7,2.906 0.016,2.1 0.9,2.1 Z`;
+const FOOT_L = `${FOOT_SOLE} M-0.9,2.1 C-0.016,2.1 0.7,2.906 0.7,3.9 C0.7,4.894 -0.016,5.7 -0.9,5.7 C-1.784,5.7 -2.5,4.894 -2.5,3.9 C-2.5,2.906 -1.784,2.1 -0.9,2.1 Z`;
 
 const toRad = (d) => (d * Math.PI) / 180;
 const toDeg = (r) => (r * 180) / Math.PI;
@@ -55,40 +56,6 @@ function jitterFor(lat, lng) {
   return ((h % 3001) / 3000) * 2 * JITTER_DEG - JITTER_DEG;
 }
 
-// Turn the raw path into evenly-spaced, direction-pointing footprints.
-function buildFootprints(pings, spacingM, trailLength) {
-  if (!Array.isArray(pings) || pings.length < 2) return [];
-  const segs = [];
-  let cum = 0;
-  for (let i = 1; i < pings.length; i += 1) {
-    const len = haversineM(pings[i - 1], pings[i]);
-    if (len <= 0) continue;
-    segs.push({ a: pings[i - 1], b: pings[i], start: cum, len, bearing: bearingDeg(pings[i - 1], pings[i]) });
-    cum += len;
-  }
-  if (!segs.length) return [];
-  const total = cum;
-  const spacing = Math.max(0.2, Number(spacingM) || 0.75);       // stride between steps
-  const offset = Math.min(0.6, Math.max(0.12, spacing * 0.4));   // ± stance half-width
-  const prints = [];
-  let idx = 0; let step = 0;
-  for (let d = 0; d <= total; d += spacing) {
-    while (idx < segs.length - 1 && d > segs[idx].start + segs[idx].len) idx += 1;
-    const s = segs[idx];
-    const f = s.len > 0 ? (d - s.start) / s.len : 0;
-    const lat = s.a.lat + (s.b.lat - s.a.lat) * f;
-    const lng = s.a.lng + (s.b.lng - s.a.lng) * f;
-    const t = s.a.t + (s.b.t - s.a.t) * f;
-    // Alternate left / right, stepping to that side of the centre-line so the
-    // prints sit side-by-side and overlap as the walker advances.
-    const side = step % 2 === 0 ? -1 : 1;
-    const off = moveLatLng(lat, lng, offset, s.bearing + 90 * side);
-    prints.push({ lat: off.lat, lng: off.lng, t, angle: s.bearing + jitterFor(lat, lng), side });
-    step += 1;
-  }
-  const cap = Math.max(1, Number(trailLength) || 100);
-  return prints.slice(-cap);
-}
 
 // Move a point `distM` metres along `bearing` (degrees) — used by the simulator.
 function moveLatLng(lat, lng, distM, bearing) {
@@ -105,14 +72,19 @@ export default function FootprintsPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
   const [now, setNow] = useState(Date.now());
+  const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);
   const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM }), []);
   const lastInteractRef = useRef(0);
   const programmaticRef = useRef(false);
   const recenterTimerRef = useRef(null);
   const fitPointsRef = useRef([]);
   const mapRef = useRef(null);
+  const textureRef = useRef(null);
   const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    try { textureRef.current?.setMap(null); } catch { /* ignore */ }
+  }, []);
   // Web-testing simulator: a fake walking trail so you can see the look without GPS.
   const [sim, setSim] = useState(false);
   const [simPings, setSimPings] = useState([]);
@@ -136,10 +108,55 @@ export default function FootprintsPage() {
   const settings = trail.settings || {};
   const fadeMs = Math.max(1000, (Number(settings.fade_seconds) || 900) * 1000);
 
-  const footprints = useMemo(() => {
-    const src = sim ? simPings : (trail.pings || []);
-    return buildFootprints(src, settings.spacing_m, settings.trail_length);
-  }, [sim, simPings, trail.pings, settings.spacing_m, settings.trail_length]);
+  // Footprints are placed ONCE at fixed positions as the walker advances, and never
+  // recomputed — so the trail doesn't crawl/jitter each update (which is what made
+  // it feel like a bad GIF). Old prints drop by age; `id` is a stable key so markers
+  // update in place (smooth) rather than remounting.
+  const sourcePings = sim ? simPings : trail.pings;
+  const [feet, setFeet] = useState([]);
+  const feetRef = useRef([]);
+  const accRef = useRef({ last: null, residual: 0, step: 0, lastT: 0 });
+
+  // Reset the accumulator when switching source (sim on/off).
+  useEffect(() => {
+    accRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
+    feetRef.current = []; setFeet([]);
+  }, [sim]);
+
+  // Ingest any NEW path points → drop footprints every `spacing_m`, alternating L/R.
+  useEffect(() => {
+    const spacing = Math.max(0.2, Number(settings.spacing_m) || 0.75);
+    const offset = Math.min(0.6, Math.max(0.12, spacing * 0.4));
+    const acc = accRef.current;
+    let prev = acc.last; let changed = false;
+    for (const pt of (sourcePings || [])) {
+      if (pt.t <= acc.lastT) continue;
+      if (!prev) { prev = pt; acc.lastT = pt.t; acc.residual = 0; continue; }
+      const segLen = haversineM(prev, pt);
+      if (segLen > 0) {
+        const bearing = bearingDeg(prev, pt);
+        let along = spacing - acc.residual;
+        while (along <= segLen + 1e-6) {
+          const f = along / segLen;
+          const lat = prev.lat + (pt.lat - prev.lat) * f;
+          const lng = prev.lng + (pt.lng - prev.lng) * f;
+          const side = acc.step % 2 === 0 ? -1 : 1;
+          const o = moveLatLng(lat, lng, offset, bearing + 90 * side);
+          feetRef.current.push({ id: acc.step, lat: o.lat, lng: o.lng, angle: bearing + jitterFor(lat, lng), side, t: pt.t });
+          acc.step += 1; along += spacing; changed = true;
+        }
+        acc.residual = segLen - (along - spacing);
+      }
+      prev = pt; acc.lastT = pt.t;
+    }
+    acc.last = prev;
+    const cutoff = Date.now() - fadeMs;
+    const cap = Math.max(1, Number(settings.trail_length) || 100);
+    const before = feetRef.current.length;
+    feetRef.current = feetRef.current.filter((ff) => ff.t >= cutoff);
+    if (feetRef.current.length > cap) feetRef.current = feetRef.current.slice(-cap);
+    if (changed || feetRef.current.length !== before) setFeet(feetRef.current.slice());
+  }, [sourcePings, settings.spacing_m, settings.trail_length, fadeMs]);
 
   // Disable pull-to-refresh while the full-screen map is up.
   useEffect(() => {
@@ -154,20 +171,20 @@ export default function FootprintsPage() {
     };
   }, []);
 
-  // Keep the fit target = all footprint positions.
+  // Keep the follow target = the newest footprint (the walker).
   useEffect(() => {
-    fitPointsRef.current = footprints.filter(inUK).map((p) => ({ lat: p.lat, lng: p.lng }));
-  }, [footprints]);
+    fitPointsRef.current = feet.filter(inUK).map((p) => ({ lat: p.lat, lng: p.lng }));
+  }, [feet]);
 
-  // Stay zoomed right in and locked on the newest footprint (the walker), rather
-  // than fitting the whole trail — so you see individual prints, not a blob.
+  // Stay zoomed right in and glide smoothly to the walker (panTo animates, so it
+  // doesn't jolt like setCenter), rather than fitting the whole trail into a blob.
   const recenter = useCallback(() => {
     const m = mapRef.current; const pts = fitPointsRef.current;
     if (!m || !window.google || !pts.length) return;
     programmaticRef.current = true;
-    m.setCenter(pts[pts.length - 1]);
     if (m.getZoom() !== FOLLOW_ZOOM) m.setZoom(FOLLOW_ZOOM);
-    window.setTimeout(() => { programmaticRef.current = false; }, 500);
+    m.panTo(pts[pts.length - 1]);
+    window.setTimeout(() => { programmaticRef.current = false; }, 700);
   }, []);
 
   const noteInteraction = useCallback(() => {
@@ -182,15 +199,45 @@ export default function FootprintsPage() {
     mapRef.current = m;
     m.setCenter(DEFAULT_CENTER); m.setZoom(FOLLOW_ZOOM);
     m.addListener('dragstart', noteInteraction);
-    m.addListener('zoom_changed', () => { if (!programmaticRef.current) noteInteraction(); });
+    m.addListener('zoom_changed', () => { setMapZoom(m.getZoom()); if (!programmaticRef.current) noteInteraction(); });
+
+    // Parchment texture laid over the map at 40%, in the overlayLayer pane — which
+    // sits BELOW the marker pane, so the footprints render on top of the texture.
+    if (window.google && !textureRef.current) {
+      const ov = new window.google.maps.OverlayView();
+      let div = null;
+      ov.onAdd = function onAdd() {
+        div = document.createElement('div');
+        Object.assign(div.style, {
+          position: 'absolute', pointerEvents: 'none',
+          backgroundImage: `url("${TEXTURE_URL}")`, backgroundSize: 'cover', backgroundPosition: 'center',
+          opacity: String(TEXTURE_OPACITY),
+        });
+        this.getPanes().overlayLayer.appendChild(div);
+      };
+      ov.draw = function draw() {
+        const proj = this.getProjection(); const b = m.getBounds();
+        if (!proj || !b || !div) return;
+        const ne = proj.fromLatLngToDivPixel(b.getNorthEast());
+        const sw = proj.fromLatLngToDivPixel(b.getSouthWest());
+        const left = Math.min(sw.x, ne.x); const top = Math.min(ne.y, sw.y);
+        const w = Math.abs(ne.x - sw.x); const h = Math.abs(sw.y - ne.y);
+        const mg = 0.25;   // extra margin so no edge shows while panning
+        div.style.left = `${left - w * mg}px`; div.style.top = `${top - h * mg}px`;
+        div.style.width = `${w * (1 + 2 * mg)}px`; div.style.height = `${h * (1 + 2 * mg)}px`;
+      };
+      ov.onRemove = function onRemove() { if (div) { div.remove(); div = null; } };
+      ov.setMap(m);
+      textureRef.current = ov;
+    }
   }, [noteInteraction]);
 
-  // Re-frame on each poll (fresh footprints), unless the user is exploring.
+  // Follow the walker as new footprints land, unless the user is exploring.
   useEffect(() => {
-    if (!isLoaded || !footprints.length) return;
+    if (!isLoaded || !feet.length) return;
     if (Date.now() - lastInteractRef.current < RECENTER_DELAY_MS) return;
     recenter();
-  }, [isLoaded, footprints, recenter]);
+  }, [isLoaded, feet, recenter]);
 
   const mapOptions = useMemo(() => ({
     center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM,
@@ -199,14 +246,25 @@ export default function FootprintsPage() {
   }), []);
   const anchor = useMemo(() => (isLoaded ? new window.google.maps.Point(0, 0) : undefined), [isLoaded]);
 
+  // Footprints are a real-world size that scales with zoom, so the trail looks the
+  // same proportionally at any zoom (foot ≈ 1.35× the stride, so the overlap is
+  // constant) — instead of clumping into a blob when zoomed out.
+  const footScale = useMemo(() => {
+    const lat = feet.length ? feet[feet.length - 1].lat : DEFAULT_CENTER.lat;
+    const mpp = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / (2 ** mapZoom);
+    const spacing = Math.max(0.2, Number(settings.spacing_m) || 0.75);
+    const px = (spacing * 1.35) / mpp;   // desired foot length in pixels
+    return Math.max(0.06, Math.min(3, px / 12.2));   // foot path spans ~12.2 units
+  }, [feet, mapZoom, settings.spacing_m]);
+
   // Simulator: seed a meandering path (timestamps spread across the fade window so
   // you see the fade gradient at once), then keep walking a live head that drops a
   // fresh print every ~1.2s and ages old ones out — the full look, no GPS needed.
   const startSim = useCallback(() => {
     const c = mapRef.current?.getCenter?.();
     const center = c ? { lat: c.lat(), lng: c.lng() } : DEFAULT_CENTER;
-    const RAW_STEP = 2;   // metres between raw path points (a smooth walk)
-    const count = 70;     // seed points → a full trail from the off
+    const RAW_STEP = 0.9;   // metres between raw path points (≈ one print each)
+    const count = 90;       // seed points → a full trail from the off
     const fade = fadeMs;
     let lat = center.lat; let lng = center.lng; let heading = Math.random() * 360;
     const now0 = Date.now();
@@ -227,7 +285,7 @@ export default function FootprintsPage() {
       s.lat = p.lat; s.lng = p.lng;
       const tnow = Date.now();
       setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fade));
-    }, 1100);
+    }, 550);
     setSim(true);
   }, [fadeMs]);
 
@@ -243,7 +301,7 @@ export default function FootprintsPage() {
     return <Navigate to="/" replace />;
   }
 
-  const head = footprints.length ? footprints[footprints.length - 1] : null;
+  const head = feet.length ? feet[feet.length - 1] : null;
   const lastAgeMin = head ? Math.max(0, Math.round((now - head.t) / 60000)) : null;
 
   return (
@@ -257,19 +315,18 @@ export default function FootprintsPage() {
             onLoad={onLoad}
             options={mapOptions}
           >
-            {anchor && footprints.map((p, i) => {
+            {anchor && feet.map((p, i) => {
               const opacity = Math.max(MIN_OPACITY, Math.min(1, 1 - (now - p.t) / fadeMs));
-              const isHead = i === footprints.length - 1;
               return (
                 <MarkerF
-                  key={`${p.lat.toFixed(6)},${p.lng.toFixed(6)},${i}`}
+                  key={p.id}
                   position={{ lat: p.lat, lng: p.lng }}
                   zIndex={i}
                   icon={{
                     path: p.side < 0 ? FOOT_L : FOOT_R,
                     anchor,
                     rotation: p.angle,
-                    scale: isHead ? FOOT_SCALE * 1.12 : FOOT_SCALE,
+                    scale: footScale,
                     fillColor: ROUTE,
                     fillOpacity: opacity,
                     strokeWeight: 0,
@@ -302,7 +359,7 @@ export default function FootprintsPage() {
         background: '#f7db9b', borderRadius: 18, padding: '10px 15px',
         boxShadow: '0 10px 34px rgba(0,0,0,0.4)', color: '#000',
       }}>
-        {footprints.length === 0 ? (
+        {feet.length === 0 ? (
           <>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>No footprints yet</p>
             <p style={{ margin: '3px 0 0', opacity: 0.65, fontSize: 12 }}>
@@ -312,7 +369,7 @@ export default function FootprintsPage() {
         ) : (
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
-              {user?.name || 'David'} <span style={{ opacity: 0.55, fontWeight: 500 }}>· {footprints.length} prints</span>
+              {user?.name || 'David'} <span style={{ opacity: 0.55, fontWeight: 500 }}>· {feet.length} prints</span>
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'rgba(0,0,0,0.55)', whiteSpace: 'nowrap' }}>
               {lastAgeMin === 0 ? 'moving now' : `${lastAgeMin} min ago`}
