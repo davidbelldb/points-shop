@@ -23,16 +23,24 @@ const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
-const FOOT_REAL_M = 0.7;        // stylised footprint length in metres (fixed; scales
-                                // with zoom, NOT with spacing, so spacing = density)
+const FOOT_REAL_M = 0.7;        // footprint length in metres AT THE FOLLOW ZOOM
+
+// Metres-per-pixel at the follow zoom (reference). We render footprints at a FIXED
+// on-screen pixel size and place them at a FIXED on-screen spacing at EVERY zoom —
+// so the trail looks identical (same size, gaps, gait) whether zoomed in or out,
+// rather than shrinking. Achieved by scaling the real-world spacing with zoom.
+const MPP_REF = (156543.03392 * Math.cos((DEFAULT_CENTER.lat * Math.PI) / 180)) / (2 ** FOLLOW_ZOOM);
+const FOOT_PX = Math.max(8, FOOT_REAL_M / MPP_REF);   // constant on-screen foot size
 
 // A shoe print = a big sole/ball oval + a small heel oval, pointing "up" (toward
 // −y = north at rotation 0); Google Maps rotates it clockwise by the travel
 // bearing. Left / right feet mirror the heel to opposite sides so a walking gait
 // reads as alternating prints.
 const FOOT_SOLE = 'M0,-6.5 C2.6,-6.5 3.2,-3 2.6,-0.3 C2.1,1.8 -2.1,1.8 -2.6,-0.3 C-3.2,-3 -2.6,-6.5 0,-6.5 Z';
-const FOOT_R = `${FOOT_SOLE} M0.9,2.1 C1.784,2.1 2.5,2.906 2.5,3.9 C2.5,4.894 1.784,5.7 0.9,5.7 C0.016,5.7 -0.7,4.894 -0.7,3.9 C-0.7,2.906 0.016,2.1 0.9,2.1 Z`;
-const FOOT_L = `${FOOT_SOLE} M-0.9,2.1 C-0.016,2.1 0.7,2.906 0.7,3.9 C0.7,4.894 -0.016,5.7 -0.9,5.7 C-1.784,5.7 -2.5,4.894 -2.5,3.9 C-2.5,2.906 -1.784,2.1 -0.9,2.1 Z`;
+// Heel: mostly-flat top facing the forefoot with softly-rounded corners, rounded
+// at the bottom (≈20% larger than the plain oval).
+const FOOT_R = `${FOOT_SOLE} M0.1,2.1 L1.7,2.1 C2.3,2.1 2.55,2.4 2.55,3 C2.55,4.4 2.1,5.7 0.9,5.8 C-0.3,5.7 -0.75,4.4 -0.75,3 C-0.75,2.4 -0.5,2.1 0.1,2.1 Z`;
+const FOOT_L = `${FOOT_SOLE} M-0.1,2.1 L-1.7,2.1 C-2.3,2.1 -2.55,2.4 -2.55,3 C-2.55,4.4 -2.1,5.7 -0.9,5.8 C0.3,5.7 0.75,4.4 0.75,3 C0.75,2.4 0.5,2.1 -0.1,2.1 Z`;
 
 const toRad = (d) => (d * Math.PI) / 180;
 const toDeg = (r) => (r * 180) / Math.PI;
@@ -118,6 +126,10 @@ export default function FootprintsPage() {
   // Simulation is EXTERNAL (outdoor) only — it always uses the outdoor config.
   const settings = fpSettings?.outdoor || {};
   const fadeMs = Math.max(1000, (Number(settings.fade_seconds) || 900) * 1000);
+  // How much to scale real-world spacing so on-screen spacing stays constant across
+  // zooms (2× per zoom level out). Quantised to whole zoom levels so it only re-lays
+  // when you cross a level, not during a pinch.
+  const zoomK = 2 ** (FOLLOW_ZOOM - Math.round(mapZoom));
 
   // Footprints are placed ONCE at fixed positions as the walker advances, and never
   // recomputed — so the trail doesn't crawl/jitter each update (which is what made
@@ -133,12 +145,12 @@ export default function FootprintsPage() {
   useEffect(() => {
     accRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
     feetRef.current = []; setFeet([]);
-  }, [sim, settings.spacing_m]);
+  }, [sim, settings.spacing_m, zoomK]);
 
-  // Ingest any NEW path points → drop footprints every `spacing_m`, alternating L/R.
+  // Ingest any NEW path points → drop footprints every (zoom-scaled) spacing, L/R.
   useEffect(() => {
-    const spacing = Math.max(0.2, Number(settings.spacing_m) || 0.75);
-    const offset = Math.min(0.6, Math.max(0.12, spacing * 0.4));
+    const spacing = Math.max(0.2, (Number(settings.spacing_m) || 0.75) * zoomK);
+    const offset = spacing * 0.4;   // scales with spacing → constant on-screen offset
     const acc = accRef.current;
     let prev = acc.last; let changed = false;
     for (const pt of (sourcePings || [])) {
@@ -168,7 +180,7 @@ export default function FootprintsPage() {
     feetRef.current = feetRef.current.filter((ff) => ff.t >= cutoff);
     if (feetRef.current.length > cap) feetRef.current = feetRef.current.slice(-cap);
     if (changed || feetRef.current.length !== before) setFeet(feetRef.current.slice());
-  }, [sourcePings, settings.spacing_m, settings.trail_length, fadeMs]);
+  }, [sourcePings, settings.spacing_m, settings.trail_length, fadeMs, zoomK]);
 
   // Disable pull-to-refresh while the full-screen map is up.
   useEffect(() => {
@@ -235,14 +247,6 @@ export default function FootprintsPage() {
     disableDefaultUI: true, keyboardShortcuts: false, gestureHandling: 'greedy',
     styles: MARAUDERS_STYLE, backgroundColor: PARCHMENT, clickableIcons: false,
   }), []);
-  // Footprint size in PIXELS — a fixed real-world length that scales with zoom, so
-  // the trail looks the same proportionally at every zoom (no blob).
-  const footPx = useMemo(() => {
-    const lat = feet.length ? feet[feet.length - 1].lat : DEFAULT_CENTER.lat;
-    const mpp = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / (2 ** mapZoom);
-    return Math.max(8, Math.min(140, FOOT_REAL_M / mpp));
-  }, [feet, mapZoom]);
-
   // Each footprint fades out via a pure CSS animation (GPU, 60fps — buttery), set
   // ONCE when its element mounts. A negative delay = its current age, so a print
   // that's already half-faded starts half-faded and continues smoothly. Read fadeMs
@@ -324,7 +328,7 @@ export default function FootprintsPage() {
               >
                 <div
                   ref={(el) => applyFade(el, p.t)}
-                  style={{ width: footPx * 0.55, height: footPx, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none' }}
+                  style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none' }}
                 >
                   <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
                     <path d={p.side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
