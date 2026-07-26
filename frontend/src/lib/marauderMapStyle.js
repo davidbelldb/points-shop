@@ -25,6 +25,9 @@ export const MARAUDERS_STYLE = [
   { featureType: 'transit.line', elementType: 'all', stylers: [{ color: '#4b0202' }, { weight: 0.5 }] },
   { featureType: 'water', elementType: 'all', stylers: [{ lightness: -20 }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#d6a95d' }] },
+  // Kill EVERY label — road/street names, house numbers, place & POI names,
+  // water names (rivers, brooks), transit — the whole lot. Last rule wins.
+  { featureType: 'all', elementType: 'labels', stylers: [{ visibility: 'off' }] },
 ];
 
 // Reject stray / null coordinates (they coerce to 0 and blow the fit out to a

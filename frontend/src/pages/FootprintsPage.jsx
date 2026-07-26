@@ -79,6 +79,16 @@ function buildFootprints(pings, spacingM, trailLength) {
   return prints.slice(-cap);
 }
 
+// Move a point `distM` metres along `bearing` (degrees) — used by the simulator.
+function moveLatLng(lat, lng, distM, bearing) {
+  const R = 6371000;
+  const br = toRad(bearing); const dr = distM / R;
+  const la1 = toRad(lat); const lo1 = toRad(lng);
+  const la2 = Math.asin(Math.sin(la1) * Math.cos(dr) + Math.cos(la1) * Math.sin(dr) * Math.cos(br));
+  const lo2 = lo1 + Math.atan2(Math.sin(br) * Math.sin(dr) * Math.cos(la1), Math.cos(dr) - Math.sin(la1) * Math.sin(la2));
+  return { lat: toDeg(la2), lng: toDeg(lo2) };
+}
+
 export default function FootprintsPage() {
   const { user } = useAuth();
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
@@ -92,6 +102,11 @@ export default function FootprintsPage() {
   const mapRef = useRef(null);
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
+  // Web-testing simulator: a fake walking trail so you can see the look without GPS.
+  const [sim, setSim] = useState(false);
+  const [simPings, setSimPings] = useState([]);
+  const simRef = useRef(null);
+  useEffect(() => () => { if (simRef.current?.timer) clearInterval(simRef.current.timer); }, []);
 
   // Poll the broadcaster's trail; a local clock fades the prints between polls.
   useEffect(() => {
@@ -110,10 +125,10 @@ export default function FootprintsPage() {
   const settings = trail.settings || {};
   const fadeMs = Math.max(1000, (Number(settings.fade_seconds) || 900) * 1000);
 
-  const footprints = useMemo(
-    () => buildFootprints(trail.pings, settings.spacing_m, settings.trail_length),
-    [trail.pings, settings.spacing_m, settings.trail_length],
-  );
+  const footprints = useMemo(() => {
+    const src = sim ? simPings : (trail.pings || []);
+    return buildFootprints(src, settings.spacing_m, settings.trail_length);
+  }, [sim, simPings, trail.pings, settings.spacing_m, settings.trail_length]);
 
   // Disable pull-to-refresh while the full-screen map is up.
   useEffect(() => {
@@ -175,6 +190,44 @@ export default function FootprintsPage() {
   }), []);
   const anchor = useMemo(() => (isLoaded ? new window.google.maps.Point(0, 0) : undefined), [isLoaded]);
 
+  // Simulator: seed a meandering path (timestamps spread across the fade window so
+  // you see the fade gradient at once), then keep walking a live head that drops a
+  // fresh print every ~1.2s and ages old ones out — the full look, no GPS needed.
+  const startSim = useCallback(() => {
+    const c = mapRef.current?.getCenter?.();
+    const center = c ? { lat: c.lat(), lng: c.lng() } : DEFAULT_CENTER;
+    const spacing = Math.max(3, Number(settings.spacing_m) || 15);
+    const count = Math.min(200, Math.max(24, Number(settings.trail_length) || 120));
+    const fade = fadeMs;
+    let lat = center.lat; let lng = center.lng; let heading = Math.random() * 360;
+    const now0 = Date.now();
+    const seed = [];
+    for (let i = 0; i < count; i += 1) {
+      heading += (Math.random() - 0.5) * 45;
+      const p = moveLatLng(lat, lng, spacing, heading);
+      lat = p.lat; lng = p.lng;
+      seed.push({ lat, lng, t: now0 - fade * (1 - i / (count - 1)) * 0.95 });
+    }
+    simRef.current = { lat, lng, heading, timer: null };
+    setSimPings(seed);
+    simRef.current.timer = setInterval(() => {
+      const s = simRef.current; if (!s) return;
+      s.heading += (Math.random() - 0.5) * 45;
+      const p = moveLatLng(s.lat, s.lng, spacing, s.heading);
+      s.lat = p.lat; s.lng = p.lng;
+      const tnow = Date.now();
+      setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fade));
+    }, 1200);
+    setSim(true);
+  }, [settings.spacing_m, settings.trail_length, fadeMs]);
+
+  const stopSim = useCallback(() => {
+    if (simRef.current?.timer) clearInterval(simRef.current.timer);
+    simRef.current = null;
+    setSimPings([]);
+    setSim(false);
+  }, []);
+
   // Admin-only for now (David's private testing build; Katie kept out until ready).
   if (!(user?.actual_role === 'admin' || user?.role === 'admin')) {
     return <Navigate to="/" replace />;
@@ -217,6 +270,21 @@ export default function FootprintsPage() {
           </GoogleMap>
         </div>
       )}
+
+      {/* Simulate button (web testing) — fakes a walking trail so you can see the
+          fading, direction-pointing footprints without GPS. */}
+      <button
+        type="button"
+        onClick={sim ? stopSim : startSim}
+        style={{
+          position: 'absolute', top: 12, right: 12, zIndex: 11,
+          border: 'none', borderRadius: 999, padding: '8px 14px', cursor: 'pointer',
+          background: sim ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 13, fontWeight: 700,
+          boxShadow: '0 6px 18px rgba(0,0,0,0.4)', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {sim ? 'Stop simulation' : 'Simulate footsteps'}
+      </button>
 
       {/* Minimal status card. */}
       <div style={{
