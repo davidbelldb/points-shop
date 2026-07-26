@@ -24,7 +24,7 @@ const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
-const FOOT_REAL_M = 0.7;        // footprint length in metres AT THE FOLLOW ZOOM
+const FOOT_REAL_M = 0.875;      // footprint length in metres AT THE FOLLOW ZOOM (+25%)
 
 // Metres-per-pixel at the follow zoom (reference). We render footprints at a FIXED
 // on-screen pixel size and place them at a FIXED on-screen spacing at EVERY zoom —
@@ -82,7 +82,6 @@ export default function FootprintsPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
   const [fpSettings, setFpSettings] = useState(null);   // per-mode config (same source as admin)
-  const [now, setNow] = useState(Date.now());
   const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);
   const mapRef = useRef(null);
   const textureRef = useRef(null);
@@ -104,11 +103,6 @@ export default function FootprintsPage() {
       .catch(() => {});
     tick();
     const id = setInterval(tick, 4000);
-    return () => clearInterval(id);
-  }, []);
-  useEffect(() => {
-    // Only drives the "X min ago" label now (the fade is pure CSS), so a lazy tick.
-    const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
   }, []);
 
@@ -258,7 +252,7 @@ export default function FootprintsPage() {
     if (!el || el.dataset.mmf) return;
     el.dataset.mmf = '1';
     const age = Math.max(0, Date.now() - t);
-    el.style.animation = `mmFootFade ${fadeMsRef.current}ms linear both`;
+    el.style.animation = `mmFootFade ${fadeMsRef.current + 500}ms linear both`;
     el.style.animationDelay = `-${age}ms`;
   }, []);
 
@@ -290,7 +284,7 @@ export default function FootprintsPage() {
       s.lat = p.lat; s.lng = p.lng;
       const tnow = Date.now();
       setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fade));
-    }, 550);
+    }, 1050);
     setSim(true);
   }, [fadeMs, loadSettings]);
 
@@ -305,9 +299,6 @@ export default function FootprintsPage() {
   if (!(user?.actual_role === 'admin' || user?.role === 'admin')) {
     return <Navigate to="/" replace />;
   }
-
-  const head = feet.length ? feet[feet.length - 1] : null;
-  const lastAgeMin = head ? Math.max(0, Math.round((now - head.t) / 60000)) : null;
 
   return (
     <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
@@ -329,7 +320,7 @@ export default function FootprintsPage() {
                 {/* Outer div = quick fade-IN; inner div = long fade-OUT. Nesting
                     multiplies the opacities so both are smooth and don't fight. */}
                 <div
-                  style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 500ms ease-out both' }}
+                  style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 1000ms ease-out both' }}
                 >
                   <div ref={(el) => applyFade(el, p.t)} style={{ width: '100%', height: '100%' }}>
                     <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
@@ -356,13 +347,13 @@ export default function FootprintsPage() {
         }}
       />
 
-      {/* Simulate button (web testing) — bottom-centre, above the tracker tile. */}
+      {/* Simulate button (web testing) — bottom-centre. */}
       <button
         type="button"
         onClick={sim ? stopSim : startSim}
         style={{
           position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          bottom: 'calc(max(20px, env(safe-area-inset-bottom)) + 74px)', zIndex: 11,
+          bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 11,
           border: 'none', borderRadius: 999, padding: '8px 16px', cursor: 'pointer',
           background: sim ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 13, fontWeight: 700,
           boxShadow: '0 6px 18px rgba(0,0,0,0.4)', WebkitTapHighlightColor: 'transparent',
@@ -370,31 +361,6 @@ export default function FootprintsPage() {
       >
         {sim ? 'Stop simulation' : 'Simulate footsteps'}
       </button>
-
-      {/* Minimal status card. */}
-      <div style={{
-        position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 10,
-        background: '#f7db9b', borderRadius: 18, padding: '10px 15px',
-        boxShadow: '0 10px 34px rgba(0,0,0,0.4)', color: '#000',
-      }}>
-        {feet.length === 0 ? (
-          <>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>No footprints yet</p>
-            <p style={{ margin: '3px 0 0', opacity: 0.65, fontSize: 12 }}>
-              {settings.enabled ? 'The trail appears once you start moving with tracking on.' : 'Outdoor tracking is turned off.'}
-            </p>
-          </>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
-              {user?.name || 'David'} <span style={{ opacity: 0.55, fontWeight: 500 }}>· {feet.length} prints</span>
-            </p>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(0,0,0,0.55)', whiteSpace: 'nowrap' }}>
-              {lastAgeMin === 0 ? 'moving now' : `${lastAgeMin} min ago`}
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
