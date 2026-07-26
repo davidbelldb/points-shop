@@ -24,6 +24,8 @@ const MIN_OPACITY = 0.06;       // faintest a footprint gets before it's dropped
 const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
 const TEXTURE_URL = '/marauders_texture.jpg';
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
+const FOOT_REAL_M = 0.7;        // stylised footprint length in metres (fixed; scales
+                                // with zoom, NOT with spacing, so spacing = density)
 
 // A shoe print = a big sole/ball oval + a small heel oval, pointing "up" (toward
 // −y = north at rotation 0); Google Maps rotates it clockwise by the travel
@@ -117,11 +119,12 @@ export default function FootprintsPage() {
   const feetRef = useRef([]);
   const accRef = useRef({ last: null, residual: 0, step: 0, lastT: 0 });
 
-  // Reset the accumulator when switching source (sim on/off).
+  // Reset + re-lay the trail when the source flips (sim on/off) OR the spacing
+  // changes in admin, so a new spacing takes effect at once (not just future prints).
   useEffect(() => {
     accRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
     feetRef.current = []; setFeet([]);
-  }, [sim]);
+  }, [sim, settings.spacing_m]);
 
   // Ingest any NEW path points → drop footprints every `spacing_m`, alternating L/R.
   useEffect(() => {
@@ -252,10 +255,9 @@ export default function FootprintsPage() {
   const footScale = useMemo(() => {
     const lat = feet.length ? feet[feet.length - 1].lat : DEFAULT_CENTER.lat;
     const mpp = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / (2 ** mapZoom);
-    const spacing = Math.max(0.2, Number(settings.spacing_m) || 0.75);
-    const px = (spacing * 1.35) / mpp;   // desired foot length in pixels
-    return Math.max(0.06, Math.min(3, px / 12.2));   // foot path spans ~12.2 units
-  }, [feet, mapZoom, settings.spacing_m]);
+    const px = FOOT_REAL_M / mpp;   // fixed real-world foot length → pixels
+    return Math.max(0.06, Math.min(3.5, px / 12.2));   // foot path spans ~12.2 units
+  }, [feet, mapZoom]);
 
   // Simulator: seed a meandering path (timestamps spread across the fade window so
   // you see the fade gradient at once), then keep walking a live head that drops a
