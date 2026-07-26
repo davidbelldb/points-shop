@@ -24,7 +24,7 @@ const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
-const FOOT_REAL_M = 0.875;      // footprint length in metres AT THE FOLLOW ZOOM (+25%)
+const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM (+25% again)
 
 // Metres-per-pixel at the follow zoom (reference). We render footprints at a FIXED
 // on-screen pixel size and place them at a FIXED on-screen spacing at EVERY zoom —
@@ -111,7 +111,6 @@ export default function FootprintsPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
   const [fpSettings, setFpSettings] = useState(null);   // per-mode config (same source as admin)
-  const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);
   const mapRef = useRef(null);
   const textureRef = useRef(null);
   const mountedRef = useRef(true);
@@ -150,10 +149,6 @@ export default function FootprintsPage() {
   // Simulation is EXTERNAL (outdoor) only — it always uses the outdoor config.
   const settings = fpSettings?.outdoor || {};
   const fadeMs = Math.max(1000, (Number(settings.fade_seconds) || 900) * 1000);
-  // How much to scale real-world spacing so on-screen spacing stays constant across
-  // zooms (2× per zoom level out). Quantised to whole zoom levels so it only re-lays
-  // when you cross a level, not during a pinch.
-  const zoomK = 2 ** (FOLLOW_ZOOM - Math.round(mapZoom));
 
   // Footprints are placed ONCE at fixed positions as the walker advances, and never
   // recomputed — so the trail doesn't crawl/jitter each update (which is what made
@@ -169,12 +164,15 @@ export default function FootprintsPage() {
   useEffect(() => {
     accRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
     feetRef.current = []; setFeet([]);
-  }, [sim, settings.spacing_m, zoomK]);
+  }, [sim, settings.spacing_m]);
 
-  // Ingest any NEW path points → drop footprints every (zoom-scaled) spacing, L/R.
+  // Ingest any NEW path points → drop footprints every `spacing_m` REAL metres, L/R.
+  // Spacing and count are absolute (real-world), NOT scaled by zoom — so the exact
+  // same set of prints is pinned to the map at every zoom height. Zoom in or out and
+  // the whole trail stays (it just gets nearer/further), instead of thinning out.
   useEffect(() => {
-    const spacing = Math.max(0.2, (Number(settings.spacing_m) || 0.75) * zoomK);
-    const offset = spacing * 0.4;   // scales with spacing → constant on-screen offset
+    const spacing = Math.max(0.2, Number(settings.spacing_m) || 0.75);
+    const offset = spacing * 0.4;   // L/R stance offset, in real metres
     const acc = accRef.current;
     let prev = acc.last; let changed = false;
     for (const pt of (sourcePings || [])) {
@@ -204,7 +202,7 @@ export default function FootprintsPage() {
     feetRef.current = feetRef.current.filter((ff) => ff.t >= cutoff);
     if (feetRef.current.length > cap) feetRef.current = feetRef.current.slice(-cap);
     if (changed || feetRef.current.length !== before) setFeet(feetRef.current.slice());
-  }, [sourcePings, settings.spacing_m, settings.trail_length, fadeMs, zoomK]);
+  }, [sourcePings, settings.spacing_m, settings.trail_length, fadeMs]);
 
   // Disable pull-to-refresh while the full-screen map is up.
   useEffect(() => {
@@ -233,7 +231,6 @@ export default function FootprintsPage() {
   const onLoad = useCallback((m) => {
     mapRef.current = m;
     m.setCenter(DEFAULT_CENTER); m.setZoom(FOLLOW_ZOOM);
-    m.addListener('zoom_changed', () => setMapZoom(m.getZoom()));
 
     // Parchment texture laid over the map at 40%, in the overlayLayer pane — which
     // sits BELOW the marker pane, so the footprints render on top of the texture.
@@ -285,37 +282,31 @@ export default function FootprintsPage() {
     el.style.animationDelay = `-${age}ms`;
   }, []);
 
-  // Simulator: seed a meandering path (timestamps spread across the fade window so
-  // you see the fade gradient at once), then keep walking a live head that drops a
-  // fresh print every ~1.2s and ages old ones out — the full look, no GPS needed.
+  // Simulator: start at Bishops Court and WALK — advancing exactly one stride
+  // (= the admin spacing) each tick so ingest drops precisely ONE footprint per
+  // tick, alternating left, right, left, right… Each new print fades in on its own;
+  // no instant seed, so you watch the trail build one step at a time.
   const startSim = useCallback(() => {
     loadSettings();   // use the latest admin config immediately
     const center = SIM_START;   // walk always starts from Bishops Court
-    const RAW_STEP = 0.9;   // metres between raw path points (≈ one print each)
-    const count = 90;       // seed points → a full trail from the off
-    const fade = fadeMs;
-    let lat = center.lat; let lng = center.lng; let heading = Math.random() * 360;
-    const now0 = Date.now();
-    const seed = [];
-    for (let i = 0; i < count; i += 1) {
-      heading += (Math.random() - 0.5) * 22;   // gentle meander
-      const p = moveLatLng(lat, lng, RAW_STEP, heading);
-      lat = p.lat; lng = p.lng;
-      seed.push({ lat, lng, t: now0 - fade * (1 - i / (count - 1)) * 0.9 });
-    }
-    simRef.current = { lat, lng, heading, timer: null };
-    setSimPings(seed);
-    // Walk a live head every ~1.1s (≈ walking pace), ageing old prints out.
+    const stride = Math.max(0.2, Number(settings.spacing_m) || 0.75);   // one print per step
+    let heading = Math.random() * 360;
+    simRef.current = { lat: center.lat, lng: center.lng, heading, timer: null };
+    // Seed with the origin only (no print yet — it just gives the walk a start point).
+    setSimPings([{ lat: center.lat, lng: center.lng, t: Date.now() }]);
+    const m = mapRef.current;
+    if (m) { m.setZoom(FOLLOW_ZOOM); m.setCenter(center); }
+    // One stride per tick → exactly one footprint (L, R, L, R…) each tick.
     simRef.current.timer = setInterval(() => {
       const s = simRef.current; if (!s) return;
-      s.heading += (Math.random() - 0.5) * 22;
-      const p = moveLatLng(s.lat, s.lng, RAW_STEP, s.heading);
+      s.heading += (Math.random() - 0.5) * 22;   // gentle meander
+      const p = moveLatLng(s.lat, s.lng, stride, s.heading);
       s.lat = p.lat; s.lng = p.lng;
       const tnow = Date.now();
-      setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fade));
+      setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fadeMs));
     }, 1050);
     setSim(true);
-  }, [fadeMs, loadSettings]);
+  }, [fadeMs, loadSettings, settings.spacing_m]);
 
   const stopSim = useCallback(() => {
     if (simRef.current?.timer) clearInterval(simRef.current.timer);
