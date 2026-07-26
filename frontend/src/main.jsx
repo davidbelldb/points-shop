@@ -7,7 +7,7 @@ import App from './App.jsx';
 import { initNativePush } from './lib/nativePush.js';
 import { enableCrowPush } from './lib/crowActivity.js';
 import { enableOmwPush } from './lib/omwActivity.js';
-import { startFootprints, stopFootprints } from './lib/footprintsTracker.js';
+import { stopFootprints } from './lib/footprintsTracker.js';
 import { syncWidgetCredentials } from './lib/widgetBridge.js';
 
 // ── Eager — the core shell + everyday pages (kept small) ─────────────────────
@@ -117,9 +117,9 @@ function NativePush() {
   const navigate = useNavigate();
   useEffect(() => {
     if (user) { initNativePush((url) => navigate(url)); enableCrowPush(); enableOmwPush(); syncWidgetCredentials(); }
-    // Footprints broadcast — David only for now (private testing build).
-    if (user?.role === 'admin' || user?.actual_role === 'admin') startFootprints();
-    else stopFootprints();
+    // Footprints tracking is now manual — David starts/ends it from the Start/End
+    // tracking button on the map. Make sure any stray watch is stopped on logout.
+    if (!user) stopFootprints();
   }, [user, navigate]);
   return null;
 }

@@ -45,9 +45,7 @@ function ModeCard({ mode, cfg, onSave }) {
         </label>
       ))}
       <p className="text-[11px] text-neutral-400">
-        {mode === 'indoor'
-          ? 'Indoor (UWB) — hardware pending; safe to configure ahead of time.'
-          : 'Outdoor (GPS) — live.'}
+        Phone GPS — David starts/ends tracking from the map.
       </p>
     </div>
   );
@@ -80,12 +78,10 @@ export default function AdminFootprintsSection() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-neutral-500">
-        The fading footprint trail. Spacing = stride between prints; fade = how long a print lingers before it
-        disappears; trail length = max prints kept. Currently David-only while testing.
+        The fading footprint trail (phone GPS). Spacing = stride between prints; fade = how long a print lingers
+        before it disappears; trail length = max prints kept. Currently David-only while testing.
       </p>
-      {['outdoor', 'indoor'].map((mode) => (
-        settings[mode] ? <ModeCard key={mode} mode={mode} cfg={settings[mode]} onSave={save} /> : null
-      ))}
+      {settings.outdoor ? <ModeCard mode="outdoor" cfg={settings.outdoor} onSave={save} /> : null}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {saved && <p className="text-xs text-emerald-600">Saved ✓</p>}
     </div>

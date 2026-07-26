@@ -4,6 +4,7 @@ import { GoogleMap, OverlayViewF, useJsApiLoader } from '@react-google-maps/api'
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle.js';
+import { startFootprints, stopFootprints } from '../lib/footprintsTracker.js';
 
 /*
  * "Marauder's Map" — a fading trail of footprints tracing where the broadcaster
@@ -11,13 +12,11 @@ import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle
  * `spacing_m`, each one pointing along the direction of travel with a random ±15°
  * angle for that hand-inked authenticity, and fading out over `fade_seconds`.
  *
- * v1 = outdoor GPS, David-only (testing). The engine is shared with the coming
- * indoor (UWB) mode; only the `mode` string and its config differ.
+ * Outdoor phone GPS, David-only (testing). David starts/ends tracking from the map.
  */
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
-const SIM_START = { lat: 52.166806, lng: 0.109111 };   // Bishops Court — sim walk origin
 const MODE = 'outdoor';
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
@@ -48,23 +47,24 @@ const FOOT_L = `${FOOT_SOLE} M-0.1,2.1 L-1.7,2.1 C-2.3,2.1 -2.55,2.4 -2.55,3 C-2
 // each time a new print dropped (the flicker). One shared function = no remounts.
 const CENTER_OFFSET = (w, h) => ({ x: -(w / 2), y: -(h / 2) });
 
-// One footprint, memoised on its (stable) print object. When a new print is added
-// the parent re-renders, but every EXISTING footprint's props are referentially
-// unchanged, so React skips them entirely — no remount, no fade restart. Each print
-// therefore fades in exactly once, when it first appears. Slick.
-const Footprint = memo(function Footprint({ p, applyFade }) {
+// One footprint, memoised on primitive props. The lat/lng passed in are the DISPLAY
+// position (scaled so the trail looks identical at every zoom — see the render). At
+// the follow zoom the display position equals the real position, so adding a print
+// leaves every existing print's props unchanged → React skips them → no remount, no
+// fade restart. Each print fades in exactly once. Slick.
+const Footprint = memo(function Footprint({ lat, lng, angle, side, t, applyFade }) {
   return (
     <OverlayViewF
-      position={{ lat: p.lat, lng: p.lng }}
+      position={{ lat, lng }}
       mapPaneName="mapPane"
       getPixelPositionOffset={CENTER_OFFSET}
     >
       {/* Outer div = quick fade-IN; inner div = long fade-OUT. Nesting multiplies
           the opacities so both are smooth and don't fight. */}
-      <div style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 1000ms ease-out both' }}>
-        <div ref={(el) => applyFade(el, p.t)} style={{ width: '100%', height: '100%' }}>
+      <div style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 1000ms ease-out both' }}>
+        <div ref={(el) => applyFade(el, t)} style={{ width: '100%', height: '100%' }}>
           <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
-            <path d={p.side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
+            <path d={side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
           </svg>
         </div>
       </div>
@@ -111,6 +111,7 @@ export default function FootprintsPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
   const [fpSettings, setFpSettings] = useState(null);   // per-mode config (same source as admin)
+  const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);  // drives the zoom-invariant layout
   const mapRef = useRef(null);
   const textureRef = useRef(null);
   const mountedRef = useRef(true);
@@ -118,11 +119,11 @@ export default function FootprintsPage() {
     mountedRef.current = false;
     try { textureRef.current?.setMap(null); } catch { /* ignore */ }
   }, []);
-  // Web-testing simulator: a fake walking trail so you can see the look without GPS.
-  const [sim, setSim] = useState(false);
-  const [simPings, setSimPings] = useState([]);
-  const simRef = useRef(null);
-  useEffect(() => () => { if (simRef.current?.timer) clearInterval(simRef.current.timer); }, []);
+  // Live phone-GPS tracking (David only). The button below starts/stops a geolocation
+  // watch that posts footprints; they come back through the trail poll and appear on
+  // the map. No simulator, no indoor beacons — just the phone in David's pocket.
+  const [tracking, setTracking] = useState(false);
+  useEffect(() => () => { stopFootprints(); }, []);   // stop the watch if the page unmounts
 
   // Poll the broadcaster's trail; a local clock fades the prints between polls.
   useEffect(() => {
@@ -130,7 +131,7 @@ export default function FootprintsPage() {
       .then((r) => { if (mountedRef.current) setTrail({ pings: r.pings || [], settings: r.settings || null }); })
       .catch(() => {});
     tick();
-    const id = setInterval(tick, 4000);
+    const id = setInterval(tick, 3000);
     return () => clearInterval(id);
   }, []);
 
@@ -146,25 +147,25 @@ export default function FootprintsPage() {
     return () => clearInterval(id);
   }, [loadSettings]);
 
-  // Simulation is EXTERNAL (outdoor) only — it always uses the outdoor config.
+  // Outdoor (phone GPS) is the only mode now.
   const settings = fpSettings?.outdoor || {};
   const fadeMs = Math.max(1000, (Number(settings.fade_seconds) || 900) * 1000);
 
-  // Footprints are placed ONCE at fixed positions as the walker advances, and never
-  // recomputed — so the trail doesn't crawl/jitter each update (which is what made
-  // it feel like a bad GIF). Old prints drop by age; `id` is a stable key so markers
-  // update in place (smooth) rather than remounting.
-  const sourcePings = sim ? simPings : trail.pings;
+  // Footprints are placed ONCE at fixed REAL positions as the walker advances, and
+  // never recomputed — so the trail doesn't crawl/jitter each update. Old prints drop
+  // by age; `id` is a stable key so markers update in place rather than remounting.
+  // (The zoom-invariant SCALING happens at render time, not here.)
+  const sourcePings = trail.pings;
   const [feet, setFeet] = useState([]);
   const feetRef = useRef([]);
   const accRef = useRef({ last: null, residual: 0, step: 0, lastT: 0 });
 
-  // Reset + re-lay the trail when the source flips (sim on/off) OR the spacing
-  // changes in admin, so a new spacing takes effect at once (not just future prints).
+  // Reset + re-lay the trail when the spacing changes in admin, so a new spacing
+  // takes effect at once (not just future prints).
   useEffect(() => {
     accRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
     feetRef.current = []; setFeet([]);
-  }, [sim, settings.spacing_m]);
+  }, [settings.spacing_m]);
 
   // Ingest any NEW path points → drop footprints every `spacing_m` REAL metres, L/R.
   // Spacing and count are absolute (real-world), NOT scaled by zoom — so the exact
@@ -217,20 +218,19 @@ export default function FootprintsPage() {
     };
   }, []);
 
-  // Centre ONCE on the latest footprint when the page (or a fresh simulation) first
-  // has a trail, then leave the map alone — no per-step re-centering. The user pans
-  // freely; the walker may wander out of view, which is intended.
+  // Centre ONCE on the latest footprint when the page first has a trail, then leave
+  // the map alone — no per-step re-centering. The user pans freely.
   const didCenterRef = useRef(false);
-  useEffect(() => { didCenterRef.current = false; }, [sim]);   // re-centre once when sim toggles
   useEffect(() => {
     if (!isLoaded || didCenterRef.current || !feet.length) return;
     const m = mapRef.current; const h = feet[feet.length - 1];
     if (m && h && inUK(h)) { m.setZoom(FOLLOW_ZOOM); m.setCenter({ lat: h.lat, lng: h.lng }); didCenterRef.current = true; }
-  }, [isLoaded, feet, sim]);
+  }, [isLoaded, feet]);
 
   const onLoad = useCallback((m) => {
     mapRef.current = m;
     m.setCenter(DEFAULT_CENTER); m.setZoom(FOLLOW_ZOOM);
+    m.addListener('zoom_changed', () => setMapZoom(m.getZoom()));
 
     // Parchment texture laid over the map at 40%, in the overlayLayer pane — which
     // sits BELOW the marker pane, so the footprints render on top of the texture.
@@ -282,43 +282,43 @@ export default function FootprintsPage() {
     el.style.animationDelay = `-${age}ms`;
   }, []);
 
-  // Simulator: start at Bishops Court and WALK — advancing exactly one stride
-  // (= the admin spacing) each tick so ingest drops precisely ONE footprint per
-  // tick, alternating left, right, left, right… Each new print fades in on its own;
-  // no instant seed, so you watch the trail build one step at a time.
-  const startSim = useCallback(() => {
-    loadSettings();   // use the latest admin config immediately
-    const center = SIM_START;   // walk always starts from Bishops Court
-    const stride = Math.max(0.2, Number(settings.spacing_m) || 0.75);   // one print per step
-    let heading = Math.random() * 360;
-    simRef.current = { lat: center.lat, lng: center.lng, heading, timer: null };
-    // Seed with the origin only (no print yet — it just gives the walk a start point).
-    setSimPings([{ lat: center.lat, lng: center.lng, t: Date.now() }]);
-    const m = mapRef.current;
-    if (m) { m.setZoom(FOLLOW_ZOOM); m.setCenter(center); }
-    // One stride per tick → exactly one footprint (L, R, L, R…) each tick.
-    simRef.current.timer = setInterval(() => {
-      const s = simRef.current; if (!s) return;
-      s.heading += (Math.random() - 0.5) * 22;   // gentle meander
-      const p = moveLatLng(s.lat, s.lng, stride, s.heading);
-      s.lat = p.lat; s.lng = p.lng;
-      const tnow = Date.now();
-      setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fadeMs));
-    }, 1050);
-    setSim(true);
-  }, [fadeMs, loadSettings, settings.spacing_m]);
+  // Start / stop live phone-GPS tracking. Starting kicks off a geolocation watch that
+  // posts footprints (gated to the admin spacing); they return via the trail poll and
+  // appear on the map. We also grab the current position once to frame the map on it.
+  const startTracking = useCallback(() => {
+    loadSettings();
+    startFootprints();
+    setTracking(true);
+    if (navigator?.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const m = mapRef.current;
+        if (m && Number.isFinite(pos.coords.latitude)) {
+          m.setZoom(FOLLOW_ZOOM);
+          m.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        }
+      }, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+    }
+  }, [loadSettings]);
 
-  const stopSim = useCallback(() => {
-    if (simRef.current?.timer) clearInterval(simRef.current.timer);
-    simRef.current = null;
-    setSimPings([]);
-    setSim(false);
+  const stopTracking = useCallback(() => {
+    stopFootprints();
+    setTracking(false);
   }, []);
 
   // Admin-only for now (David's private testing build; Katie kept out until ready).
   if (!(user?.actual_role === 'admin' || user?.role === 'admin')) {
     return <Navigate to="/" replace />;
   }
+
+  // ZOOM-INVARIANT LAYOUT. Prints are stored at their true positions, but we DISPLAY
+  // them scaled outward from the newest print (the "head") by 2^(FOLLOW_ZOOM - zoom).
+  // That exactly cancels the map's own scaling, so every footprint keeps the same
+  // on-screen SIZE and the same on-screen GAP at every zoom level — the trail looks
+  // identical zoomed all the way in or all the way out (it never collapses to a blob
+  // or loses prints). At the follow zoom the factor is 1, i.e. true positions. Uses
+  // the exact (unrounded) zoom so the scaling cancels continuously — no snapping.
+  const zoomK = 2 ** (FOLLOW_ZOOM - mapZoom);
+  const head = feet.length ? feet[feet.length - 1] : null;
 
   return (
     <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
@@ -330,9 +330,13 @@ export default function FootprintsPage() {
             onLoad={onLoad}
             options={mapOptions}
           >
-            {feet.map((p) => (
-              <Footprint key={p.id} p={p} applyFade={applyFade} />
-            ))}
+            {feet.map((p) => {
+              const lat = head ? head.lat + (p.lat - head.lat) * zoomK : p.lat;
+              const lng = head ? head.lng + (p.lng - head.lng) * zoomK : p.lng;
+              return (
+                <Footprint key={p.id} lat={lat} lng={lng} angle={p.angle} side={p.side} t={p.t} applyFade={applyFade} />
+              );
+            })}
           </GoogleMap>
         </div>
       )}
@@ -350,19 +354,19 @@ export default function FootprintsPage() {
         }}
       />
 
-      {/* Simulate button (web testing) — bottom-centre. */}
+      {/* Start / End tracking — David only (the whole page is admin-gated). */}
       <button
         type="button"
-        onClick={sim ? stopSim : startSim}
+        onClick={tracking ? stopTracking : startTracking}
         style={{
           position: 'absolute', left: '50%', transform: 'translateX(-50%)',
           bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 11,
-          border: 'none', borderRadius: 999, padding: '8px 16px', cursor: 'pointer',
-          background: sim ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 13, fontWeight: 700,
+          border: 'none', borderRadius: 999, padding: '10px 20px', cursor: 'pointer',
+          background: tracking ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 14, fontWeight: 700,
           boxShadow: '0 6px 18px rgba(0,0,0,0.4)', WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {sim ? 'Stop simulation' : 'Simulate footsteps'}
+        {tracking ? 'End tracking' : 'Start tracking'}
       </button>
     </div>
   );
