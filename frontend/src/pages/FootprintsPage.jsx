@@ -17,6 +17,7 @@ import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
+const SIM_START = { lat: 52.166806, lng: 0.109111 };   // Bishops Court — sim walk origin
 const MODE = 'outdoor';
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
@@ -266,8 +267,7 @@ export default function FootprintsPage() {
   // fresh print every ~1.2s and ages old ones out — the full look, no GPS needed.
   const startSim = useCallback(() => {
     loadSettings();   // use the latest admin config immediately
-    const c = mapRef.current?.getCenter?.();
-    const center = c ? { lat: c.lat(), lng: c.lng() } : DEFAULT_CENTER;
+    const center = SIM_START;   // walk always starts from Bishops Court
     const RAW_STEP = 0.9;   // metres between raw path points (≈ one print each)
     const count = 90;       // seed points → a full trail from the off
     const fade = fadeMs;
