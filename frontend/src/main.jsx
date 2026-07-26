@@ -7,6 +7,7 @@ import App from './App.jsx';
 import { initNativePush } from './lib/nativePush.js';
 import { enableCrowPush } from './lib/crowActivity.js';
 import { enableOmwPush } from './lib/omwActivity.js';
+import { startFootprints, stopFootprints } from './lib/footprintsTracker.js';
 import { syncWidgetCredentials } from './lib/widgetBridge.js';
 
 // ── Eager — the core shell + everyday pages (kept small) ─────────────────────
@@ -24,6 +25,7 @@ import MessagesPage from './pages/MessagesPage.jsx';
 import NewChatPage from './pages/NewChatPage.jsx';
 import OmwMapPage from './pages/OmwMapPage.jsx';
 import CrowTrackerPage from './pages/CrowTrackerPage.jsx';
+import FootprintsPage from './pages/FootprintsPage.jsx';
 import SheetIn from './components/SheetIn.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
 
@@ -115,6 +117,9 @@ function NativePush() {
   const navigate = useNavigate();
   useEffect(() => {
     if (user) { initNativePush((url) => navigate(url)); enableCrowPush(); enableOmwPush(); syncWidgetCredentials(); }
+    // Footprints broadcast — David only for now (private testing build).
+    if (user?.role === 'admin' || user?.actual_role === 'admin') startFootprints();
+    else stopFootprints();
   }, [user, navigate]);
   return null;
 }
@@ -182,6 +187,8 @@ createRoot(document.getElementById('root')).render(
               {/* Crow-delivery live tracker — opened by tapping a crow / weather
                   Live Activity (sneakystuff://crow-tracker). Straight-line flight. */}
               <Route path="crow-tracker" element={<CrowTrackerPage />} />
+              {/* Marauder's Map footprints — admin-only (David testing) inside the page. */}
+              <Route path="footprints" element={<FootprintsPage />} />
               <Route path="games" element={<GamesPage />} />
               <Route path="games/truth-or-dare" element={<TruthOrDarePage />} />
               <Route path="games/tic-tac-face" element={<TicTacFacePage />} />

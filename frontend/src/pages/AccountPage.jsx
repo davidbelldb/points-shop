@@ -119,6 +119,16 @@ export default function AccountPage() {
             <span aria-hidden>&rarr;</span>
           </Pressable>
 
+          {/* Marauder's Map footprints — admin-only while David tests it (kept off
+              Katie's account until it's polished). */}
+          {user?.role === 'admin' && (
+            <Pressable as={Link} to="/footprints"
+              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm font-medium text-amber-700">
+              <span>Marauder&apos;s Map (test)</span>
+              <span aria-hidden>&rarr;</span>
+            </Pressable>
+          )}
+
           <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center gap-3">
               <label className="relative cursor-pointer">

@@ -140,6 +140,16 @@ export const api = {
     updateForecastConfig: (patch) => request('/scrolls/forecast-config', { method: 'PUT', body: JSON.stringify(patch) }),
     sendForecastTest:     () => request('/scrolls/forecast-test', { method: 'POST' }),
   },
+
+  // "Marauder's Map" footprints — a fading position trail. David broadcasts, both
+  // watch; independent config for 'outdoor' (GPS) and 'indoor' (UWB, later).
+  footprints: {
+    ping:  (mode, lat, lng) => request('/footprints/ping', { method: 'POST', body: JSON.stringify({ mode, lat, lng }) }),
+    trail: (mode) => request(`/footprints/trail?mode=${encodeURIComponent(mode)}`),
+    settings: () => request('/footprints/settings'),
+    saveSettings: (mode, patch) => request(`/footprints/settings/${mode}`, { method: 'PUT', body: JSON.stringify(patch) }),
+  },
+
   getMessages: () => request('/messages'),
   sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>
     request('/messages', {
