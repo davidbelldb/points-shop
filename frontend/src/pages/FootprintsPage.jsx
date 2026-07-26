@@ -343,14 +343,26 @@ export default function FootprintsPage() {
         </div>
       )}
 
-      {/* Simulate button (web testing) — fakes a walking trail so you can see the
-          fading, direction-pointing footprints without GPS. */}
+      {/* Marauder's banner across the top (transparent PNG, sits over the map). */}
+      <img
+        src="/marauders_banner.png"
+        alt="The Marauder's Map"
+        draggable={false}
+        style={{
+          position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
+          width: 'min(90%, 440px)', height: 'auto', pointerEvents: 'none',
+          filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.35))',
+        }}
+      />
+
+      {/* Simulate button (web testing) — bottom-centre, above the tracker tile. */}
       <button
         type="button"
         onClick={sim ? stopSim : startSim}
         style={{
-          position: 'absolute', top: 12, right: 12, zIndex: 11,
-          border: 'none', borderRadius: 999, padding: '8px 14px', cursor: 'pointer',
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'calc(max(20px, env(safe-area-inset-bottom)) + 74px)', zIndex: 11,
+          border: 'none', borderRadius: 999, padding: '8px 16px', cursor: 'pointer',
           background: sim ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 13, fontWeight: 700,
           boxShadow: '0 6px 18px rgba(0,0,0,0.4)', WebkitTapHighlightColor: 'transparent',
         }}
