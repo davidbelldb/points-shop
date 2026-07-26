@@ -19,6 +19,7 @@ import AdminPushSection from './AdminPushSection.jsx';
 import AdminGroceriesSection from './AdminGroceriesSection.jsx';
 import AdminScrollsSection from './AdminScrollsSection.jsx';
 import AdminForecastSection from './AdminForecastSection.jsx';
+import AdminFootprintsSection from './AdminFootprintsSection.jsx';
 import AdminOmwSection from './AdminOmwSection.jsx';
 import AdminFloatingHeadSection from './AdminFloatingHeadSection.jsx';
 import AdminNfcSection from './AdminNfcSection.jsx';
@@ -198,6 +199,10 @@ export default function AdminPage() {
 
       <AdminCollapsible title="On My Way" storageKey="admin::omw">
         <AdminOmwSection />
+      </AdminCollapsible>
+
+      <AdminCollapsible title="Marauder's Map (footprints)" storageKey="admin::footprints">
+        <AdminFootprintsSection />
       </AdminCollapsible>
 
       <AdminCollapsible title="Floating Head" storageKey="admin::floatinghead">

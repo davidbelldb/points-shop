@@ -18,14 +18,19 @@ import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 const MODE = 'outdoor';
-const FIT_PADDING = { top: 71, bottom: 90, left: 56, right: 56 };
 const RECENTER_DELAY_MS = 6000;
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const MIN_OPACITY = 0.06;       // faintest a footprint gets before it's dropped
+const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
+const FOOT_SCALE = 1.5;
 
-// A single left-foot sole shape pointing "up" (toward −y = north at rotation 0);
-// Google Maps rotates it clockwise by the travel bearing.
-const FOOT_PATH = 'M 0,-7 C 3.1,-7 4.1,-2.6 3,1.4 C 2.4,4 -2.4,4 -3,1.4 C -4.1,-2.6 -3.1,-7 0,-7 Z';
+// A shoe print = a big sole/ball oval + a small heel oval, pointing "up" (toward
+// −y = north at rotation 0); Google Maps rotates it clockwise by the travel
+// bearing. Left / right feet mirror the heel to opposite sides so a walking gait
+// reads as alternating prints.
+const FOOT_SOLE = 'M0,-6.5 C2.6,-6.5 3.2,-3 2.6,-0.3 C2.1,1.8 -2.1,1.8 -2.6,-0.3 C-3.2,-3 -2.6,-6.5 0,-6.5 Z';
+const FOOT_R = `${FOOT_SOLE} M1,2.8 C1.9,2.8 2.2,3.9 1.9,4.8 C1.6,5.6 0.4,5.6 0.1,4.8 C-0.2,3.9 0.1,2.8 1,2.8 Z`;
+const FOOT_L = `${FOOT_SOLE} M-1,2.8 C-1.9,2.8 -2.2,3.9 -1.9,4.8 C-1.6,5.6 -0.4,5.6 -0.1,4.8 C0.2,3.9 -0.1,2.8 -1,2.8 Z`;
 
 const toRad = (d) => (d * Math.PI) / 180;
 const toDeg = (r) => (r * 180) / Math.PI;
@@ -63,9 +68,10 @@ function buildFootprints(pings, spacingM, trailLength) {
   }
   if (!segs.length) return [];
   const total = cum;
-  const spacing = Math.max(0.3, Number(spacingM) || 10);
+  const spacing = Math.max(0.2, Number(spacingM) || 0.75);       // stride between steps
+  const offset = Math.min(0.6, Math.max(0.12, spacing * 0.4));   // ± stance half-width
   const prints = [];
-  let idx = 0;
+  let idx = 0; let step = 0;
   for (let d = 0; d <= total; d += spacing) {
     while (idx < segs.length - 1 && d > segs[idx].start + segs[idx].len) idx += 1;
     const s = segs[idx];
@@ -73,7 +79,12 @@ function buildFootprints(pings, spacingM, trailLength) {
     const lat = s.a.lat + (s.b.lat - s.a.lat) * f;
     const lng = s.a.lng + (s.b.lng - s.a.lng) * f;
     const t = s.a.t + (s.b.t - s.a.t) * f;
-    prints.push({ lat, lng, t, angle: s.bearing + jitterFor(lat, lng) });
+    // Alternate left / right, stepping to that side of the centre-line so the
+    // prints sit side-by-side and overlap as the walker advances.
+    const side = step % 2 === 0 ? -1 : 1;
+    const off = moveLatLng(lat, lng, offset, s.bearing + 90 * side);
+    prints.push({ lat: off.lat, lng: off.lng, t, angle: s.bearing + jitterFor(lat, lng), side });
+    step += 1;
   }
   const cap = Math.max(1, Number(trailLength) || 100);
   return prints.slice(-cap);
@@ -94,7 +105,7 @@ export default function FootprintsPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
   const [now, setNow] = useState(Date.now());
-  const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: 15 }), []);
+  const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM }), []);
   const lastInteractRef = useRef(0);
   const programmaticRef = useRef(false);
   const recenterTimerRef = useRef(null);
@@ -148,17 +159,15 @@ export default function FootprintsPage() {
     fitPointsRef.current = footprints.filter(inUK).map((p) => ({ lat: p.lat, lng: p.lng }));
   }, [footprints]);
 
+  // Stay zoomed right in and locked on the newest footprint (the walker), rather
+  // than fitting the whole trail — so you see individual prints, not a blob.
   const recenter = useCallback(() => {
     const m = mapRef.current; const pts = fitPointsRef.current;
     if (!m || !window.google || !pts.length) return;
     programmaticRef.current = true;
-    if (pts.length === 1) { m.setCenter(pts[0]); m.setZoom(17); }
-    else {
-      const b = new window.google.maps.LatLngBounds();
-      pts.forEach((p) => b.extend(p));
-      m.fitBounds(b, FIT_PADDING);
-    }
-    window.setTimeout(() => { programmaticRef.current = false; }, 800);
+    m.setCenter(pts[pts.length - 1]);
+    if (m.getZoom() !== FOLLOW_ZOOM) m.setZoom(FOLLOW_ZOOM);
+    window.setTimeout(() => { programmaticRef.current = false; }, 500);
   }, []);
 
   const noteInteraction = useCallback(() => {
@@ -171,7 +180,7 @@ export default function FootprintsPage() {
 
   const onLoad = useCallback((m) => {
     mapRef.current = m;
-    m.setCenter(DEFAULT_CENTER); m.setZoom(15);
+    m.setCenter(DEFAULT_CENTER); m.setZoom(FOLLOW_ZOOM);
     m.addListener('dragstart', noteInteraction);
     m.addListener('zoom_changed', () => { if (!programmaticRef.current) noteInteraction(); });
   }, [noteInteraction]);
@@ -184,7 +193,7 @@ export default function FootprintsPage() {
   }, [isLoaded, footprints, recenter]);
 
   const mapOptions = useMemo(() => ({
-    center: DEFAULT_CENTER, zoom: 15,
+    center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM,
     disableDefaultUI: true, keyboardShortcuts: false, gestureHandling: 'greedy',
     styles: MARAUDERS_STYLE, backgroundColor: PARCHMENT, clickableIcons: false,
   }), []);
@@ -196,30 +205,31 @@ export default function FootprintsPage() {
   const startSim = useCallback(() => {
     const c = mapRef.current?.getCenter?.();
     const center = c ? { lat: c.lat(), lng: c.lng() } : DEFAULT_CENTER;
-    const spacing = Math.max(3, Number(settings.spacing_m) || 15);
-    const count = Math.min(200, Math.max(24, Number(settings.trail_length) || 120));
+    const RAW_STEP = 2;   // metres between raw path points (a smooth walk)
+    const count = 70;     // seed points → a full trail from the off
     const fade = fadeMs;
     let lat = center.lat; let lng = center.lng; let heading = Math.random() * 360;
     const now0 = Date.now();
     const seed = [];
     for (let i = 0; i < count; i += 1) {
-      heading += (Math.random() - 0.5) * 45;
-      const p = moveLatLng(lat, lng, spacing, heading);
+      heading += (Math.random() - 0.5) * 22;   // gentle meander
+      const p = moveLatLng(lat, lng, RAW_STEP, heading);
       lat = p.lat; lng = p.lng;
-      seed.push({ lat, lng, t: now0 - fade * (1 - i / (count - 1)) * 0.95 });
+      seed.push({ lat, lng, t: now0 - fade * (1 - i / (count - 1)) * 0.9 });
     }
     simRef.current = { lat, lng, heading, timer: null };
     setSimPings(seed);
+    // Walk a live head every ~1.1s (≈ walking pace), ageing old prints out.
     simRef.current.timer = setInterval(() => {
       const s = simRef.current; if (!s) return;
-      s.heading += (Math.random() - 0.5) * 45;
-      const p = moveLatLng(s.lat, s.lng, spacing, s.heading);
+      s.heading += (Math.random() - 0.5) * 22;
+      const p = moveLatLng(s.lat, s.lng, RAW_STEP, s.heading);
       s.lat = p.lat; s.lng = p.lng;
       const tnow = Date.now();
       setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fade));
-    }, 1200);
+    }, 1100);
     setSim(true);
-  }, [settings.spacing_m, settings.trail_length, fadeMs]);
+  }, [fadeMs]);
 
   const stopSim = useCallback(() => {
     if (simRef.current?.timer) clearInterval(simRef.current.timer);
@@ -256,10 +266,10 @@ export default function FootprintsPage() {
                   position={{ lat: p.lat, lng: p.lng }}
                   zIndex={i}
                   icon={{
-                    path: FOOT_PATH,
+                    path: p.side < 0 ? FOOT_L : FOOT_R,
                     anchor,
                     rotation: p.angle,
-                    scale: isHead ? 1.55 : 1.35,
+                    scale: isHead ? FOOT_SCALE * 1.12 : FOOT_SCALE,
                     fillColor: ROUTE,
                     fillOpacity: opacity,
                     strokeWeight: 0,
