@@ -311,7 +311,7 @@ export default function FootprintsPage() {
 
   return (
     <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
-      <style>{'@keyframes mmFootFade{from{opacity:1}to{opacity:0}}'}</style>
+      <style>{'@keyframes mmFootFade{from{opacity:1}to{opacity:0}}@keyframes mmFootIn{from{opacity:0}to{opacity:1}}'}</style>
       {isLoaded && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           <GoogleMap
@@ -326,13 +326,16 @@ export default function FootprintsPage() {
                 mapPaneName="markerLayer"
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}
               >
+                {/* Outer div = quick fade-IN; inner div = long fade-OUT. Nesting
+                    multiplies the opacities so both are smooth and don't fight. */}
                 <div
-                  ref={(el) => applyFade(el, p.t)}
-                  style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none' }}
+                  style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${p.angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 500ms ease-out both' }}
                 >
-                  <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
-                    <path d={p.side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
-                  </svg>
+                  <div ref={(el) => applyFade(el, p.t)} style={{ width: '100%', height: '100%' }}>
+                    <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
+                      <path d={p.side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
+                    </svg>
+                  </div>
                 </div>
               </OverlayViewF>
             ))}
