@@ -22,6 +22,7 @@ const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
+const TEXTURE_SATURATION = 1.6; // boost the texture's colour
 const FOOT_REAL_M = 0.7;        // stylised footprint length in metres (fixed; scales
                                 // with zoom, NOT with spacing, so spacing = density)
 
@@ -74,7 +75,6 @@ export default function FootprintsPage() {
   const [fpSettings, setFpSettings] = useState(null);   // per-mode config (same source as admin)
   const [now, setNow] = useState(Date.now());
   const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);
-  const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM }), []);
   const mapRef = useRef(null);
   const textureRef = useRef(null);
   const mountedRef = useRef(true);
@@ -209,7 +209,7 @@ export default function FootprintsPage() {
         Object.assign(div.style, {
           position: 'absolute', pointerEvents: 'none',
           backgroundImage: `url("${TEXTURE_URL}")`, backgroundSize: 'cover', backgroundPosition: 'center',
-          opacity: String(TEXTURE_OPACITY),
+          opacity: String(TEXTURE_OPACITY), filter: `saturate(${TEXTURE_SATURATION})`,
         });
         this.getPanes().overlayLayer.appendChild(div);
       };
@@ -312,8 +312,6 @@ export default function FootprintsPage() {
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: 'calc(100% + 34px)' }}
-            center={cam.center}
-            zoom={cam.zoom}
             onLoad={onLoad}
             options={mapOptions}
           >
