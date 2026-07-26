@@ -73,6 +73,7 @@ export default function FootprintsPage() {
   const { user } = useAuth();
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
+  const [fpSettings, setFpSettings] = useState(null);   // per-mode config (same source as admin)
   const [now, setNow] = useState(Date.now());
   const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);
   const cam = useMemo(() => ({ center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM }), []);
@@ -107,7 +108,20 @@ export default function FootprintsPage() {
     return () => clearInterval(id);
   }, []);
 
-  const settings = trail.settings || {};
+  // Load the per-mode config from the SAME endpoint the admin writes to, so admin
+  // edits (spacing / fade / trail length) actually reach the map. Polled so changes
+  // show within a few seconds.
+  const loadSettings = useCallback(() => api.footprints.settings()
+    .then((s) => { if (mountedRef.current) setFpSettings(s); })
+    .catch(() => {}), []);
+  useEffect(() => {
+    loadSettings();
+    const id = setInterval(loadSettings, 4000);
+    return () => clearInterval(id);
+  }, [loadSettings]);
+
+  // Simulation is EXTERNAL (outdoor) only — it always uses the outdoor config.
+  const settings = fpSettings?.outdoor || {};
   const fadeMs = Math.max(1000, (Number(settings.fade_seconds) || 900) * 1000);
 
   // Footprints are placed ONCE at fixed positions as the walker advances, and never
@@ -263,6 +277,7 @@ export default function FootprintsPage() {
   // you see the fade gradient at once), then keep walking a live head that drops a
   // fresh print every ~1.2s and ages old ones out — the full look, no GPS needed.
   const startSim = useCallback(() => {
+    loadSettings();   // use the latest admin config immediately
     const c = mapRef.current?.getCenter?.();
     const center = c ? { lat: c.lat(), lng: c.lng() } : DEFAULT_CENTER;
     const RAW_STEP = 0.9;   // metres between raw path points (≈ one print each)
@@ -289,7 +304,7 @@ export default function FootprintsPage() {
       setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fade));
     }, 550);
     setSim(true);
-  }, [fadeMs]);
+  }, [fadeMs, loadSettings]);
 
   const stopSim = useCallback(() => {
     if (simRef.current?.timer) clearInterval(simRef.current.timer);
