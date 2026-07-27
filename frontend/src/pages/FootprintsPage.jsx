@@ -6,6 +6,7 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import { MARAUDERS_STYLE, PARCHMENT, ROUTE } from '../lib/marauderMapStyle.js';
 import { createFloorplanOverlay } from '../lib/floorplanOverlay.js';
 import { isSimOn, subscribeSim } from '../lib/footprintsSim.js';
+import { isCalibratorShown, subscribeCalibrator } from '../lib/footprintsCalibrator.js';
 import FloorplanControls from './FloorplanControls.jsx';
 
 /*
@@ -35,7 +36,6 @@ const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM
 // Katie's house floorplan overlay (blinco_floorplan.svg). ASPECT = viewBox H / W.
 // DEFAULT_CAL is the best-guess georeferencing; David tunes it live with the on-map
 // calibrator (drag / rotate / scale) and the locked-in numbers get baked in here.
-const SHOW_CALIBRATOR = true;   // re-shown so David can dial the map rotation; flip false when set
 const FLOORPLAN_URL = '/blinco_floorplan.svg?v=3';
 const FLOORPLAN_ASPECT = 835.44 / 407.04;
 const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
@@ -216,6 +216,9 @@ export default function FootprintsPage() {
   // House floorplan overlay + its live calibration (drag/rotate/scale on the map).
   const [cal, setCal] = useState(loadCal);
   const [calibrating, setCalibrating] = useState(false);
+  // Whether the on-map "Calibrate floorplan" button shows — toggled from Admin.
+  const [showCalibrator, setShowCalibrator] = useState(isCalibratorShown);
+  useEffect(() => subscribeCalibrator(setShowCalibrator), []);
   const calRef = useRef(cal); calRef.current = cal;
   const floorplanRef = useRef(null);
   useEffect(() => {
@@ -549,9 +552,8 @@ export default function FootprintsPage() {
         }}
       />
 
-      {/* Floorplan calibrator — hidden now the placement is set. Flip SHOW_CALIBRATOR
-          to true to re-enable the drag/rotate/scale + default-view controls. */}
-      {SHOW_CALIBRATOR && (
+      {/* Floorplan calibrator — its visibility is toggled from Admin → Marauder's Map. */}
+      {showCalibrator && (
         <FloorplanControls
           cal={cal}
           setCal={setCal}

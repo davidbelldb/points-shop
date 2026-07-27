@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { startFootprints, stopFootprints, isFootprintsTracking } from '../lib/footprintsTracker.js';
 import { isSimOn, setSimOn } from '../lib/footprintsSim.js';
+import { isCalibratorShown, setCalibratorShown } from '../lib/footprintsCalibrator.js';
 
 /*
  * Admin controls for the "Marauder's Map" footprints trail. Each mode ('outdoor'
@@ -71,6 +72,13 @@ export default function AdminFootprintsSection() {
     setSimOnState(next);
   }
 
+  const [calShown, setCalShown] = useState(isCalibratorShown());
+  function toggleCalibrator() {
+    const next = !calShown;
+    setCalibratorShown(next);
+    setCalShown(next);
+  }
+
   async function load() {
     try { setSettings(await api.footprints.settings()); }
     catch (e) { setError(e.message); }
@@ -127,6 +135,22 @@ export default function AdminFootprintsSection() {
           className={`rounded-full px-4 py-1.5 text-sm font-semibold ${simOn ? 'bg-neutral-800 text-white' : 'bg-amber-600 text-white'}`}
         >
           {simOn ? 'Stop simulation' : 'Simulate'}
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 p-3">
+        <div>
+          <p className="text-sm font-semibold">Calibrate button</p>
+          <p className="text-[11px] text-neutral-400">
+            {calShown ? 'The “Calibrate floorplan” button is shown on the map.' : 'Hidden — placement is locked in.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleCalibrator}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold ${calShown ? 'bg-neutral-800 text-white' : 'bg-neutral-200 text-neutral-700'}`}
+        >
+          {calShown ? 'Hide' : 'Show'}
         </button>
       </div>
 
