@@ -394,6 +394,7 @@ export default function StoryViewer({ stories: initialStories, initialIndex = 0,
 
   return (
     <div
+      data-no-ptr
       className={`fixed inset-0 z-50 flex flex-col ${isDark ? 'bg-black text-white' : 'bg-white text-neutral-900'}`}
       style={{ height: '100dvh', width: '100vw' }}
     >

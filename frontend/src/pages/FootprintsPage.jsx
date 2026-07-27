@@ -360,7 +360,7 @@ export default function FootprintsPage() {
   const head = feet.length ? feet[feet.length - 1] : null;
 
   return (
-    <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
+    <div data-no-ptr style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
       <style>{'@keyframes mmFootFade{from{opacity:1}to{opacity:0}}@keyframes mmFootIn{from{opacity:0}to{opacity:1}}'}</style>
       {isLoaded && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>

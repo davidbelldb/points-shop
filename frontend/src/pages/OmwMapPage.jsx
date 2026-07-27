@@ -285,7 +285,7 @@ export default function OmwMapPage() {
   }), []);
 
   return (
-    <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: GREY, overscrollBehavior: 'none' }}>
+    <div data-no-ptr style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: GREY, overscrollBehavior: 'none' }}>
       {/* The map is oversized below the visible area and this wrapper clips the
           overflow, pushing Google's bottom badge + "Map data / Terms" row off the
           bottom edge (the "Keyboard shortcuts" link is removed via options). */}

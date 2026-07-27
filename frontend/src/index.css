@@ -154,7 +154,11 @@ img, video {
 html { overflow-x: clip; -webkit-text-size-adjust: 100%; }
 body { overflow-x: clip; max-width: 100%; -webkit-text-size-adjust: 100%; }
 #root { overflow-x: clip; }
-body { overscroll-behavior: none; }
+/* Kill the browser's own pull-to-refresh / overscroll glow site-wide (native
+   shell uses the custom PullToRefresh component, which opts out of maps/stories
+   via [data-no-ptr]). Set on BOTH html and body so whichever the browser treats
+   as the scroller is covered. */
+html, body { overscroll-behavior: none; }
 
 /* ── Safe-area helpers for full-screen modal sheets ──────────────────────────
    On phones a modal sheet is edge-to-edge, so its header (Cancel / Save / Post

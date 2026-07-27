@@ -303,7 +303,7 @@ export default function CrowTrackerPage() {
   const focusProgress = progressOf(focusFlight);
 
   return (
-    <div style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
+    <div data-no-ptr style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
       {isLoaded && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           <GoogleMap

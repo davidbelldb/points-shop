@@ -29,6 +29,14 @@ export default function PullToRefresh() {
   // refresh spinner never flashes while pulling the drawer out.
   const EDGE_ZONE = 32;
 
+  // Surfaces that OWN their vertical drags and must never arm a refresh: any
+  // Google map (`.gm-style` — the footprints / crow-tracker / OMW / timeline maps,
+  // where a downward pan would otherwise trigger a reload since the page is
+  // full-screen and "at top"), plus anything explicitly opted out with
+  // `data-no-ptr` (the full-screen story viewer, etc.). One check here disables
+  // pull-to-refresh across all of them site-wide.
+  const NO_PTR = '.gm-style, [data-no-ptr]';
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return undefined;
     const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
@@ -51,7 +59,8 @@ export default function PullToRefresh() {
 
     const onStart = (e) => {
       const x = e.touches[0].clientX;
-      if (refreshing || !atTop() || x <= EDGE_ZONE || x >= window.innerWidth - EDGE_ZONE || innerScrolled(e.target)) {
+      const optedOut = e.target instanceof Element && e.target.closest(NO_PTR);
+      if (refreshing || !atTop() || optedOut || x <= EDGE_ZONE || x >= window.innerWidth - EDGE_ZONE || innerScrolled(e.target)) {
         active.current = false; return;
       }
       start.current = e.touches[0].clientY;
