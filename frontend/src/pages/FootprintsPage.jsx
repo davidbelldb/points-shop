@@ -24,9 +24,8 @@ const MODE = 'outdoor';
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const FOLLOW_ZOOM = 20;         // footprint SIZING reference (do not change — it sets the print size)
 const DEFAULT_ZOOM = 22;        // open as zoomed-in as the map allows (Google clamps to its true max)
-const SIM_START = { lat: 52.185869, lng: 0.142019 };  // simulator walks around here (Katie's house)
-const SIM_RADIUS_M = 6;         // keep the simulated wander within ~6 m of SIM_START (house-scale, stays framed at max zoom)
 const SIM_SPACING_M = 0.4;      // tight house-scale stride between simulated prints (real GPS uses the admin spacing)
+const SVG_W = 407, SVG_H = 835; // floorplan raster resolution for the wall-collision mask (≈ viewBox)
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
@@ -36,7 +35,7 @@ const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM
 // DEFAULT_CAL is the best-guess georeferencing; David tunes it live with the on-map
 // calibrator (drag / rotate / scale) and the locked-in numbers get baked in here.
 const SHOW_CALIBRATOR = true;   // re-shown so David can dial the map rotation; flip false when set
-const FLOORPLAN_URL = '/blinco_floorplan.svg';
+const FLOORPLAN_URL = '/blinco_floorplan.svg?v=3';
 const FLOORPLAN_ASPECT = 835.44 / 407.04;
 const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
 // mapHeading rotates the WHOLE map (roads + floorplan + footprints) so Katie's house
@@ -169,12 +168,45 @@ export default function FootprintsPage() {
     setCal((prev) => ({ ...prev, viewLat: c.lat(), viewLng: c.lng(), viewZoom: m.getZoom() }));
   }, []);
 
-  // Web-testing simulator: a fake walk around Katie's house so the trail can be
-  // seen without GPS. Bounded random walk near SIM_START, one print per step.
+  // Web-testing simulator: a fake walk THROUGH Katie's house so the trail can be seen
+  // without GPS. The walker respects the floorplan — it can't cross a wall (a drawn
+  // line in the SVG) but passes freely through doorway gaps (transparent), one print
+  // per step. See startSim.
   const [sim, setSim] = useState(false);
   const [simPings, setSimPings] = useState([]);
   const simRef = useRef(null);
   useEffect(() => () => { if (simRef.current?.timer) clearInterval(simRef.current.timer); }, []);
+
+  // Rasterise the floorplan SVG once into a WALL MASK: a drawn (opaque) pixel = wall,
+  // a transparent pixel = walkable room / doorway. The simulator tests candidate steps
+  // against this so footprints never walk through walls. Built from the same-origin SVG
+  // (with an injected width/height so it rasterises at a known size, untainted).
+  const wallMaskRef = useRef(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const svgText = await (await fetch(FLOORPLAN_URL)).text();
+        const sized = svgText.replace('<svg', `<svg width="${SVG_W}" height="${SVG_H}"`);
+        const url = URL.createObjectURL(new Blob([sized], { type: 'image/svg+xml' }));
+        const img = new Image();
+        img.onload = () => {
+          if (cancelled) { URL.revokeObjectURL(url); return; }
+          const cv = document.createElement('canvas'); cv.width = SVG_W; cv.height = SVG_H;
+          const ctx = cv.getContext('2d');
+          ctx.drawImage(img, 0, 0, SVG_W, SVG_H);
+          const px = ctx.getImageData(0, 0, SVG_W, SVG_H).data;
+          const mask = new Uint8Array(SVG_W * SVG_H);
+          for (let i = 0; i < mask.length; i += 1) mask[i] = px[i * 4 + 3] > 40 ? 1 : 0;
+          wallMaskRef.current = mask;
+          URL.revokeObjectURL(url);
+        };
+        img.onerror = () => URL.revokeObjectURL(url);
+        img.src = url;
+      } catch { /* no mask → walker just stays within the SVG rectangle */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Poll the broadcaster's trail; a local clock fades the prints between polls.
   useEffect(() => {
@@ -337,32 +369,59 @@ export default function FootprintsPage() {
     el.style.animationDelay = `-${age}ms`;
   }, []);
 
-  // Simulator: walk around Katie's house (bounded random walk near SIM_START),
-  // dropping exactly ONE print per tick (L, R, L, R…). Steers back toward the start
-  // whenever it drifts past SIM_RADIUS_M so the trail stays over the floorplan.
+  // Simulator: walk THROUGH the house, one tight print per tick (L, R, L, R…). Each
+  // candidate step is tested against the wall mask — it can't cross a drawn wall, but
+  // walks freely through transparent doorway gaps (even sharp 90° turns, because it
+  // retries other headings until it finds a clear one). Starts at the floorplan centre.
   const startSim = useCallback(() => {
     loadSettings();
-    const stride = SIM_SPACING_M;   // one tight house-scale step per tick (matches ingest spacing → 1 print/tick)
-    const s = { lat: SIM_START.lat, lng: SIM_START.lng, heading: Math.random() * 360, timer: null };
+    const stride = SIM_SPACING_M;
+    const c0 = calRef.current;
+    const s = { lat: c0.lat, lng: c0.lng, heading: Math.random() * 360, timer: null };
     simRef.current = s;
     setSimPings([{ lat: s.lat, lng: s.lng, t: Date.now() }]);
-    const m = mapRef.current;
-    if (m) { m.setCenter(SIM_START); }
+
+    // (lat,lng) → floorplan-SVG pixel, using the live calibration (centre, size, rotation).
+    const toSvg = (lat, lng) => {
+      const cal0 = calRef.current;
+      const halfW = (Number(cal0.widthM) || 6) / 2;
+      const halfH = ((Number(cal0.widthM) || 6) * FLOORPLAN_ASPECT) / 2;
+      const rr = ((cal0.rotationDeg || 0) * Math.PI) / 180;
+      const dN = (lat - cal0.lat) * 111320;
+      const dE = (lng - cal0.lng) * 111320 * Math.cos((cal0.lat * Math.PI) / 180);
+      const lx = dE * Math.cos(rr) - dN * Math.sin(rr);
+      const ly = -dE * Math.sin(rr) - dN * Math.cos(rr);
+      return { sx: ((lx + halfW) / (2 * halfW)) * SVG_W, sy: ((ly + halfH) / (2 * halfH)) * SVG_H };
+    };
+    const hitsWall = (sx, sy) => {
+      const x = Math.round(sx); const y = Math.round(sy);
+      if (x < 0 || y < 0 || x >= SVG_W || y >= SVG_H) return true;   // outside the plan = blocked
+      const mask = wallMaskRef.current;
+      return mask ? mask[y * SVG_W + x] === 1 : false;               // no mask yet → only the rectangle bounds
+    };
+    // Does the step from the walker to (lat,lng) cross a wall? Sample along it in SVG space.
+    const stepBlocked = (lat2, lng2) => {
+      const a = toSvg(s.lat, s.lng); const b = toSvg(lat2, lng2);
+      const n = Math.max(2, Math.ceil(Math.hypot(b.sx - a.sx, b.sy - a.sy)));
+      for (let i = 1; i <= n; i += 1) { const t = i / n; if (hitsWall(a.sx + (b.sx - a.sx) * t, a.sy + (b.sy - a.sy) * t)) return true; }
+      return false;
+    };
+
     s.timer = setInterval(() => {
       const st = simRef.current; if (!st) return;
-      const here = { lat: st.lat, lng: st.lng };
-      if (haversineM(here, SIM_START) > SIM_RADIUS_M) {
-        st.heading = bearingDeg(here, SIM_START) + (Math.random() - 0.5) * 40;   // turn back toward the house
-      } else {
-        st.heading += (Math.random() - 0.5) * 35;   // gentle meander
+      let moved = false;
+      for (let attempt = 0; attempt < 16; attempt += 1) {
+        // Prefer carrying straight on (small wobble); if blocked, try ever-wider turns.
+        const h = attempt === 0 ? st.heading + (Math.random() - 0.5) * 20 : Math.random() * 360;
+        const p = moveLatLng(st.lat, st.lng, stride, h);
+        if (!stepBlocked(p.lat, p.lng)) { st.lat = p.lat; st.lng = p.lng; st.heading = h; moved = true; break; }
       }
-      const p = moveLatLng(st.lat, st.lng, stride, st.heading);
-      st.lat = p.lat; st.lng = p.lng;
+      if (!moved) { st.heading = (st.heading + 150 + Math.random() * 60) % 360; return; }   // boxed in — turn, skip this tick
       const tnow = Date.now();
-      setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fadeMs));
+      setSimPings((prev) => [...prev, { lat: st.lat, lng: st.lng, t: tnow }].filter((pp) => pp.t >= tnow - fadeMs));
     }, 1050);
     setSim(true);
-  }, [fadeMs, loadSettings, settings.spacing_m]);
+  }, [fadeMs, loadSettings]);
 
   const stopSim = useCallback(() => {
     if (simRef.current?.timer) clearInterval(simRef.current.timer);
