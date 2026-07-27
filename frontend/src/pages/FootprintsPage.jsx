@@ -132,6 +132,72 @@ function moveLatLng(lat, lng, distM, bearing) {
   return { lat: toDeg(la2), lng: toDeg(lo2) };
 }
 
+// ── Floorplan collision (shared by the simulator AND real GPS) ────────────────
+// A wall mask is the floorplan SVG rasterised to SVG_W×SVG_H, 1 = wall (drawn),
+// 0 = walkable (transparent room / doorway). `cal` gives the georeferencing.
+const CONSTRAIN_REAL_TO_HOUSE = true;   // snap real GPS prints into the house + off walls
+const HOUSE_GATE_M = 25;                // only constrain GPS pings within 25 m of the house (else it's outdoors)
+
+function latLngToSvg(lat, lng, cal) {
+  const halfW = (Number(cal.widthM) || 6) / 2;
+  const halfH = ((Number(cal.widthM) || 6) * FLOORPLAN_ASPECT) / 2;
+  const rr = ((cal.rotationDeg || 0) * Math.PI) / 180;
+  const dN = (lat - cal.lat) * 111320;
+  const dE = (lng - cal.lng) * 111320 * Math.cos((cal.lat * Math.PI) / 180);
+  const lx = dE * Math.cos(rr) - dN * Math.sin(rr);
+  const ly = -dE * Math.sin(rr) - dN * Math.cos(rr);
+  return { sx: ((lx + halfW) / (2 * halfW)) * SVG_W, sy: ((ly + halfH) / (2 * halfH)) * SVG_H };
+}
+function svgToLatLng(sx, sy, cal) {
+  const halfW = (Number(cal.widthM) || 6) / 2;
+  const halfH = ((Number(cal.widthM) || 6) * FLOORPLAN_ASPECT) / 2;
+  const rr = ((cal.rotationDeg || 0) * Math.PI) / 180;
+  const lx = (sx / SVG_W) * 2 * halfW - halfW;
+  const ly = (sy / SVG_H) * 2 * halfH - halfH;
+  const dE = lx * Math.cos(rr) - ly * Math.sin(rr);      // R is its own inverse (reflection)
+  const dN = -lx * Math.sin(rr) - ly * Math.cos(rr);
+  return { lat: cal.lat + dN / 111320, lng: cal.lng + dE / (111320 * Math.cos((cal.lat * Math.PI) / 180)) };
+}
+function isWallAt(mask, sx, sy) {
+  const x = Math.round(sx); const y = Math.round(sy);
+  if (x < 0 || y < 0 || x >= SVG_W || y >= SVG_H) return true;   // outside the plan = blocked
+  return mask ? mask[y * SVG_W + x] === 1 : false;               // no mask → only the rectangle bounds
+}
+// Does the straight line a→b cross a wall (sampled in SVG space)?
+function pathHitsWall(aLat, aLng, bLat, bLng, cal, mask) {
+  const a = latLngToSvg(aLat, aLng, cal); const b = latLngToSvg(bLat, bLng, cal);
+  const n = Math.max(2, Math.ceil(Math.hypot(b.sx - a.sx, b.sy - a.sy)));
+  for (let i = 1; i <= n; i += 1) { const t = i / n; if (isWallAt(mask, a.sx + (b.sx - a.sx) * t, a.sy + (b.sy - a.sy) * t)) return true; }
+  return false;
+}
+// Nearest walkable pixel to (sx,sy) within maxR (spiral). Clamps into bounds first.
+function nearestWalkable(mask, sx, sy, maxR) {
+  let x = Math.max(0, Math.min(SVG_W - 1, Math.round(sx)));
+  let y = Math.max(0, Math.min(SVG_H - 1, Math.round(sy)));
+  if (!mask || mask[y * SVG_W + x] === 0) return { sx: x, sy: y };
+  for (let r = 1; r <= maxR; r += 1) {
+    for (let dx = -r; dx <= r; dx += 1) {
+      for (let dy = -r; dy <= r; dy += 1) {
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;   // ring only
+        const nx = x + dx; const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= SVG_W || ny >= SVG_H) continue;
+        if (mask[ny * SVG_W + nx] === 0) return { sx: nx, sy: ny };
+      }
+    }
+  }
+  return null;
+}
+// Snap a real GPS (lat,lng) into the house: leave it alone if it's clearly outdoors,
+// otherwise clamp into the SVG bounds and off any wall into the nearest room.
+function constrainToHouse(lat, lng, cal, mask) {
+  const dN = (lat - cal.lat) * 111320;
+  const dE = (lng - cal.lng) * 111320 * Math.cos((cal.lat * Math.PI) / 180);
+  if (Math.hypot(dE, dN) > HOUSE_GATE_M) return { lat, lng };     // far from the house — real outdoor GPS
+  const { sx, sy } = latLngToSvg(lat, lng, cal);
+  const w = nearestWalkable(mask, sx, sy, 90);
+  return w ? svgToLatLng(w.sx, w.sy, cal) : { lat, lng };
+}
+
 export default function FootprintsPage() {
   const { user } = useAuth();
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
@@ -259,13 +325,20 @@ export default function FootprintsPage() {
     // The simulator uses a tight house-scale stride; real GPS uses the admin spacing.
     const spacing = sim ? SIM_SPACING_M : Math.max(0.2, Number(settings.spacing_m) || 0.75);
     const offset = spacing * 0.3;   // L/R stance offset, in real metres (feet closer together)
+    // Real GPS prints are snapped into the house (inside the SVG bounds + off any wall)
+    // and segments that would cut through a wall are skipped. Sim prints are already
+    // valid, so we leave those alone.
+    const constrain = CONSTRAIN_REAL_TO_HOUSE && !sim;
+    const cal0 = calRef.current; const mask = wallMaskRef.current;
     const acc = accRef.current;
     let prev = acc.last; let changed = false;
-    for (const pt of (sourcePings || [])) {
-      if (pt.t <= acc.lastT) continue;
+    for (const rawPt of (sourcePings || [])) {
+      if (rawPt.t <= acc.lastT) continue;
+      const pt = constrain ? { ...rawPt, ...constrainToHouse(rawPt.lat, rawPt.lng, cal0, mask) } : rawPt;
       if (!prev) { prev = pt; acc.lastT = pt.t; acc.residual = 0; continue; }
       const segLen = haversineM(prev, pt);
-      if (segLen > 0) {
+      const wallBetween = constrain && mask && pathHitsWall(prev.lat, prev.lng, pt.lat, pt.lng, cal0, mask);
+      if (segLen > 0 && !wallBetween) {
         const bearing = bearingDeg(prev, pt);
         let along = spacing - acc.residual;
         while (along <= segLen + 1e-6) {
@@ -273,11 +346,18 @@ export default function FootprintsPage() {
           const lat = prev.lat + (pt.lat - prev.lat) * f;
           const lng = prev.lng + (pt.lng - prev.lng) * f;
           const side = acc.step % 2 === 0 ? -1 : 1;
-          const o = moveLatLng(lat, lng, offset, bearing + 90 * side);
+          let o = moveLatLng(lat, lng, offset, bearing + 90 * side);
+          if (constrain && mask) {   // keep the stance-offset print off a wall too
+            const sp = latLngToSvg(o.lat, o.lng, cal0);
+            const w = nearestWalkable(mask, sp.sx, sp.sy, 18);
+            if (w) o = svgToLatLng(w.sx, w.sy, cal0);
+          }
           feetRef.current.push({ id: acc.step, lat: o.lat, lng: o.lng, angle: bearing + jitterFor(lat, lng), side, t: pt.t });
           acc.step += 1; along += spacing; changed = true;
         }
         acc.residual = segLen - (along - spacing);
+      } else if (wallBetween) {
+        acc.residual = 0;   // don't carry the stride across a wall
       }
       prev = pt; acc.lastT = pt.t;
     }
@@ -382,40 +462,15 @@ export default function FootprintsPage() {
     simRef.current = s;
     setSimPings([{ lat: s.lat, lng: s.lng, t: Date.now() }]);
 
-    // (lat,lng) → floorplan-SVG pixel, using the live calibration (centre, size, rotation).
-    const toSvg = (lat, lng) => {
-      const cal0 = calRef.current;
-      const halfW = (Number(cal0.widthM) || 6) / 2;
-      const halfH = ((Number(cal0.widthM) || 6) * FLOORPLAN_ASPECT) / 2;
-      const rr = ((cal0.rotationDeg || 0) * Math.PI) / 180;
-      const dN = (lat - cal0.lat) * 111320;
-      const dE = (lng - cal0.lng) * 111320 * Math.cos((cal0.lat * Math.PI) / 180);
-      const lx = dE * Math.cos(rr) - dN * Math.sin(rr);
-      const ly = -dE * Math.sin(rr) - dN * Math.cos(rr);
-      return { sx: ((lx + halfW) / (2 * halfW)) * SVG_W, sy: ((ly + halfH) / (2 * halfH)) * SVG_H };
-    };
-    const hitsWall = (sx, sy) => {
-      const x = Math.round(sx); const y = Math.round(sy);
-      if (x < 0 || y < 0 || x >= SVG_W || y >= SVG_H) return true;   // outside the plan = blocked
-      const mask = wallMaskRef.current;
-      return mask ? mask[y * SVG_W + x] === 1 : false;               // no mask yet → only the rectangle bounds
-    };
-    // Does the step from the walker to (lat,lng) cross a wall? Sample along it in SVG space.
-    const stepBlocked = (lat2, lng2) => {
-      const a = toSvg(s.lat, s.lng); const b = toSvg(lat2, lng2);
-      const n = Math.max(2, Math.ceil(Math.hypot(b.sx - a.sx, b.sy - a.sy)));
-      for (let i = 1; i <= n; i += 1) { const t = i / n; if (hitsWall(a.sx + (b.sx - a.sx) * t, a.sy + (b.sy - a.sy) * t)) return true; }
-      return false;
-    };
-
     s.timer = setInterval(() => {
       const st = simRef.current; if (!st) return;
+      const cal0 = calRef.current; const mask = wallMaskRef.current;
       let moved = false;
       for (let attempt = 0; attempt < 16; attempt += 1) {
         // Prefer carrying straight on (small wobble); if blocked, try ever-wider turns.
         const h = attempt === 0 ? st.heading + (Math.random() - 0.5) * 20 : Math.random() * 360;
         const p = moveLatLng(st.lat, st.lng, stride, h);
-        if (!stepBlocked(p.lat, p.lng)) { st.lat = p.lat; st.lng = p.lng; st.heading = h; moved = true; break; }
+        if (!pathHitsWall(st.lat, st.lng, p.lat, p.lng, cal0, mask)) { st.lat = p.lat; st.lng = p.lng; st.heading = h; moved = true; break; }
       }
       if (!moved) { st.heading = (st.heading + 150 + Math.random() * 60) % 360; return; }   // boxed in — turn, skip this tick
       const tnow = Date.now();
