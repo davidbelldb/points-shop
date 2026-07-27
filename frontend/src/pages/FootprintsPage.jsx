@@ -25,7 +25,7 @@ const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const FOLLOW_ZOOM = 20;         // footprint SIZING reference (do not change — it sets the print size)
 const DEFAULT_ZOOM = 22;        // open as zoomed-in as the map allows (Google clamps to its true max)
 const SIM_START = { lat: 52.185869, lng: 0.142019 };  // simulator walks around here (Katie's house)
-const SIM_RADIUS_M = 12;        // keep the simulated wander within ~12 m of SIM_START
+const SIM_RADIUS_M = 6;         // keep the simulated wander within ~6 m of SIM_START (house-scale, stays framed at max zoom)
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
@@ -136,7 +136,6 @@ export default function FootprintsPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
   const [fpSettings, setFpSettings] = useState(null);   // per-mode config (same source as admin)
-  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);  // drives the zoom-invariant layout
   const mapRef = useRef(null);
   const textureRef = useRef(null);
   const mountedRef = useRef(true);
@@ -276,7 +275,6 @@ export default function FootprintsPage() {
     const v = calRef.current;
     m.setCenter({ lat: v.viewLat ?? DEFAULT_CENTER.lat, lng: v.viewLng ?? DEFAULT_CENTER.lng });
     m.setZoom(v.viewZoom ?? DEFAULT_ZOOM);
-    m.addListener('zoom_changed', () => setMapZoom(m.getZoom()));
 
     // House floorplan overlay (mapPane = below the footprints, so the trail runs on
     // top of the house). Dragging while calibrating moves it up to the event pane.
@@ -376,16 +374,6 @@ export default function FootprintsPage() {
     return <Navigate to="/" replace />;
   }
 
-  // ZOOM-INVARIANT LAYOUT. Prints are stored at their true positions, but we DISPLAY
-  // them scaled outward from the newest print (the "head") by 2^(FOLLOW_ZOOM - zoom).
-  // That exactly cancels the map's own scaling, so every footprint keeps the same
-  // on-screen SIZE and the same on-screen GAP at every zoom level — the trail looks
-  // identical zoomed all the way in or all the way out (it never collapses to a blob
-  // or loses prints). At the follow zoom the factor is 1, i.e. true positions. Uses
-  // the exact (unrounded) zoom so the scaling cancels continuously — no snapping.
-  const zoomK = 2 ** (FOLLOW_ZOOM - mapZoom);
-  const head = feet.length ? feet[feet.length - 1] : null;
-
   // Only wrap the map in a transformed container when a rotation is actually set —
   // a CSS-transformed ancestor can upset Google Maps' tile rendering, so with no
   // rotation (the usual case) the map sits in a plain container and renders cleanly.
@@ -408,13 +396,12 @@ export default function FootprintsPage() {
             onLoad={onLoad}
             options={mapOptions}
           >
-            {feet.map((p) => {
-              const lat = head ? head.lat + (p.lat - head.lat) * zoomK : p.lat;
-              const lng = head ? head.lng + (p.lng - head.lng) * zoomK : p.lng;
-              return (
-                <Footprint key={p.id} lat={lat} lng={lng} angle={p.angle} side={p.side} t={p.t} applyFade={applyFade} />
-              );
-            })}
+            {/* Prints render at their REAL positions (pinned to the map / floorplan),
+                so adding a new one never disturbs the others — one fades in, the old
+                ones stay put and fade out. Smooth and identical at every zoom. */}
+            {feet.map((p) => (
+              <Footprint key={p.id} lat={p.lat} lng={p.lng} angle={p.angle} side={p.side} t={p.t} applyFade={applyFade} />
+            ))}
           </GoogleMap>
           </div>
         </div>
