@@ -5,6 +5,8 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle.js';
 import { startFootprints, stopFootprints } from '../lib/footprintsTracker.js';
+import { createFloorplanOverlay } from '../lib/floorplanOverlay.js';
+import FloorplanControls from './FloorplanControls.jsx';
 
 /*
  * "Marauder's Map" — a fading trail of footprints tracing where the broadcaster
@@ -24,6 +26,18 @@ const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture 
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
 const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM (+25% again)
+
+// Katie's house floorplan overlay (blinco_floorplan.svg). ASPECT = viewBox H / W.
+// DEFAULT_CAL is the best-guess georeferencing; David tunes it live with the on-map
+// calibrator (drag / rotate / scale) and the locked-in numbers get baked in here.
+const FLOORPLAN_URL = '/blinco_floorplan.svg';
+const FLOORPLAN_ASPECT = 835.44 / 407.04;
+const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
+const DEFAULT_CAL = { lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95 };
+function loadCal() {
+  try { const v = JSON.parse(localStorage.getItem(FLOORPLAN_CAL_KEY)); if (v && Number.isFinite(v.lat)) return { ...DEFAULT_CAL, ...v }; } catch { /* ignore */ }
+  return DEFAULT_CAL;
+}
 
 // Metres-per-pixel at the follow zoom (reference). We render footprints at a FIXED
 // on-screen pixel size and place them at a FIXED on-screen spacing at EVERY zoom —
@@ -56,7 +70,7 @@ const Footprint = memo(function Footprint({ lat, lng, angle, side, t, applyFade 
   return (
     <OverlayViewF
       position={{ lat, lng }}
-      mapPaneName="mapPane"
+      mapPaneName="overlayLayer"
       getPixelPositionOffset={CENTER_OFFSET}
     >
       {/* Outer div = quick fade-IN; inner div = long fade-OUT. Nesting multiplies
@@ -124,6 +138,22 @@ export default function FootprintsPage() {
   // the map. No simulator, no indoor beacons — just the phone in David's pocket.
   const [tracking, setTracking] = useState(false);
   useEffect(() => () => { stopFootprints(); }, []);   // stop the watch if the page unmounts
+
+  // House floorplan overlay + its live calibration (drag/rotate/scale on the map).
+  const [cal, setCal] = useState(loadCal);
+  const [calibrating, setCalibrating] = useState(false);
+  const calRef = useRef(cal); calRef.current = cal;
+  const floorplanRef = useRef(null);
+  useEffect(() => {
+    floorplanRef.current?.update(cal);
+    try { localStorage.setItem(FLOORPLAN_CAL_KEY, JSON.stringify(cal)); } catch { /* ignore */ }
+  }, [cal]);
+  useEffect(() => { floorplanRef.current?.setInteractive(calibrating); }, [calibrating]);
+  useEffect(() => () => { floorplanRef.current?.destroy(); }, []);
+  const goToHouse = useCallback(() => {
+    const m = mapRef.current; const c = calRef.current;
+    if (m) { m.setZoom(FOLLOW_ZOOM); m.setCenter({ lat: c.lat, lng: c.lng }); }
+  }, []);
 
   // Poll the broadcaster's trail; a local clock fades the prints between polls.
   useEffect(() => {
@@ -232,8 +262,17 @@ export default function FootprintsPage() {
     m.setCenter(DEFAULT_CENTER); m.setZoom(FOLLOW_ZOOM);
     m.addListener('zoom_changed', () => setMapZoom(m.getZoom()));
 
-    // Parchment texture laid over the map at 40%, in the overlayLayer pane — which
-    // sits BELOW the marker pane, so the footprints render on top of the texture.
+    // House floorplan overlay (mapPane = below the footprints, so the trail runs on
+    // top of the house). Dragging while calibrating moves it up to the event pane.
+    if (window.google && !floorplanRef.current) {
+      floorplanRef.current = createFloorplanOverlay(m, {
+        svgUrl: FLOORPLAN_URL, aspect: FLOORPLAN_ASPECT, initial: calRef.current,
+        onChange: (c) => setCal(c),
+      });
+    }
+
+    // Parchment texture laid over the map at 40%, in the markerLayer pane — above the
+    // footprints (overlayLayer) and the floorplan (mapPane), so it tints the whole lot.
     if (window.google && !textureRef.current) {
       const ov = new window.google.maps.OverlayView();
       let div = null;
@@ -244,7 +283,7 @@ export default function FootprintsPage() {
           backgroundImage: `url("${TEXTURE_URL}")`, backgroundSize: 'cover', backgroundPosition: 'center',
           opacity: String(TEXTURE_OPACITY), filter: `saturate(${TEXTURE_SATURATION})`,
         });
-        this.getPanes().overlayLayer.appendChild(div);
+        this.getPanes().markerLayer.appendChild(div);
       };
       ov.draw = function draw() {
         const proj = this.getProjection(); const b = m.getBounds();
@@ -368,6 +407,15 @@ export default function FootprintsPage() {
       >
         {tracking ? 'End tracking' : 'Start tracking'}
       </button>
+
+      {/* Floorplan calibrator (admin only — the whole page is admin-gated). */}
+      <FloorplanControls
+        cal={cal}
+        setCal={setCal}
+        calibrating={calibrating}
+        setCalibrating={setCalibrating}
+        onGoToHouse={goToHouse}
+      />
     </div>
   );
 }
