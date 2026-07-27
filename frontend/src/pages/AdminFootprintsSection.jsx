@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { startFootprints, stopFootprints, isFootprintsTracking } from '../lib/footprintsTracker.js';
+import { isSimOn, setSimOn } from '../lib/footprintsSim.js';
 
 /*
  * Admin controls for the "Marauder's Map" footprints trail. Each mode ('outdoor'
@@ -57,10 +58,17 @@ export default function AdminFootprintsSection() {
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
   const [tracking, setTracking] = useState(isFootprintsTracking());
+  const [simOn, setSimOnState] = useState(isSimOn());
 
   function toggleTracking() {
     if (tracking) { stopFootprints(); setTracking(false); }
     else { startFootprints(); setTracking(true); }
+  }
+
+  function toggleSim() {
+    const next = !simOn;
+    setSimOn(next);
+    setSimOnState(next);
   }
 
   async function load() {
@@ -103,6 +111,22 @@ export default function AdminFootprintsSection() {
           className={`rounded-full px-4 py-1.5 text-sm font-semibold ${tracking ? 'bg-neutral-800 text-white' : 'bg-emerald-600 text-white'}`}
         >
           {tracking ? 'End tracking' : 'Start tracking'}
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 p-3">
+        <div>
+          <p className="text-sm font-semibold">Simulate footsteps</p>
+          <p className="text-[11px] text-neutral-400">
+            {simOn ? 'A fake walk is running through the house on the map.' : 'Fake a walk through the house (open the Marauder map to watch).'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleSim}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold ${simOn ? 'bg-neutral-800 text-white' : 'bg-amber-600 text-white'}`}
+        >
+          {simOn ? 'Stop simulation' : 'Simulate'}
         </button>
       </div>
 

@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { MARAUDERS_STYLE, PARCHMENT, ROUTE } from '../lib/marauderMapStyle.js';
 import { createFloorplanOverlay } from '../lib/floorplanOverlay.js';
+import { isSimOn, subscribeSim } from '../lib/footprintsSim.js';
 import FloorplanControls from './FloorplanControls.jsx';
 
 /*
@@ -430,6 +431,18 @@ export default function FootprintsPage() {
     setSim(false);
   }, []);
 
+  // The simulator is toggled from Admin → Marauder's Map. Mirror that flag here:
+  // start/stop the walk to match, and auto-start if it's already on when the map opens.
+  useEffect(() => {
+    const apply = (v) => {
+      const running = !!simRef.current;
+      if (v && !running) startSim();
+      else if (!v && running) stopSim();
+    };
+    apply(isSimOn());
+    return subscribeSim(apply);
+  }, [startSim, stopSim]);
+
   // Admin-only for now (David's private testing build; Katie kept out until ready).
   if (!(user?.actual_role === 'admin' || user?.role === 'admin')) {
     return <Navigate to="/" replace />;
@@ -480,21 +493,6 @@ export default function FootprintsPage() {
           animation: 'mmFootIn 2s ease-out 2s both',
         }}
       />
-
-      {/* Simulate footsteps (web testing) — bottom-centre. Walks around the house. */}
-      <button
-        type="button"
-        onClick={sim ? stopSim : startSim}
-        style={{
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 11,
-          border: 'none', borderRadius: 999, padding: '10px 20px', cursor: 'pointer',
-          background: sim ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 14, fontWeight: 700,
-          boxShadow: '0 6px 18px rgba(0,0,0,0.4)', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {sim ? 'Stop simulation' : 'Simulate footsteps'}
-      </button>
 
       {/* Floorplan calibrator — hidden now the placement is set. Flip SHOW_CALIBRATOR
           to true to re-enable the drag/rotate/scale + default-view controls. */}
