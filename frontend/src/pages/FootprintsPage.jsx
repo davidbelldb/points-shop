@@ -18,10 +18,12 @@ import FloorplanControls from './FloorplanControls.jsx';
  */
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
-const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
+// Katie's house — 52°11'08.9"N 0°08'31.2"E. The map opens here at max zoom.
+const DEFAULT_CENTER = { lat: 52.185806, lng: 0.142000 };
 const MODE = 'outdoor';
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
-const FOLLOW_ZOOM = 20;         // stay zoomed right in, following the walker
+const FOLLOW_ZOOM = 20;         // footprint SIZING reference (do not change — it sets the print size)
+const DEFAULT_ZOOM = 21;        // the zoom the map OPENS at (≈ max for a styled roadmap)
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
@@ -30,11 +32,13 @@ const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM
 // Katie's house floorplan overlay (blinco_floorplan.svg). ASPECT = viewBox H / W.
 // DEFAULT_CAL is the best-guess georeferencing; David tunes it live with the on-map
 // calibrator (drag / rotate / scale) and the locked-in numbers get baked in here.
-const SHOW_CALIBRATOR = false;  // floorplan placement is set — flip true to re-tune it
+const SHOW_CALIBRATOR = true;   // re-shown so David can dial the map rotation; flip false when set
 const FLOORPLAN_URL = '/blinco_floorplan.svg';
 const FLOORPLAN_ASPECT = 835.44 / 407.04;
 const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
-const DEFAULT_CAL = { lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95 };
+// mapHeading rotates the WHOLE map (roads + floorplan + footprints) so Katie's house
+// — which doesn't face true north — sits square on screen. Degrees clockwise.
+const DEFAULT_CAL = { lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95, mapHeading: 0 };
 function loadCal() {
   try { const v = JSON.parse(localStorage.getItem(FLOORPLAN_CAL_KEY)); if (v && Number.isFinite(v.lat)) return { ...DEFAULT_CAL, ...v }; } catch { /* ignore */ }
   return DEFAULT_CAL;
@@ -126,7 +130,7 @@ export default function FootprintsPage() {
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
   const [trail, setTrail] = useState({ pings: [], settings: null });
   const [fpSettings, setFpSettings] = useState(null);   // per-mode config (same source as admin)
-  const [mapZoom, setMapZoom] = useState(FOLLOW_ZOOM);  // drives the zoom-invariant layout
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);  // drives the zoom-invariant layout
   const mapRef = useRef(null);
   const textureRef = useRef(null);
   const mountedRef = useRef(true);
@@ -150,7 +154,7 @@ export default function FootprintsPage() {
   useEffect(() => () => { floorplanRef.current?.destroy(); }, []);
   const goToHouse = useCallback(() => {
     const m = mapRef.current; const c = calRef.current;
-    if (m) { m.setZoom(FOLLOW_ZOOM); m.setCenter({ lat: c.lat, lng: c.lng }); }
+    if (m) { m.setZoom(DEFAULT_ZOOM); m.setCenter({ lat: c.lat, lng: c.lng }); }
   }, []);
 
   // Poll the broadcaster's trail; a local clock fades the prints between polls.
@@ -252,12 +256,12 @@ export default function FootprintsPage() {
   useEffect(() => {
     if (!isLoaded || didCenterRef.current || !feet.length) return;
     const m = mapRef.current; const h = feet[feet.length - 1];
-    if (m && h && inUK(h)) { m.setZoom(FOLLOW_ZOOM); m.setCenter({ lat: h.lat, lng: h.lng }); didCenterRef.current = true; }
+    if (m && h && inUK(h)) { m.setZoom(DEFAULT_ZOOM); m.setCenter({ lat: h.lat, lng: h.lng }); didCenterRef.current = true; }
   }, [isLoaded, feet]);
 
   const onLoad = useCallback((m) => {
     mapRef.current = m;
-    m.setCenter(DEFAULT_CENTER); m.setZoom(FOLLOW_ZOOM);
+    m.setCenter(DEFAULT_CENTER); m.setZoom(DEFAULT_ZOOM);
     m.addListener('zoom_changed', () => setMapZoom(m.getZoom()));
 
     // House floorplan overlay (mapPane = below the footprints, so the trail runs on
@@ -301,7 +305,7 @@ export default function FootprintsPage() {
   }, []);
 
   const mapOptions = useMemo(() => ({
-    center: DEFAULT_CENTER, zoom: FOLLOW_ZOOM,
+    center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM,
     disableDefaultUI: true, keyboardShortcuts: false, gestureHandling: 'greedy',
     styles: MARAUDERS_STYLE, backgroundColor: PARCHMENT, clickableIcons: false,
   }), []);
@@ -339,8 +343,16 @@ export default function FootprintsPage() {
       <style>{'@keyframes mmFootFade{from{opacity:1}to{opacity:0}}@keyframes mmFootIn{from{opacity:0}to{opacity:1}}'}</style>
       {isLoaded && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          {/* Oversized (180%) so that rotating it never reveals empty corners; the
+              CSS rotation turns the whole map — roads, floorplan and footprints as
+              one — so Katie's not-quite-north house can sit square on screen. */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', width: '180%', height: '180%',
+            transformOrigin: 'center center',
+            transform: `translate(-50%, -50%) rotate(${cal.mapHeading || 0}deg)`,
+          }}>
           <GoogleMap
-            mapContainerStyle={{ width: '100%', height: 'calc(100% + 34px)' }}
+            mapContainerStyle={{ width: '100%', height: '100%' }}
             onLoad={onLoad}
             options={mapOptions}
           >
@@ -352,6 +364,7 @@ export default function FootprintsPage() {
               );
             })}
           </GoogleMap>
+          </div>
         </div>
       )}
 

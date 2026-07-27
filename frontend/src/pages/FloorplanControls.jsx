@@ -27,7 +27,7 @@ export default function FloorplanControls({ cal, setCal, calibrating, setCalibra
   const set = (k) => (e) => setCal((c) => ({ ...c, [k]: Number(e.target.value) }));
   const nudge = (k, d) => () => setCal((c) => ({ ...c, [k]: Number((c[k] + d).toFixed(6)) }));
 
-  const values = `lat: ${cal.lat.toFixed(6)}, lng: ${cal.lng.toFixed(6)}, widthM: ${cal.widthM}, rotationDeg: ${cal.rotationDeg}, opacity: ${cal.opacity}`;
+  const values = `lat: ${cal.lat.toFixed(6)}, lng: ${cal.lng.toFixed(6)}, widthM: ${cal.widthM}, rotationDeg: ${cal.rotationDeg}, opacity: ${cal.opacity}, mapHeading: ${cal.mapHeading ?? 0}`;
 
   if (!calibrating) {
     return (
@@ -62,7 +62,15 @@ export default function FloorplanControls({ cal, setCal, calibrating, setCalibra
 
       <p style={{ margin: '0 0 10px', fontSize: 12, opacity: 0.7 }}>Drag the floorplan on the map to move it.</p>
 
-      <Row label="Rotation" value={`${cal.rotationDeg}°`}>
+      <Row label="Map rotation (whole map)" value={`${cal.mapHeading ?? 0}°`}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button type="button" onClick={nudge('mapHeading', -0.5)} style={mini}>−</button>
+          <input type="range" min="-45" max="45" step="0.5" value={cal.mapHeading ?? 0} onChange={set('mapHeading')} style={{ flex: 1 }} />
+          <button type="button" onClick={nudge('mapHeading', 0.5)} style={mini}>+</button>
+        </div>
+      </Row>
+
+      <Row label="Floorplan rotation" value={`${cal.rotationDeg}°`}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button type="button" onClick={nudge('rotationDeg', -1)} style={mini}>−</button>
           <input type="range" min="0" max="359" step="1" value={cal.rotationDeg} onChange={set('rotationDeg')} style={{ flex: 1 }} />
