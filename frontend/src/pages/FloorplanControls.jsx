@@ -22,12 +22,12 @@ function Row({ label, value, children }) {
   );
 }
 
-export default function FloorplanControls({ cal, setCal, calibrating, setCalibrating, onGoToHouse }) {
+export default function FloorplanControls({ cal, setCal, calibrating, setCalibrating, onGoToHouse, onCaptureView }) {
   const [copied, setCopied] = useState(false);
   const set = (k) => (e) => setCal((c) => ({ ...c, [k]: Number(e.target.value) }));
   const nudge = (k, d) => () => setCal((c) => ({ ...c, [k]: Number((c[k] + d).toFixed(6)) }));
 
-  const values = `lat: ${cal.lat.toFixed(6)}, lng: ${cal.lng.toFixed(6)}, widthM: ${cal.widthM}, rotationDeg: ${cal.rotationDeg}, opacity: ${cal.opacity}, mapHeading: ${cal.mapHeading ?? 0}`;
+  const values = `lat: ${cal.lat.toFixed(6)}, lng: ${cal.lng.toFixed(6)}, widthM: ${cal.widthM}, rotationDeg: ${cal.rotationDeg}, opacity: ${cal.opacity}, mapHeading: ${cal.mapHeading ?? 0}, viewLat: ${(cal.viewLat ?? 0).toFixed(6)}, viewLng: ${(cal.viewLng ?? 0).toFixed(6)}, viewZoom: ${cal.viewZoom ?? 0}`;
 
   if (!calibrating) {
     return (
@@ -60,7 +60,14 @@ export default function FloorplanControls({ cal, setCal, calibrating, setCalibra
         </div>
       </div>
 
-      <p style={{ margin: '0 0 10px', fontSize: 12, opacity: 0.7 }}>Drag the floorplan on the map to move it.</p>
+      <p style={{ margin: '0 0 8px', fontSize: 12, opacity: 0.7 }}>Drag the floorplan on the map to move it.</p>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10, padding: '6px 8px', borderRadius: 10, background: 'rgba(0,0,0,0.05)' }}>
+        <span style={{ fontSize: 12 }}>
+          Default view <span style={{ opacity: 0.6 }}>· zoom {(cal.viewZoom ?? 0).toFixed ? (cal.viewZoom ?? 0).toFixed(1) : cal.viewZoom}</span>
+        </span>
+        <button type="button" onClick={onCaptureView} style={{ ...mini, background: ROUTE, color: '#fff' }}>Set current view</button>
+      </div>
 
       <Row label="Map rotation (whole map)" value={`${cal.mapHeading ?? 0}°`}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

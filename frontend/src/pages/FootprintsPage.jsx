@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { GoogleMap, OverlayViewF, useJsApiLoader } from '@react-google-maps/api';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
-import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle.js';
+import { MARAUDERS_STYLE, PARCHMENT, ROUTE } from '../lib/marauderMapStyle.js';
 import { createFloorplanOverlay } from '../lib/floorplanOverlay.js';
 import FloorplanControls from './FloorplanControls.jsx';
 
@@ -23,7 +23,9 @@ const DEFAULT_CENTER = { lat: 52.185806, lng: 0.142000 };
 const MODE = 'outdoor';
 const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const FOLLOW_ZOOM = 20;         // footprint SIZING reference (do not change — it sets the print size)
-const DEFAULT_ZOOM = 21;        // the zoom the map OPENS at (≈ max for a styled roadmap)
+const DEFAULT_ZOOM = 22;        // open as zoomed-in as the map allows (Google clamps to its true max)
+const SIM_START = { lat: 52.185869, lng: 0.142019 };  // simulator walks around here (Katie's house)
+const SIM_RADIUS_M = 12;        // keep the simulated wander within ~12 m of SIM_START
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
@@ -38,7 +40,11 @@ const FLOORPLAN_ASPECT = 835.44 / 407.04;
 const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
 // mapHeading rotates the WHOLE map (roads + floorplan + footprints) so Katie's house
 // — which doesn't face true north — sits square on screen. Degrees clockwise.
-const DEFAULT_CAL = { lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95, mapHeading: 0 };
+const DEFAULT_CAL = {
+  lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95, mapHeading: 0,
+  // The default view the map OPENS at — captured live from the calibrator.
+  viewLat: DEFAULT_CENTER.lat, viewLng: DEFAULT_CENTER.lng, viewZoom: DEFAULT_ZOOM,
+};
 function loadCal() {
   try { const v = JSON.parse(localStorage.getItem(FLOORPLAN_CAL_KEY)); if (v && Number.isFinite(v.lat)) return { ...DEFAULT_CAL, ...v }; } catch { /* ignore */ }
   return DEFAULT_CAL;
@@ -154,8 +160,21 @@ export default function FootprintsPage() {
   useEffect(() => () => { floorplanRef.current?.destroy(); }, []);
   const goToHouse = useCallback(() => {
     const m = mapRef.current; const c = calRef.current;
-    if (m) { m.setZoom(DEFAULT_ZOOM); m.setCenter({ lat: c.lat, lng: c.lng }); }
+    if (m) { m.setZoom(c.viewZoom ?? DEFAULT_ZOOM); m.setCenter({ lat: c.lat, lng: c.lng }); }
   }, []);
+  // Capture the map's CURRENT centre + zoom as the default view (persisted).
+  const captureView = useCallback(() => {
+    const m = mapRef.current; if (!m) return;
+    const c = m.getCenter(); if (!c) return;
+    setCal((prev) => ({ ...prev, viewLat: c.lat(), viewLng: c.lng(), viewZoom: m.getZoom() }));
+  }, []);
+
+  // Web-testing simulator: a fake walk around Katie's house so the trail can be
+  // seen without GPS. Bounded random walk near SIM_START, one print per step.
+  const [sim, setSim] = useState(false);
+  const [simPings, setSimPings] = useState([]);
+  const simRef = useRef(null);
+  useEffect(() => () => { if (simRef.current?.timer) clearInterval(simRef.current.timer); }, []);
 
   // Poll the broadcaster's trail; a local clock fades the prints between polls.
   useEffect(() => {
@@ -187,17 +206,17 @@ export default function FootprintsPage() {
   // never recomputed — so the trail doesn't crawl/jitter each update. Old prints drop
   // by age; `id` is a stable key so markers update in place rather than remounting.
   // (The zoom-invariant SCALING happens at render time, not here.)
-  const sourcePings = trail.pings;
+  const sourcePings = sim ? simPings : trail.pings;
   const [feet, setFeet] = useState([]);
   const feetRef = useRef([]);
   const accRef = useRef({ last: null, residual: 0, step: 0, lastT: 0 });
 
-  // Reset + re-lay the trail when the spacing changes in admin, so a new spacing
-  // takes effect at once (not just future prints).
+  // Reset + re-lay the trail when the source flips (sim on/off) or the spacing
+  // changes in admin, so a new spacing takes effect at once (not just future prints).
   useEffect(() => {
     accRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
     feetRef.current = []; setFeet([]);
-  }, [settings.spacing_m]);
+  }, [sim, settings.spacing_m]);
 
   // Ingest any NEW path points → drop footprints every `spacing_m` REAL metres, L/R.
   // Spacing and count are absolute (real-world), NOT scaled by zoom — so the exact
@@ -250,18 +269,13 @@ export default function FootprintsPage() {
     };
   }, []);
 
-  // Centre ONCE on the latest footprint when the page first has a trail, then leave
-  // the map alone — no per-step re-centering. The user pans freely.
-  const didCenterRef = useRef(false);
-  useEffect(() => {
-    if (!isLoaded || didCenterRef.current || !feet.length) return;
-    const m = mapRef.current; const h = feet[feet.length - 1];
-    if (m && h && inUK(h)) { m.setZoom(DEFAULT_ZOOM); m.setCenter({ lat: h.lat, lng: h.lng }); didCenterRef.current = true; }
-  }, [isLoaded, feet]);
-
   const onLoad = useCallback((m) => {
     mapRef.current = m;
-    m.setCenter(DEFAULT_CENTER); m.setZoom(DEFAULT_ZOOM);
+    // Open at the saved default view (set live from the calibrator), as zoomed as
+    // the map allows — Google clamps the zoom to its true max for this area.
+    const v = calRef.current;
+    m.setCenter({ lat: v.viewLat ?? DEFAULT_CENTER.lat, lng: v.viewLng ?? DEFAULT_CENTER.lng });
+    m.setZoom(v.viewZoom ?? DEFAULT_ZOOM);
     m.addListener('zoom_changed', () => setMapZoom(m.getZoom()));
 
     // House floorplan overlay (mapPane = below the footprints, so the trail runs on
@@ -323,6 +337,40 @@ export default function FootprintsPage() {
     el.style.animationDelay = `-${age}ms`;
   }, []);
 
+  // Simulator: walk around Katie's house (bounded random walk near SIM_START),
+  // dropping exactly ONE print per tick (L, R, L, R…). Steers back toward the start
+  // whenever it drifts past SIM_RADIUS_M so the trail stays over the floorplan.
+  const startSim = useCallback(() => {
+    loadSettings();
+    const stride = Math.max(0.2, Number(settings.spacing_m) || 0.75);
+    const s = { lat: SIM_START.lat, lng: SIM_START.lng, heading: Math.random() * 360, timer: null };
+    simRef.current = s;
+    setSimPings([{ lat: s.lat, lng: s.lng, t: Date.now() }]);
+    const m = mapRef.current;
+    if (m) { m.setCenter(SIM_START); }
+    s.timer = setInterval(() => {
+      const st = simRef.current; if (!st) return;
+      const here = { lat: st.lat, lng: st.lng };
+      if (haversineM(here, SIM_START) > SIM_RADIUS_M) {
+        st.heading = bearingDeg(here, SIM_START) + (Math.random() - 0.5) * 40;   // turn back toward the house
+      } else {
+        st.heading += (Math.random() - 0.5) * 35;   // gentle meander
+      }
+      const p = moveLatLng(st.lat, st.lng, stride, st.heading);
+      st.lat = p.lat; st.lng = p.lng;
+      const tnow = Date.now();
+      setSimPings((prev) => [...prev, { lat: p.lat, lng: p.lng, t: tnow }].filter((pp) => pp.t >= tnow - fadeMs));
+    }, 1050);
+    setSim(true);
+  }, [fadeMs, loadSettings, settings.spacing_m]);
+
+  const stopSim = useCallback(() => {
+    if (simRef.current?.timer) clearInterval(simRef.current.timer);
+    simRef.current = null;
+    setSimPings([]);
+    setSim(false);
+  }, []);
+
   // Admin-only for now (David's private testing build; Katie kept out until ready).
   if (!(user?.actual_role === 'admin' || user?.role === 'admin')) {
     return <Navigate to="/" replace />;
@@ -338,21 +386,25 @@ export default function FootprintsPage() {
   const zoomK = 2 ** (FOLLOW_ZOOM - mapZoom);
   const head = feet.length ? feet[feet.length - 1] : null;
 
+  // Only wrap the map in a transformed container when a rotation is actually set —
+  // a CSS-transformed ancestor can upset Google Maps' tile rendering, so with no
+  // rotation (the usual case) the map sits in a plain container and renders cleanly.
+  const rot = cal.mapHeading || 0;
+  const mapWrapStyle = rot
+    ? { position: 'absolute', top: '50%', left: '50%', width: '180%', height: '180%', transformOrigin: 'center center', transform: `translate(-50%, -50%) rotate(${rot}deg)` }
+    : { position: 'absolute', inset: 0 };
+
   return (
     <div data-no-ptr style={{ position: 'fixed', top: 'var(--app-header-h, 0px)', left: 0, right: 0, bottom: 0, background: PARCHMENT, overscrollBehavior: 'none' }}>
       <style>{'@keyframes mmFootFade{from{opacity:1}to{opacity:0}}@keyframes mmFootIn{from{opacity:0}to{opacity:1}}'}</style>
       {isLoaded && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-          {/* Oversized (180%) so that rotating it never reveals empty corners; the
-              CSS rotation turns the whole map — roads, floorplan and footprints as
-              one — so Katie's not-quite-north house can sit square on screen. */}
-          <div style={{
-            position: 'absolute', top: '50%', left: '50%', width: '180%', height: '180%',
-            transformOrigin: 'center center',
-            transform: `translate(-50%, -50%) rotate(${cal.mapHeading || 0}deg)`,
-          }}>
+          {/* When rotated, the wrapper is oversized (180%) so the turn never reveals
+              empty corners; the CSS rotation turns the whole map — roads, floorplan
+              and footprints as one — so Katie's not-quite-north house sits square. */}
+          <div style={mapWrapStyle}>
           <GoogleMap
-            mapContainerStyle={{ width: '100%', height: '100%' }}
+            mapContainerStyle={{ width: '100%', height: rot ? '100%' : 'calc(100% + 34px)' }}
             onLoad={onLoad}
             options={mapOptions}
           >
@@ -381,8 +433,23 @@ export default function FootprintsPage() {
         }}
       />
 
+      {/* Simulate footsteps (web testing) — bottom-centre. Walks around the house. */}
+      <button
+        type="button"
+        onClick={sim ? stopSim : startSim}
+        style={{
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 11,
+          border: 'none', borderRadius: 999, padding: '10px 20px', cursor: 'pointer',
+          background: sim ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 14, fontWeight: 700,
+          boxShadow: '0 6px 18px rgba(0,0,0,0.4)', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {sim ? 'Stop simulation' : 'Simulate footsteps'}
+      </button>
+
       {/* Floorplan calibrator — hidden now the placement is set. Flip SHOW_CALIBRATOR
-          to true to re-enable the drag/rotate/scale controls for a tweak. */}
+          to true to re-enable the drag/rotate/scale + default-view controls. */}
       {SHOW_CALIBRATOR && (
         <FloorplanControls
           cal={cal}
@@ -390,6 +457,7 @@ export default function FootprintsPage() {
           calibrating={calibrating}
           setCalibrating={setCalibrating}
           onGoToHouse={goToHouse}
+          onCaptureView={captureView}
         />
       )}
     </div>
