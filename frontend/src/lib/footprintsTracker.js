@@ -63,3 +63,9 @@ export function stopFootprints() {
   if (configTimer) { clearInterval(configTimer); configTimer = null; }
   running = false;
 }
+
+// Whether the geolocation watch is currently active (so a UI toggle can reflect
+// the real state even after navigating away and back).
+export function isFootprintsTracking() {
+  return running;
+}

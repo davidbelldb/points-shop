@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { startFootprints, stopFootprints, isFootprintsTracking } from '../lib/footprintsTracker.js';
 
 /*
  * Admin controls for the "Marauder's Map" footprints trail. Each mode ('outdoor'
@@ -55,6 +56,12 @@ export default function AdminFootprintsSection() {
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [tracking, setTracking] = useState(isFootprintsTracking());
+
+  function toggleTracking() {
+    if (tracking) { stopFootprints(); setTracking(false); }
+    else { startFootprints(); setTracking(true); }
+  }
 
   async function load() {
     try { setSettings(await api.footprints.settings()); }
@@ -82,6 +89,23 @@ export default function AdminFootprintsSection() {
         before it disappears; trail length = max prints kept. Currently David-only while testing.
       </p>
       {settings.outdoor ? <ModeCard mode="outdoor" cfg={settings.outdoor} onSave={save} /> : null}
+
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 p-3">
+        <div>
+          <p className="text-sm font-semibold">Live tracking (this device)</p>
+          <p className="text-[11px] text-neutral-400">
+            {tracking ? 'Broadcasting your footsteps from this phone.' : 'Start to broadcast your footsteps as you walk.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleTracking}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold ${tracking ? 'bg-neutral-800 text-white' : 'bg-emerald-600 text-white'}`}
+        >
+          {tracking ? 'End tracking' : 'Start tracking'}
+        </button>
+      </div>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       {saved && <p className="text-xs text-emerald-600">Saved ✓</p>}
     </div>

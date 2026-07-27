@@ -4,7 +4,6 @@ import { GoogleMap, OverlayViewF, useJsApiLoader } from '@react-google-maps/api'
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { MARAUDERS_STYLE, PARCHMENT, ROUTE, inUK } from '../lib/marauderMapStyle.js';
-import { startFootprints, stopFootprints } from '../lib/footprintsTracker.js';
 import { createFloorplanOverlay } from '../lib/floorplanOverlay.js';
 import FloorplanControls from './FloorplanControls.jsx';
 
@@ -14,7 +13,8 @@ import FloorplanControls from './FloorplanControls.jsx';
  * `spacing_m`, each one pointing along the direction of travel with a random ±15°
  * angle for that hand-inked authenticity, and fading out over `fade_seconds`.
  *
- * Outdoor phone GPS, David-only (testing). David starts/ends tracking from the map.
+ * Outdoor phone GPS, David-only (testing). Tracking is started/ended from the Admin
+ * → Marauder's Map section (so it keeps running as David moves between pages).
  */
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -30,6 +30,7 @@ const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM
 // Katie's house floorplan overlay (blinco_floorplan.svg). ASPECT = viewBox H / W.
 // DEFAULT_CAL is the best-guess georeferencing; David tunes it live with the on-map
 // calibrator (drag / rotate / scale) and the locked-in numbers get baked in here.
+const SHOW_CALIBRATOR = false;  // floorplan placement is set — flip true to re-tune it
 const FLOORPLAN_URL = '/blinco_floorplan.svg';
 const FLOORPLAN_ASPECT = 835.44 / 407.04;
 const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
@@ -133,11 +134,8 @@ export default function FootprintsPage() {
     mountedRef.current = false;
     try { textureRef.current?.setMap(null); } catch { /* ignore */ }
   }, []);
-  // Live phone-GPS tracking (David only). The button below starts/stops a geolocation
-  // watch that posts footprints; they come back through the trail poll and appear on
-  // the map. No simulator, no indoor beacons — just the phone in David's pocket.
-  const [tracking, setTracking] = useState(false);
-  useEffect(() => () => { stopFootprints(); }, []);   // stop the watch if the page unmounts
+  // Live phone-GPS tracking is started/stopped from the Admin → Marauder's Map
+  // section now, so it keeps running as David moves between pages.
 
   // House floorplan overlay + its live calibration (drag/rotate/scale on the map).
   const [cal, setCal] = useState(loadCal);
@@ -321,29 +319,6 @@ export default function FootprintsPage() {
     el.style.animationDelay = `-${age}ms`;
   }, []);
 
-  // Start / stop live phone-GPS tracking. Starting kicks off a geolocation watch that
-  // posts footprints (gated to the admin spacing); they return via the trail poll and
-  // appear on the map. We also grab the current position once to frame the map on it.
-  const startTracking = useCallback(() => {
-    loadSettings();
-    startFootprints();
-    setTracking(true);
-    if (navigator?.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const m = mapRef.current;
-        if (m && Number.isFinite(pos.coords.latitude)) {
-          m.setZoom(FOLLOW_ZOOM);
-          m.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        }
-      }, () => {}, { enableHighAccuracy: true, timeout: 10000 });
-    }
-  }, [loadSettings]);
-
-  const stopTracking = useCallback(() => {
-    stopFootprints();
-    setTracking(false);
-  }, []);
-
   // Admin-only for now (David's private testing build; Katie kept out until ready).
   if (!(user?.actual_role === 'admin' || user?.role === 'admin')) {
     return <Navigate to="/" replace />;
@@ -393,29 +368,17 @@ export default function FootprintsPage() {
         }}
       />
 
-      {/* Start / End tracking — David only (the whole page is admin-gated). */}
-      <button
-        type="button"
-        onClick={tracking ? stopTracking : startTracking}
-        style={{
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 11,
-          border: 'none', borderRadius: 999, padding: '10px 20px', cursor: 'pointer',
-          background: tracking ? '#2a2a2a' : ROUTE, color: '#fff', fontSize: 14, fontWeight: 700,
-          boxShadow: '0 6px 18px rgba(0,0,0,0.4)', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {tracking ? 'End tracking' : 'Start tracking'}
-      </button>
-
-      {/* Floorplan calibrator (admin only — the whole page is admin-gated). */}
-      <FloorplanControls
-        cal={cal}
-        setCal={setCal}
-        calibrating={calibrating}
-        setCalibrating={setCalibrating}
-        onGoToHouse={goToHouse}
-      />
+      {/* Floorplan calibrator — hidden now the placement is set. Flip SHOW_CALIBRATOR
+          to true to re-enable the drag/rotate/scale controls for a tweak. */}
+      {SHOW_CALIBRATOR && (
+        <FloorplanControls
+          cal={cal}
+          setCal={setCal}
+          calibrating={calibrating}
+          setCalibrating={setCalibrating}
+          onGoToHouse={goToHouse}
+        />
+      )}
     </div>
   );
 }
