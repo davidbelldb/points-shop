@@ -462,9 +462,9 @@ export default function FootprintsPage() {
     loadSettings();
     const stride = SIM_SPACING_M;
     const c0 = calRef.current;
-    // Start in the TOP THIRD of the floorplan (SVG y ≈ 1/6 of height), snapped into
-    // the nearest walkable room rather than the plan's centre.
-    const startPix = nearestWalkable(wallMaskRef.current, SVG_W / 2, SVG_H / 6, 300) || { sx: SVG_W / 2, sy: SVG_H / 6 };
+    // Start in the BOTTOM THIRD of the floorplan (SVG y ≈ 5/6 of height), snapped into
+    // the nearest walkable room. (Uses the locked-in calibration; changes nothing about it.)
+    const startPix = nearestWalkable(wallMaskRef.current, SVG_W / 2, (SVG_H * 5) / 6, 300) || { sx: SVG_W / 2, sy: (SVG_H * 5) / 6 };
     const start = svgToLatLng(startPix.sx, startPix.sy, c0);
     const s = { lat: start.lat, lng: start.lng, heading: Math.random() * 360, timer: null };
     simRef.current = s;
