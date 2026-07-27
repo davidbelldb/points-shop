@@ -12,3 +12,7 @@ frontend/calc*.mjs
 *.p8
 *.mobileprovision
 *.p12
+
+*.ipa
+*.xcarchive/
+frontend/ios/App/App/CrowWidgetExtension */

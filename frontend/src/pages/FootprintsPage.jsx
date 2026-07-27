@@ -27,7 +27,7 @@ const JITTER_DEG = 15;          // ±15° hand-drawn wobble
 const FOLLOW_ZOOM = 20;         // footprint SIZING reference (do not change — it sets the print size)
 const DEFAULT_ZOOM = 22;        // open as zoomed-in as the map allows (Google clamps to its true max)
 const SIM_SPACING_M = 0.4;      // tight house-scale stride between simulated prints (real GPS uses the admin spacing)
-const SVG_W = 407, SVG_H = 835; // floorplan raster resolution for the wall-collision mask (≈ viewBox)
+const SVG_W = 407, SVG_H = 2339; // floorplan raster resolution for the wall-collision mask (≈ viewBox)
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
@@ -36,8 +36,8 @@ const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM
 // Katie's house floorplan overlay (blinco_floorplan.svg). ASPECT = viewBox H / W.
 // DEFAULT_CAL is the best-guess georeferencing; David tunes it live with the on-map
 // calibrator (drag / rotate / scale) and the locked-in numbers get baked in here.
-const FLOORPLAN_URL = '/blinco_floorplan.svg?v=3';
-const FLOORPLAN_ASPECT = 835.44 / 407.04;
+const FLOORPLAN_URL = '/blinco_floorplan.svg?v=4';
+const FLOORPLAN_ASPECT = 2338.73 / 407.04;   // "long" floorplan — much taller than wide
 const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
 // mapHeading rotates the WHOLE map (roads + floorplan + footprints) so Katie's house
 // — which doesn't face true north — sits square on screen. Degrees clockwise.
@@ -510,8 +510,10 @@ export default function FootprintsPage() {
   // a CSS-transformed ancestor can upset Google Maps' tile rendering, so with no
   // rotation (the usual case) the map sits in a plain container and renders cleanly.
   const rot = cal.mapHeading || 0;
+  // When rotated we use a big CENTRED SQUARE (side ≥ the viewport diagonal) so ANY
+  // angle 0–360° stays fully covered with no empty corners.
   const mapWrapStyle = rot
-    ? { position: 'absolute', top: '50%', left: '50%', width: '180%', height: '180%', transformOrigin: 'center center', transform: `translate(-50%, -50%) rotate(${rot}deg)` }
+    ? { position: 'absolute', top: '50%', left: '50%', width: '160vmax', height: '160vmax', transformOrigin: 'center center', transform: `translate(-50%, -50%) rotate(${rot}deg)` }
     : { position: 'absolute', inset: 0 };
 
   return (

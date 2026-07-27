@@ -72,7 +72,7 @@ export default function FloorplanControls({ cal, setCal, calibrating, setCalibra
       <Row label="Map rotation (whole map)" value={`${cal.mapHeading ?? 0}°`}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button type="button" onClick={nudge('mapHeading', -0.5)} style={mini}>−</button>
-          <input type="range" min="-45" max="45" step="0.5" value={cal.mapHeading ?? 0} onChange={set('mapHeading')} style={{ flex: 1 }} />
+          <input type="range" min="-180" max="180" step="0.5" value={cal.mapHeading ?? 0} onChange={set('mapHeading')} style={{ flex: 1 }} />
           <button type="button" onClick={nudge('mapHeading', 0.5)} style={mini}>+</button>
         </div>
       </Row>
