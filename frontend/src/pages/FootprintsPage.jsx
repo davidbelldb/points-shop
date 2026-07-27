@@ -26,6 +26,7 @@ const FOLLOW_ZOOM = 20;         // footprint SIZING reference (do not change —
 const DEFAULT_ZOOM = 22;        // open as zoomed-in as the map allows (Google clamps to its true max)
 const SIM_START = { lat: 52.185869, lng: 0.142019 };  // simulator walks around here (Katie's house)
 const SIM_RADIUS_M = 6;         // keep the simulated wander within ~6 m of SIM_START (house-scale, stays framed at max zoom)
+const SIM_SPACING_M = 0.4;      // tight house-scale stride between simulated prints (real GPS uses the admin spacing)
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
@@ -222,8 +223,9 @@ export default function FootprintsPage() {
   // same set of prints is pinned to the map at every zoom height. Zoom in or out and
   // the whole trail stays (it just gets nearer/further), instead of thinning out.
   useEffect(() => {
-    const spacing = Math.max(0.2, Number(settings.spacing_m) || 0.75);
-    const offset = spacing * 0.4;   // L/R stance offset, in real metres
+    // The simulator uses a tight house-scale stride; real GPS uses the admin spacing.
+    const spacing = sim ? SIM_SPACING_M : Math.max(0.2, Number(settings.spacing_m) || 0.75);
+    const offset = spacing * 0.3;   // L/R stance offset, in real metres (feet closer together)
     const acc = accRef.current;
     let prev = acc.last; let changed = false;
     for (const pt of (sourcePings || [])) {
@@ -248,12 +250,12 @@ export default function FootprintsPage() {
     }
     acc.last = prev;
     const cutoff = Date.now() - fadeMs;
-    const cap = Math.max(1, Number(settings.trail_length) || 100);
+    const cap = sim ? 400 : Math.max(1, Number(settings.trail_length) || 100);
     const before = feetRef.current.length;
     feetRef.current = feetRef.current.filter((ff) => ff.t >= cutoff);
     if (feetRef.current.length > cap) feetRef.current = feetRef.current.slice(-cap);
     if (changed || feetRef.current.length !== before) setFeet(feetRef.current.slice());
-  }, [sourcePings, settings.spacing_m, settings.trail_length, fadeMs]);
+  }, [sim, sourcePings, settings.spacing_m, settings.trail_length, fadeMs]);
 
   // Disable pull-to-refresh while the full-screen map is up.
   useEffect(() => {
@@ -340,7 +342,7 @@ export default function FootprintsPage() {
   // whenever it drifts past SIM_RADIUS_M so the trail stays over the floorplan.
   const startSim = useCallback(() => {
     loadSettings();
-    const stride = Math.max(0.2, Number(settings.spacing_m) || 0.75);
+    const stride = SIM_SPACING_M;   // one tight house-scale step per tick (matches ingest spacing → 1 print/tick)
     const s = { lat: SIM_START.lat, lng: SIM_START.lng, heading: Math.random() * 360, timer: null };
     simRef.current = s;
     setSimPings([{ lat: s.lat, lng: s.lng, t: Date.now() }]);
