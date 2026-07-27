@@ -38,13 +38,14 @@ const FOOT_REAL_M = 1.094;      // footprint length in metres AT THE FOLLOW ZOOM
 // calibrator (drag / rotate / scale) and the locked-in numbers get baked in here.
 const FLOORPLAN_URL = '/blinco_floorplan.svg?v=4';
 const FLOORPLAN_ASPECT = 2338.73 / 407.04;   // "long" floorplan — much taller than wide
-const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal';
+const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal_long';   // new key → fresh calibration for the long floorplan
 // mapHeading rotates the WHOLE map (roads + floorplan + footprints) so Katie's house
 // — which doesn't face true north — sits square on screen. Degrees clockwise.
 const DEFAULT_CAL = {
   lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95, mapHeading: 0,
-  // The default view the map OPENS at — captured live from the calibrator.
-  viewLat: DEFAULT_CENTER.lat, viewLng: DEFAULT_CENTER.lng, viewZoom: DEFAULT_ZOOM,
+  // The default view the map OPENS at — centred on the floorplan and zoomed out enough
+  // to frame the whole (very tall) long plan, so it's visible before you recalibrate.
+  viewLat: 52.185833, viewLng: 0.141944, viewZoom: 19,
 };
 function loadCal() {
   try { const v = JSON.parse(localStorage.getItem(FLOORPLAN_CAL_KEY)); if (v && Number.isFinite(v.lat)) return { ...DEFAULT_CAL, ...v }; } catch { /* ignore */ }
@@ -461,7 +462,11 @@ export default function FootprintsPage() {
     loadSettings();
     const stride = SIM_SPACING_M;
     const c0 = calRef.current;
-    const s = { lat: c0.lat, lng: c0.lng, heading: Math.random() * 360, timer: null };
+    // Start in the TOP THIRD of the floorplan (SVG y ≈ 1/6 of height), snapped into
+    // the nearest walkable room rather than the plan's centre.
+    const startPix = nearestWalkable(wallMaskRef.current, SVG_W / 2, SVG_H / 6, 300) || { sx: SVG_W / 2, sy: SVG_H / 6 };
+    const start = svgToLatLng(startPix.sx, startPix.sy, c0);
+    const s = { lat: start.lat, lng: start.lng, heading: Math.random() * 360, timer: null };
     simRef.current = s;
     setSimPings([{ lat: s.lat, lng: s.lng, t: Date.now() }]);
 
