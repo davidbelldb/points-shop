@@ -70,6 +70,16 @@ const FOOT_SOLE = 'M0,-6.5 C2.6,-6.5 3.2,-3 2.6,-0.3 C2.1,1.8 -2.1,1.8 -2.6,-0.3
 const FOOT_R = `${FOOT_SOLE} M0.1,2.1 L1.7,2.1 C2.3,2.1 2.55,2.4 2.55,3 C2.55,4.4 2.1,5.7 0.9,5.8 C-0.3,5.7 -0.75,4.4 -0.75,3 C-0.75,2.4 -0.5,2.1 0.1,2.1 Z`;
 const FOOT_L = `${FOOT_SOLE} M-0.1,2.1 L-1.7,2.1 C-2.3,2.1 -2.55,2.4 -2.55,3 C-2.55,4.4 -2.1,5.7 -0.9,5.8 C0.3,5.7 0.75,4.4 0.75,3 C0.75,2.4 0.5,2.1 -0.1,2.1 Z`;
 
+// Cat paw print (same box + size as the foot): a big pad + four toe beans, pointing
+// "up" along the direction of travel. Symmetric, so left/right paws use one shape.
+const CAT_PAW = [
+  'M-2.3,1.9 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0 Z',      // pad
+  'M-3.55,-0.7 a0.95,0.95 0 1,0 1.9,0 a0.95,0.95 0 1,0 -1.9,0 Z', // toe far-left
+  'M-1.95,-2.7 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0 Z',                 // toe mid-left
+  'M-0.05,-2.7 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0 Z',                 // toe mid-right
+  'M1.65,-0.7 a0.95,0.95 0 1,0 1.9,0 a0.95,0.95 0 1,0 -1.9,0 Z',  // toe far-right
+].join(' ');
+
 // STABLE reference — passing an inline arrow here makes OverlayViewF tear down and
 // re-mount the DOM on every render, which restarted the fade-in on the whole trail
 // each time a new print dropped (the flicker). One shared function = no remounts.
@@ -80,7 +90,8 @@ const CENTER_OFFSET = (w, h) => ({ x: -(w / 2), y: -(h / 2) });
 // the follow zoom the display position equals the real position, so adding a print
 // leaves every existing print's props unchanged → React skips them → no remount, no
 // fade restart. Each print fades in exactly once. Slick.
-const Footprint = memo(function Footprint({ lat, lng, angle, side, t, applyFade }) {
+const Footprint = memo(function Footprint({ lat, lng, angle, side, t, kind, applyFade }) {
+  const d = kind === 'paw' ? CAT_PAW : (side < 0 ? FOOT_L : FOOT_R);
   return (
     <OverlayViewF
       position={{ lat, lng }}
@@ -92,7 +103,7 @@ const Footprint = memo(function Footprint({ lat, lng, angle, side, t, applyFade 
       <div style={{ width: FOOT_PX * 0.55, height: FOOT_PX, transform: `rotate(${angle}deg)`, pointerEvents: 'none', animation: 'mmFootIn 1000ms ease-out both' }}>
         <div ref={(el) => applyFade(el, t)} style={{ width: '100%', height: '100%' }}>
           <svg viewBox="-3.6 -7 7.2 13.2" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
-            <path d={side < 0 ? FOOT_L : FOOT_R} fill={ROUTE} />
+            <path d={d} fill={ROUTE} />
           </svg>
         </div>
       </div>
@@ -224,6 +235,62 @@ function constrainToHouse(lat, lng, cal, mask) {
   return w ? svgToLatLng(w.sx, w.sy, cal) : { lat, lng };
 }
 
+// Turn a walker's path (pings) into evenly-spaced, direction-pointing prints, L/R,
+// dropping any that would sit on a wall. Shared by BOTH David's trail and the cat's.
+// Mutates `acc` (the resampling cursor) and `feetRef.current`; returns whether it
+// changed so the caller can re-render.
+function ingestTrail(sourcePings, acc, feetRef, opts) {
+  const { spacing, offset, fadeMs, cap, constrain, cal, mask } = opts;
+  let prev = acc.last; let changed = false;
+  for (const rawPt of (sourcePings || [])) {
+    if (rawPt.t <= acc.lastT) continue;
+    const pt = constrain ? { ...rawPt, ...constrainToHouse(rawPt.lat, rawPt.lng, cal, mask) } : rawPt;
+    if (!prev) { prev = pt; acc.lastT = pt.t; acc.residual = 0; continue; }
+    const segLen = haversineM(prev, pt);
+    const wallBetween = constrain && mask && pathHitsWall(prev.lat, prev.lng, pt.lat, pt.lng, cal, mask);
+    if (segLen > 0 && !wallBetween) {
+      const bearing = bearingDeg(prev, pt);
+      let along = spacing - acc.residual;
+      while (along <= segLen + 1e-6) {
+        const f = along / segLen;
+        const lat = prev.lat + (pt.lat - prev.lat) * f;
+        const lng = prev.lng + (pt.lng - prev.lng) * f;
+        const side = acc.step % 2 === 0 ? -1 : 1;
+        let o = moveLatLng(lat, lng, offset, bearing + 90 * side);
+        if (constrain && mask) {
+          const sp = latLngToSvg(o.lat, o.lng, cal);
+          const w = nearestWalkable(mask, sp.sx, sp.sy, 18);
+          if (w) o = svgToLatLng(w.sx, w.sy, cal);
+        }
+        feetRef.current.push({ id: acc.step, lat: o.lat, lng: o.lng, angle: bearing + jitterFor(lat, lng), side, t: pt.t });
+        acc.step += 1; along += spacing; changed = true;
+      }
+      acc.residual = segLen - (along - spacing);
+    } else if (wallBetween) {
+      acc.residual = 0;   // don't carry the stride across a wall
+    }
+    prev = pt; acc.lastT = pt.t;
+  }
+  acc.last = prev;
+  const cutoff = Date.now() - fadeMs;
+  const before = feetRef.current.length;
+  feetRef.current = feetRef.current.filter((ff) => ff.t >= cutoff);
+  if (feetRef.current.length > cap) feetRef.current = feetRef.current.slice(-cap);
+  return changed || feetRef.current.length !== before;
+}
+
+// Advance a simulated walker one wall-respecting step (prefers straight on; retries
+// other headings through doorway gaps). Returns whether it moved.
+function stepWalker(st, stride, cal, mask) {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const h = attempt === 0 ? st.heading + (Math.random() - 0.5) * 20 : Math.random() * 360;
+    const p = moveLatLng(st.lat, st.lng, stride, h);
+    if (!pathHitsWall(st.lat, st.lng, p.lat, p.lng, cal, mask)) { st.lat = p.lat; st.lng = p.lng; st.heading = h; return true; }
+  }
+  st.heading = (st.heading + 150 + Math.random() * 60) % 360;   // boxed in — turn, skip this tick
+  return false;
+}
+
 export default function FootprintsPage() {
   const { user } = useAuth();
   const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: KEY });
@@ -298,7 +365,12 @@ export default function FootprintsPage() {
   const [sim, setSim] = useState(false);
   const [simPings, setSimPings] = useState([]);
   const simRef = useRef(null);
-  useEffect(() => () => { if (simRef.current?.timer) clearInterval(simRef.current.timer); }, []);
+  const [catSimPings, setCatSimPings] = useState([]);   // the cat's simulated walk
+  const catSimRef = useRef(null);
+  useEffect(() => () => {
+    if (simRef.current?.timer) clearInterval(simRef.current.timer);
+    if (catSimRef.current?.timer) clearInterval(catSimRef.current.timer);
+  }, []);
 
   // Rasterise the floorplan SVG once into a WALL MASK: a drawn (opaque) pixel = wall,
   // a transparent pixel = walkable room / doorway. The simulator tests candidate steps
@@ -368,65 +440,42 @@ export default function FootprintsPage() {
   const feetRef = useRef([]);
   const accRef = useRef({ last: null, residual: 0, step: 0, lastT: 0 });
 
-  // Reset + re-lay the trail when the source flips (sim on/off) or the spacing
+  // The CAT trail — a second walker (paw prints), simulated alongside David for now.
+  // No backend cat source yet, so it's sim-only until the cat is UWB-tagged.
+  const catSourcePings = sim ? catSimPings : [];
+  const [catFeet, setCatFeet] = useState([]);
+  const catFeetRef = useRef([]);
+  const catAccRef = useRef({ last: null, residual: 0, step: 0, lastT: 0 });
+
+  // Reset + re-lay BOTH trails when the source flips (sim on/off) or the spacing
   // changes in admin, so a new spacing takes effect at once (not just future prints).
   useEffect(() => {
     accRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
     feetRef.current = []; setFeet([]);
+    catAccRef.current = { last: null, residual: 0, step: 0, lastT: 0 };
+    catFeetRef.current = []; setCatFeet([]);
   }, [sim, settings.spacing_m]);
 
-  // Ingest any NEW path points → drop footprints every `spacing_m` REAL metres, L/R.
-  // Spacing and count are absolute (real-world), NOT scaled by zoom — so the exact
-  // same set of prints is pinned to the map at every zoom height. Zoom in or out and
-  // the whole trail stays (it just gets nearer/further), instead of thinning out.
+  // Ingest David's path → shoe prints. Sim uses a tight house-scale stride; real GPS
+  // uses the admin spacing and is snapped into the house / off walls.
   useEffect(() => {
-    // The simulator uses a tight house-scale stride; real GPS uses the admin spacing.
     const spacing = sim ? SIM_SPACING_M : Math.max(0.2, Number(settings.spacing_m) || 0.75);
-    const offset = spacing * 0.3;   // L/R stance offset, in real metres (feet closer together)
-    // Real GPS prints are snapped into the house (inside the SVG bounds + off any wall)
-    // and segments that would cut through a wall are skipped. Sim prints are already
-    // valid, so we leave those alone.
-    const constrain = CONSTRAIN_REAL_TO_HOUSE && !sim;
-    const cal0 = calRef.current; const mask = wallMaskRef.current;
-    const acc = accRef.current;
-    let prev = acc.last; let changed = false;
-    for (const rawPt of (sourcePings || [])) {
-      if (rawPt.t <= acc.lastT) continue;
-      const pt = constrain ? { ...rawPt, ...constrainToHouse(rawPt.lat, rawPt.lng, cal0, mask) } : rawPt;
-      if (!prev) { prev = pt; acc.lastT = pt.t; acc.residual = 0; continue; }
-      const segLen = haversineM(prev, pt);
-      const wallBetween = constrain && mask && pathHitsWall(prev.lat, prev.lng, pt.lat, pt.lng, cal0, mask);
-      if (segLen > 0 && !wallBetween) {
-        const bearing = bearingDeg(prev, pt);
-        let along = spacing - acc.residual;
-        while (along <= segLen + 1e-6) {
-          const f = along / segLen;
-          const lat = prev.lat + (pt.lat - prev.lat) * f;
-          const lng = prev.lng + (pt.lng - prev.lng) * f;
-          const side = acc.step % 2 === 0 ? -1 : 1;
-          let o = moveLatLng(lat, lng, offset, bearing + 90 * side);
-          if (constrain && mask) {   // keep the stance-offset print off a wall too
-            const sp = latLngToSvg(o.lat, o.lng, cal0);
-            const w = nearestWalkable(mask, sp.sx, sp.sy, 18);
-            if (w) o = svgToLatLng(w.sx, w.sy, cal0);
-          }
-          feetRef.current.push({ id: acc.step, lat: o.lat, lng: o.lng, angle: bearing + jitterFor(lat, lng), side, t: pt.t });
-          acc.step += 1; along += spacing; changed = true;
-        }
-        acc.residual = segLen - (along - spacing);
-      } else if (wallBetween) {
-        acc.residual = 0;   // don't carry the stride across a wall
-      }
-      prev = pt; acc.lastT = pt.t;
-    }
-    acc.last = prev;
-    const cutoff = Date.now() - fadeMs;
     const cap = sim ? 400 : Math.max(1, Number(settings.trail_length) || 100);
-    const before = feetRef.current.length;
-    feetRef.current = feetRef.current.filter((ff) => ff.t >= cutoff);
-    if (feetRef.current.length > cap) feetRef.current = feetRef.current.slice(-cap);
-    if (changed || feetRef.current.length !== before) setFeet(feetRef.current.slice());
+    const changed = ingestTrail(sourcePings, accRef.current, feetRef, {
+      spacing, offset: spacing * 0.3, fadeMs, cap,
+      constrain: CONSTRAIN_REAL_TO_HOUSE && !sim, cal: calRef.current, mask: wallMaskRef.current,
+    });
+    if (changed) setFeet(feetRef.current.slice());
   }, [sim, sourcePings, settings.spacing_m, settings.trail_length, fadeMs]);
+
+  // Ingest the cat's path → paw prints (sim path is already wall-valid, so no snapping).
+  useEffect(() => {
+    const changed = ingestTrail(catSourcePings, catAccRef.current, catFeetRef, {
+      spacing: SIM_SPACING_M, offset: SIM_SPACING_M * 0.3, fadeMs, cap: 400,
+      constrain: false, cal: calRef.current, mask: wallMaskRef.current,
+    });
+    if (changed) setCatFeet(catFeetRef.current.slice());
+  }, [sim, catSourcePings, fadeMs]);
 
   // Disable pull-to-refresh while the full-screen map is up.
   useEffect(() => {
@@ -510,43 +559,36 @@ export default function FootprintsPage() {
     el.style.animationDelay = `-${age}ms`;
   }, []);
 
-  // Simulator: walk THROUGH the house, one tight print per tick (L, R, L, R…). Each
-  // candidate step is tested against the wall mask — it can't cross a drawn wall, but
-  // walks freely through transparent doorway gaps (even sharp 90° turns, because it
-  // retries other headings until it finds a clear one). Starts at the floorplan centre.
+  // Simulator: walk David AND the cat THROUGH the house — one tight print per tick each,
+  // respecting the walls (retrying headings to slip through doorway gaps). Each starts
+  // at an SVG spot, snapped into the nearest walkable room.
+  const startWalker = useCallback((svgX, svgY, setPings, ref) => {
+    const wp = nearestWalkable(wallMaskRef.current, svgX, svgY, 300) || { sx: svgX, sy: svgY };
+    const start = svgToLatLng(wp.sx, wp.sy, calRef.current);
+    const s = { lat: start.lat, lng: start.lng, heading: Math.random() * 360, timer: null };
+    ref.current = s;
+    setPings([{ lat: s.lat, lng: s.lng, t: Date.now() }]);
+    s.timer = setInterval(() => {
+      const st = ref.current; if (!st) return;
+      if (!stepWalker(st, SIM_SPACING_M, calRef.current, wallMaskRef.current)) return;
+      const tnow = Date.now();
+      setPings((prev) => [...prev, { lat: st.lat, lng: st.lng, t: tnow }].filter((pp) => pp.t >= tnow - fadeMs));
+    }, 1050);
+  }, [fadeMs]);
+
   const startSim = useCallback(() => {
     loadSettings();
-    const stride = SIM_SPACING_M;
-    const c0 = calRef.current;
-    // Start in the BOTTOM THIRD of the floorplan (SVG y ≈ 5/6 of height), snapped into
-    // the nearest walkable room. (Uses the locked-in calibration; changes nothing about it.)
-    const startPix = nearestWalkable(wallMaskRef.current, SVG_W / 2, (SVG_H * 5) / 6, 300) || { sx: SVG_W / 2, sy: (SVG_H * 5) / 6 };
-    const start = svgToLatLng(startPix.sx, startPix.sy, c0);
-    const s = { lat: start.lat, lng: start.lng, heading: Math.random() * 360, timer: null };
-    simRef.current = s;
-    setSimPings([{ lat: s.lat, lng: s.lng, t: Date.now() }]);
-
-    s.timer = setInterval(() => {
-      const st = simRef.current; if (!st) return;
-      const cal0 = calRef.current; const mask = wallMaskRef.current;
-      let moved = false;
-      for (let attempt = 0; attempt < 16; attempt += 1) {
-        // Prefer carrying straight on (small wobble); if blocked, try ever-wider turns.
-        const h = attempt === 0 ? st.heading + (Math.random() - 0.5) * 20 : Math.random() * 360;
-        const p = moveLatLng(st.lat, st.lng, stride, h);
-        if (!pathHitsWall(st.lat, st.lng, p.lat, p.lng, cal0, mask)) { st.lat = p.lat; st.lng = p.lng; st.heading = h; moved = true; break; }
-      }
-      if (!moved) { st.heading = (st.heading + 150 + Math.random() * 60) % 360; return; }   // boxed in — turn, skip this tick
-      const tnow = Date.now();
-      setSimPings((prev) => [...prev, { lat: st.lat, lng: st.lng, t: tnow }].filter((pp) => pp.t >= tnow - fadeMs));
-    }, 1050);
+    // David in the bottom third; the cat starts NEARBY (a little to the side and up).
+    startWalker(SVG_W / 2, (SVG_H * 5) / 6, setSimPings, simRef);
+    startWalker(SVG_W * 0.32, (SVG_H * 5) / 6 - SVG_H * 0.045, setCatSimPings, catSimRef);
     setSim(true);
-  }, [fadeMs, loadSettings]);
+  }, [loadSettings, startWalker]);
 
   const stopSim = useCallback(() => {
     if (simRef.current?.timer) clearInterval(simRef.current.timer);
-    simRef.current = null;
-    setSimPings([]);
+    if (catSimRef.current?.timer) clearInterval(catSimRef.current.timer);
+    simRef.current = null; catSimRef.current = null;
+    setSimPings([]); setCatSimPings([]);
     setSim(false);
   }, []);
 
@@ -597,7 +639,10 @@ export default function FootprintsPage() {
                 so adding a new one never disturbs the others — one fades in, the old
                 ones stay put and fade out. Smooth and identical at every zoom. */}
             {feet.map((p) => (
-              <Footprint key={p.id} lat={p.lat} lng={p.lng} angle={p.angle} side={p.side} t={p.t} applyFade={applyFade} />
+              <Footprint key={`d${p.id}`} lat={p.lat} lng={p.lng} angle={p.angle} side={p.side} t={p.t} applyFade={applyFade} />
+            ))}
+            {catFeet.map((p) => (
+              <Footprint key={`c${p.id}`} lat={p.lat} lng={p.lng} angle={p.angle} side={p.side} t={p.t} kind="paw" applyFade={applyFade} />
             ))}
           </GoogleMap>
           </div>
