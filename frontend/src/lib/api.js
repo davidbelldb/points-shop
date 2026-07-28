@@ -148,6 +148,8 @@ export const api = {
     trail: (mode) => request(`/footprints/trail?mode=${encodeURIComponent(mode)}`),
     settings: () => request('/footprints/settings'),
     saveSettings: (mode, patch) => request(`/footprints/settings/${mode}`, { method: 'PUT', body: JSON.stringify(patch) }),
+    floorplan: () => request('/footprints/floorplan'),
+    saveFloorplan: (config) => request('/footprints/floorplan', { method: 'PUT', body: JSON.stringify(config) }),
   },
 
   getMessages: () => request('/messages'),

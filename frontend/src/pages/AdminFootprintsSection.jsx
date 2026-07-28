@@ -73,10 +73,18 @@ export default function AdminFootprintsSection() {
   }
 
   const [calShown, setCalShown] = useState(isCalibratorShown());
+  // The calibrator-button visibility is shared via the backend, so hiding it on one
+  // device hides it everywhere (desktop AND iOS) — not just this browser's localStorage.
+  useEffect(() => {
+    api.footprints.floorplan()
+      .then((cfg) => { if (cfg && typeof cfg.showCalibrator === 'boolean') { setCalShown(cfg.showCalibrator); setCalibratorShown(cfg.showCalibrator); } })
+      .catch(() => {});
+  }, []);
   function toggleCalibrator() {
     const next = !calShown;
     setCalibratorShown(next);
     setCalShown(next);
+    api.footprints.saveFloorplan({ showCalibrator: next }).catch(() => {});
   }
 
   async function load() {

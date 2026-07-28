@@ -67,6 +67,27 @@ export async function updateModeSettings(mode, patch = {}) {
   return getModeSettings(m);
 }
 
+// Shared floorplan calibration (centre / width / rotation / opacity / map heading /
+// default view). One row, one JSON blob — so every device shows the same placement.
+export async function getFloorplan() {
+  const { rows } = await query(`SELECT config FROM footprint_floorplan WHERE id = 1`);
+  return rows[0]?.config ?? {};
+}
+
+// Shallow-MERGE the patch into the stored config (jsonb `||`), so independent bits —
+// the placement (from the map) and the "show calibrator" flag (from admin) — can each
+// be updated without wiping the other.
+export async function saveFloorplan(patch) {
+  const p = (patch && typeof patch === 'object') ? patch : {};
+  const { rows } = await query(
+    `INSERT INTO footprint_floorplan (id, config, updated_at) VALUES (1, $1::jsonb, NOW())
+       ON CONFLICT (id) DO UPDATE SET config = footprint_floorplan.config || $1::jsonb, updated_at = NOW()
+     RETURNING config`,
+    [JSON.stringify(p)],
+  );
+  return rows[0]?.config ?? p;
+}
+
 // The broadcaster's recent trail for a mode, within its fade window — the raw
 // path points (with epoch-ms timestamps) the client draws footprints along.
 export async function getTrail(mode) {

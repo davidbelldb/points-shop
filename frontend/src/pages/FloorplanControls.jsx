@@ -27,12 +27,13 @@ export default function FloorplanControls({ cal, setCal, calibrating, setCalibra
   const set = (k) => (e) => setCal((c) => ({ ...c, [k]: Number(e.target.value) }));
   const nudge = (k, d) => () => setCal((c) => ({ ...c, [k]: Number((c[k] + d).toFixed(6)) }));
 
-  const values = `lat: ${cal.lat.toFixed(6)}, lng: ${cal.lng.toFixed(6)}, widthM: ${cal.widthM}, rotationDeg: ${cal.rotationDeg}, opacity: ${cal.opacity}, mapHeading: ${cal.mapHeading ?? 0}, viewLat: ${(cal.viewLat ?? 0).toFixed(6)}, viewLng: ${(cal.viewLng ?? 0).toFixed(6)}, viewZoom: ${cal.viewZoom ?? 0}`;
+  const values = `lat: ${cal.lat.toFixed(6)}, lng: ${cal.lng.toFixed(6)}, widthM: ${cal.widthM}, rotationDeg: ${cal.rotationDeg}, opacity: ${cal.opacity}, mapHeading: ${cal.mapHeading ?? 0}, mapScale: ${cal.mapScale ?? 1}, viewLat: ${(cal.viewLat ?? 0).toFixed(6)}, viewLng: ${(cal.viewLng ?? 0).toFixed(6)}, viewZoom: ${cal.viewZoom ?? 0}`;
 
   if (!calibrating) {
     return (
       <button
         type="button"
+        data-mm-controls
         onClick={() => setCalibrating(true)}
         style={{
           position: 'absolute', left: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 12,
@@ -47,7 +48,7 @@ export default function FloorplanControls({ cal, setCal, calibrating, setCalibra
   }
 
   return (
-    <div style={{
+    <div data-mm-controls style={{
       position: 'absolute', left: 12, right: 12, bottom: 'max(20px, env(safe-area-inset-bottom))', zIndex: 13,
       background: CARD, borderRadius: 18, padding: '12px 14px', color: '#000',
       boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
@@ -90,6 +91,14 @@ export default function FloorplanControls({ cal, setCal, calibrating, setCalibra
           <button type="button" onClick={nudge('widthM', -0.2)} style={mini}>−</button>
           <input type="range" min="2" max="25" step="0.1" value={cal.widthM} onChange={set('widthM')} style={{ flex: 1 }} />
           <button type="button" onClick={nudge('widthM', 0.2)} style={mini}>+</button>
+        </div>
+      </Row>
+
+      <Row label="Extra zoom (beyond map max)" value={`${(cal.mapScale ?? 1).toFixed(2)}×`}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button type="button" onClick={nudge('mapScale', -0.1)} style={mini}>−</button>
+          <input type="range" min="1" max="4" step="0.1" value={cal.mapScale ?? 1} onChange={set('mapScale')} style={{ flex: 1 }} />
+          <button type="button" onClick={nudge('mapScale', 0.1)} style={mini}>+</button>
         </div>
       </Row>
 

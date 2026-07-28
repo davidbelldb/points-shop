@@ -1,5 +1,5 @@
 import {
-  recordPing, getTrail, getSettings, updateModeSettings,
+  recordPing, getTrail, getSettings, updateModeSettings, getFloorplan, saveFloorplan,
 } from './footprints.repo.js';
 import { getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
@@ -37,5 +37,17 @@ export default async function footprintsRoutes(fastify) {
   fastify.put('/api/footprints/settings/:mode', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
     return updateModeSettings(req.params.mode, req.body ?? {});
+  });
+
+  // Shared floorplan calibration — so the placement David dials in on one device
+  // (desktop) shows identically on the others (iOS). Admin-only for now, like the rest.
+  fastify.get('/api/footprints/floorplan', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return getFloorplan();
+  });
+
+  fastify.put('/api/footprints/floorplan', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'Admin only' });
+    return saveFloorplan(req.body ?? {});
   });
 }

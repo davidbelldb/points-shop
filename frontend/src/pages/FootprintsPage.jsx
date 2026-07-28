@@ -6,7 +6,7 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import { MARAUDERS_STYLE, PARCHMENT, ROUTE } from '../lib/marauderMapStyle.js';
 import { createFloorplanOverlay } from '../lib/floorplanOverlay.js';
 import { isSimOn, subscribeSim } from '../lib/footprintsSim.js';
-import { isCalibratorShown, subscribeCalibrator } from '../lib/footprintsCalibrator.js';
+import { isCalibratorShown, subscribeCalibrator, setCalibratorShown } from '../lib/footprintsCalibrator.js';
 import FloorplanControls from './FloorplanControls.jsx';
 
 /*
@@ -28,6 +28,7 @@ const FOLLOW_ZOOM = 20;         // footprint SIZING reference (do not change —
 const DEFAULT_ZOOM = 22;        // open as zoomed-in as the map allows (Google clamps to its true max)
 const SIM_SPACING_M = 0.4;      // tight house-scale stride between simulated prints (real GPS uses the admin spacing)
 const SVG_W = 407, SVG_H = 2339; // floorplan raster resolution for the wall-collision mask (≈ viewBox)
+const WALL_BUFFER_PX = 6;        // small safe-zone: grow walls by ~6 SVG px so prints keep off them
 const TEXTURE_URL = '/marauders_texture.jpg?v=2';   // bump ?v when the texture changes (busts cache)
 const TEXTURE_OPACITY = 0.4;    // aged-parchment texture laid over the map
 const TEXTURE_SATURATION = 1.6; // boost the texture's colour
@@ -42,7 +43,7 @@ const FLOORPLAN_CAL_KEY = 'blincoFloorplanCal_long';   // new key → fresh cali
 // mapHeading rotates the WHOLE map (roads + floorplan + footprints) so Katie's house
 // — which doesn't face true north — sits square on screen. Degrees clockwise.
 const DEFAULT_CAL = {
-  lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95, mapHeading: 0,
+  lat: 52.185833, lng: 0.141944, widthM: 6, rotationDeg: 0, opacity: 0.95, mapHeading: 0, mapScale: 1,
   // The default view the map OPENS at — centred on the floorplan and zoomed out enough
   // to frame the whole (very tall) long plan, so it's visible before you recalibrate.
   viewLat: 52.185833, viewLng: 0.141944, viewZoom: 19,
@@ -139,6 +140,30 @@ function moveLatLng(lat, lng, distM, bearing) {
 const CONSTRAIN_REAL_TO_HOUSE = true;   // snap real GPS prints into the house + off walls
 const HOUSE_GATE_M = 25;                // only constrain GPS pings within 25 m of the house (else it's outdoors)
 
+// Grow a 1=wall mask by `r` pixels (separable box dilation) — a cheap safe-zone so the
+// walker keeps a small margin off every wall. Two O(W·H·r) passes, run once on load.
+function dilateMask(mask, W, H, r) {
+  if (!r || r <= 0) return mask;
+  const tmp = new Uint8Array(W * H);
+  for (let y = 0; y < H; y += 1) {
+    const row = y * W;
+    for (let x = 0; x < W; x += 1) {
+      let v = 0;
+      for (let dx = -r; dx <= r; dx += 1) { const nx = x + dx; if (nx >= 0 && nx < W && mask[row + nx]) { v = 1; break; } }
+      tmp[row + x] = v;
+    }
+  }
+  const out = new Uint8Array(W * H);
+  for (let x = 0; x < W; x += 1) {
+    for (let y = 0; y < H; y += 1) {
+      let v = 0;
+      for (let dy = -r; dy <= r; dy += 1) { const ny = y + dy; if (ny >= 0 && ny < H && tmp[ny * W + x]) { v = 1; break; } }
+      out[y * W + x] = v;
+    }
+  }
+  return out;
+}
+
 function latLngToSvg(lat, lng, cal) {
   const halfW = (Number(cal.widthM) || 6) / 2;
   const halfH = ((Number(cal.widthM) || 6) * FLOORPLAN_ASPECT) / 2;
@@ -222,9 +247,36 @@ export default function FootprintsPage() {
   useEffect(() => subscribeCalibrator(setShowCalibrator), []);
   const calRef = useRef(cal); calRef.current = cal;
   const floorplanRef = useRef(null);
+  // The calibration is shared via the backend so it's the SAME on every device
+  // (desktop, iOS). We seed from localStorage for a fast first paint, then overwrite
+  // with the server copy on mount, and push admin edits back up (debounced).
+  const calSyncedRef = useRef(false);
+  const calSaveTimer = useRef(null);
+  useEffect(() => {
+    let cancelled = false;
+    const hadLocal = (() => { try { return !!localStorage.getItem(FLOORPLAN_CAL_KEY); } catch { return false; } })();
+    api.footprints.floorplan()
+      .then((cfg) => {
+        if (cancelled) return;
+        if (cfg && typeof cfg.showCalibrator === 'boolean') setCalibratorShown(cfg.showCalibrator);   // shared button visibility
+        if (cfg && Number.isFinite(Number(cfg.lat))) {
+          const { showCalibrator, ...calFields } = cfg;                  // keep the UI flag out of the cal object
+          setCal((c) => ({ ...c, ...calFields }));                       // server has it → every device uses it
+        } else if (hadLocal) {
+          api.footprints.saveFloorplan(calRef.current).catch(() => {});  // server empty → seed it from this device's saved calibration
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) calSyncedRef.current = true; });   // allow further saves only after the server load
+    return () => { cancelled = true; if (calSaveTimer.current) clearTimeout(calSaveTimer.current); };
+  }, []);
   useEffect(() => {
     floorplanRef.current?.update(cal);
     try { localStorage.setItem(FLOORPLAN_CAL_KEY, JSON.stringify(cal)); } catch { /* ignore */ }
+    if (calSyncedRef.current) {   // debounce-persist to the backend (admin-only endpoint)
+      if (calSaveTimer.current) clearTimeout(calSaveTimer.current);
+      calSaveTimer.current = setTimeout(() => { api.footprints.saveFloorplan(cal).catch(() => {}); }, 700);
+    }
   }, [cal]);
   useEffect(() => { floorplanRef.current?.setInteractive(calibrating); }, [calibrating]);
   useEffect(() => () => { floorplanRef.current?.destroy(); }, []);
@@ -269,7 +321,9 @@ export default function FootprintsPage() {
           const px = ctx.getImageData(0, 0, SVG_W, SVG_H).data;
           const mask = new Uint8Array(SVG_W * SVG_H);
           for (let i = 0; i < mask.length; i += 1) mask[i] = px[i * 4 + 3] > 40 ? 1 : 0;
-          wallMaskRef.current = mask;
+          // Grow the walls by a small SAFE-ZONE buffer so footprints keep a little
+          // margin off every line rather than skimming right against it.
+          wallMaskRef.current = dilateMask(mask, SVG_W, SVG_H, WALL_BUFFER_PX);
           URL.revokeObjectURL(url);
         };
         img.onerror = () => URL.revokeObjectURL(url);
@@ -379,7 +433,9 @@ export default function FootprintsPage() {
     const html = document.documentElement; const body = document.body;
     const prev = { h: html.style.overscrollBehavior, bo: body.style.overscrollBehavior, ov: body.style.overflow };
     html.style.overscrollBehavior = 'none'; body.style.overscrollBehavior = 'none'; body.style.overflow = 'hidden';
-    const blockPull = (e) => { const t = e.target; if (t && t.closest && t.closest('.gm-style')) return; e.preventDefault(); };
+    // Let the map pan AND let the calibration controls (sliders) receive touchmove —
+    // otherwise on iOS the preventDefault here kills the range-slider drag.
+    const blockPull = (e) => { const t = e.target; if (t && t.closest && t.closest('.gm-style, [data-mm-controls]')) return; e.preventDefault(); };
     document.addEventListener('touchmove', blockPull, { passive: false });
     return () => {
       html.style.overscrollBehavior = prev.h; body.style.overscrollBehavior = prev.bo; body.style.overflow = prev.ov;
@@ -515,10 +571,12 @@ export default function FootprintsPage() {
   // a CSS-transformed ancestor can upset Google Maps' tile rendering, so with no
   // rotation (the usual case) the map sits in a plain container and renders cleanly.
   const rot = cal.mapHeading || 0;
-  // When rotated we use a big CENTRED SQUARE (side ≥ the viewport diagonal) so ANY
+  const scale = Math.max(1, cal.mapScale || 1);   // extra CSS zoom BEYOND Google's max (base map is just parchment there)
+  // When rotated/scaled we use a big CENTRED SQUARE (side ≥ the viewport diagonal) so ANY
   // angle 0–360° stays fully covered with no empty corners.
-  const mapWrapStyle = rot
-    ? { position: 'absolute', top: '50%', left: '50%', width: '160vmax', height: '160vmax', transformOrigin: 'center center', transform: `translate(-50%, -50%) rotate(${rot}deg)` }
+  const transformed = rot !== 0 || scale !== 1;
+  const mapWrapStyle = transformed
+    ? { position: 'absolute', top: '50%', left: '50%', width: '160vmax', height: '160vmax', transformOrigin: 'center center', transform: `translate(-50%, -50%) rotate(${rot}deg) scale(${scale})` }
     : { position: 'absolute', inset: 0 };
 
   return (
@@ -531,7 +589,7 @@ export default function FootprintsPage() {
               and footprints as one — so Katie's not-quite-north house sits square. */}
           <div style={mapWrapStyle}>
           <GoogleMap
-            mapContainerStyle={{ width: '100%', height: rot ? '100%' : 'calc(100% + 34px)' }}
+            mapContainerStyle={{ width: '100%', height: transformed ? '100%' : 'calc(100% + 34px)' }}
             onLoad={onLoad}
             options={mapOptions}
           >

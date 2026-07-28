@@ -6,10 +6,11 @@
  * it to match the building's true orientation. This is the piece Google's built-in
  * GroundOverlay can't do (it has no rotation), so we roll a custom OverlayView.
  *
- * Layering: normally the floorplan sits in `mapPane` (the lowest overlay pane, above
- * the tiles) so the footprint trail draws ON TOP of it — footsteps inside the house.
- * During calibration we temporarily move it up to `overlayMouseTarget` (the pane that
- * receives DOM events) so it can be dragged, then drop it back down when done.
+ * Layering: the floorplan sits in `overlayMouseTarget` — the TOP overlay pane — so it
+ * draws ABOVE the parchment texture (which lives in markerLayer), keeping the house
+ * lines crisp. Normally pointer-events are off (so the map pans through it); during
+ * calibration they're on so it can be dragged. Footprints (overlayLayer, below the
+ * texture) show through the floorplan's transparent rooms.
  *
  * `state` = { lat, lng, widthM, rotationDeg, opacity }.
  */
@@ -26,7 +27,7 @@ export function createFloorplanOverlay(map, { svgUrl, aspect, initial, onChange 
 
   function place(panes) {
     if (!div || !panes) return;
-    (interactive ? panes.overlayMouseTarget : panes.mapPane).appendChild(div);
+    panes.overlayMouseTarget.appendChild(div);   // top pane → above the texture
   }
 
   overlay.onAdd = function onAdd() {
