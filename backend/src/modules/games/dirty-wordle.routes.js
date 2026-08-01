@@ -209,20 +209,21 @@ export default async function dirtyWordleRoutes(fastify) {
       [`dirty-wordle:${date}`, date],
     );
 
-    // Current-series stats — find the active series, fall back to most recent
-    const { rows: seriesRows } = await query(
-      `SELECT id, name, starts_on, ends_on
-         FROM dirty_wordle_series
-        WHERE starts_on <= CURRENT_DATE
-        ORDER BY starts_on DESC
-        LIMIT 1`,
+    // Current-series stats — always scoped to the current calendar month.
+    // Auto-inserts a series row if one doesn't exist yet, so no manual migrations needed.
+    const now = new Date();
+    const seriesStartStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const seriesEndStr   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+                             .toISOString().slice(0, 10);
+    const currentSeriesName = now.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+
+    // Ensure a series row exists for this month (idempotent)
+    await query(
+      `INSERT INTO dirty_wordle_series (name, starts_on, ends_on)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (starts_on) DO NOTHING`,
+      [currentSeriesName, seriesStartStr, seriesEndStr],
     );
-    const currentSeries     = seriesRows[0] ?? null;
-    const seriesStartStr    = currentSeries?.starts_on?.toISOString?.().slice(0, 10)
-                              ?? currentSeries?.starts_on ?? null;
-    const seriesEndStr      = currentSeries?.ends_on?.toISOString?.().slice(0, 10)
-                              ?? currentSeries?.ends_on ?? null;
-    const currentSeriesName = currentSeries?.name ?? null;
 
     const { rows: statsRows } = await query(
       `SELECT a.id AS account_id,
