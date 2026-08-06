@@ -63,6 +63,10 @@ const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
 
 const FIT_PADDING = { top: 71, bottom: 210, left: 56, right: 56 };
 const RECENTER_DELAY_MS = 5000;
+// How long the bottom "Arrived" card shows a just-landed crow. The perched crow can
+// persist far longer (a forecast stays all day), but the card should still revert to
+// "no crow in flight" shortly after landing rather than sticking on the day's forecast.
+const CARD_ARRIVED_MS = 5 * 60000;
 const ts = (x) => new Date(x).getTime();
 
 export default function CrowTrackerPage() {
@@ -148,7 +152,11 @@ export default function CrowTrackerPage() {
     if (!flights.length) return null;
     const inflight = flights.filter((f) => !f.arrived);
     if (inflight.length) return inflight.reduce((a, b) => (ts(b.started_at) > ts(a.started_at) ? b : a));
-    return flights.reduce((a, b) => (ts(b.arrives_at) > ts(a.arrives_at) ? b : a));
+    // Only card a RECENTLY-arrived crow — a forecast now perches all day, but the card
+    // shouldn't stay stuck on "Arrived" for it.
+    const recent = flights.filter((f) => f.arrived && Date.now() - ts(f.arrives_at) < CARD_ARRIVED_MS);
+    if (!recent.length) return null;
+    return recent.reduce((a, b) => (ts(b.arrives_at) > ts(a.arrives_at) ? b : a));
   }, [flights]);
 
   // Flap the crows while any are travelling (shared frame — they beat in sync).
@@ -180,10 +188,10 @@ export default function CrowTrackerPage() {
     return [...groups.values()];
   }, [scrolls.scrolls]);
 
-  // Perched crows to draw = the unread scrolls above, PLUS any just-arrived forecast
+  // Perched crows to draw = the unread scrolls above, PLUS the day's forecast
   // ("Three-Eyed Crow"): forecasts aren't readable/unread scrolls, so they aren't in
-  // the list, but on the tracker they still perch with a badge for the arrived
-  // window (they can't be opened, so they clear when their 5-min linger ends).
+  // the list, but the backend keeps the arrived forecast around all day, so it perches
+  // (non-openable) until the next day rather than vanishing after landing.
   const perches = useMemo(() => {
     const list = unreadPerches.map((p) => ({ ...p }));
     for (const f of (Array.isArray(flights) ? flights : [])) {

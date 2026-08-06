@@ -672,8 +672,9 @@ export async function getActiveCrowFlights(recipientId) {
        FROM scrolls s JOIN accounts a ON a.id = s.sender_id
       WHERE s.recipient_id = $1
         AND (
-          s.deliver_at > NOW()                                       -- still in flight
-          OR (s.delivered = TRUE AND s.delivered_at > NOW() - make_interval(mins => $2))
+          s.deliver_at > NOW()                                                         -- still in flight
+          OR (s.from_label IS NULL AND s.delivered = TRUE AND s.delivered_at > NOW() - make_interval(mins => $2))  -- standard: brief "Arrived" linger (the perch then persists via the unread list)
+          OR (s.from_label IS NOT NULL AND s.deliver_at >= date_trunc('day', NOW()))   -- forecast (Three-Eyed Crow): perch stays all day, time-based so it never blinks out at landing
         )
       ORDER BY s.deliver_at ASC`,
     [recipientId, CROW_TRACKER_LINGER_MIN],
