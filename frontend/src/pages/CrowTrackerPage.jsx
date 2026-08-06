@@ -87,6 +87,7 @@ export default function CrowTrackerPage() {
   const scrollsEnabled = !!scrollSettings.enabled;   // admin launch toggle
   const [composeOpen, setComposeOpen] = useState(false);
   const [openLocKey, setOpenLocKey] = useState(null); // "lat,lng" of a tapped perched crow
+  const [openForecast, setOpenForecast] = useState(null); // tapped forecast crow → show the day's weather
   const [stamped, setStamped] = useState(false);     // Pen-scroll seal press illusion
 
   // Press the seal → flip it to the stamped graphic for a beat, then open the composer.
@@ -199,7 +200,9 @@ export default function CrowTrackerPage() {
       const lat = Number(f.dest_lat); const lng = Number(f.dest_lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const key = locKey(lat, lng);
-      if (!list.some((p) => p.key === key)) list.push({ key, lat, lng, label: f.dest_label, count: 1, openable: false });
+      if (!list.some((p) => p.key === key)) {
+        list.push({ key, lat, lng, label: f.dest_label, count: 1, openable: false, forecast: true, message: f.message, title: f.from_label || f.traveller_name });
+      }
     }
     return list;
   }, [unreadPerches, flights]);
@@ -352,17 +355,19 @@ export default function CrowTrackerPage() {
               <OverlayViewF key={p.key} position={{ lat: p.lat, lng: p.lng }} mapPaneName="overlayMouseTarget"
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
                 <div
-                  onClick={() => p.openable && setOpenLocKey(p.key)}
-                  style={{ position: 'relative', width: 52, height: 52, cursor: p.openable ? 'pointer' : 'default' }}
+                  onClick={() => { if (p.forecast) setOpenForecast(p); else if (p.openable) setOpenLocKey(p.key); }}
+                  style={{ position: 'relative', width: 52, height: 52, cursor: (p.openable || p.forecast) ? 'pointer' : 'default' }}
                 >
                   <img src={PERCH_SPRITE} alt="" draggable={false}
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-                  <span style={{
-                    position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, boxSizing: 'border-box',
-                    padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
-                    fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
-                    border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                  }}>{p.count}</span>
+                  {!p.forecast && (
+                    <span style={{
+                      position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, boxSizing: 'border-box',
+                      padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
+                      fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
+                      border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                    }}>{p.count}</span>
+                  )}
                 </div>
               </OverlayViewF>
             ))}
@@ -492,6 +497,28 @@ export default function CrowTrackerPage() {
           onRead={scrolls.markRead}
           onClose={() => { setOpenLocKey(null); scrolls.refresh(); fetchFlights(); }}
         />
+      )}
+
+      {/* Tap the perched forecast crow → read the day's weather (forecasts aren't
+          readable scrolls, so this is a light read-only card rather than the reader). */}
+      {openForecast && (
+        <div
+          onClick={() => setOpenForecast(null)}
+          style={{ position: 'absolute', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: CARD_BG, borderRadius: 20, padding: '18px 20px', maxWidth: 360, width: '100%', color: '#000', boxShadow: '0 16px 50px rgba(0,0,0,0.55)' }}>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: 17 }}>{openForecast.title || 'The Three-Eyed Crow'}</p>
+            {openForecast.label && <p style={{ margin: '2px 0 12px', fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>Forecast for {openForecast.label}</p>}
+            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, whiteSpace: 'pre-line' }}>{openForecast.message || 'No forecast text.'}</p>
+            <button
+              type="button"
+              onClick={() => setOpenForecast(null)}
+              style={{ marginTop: 16, width: '100%', border: 'none', borderRadius: 999, padding: '10px 0', cursor: 'pointer', background: ROUTE, color: '#fff', fontSize: 14, fontWeight: 800 }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
