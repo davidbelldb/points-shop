@@ -571,6 +571,31 @@ export async function listReceived(recipientId) {
   return rows;
 }
 
+// Scrolls that a perched crow on the CROW TRACKER holds at a location: the recipient's
+// delivered-but-unread message scrolls PLUS the day's forecast scroll (the latest per
+// destination). Full rows, so the tracker renders each in the real scroll reader and
+// pools message + forecast crows together per location. Unlike /messages (listReceived),
+// this DOES include forecasts — the tracker is where the weather scroll can be read.
+export async function listPerchScrolls(recipientId) {
+  const { rows: msgs } = await query(
+    `SELECT s.*, a.name AS sender_name, a.username AS sender_username, a.photo_url AS sender_photo
+       FROM scrolls s JOIN accounts a ON a.id = s.sender_id
+      WHERE s.recipient_id = $1 AND s.from_label IS NULL AND s.deliver_at <= NOW()
+      ORDER BY s.deliver_at DESC`,
+    [recipientId],
+  );
+  const { rows: forecasts } = await query(
+    `SELECT DISTINCT ON (s.dest_lat, s.dest_lng)
+            s.*, a.name AS sender_name, a.username AS sender_username, a.photo_url AS sender_photo
+       FROM scrolls s JOIN accounts a ON a.id = s.sender_id
+      WHERE s.recipient_id = $1 AND s.from_label IS NOT NULL
+        AND s.deliver_at <= NOW() AND s.deliver_at >= date_trunc('day', NOW())
+      ORDER BY s.dest_lat, s.dest_lng, s.deliver_at DESC`,
+    [recipientId],
+  );
+  return [...msgs, ...forecasts];
+}
+
 // Recipient's IN-FLIGHT scrolls (crow still on its way). Drives the "crow
 // incoming" countdown toast — earliest arrival first.
 export async function listIncoming(recipientId) {

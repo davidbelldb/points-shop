@@ -87,7 +87,7 @@ export default function CrowTrackerPage() {
   const scrollsEnabled = !!scrollSettings.enabled;   // admin launch toggle
   const [composeOpen, setComposeOpen] = useState(false);
   const [openLocKey, setOpenLocKey] = useState(null); // "lat,lng" of a tapped perched crow
-  const [openForecast, setOpenForecast] = useState(null); // tapped forecast crow → show the day's weather
+  const [perchScrolls, setPerchScrolls] = useState([]); // scrolls (messages + day's forecast) the crows hold
   const [stamped, setStamped] = useState(false);     // Pen-scroll seal press illusion
 
   // Press the seal → flip it to the stamped graphic for a beat, then open the composer.
@@ -130,6 +130,17 @@ export default function CrowTrackerPage() {
     return () => clearInterval(id);
   }, [fetchFlights]);
 
+  // Poll the scrolls the perched crows hold (delivered messages + the day's forecast),
+  // so the crows pool per location and each opens in the real scroll reader.
+  const fetchPerchScrolls = useCallback(() => api.scrolls.perchScrolls()
+    .then((r) => { if (mountedRef.current) setPerchScrolls(r.scrolls ?? []); })
+    .catch(() => {}), []);
+  useEffect(() => {
+    fetchPerchScrolls();
+    const id = setInterval(fetchPerchScrolls, 5000);
+    return () => clearInterval(id);
+  }, [fetchPerchScrolls]);
+
   // A single 100ms clock that all time-based motion reads from.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 100);
@@ -171,15 +182,14 @@ export default function CrowTrackerPage() {
   // Preload the frames once so the first wingbeat doesn't flicker.
   useEffect(() => { FLY_FRAMES.forEach((src) => { const im = new Image(); im.src = src; }); }, []);
 
-  // Every unread scroll waiting for this user, grouped by the destination it was
-  // sent to. Each group becomes ONE perched crow (crow_land_10) sitting on that
-  // location with a count badge, persisting until the scroll(s) there are read —
-  // independent of the 5-minute journey linger. `scrolls.scrolls` is exactly the
-  // set of delivered-but-unread scrolls (reading deletes them).
+  // Every scroll a crow holds (delivered messages + the day's forecast), grouped by
+  // destination. Each group is ONE perched crow with a count badge — message AND
+  // forecast scrolls at the same place POOL into one crow. Tapping opens them all in
+  // the real scroll reader. Message scrolls clear on read; the forecast stays all day.
   const locKey = (lat, lng) => `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
-  const unreadPerches = useMemo(() => {
+  const perches = useMemo(() => {
     const groups = new Map();
-    for (const s of (scrolls.scrolls || [])) {
+    for (const s of (perchScrolls || [])) {
       const lat = Number(s.dest_lat); const lng = Number(s.dest_lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const key = locKey(lat, lng);
@@ -187,32 +197,27 @@ export default function CrowTrackerPage() {
       groups.get(key).count += 1;
     }
     return [...groups.values()];
-  }, [scrolls.scrolls]);
-
-  // Perched crows to draw = the unread scrolls above, PLUS the day's forecast
-  // ("Three-Eyed Crow"): forecasts aren't readable/unread scrolls, so they aren't in
-  // the list, but the backend keeps the arrived forecast around all day, so it perches
-  // (non-openable) until the next day rather than vanishing after landing.
-  const perches = useMemo(() => {
-    const list = unreadPerches.map((p) => ({ ...p }));
-    for (const f of (Array.isArray(flights) ? flights : [])) {
-      if (!(f.arrived && f.kind === 'forecast')) continue;
-      const lat = Number(f.dest_lat); const lng = Number(f.dest_lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      const key = locKey(lat, lng);
-      if (!list.some((p) => p.key === key)) {
-        list.push({ key, lat, lng, label: f.dest_label, count: 1, openable: false, forecast: true, message: f.message, title: f.from_label || f.traveller_name });
-      }
-    }
-    return list;
-  }, [unreadPerches, flights]);
+  }, [perchScrolls]);
 
   // Live list of scrolls at the tapped location (derived, so it shrinks as they're
   // read and the reader closes itself once the location is cleared).
   const openLocScrolls = useMemo(() => {
     if (!openLocKey) return null;
-    return (scrolls.scrolls || []).filter((s) => locKey(s.dest_lat, s.dest_lng) === openLocKey);
-  }, [openLocKey, scrolls.scrolls]);
+    return (perchScrolls || []).filter((s) => locKey(s.dest_lat, s.dest_lng) === openLocKey);
+  }, [openLocKey, perchScrolls]);
+
+  // Reading a scroll: message scrolls are ephemeral (deleted server-side); the daily
+  // forecast is NOT deleted (it perches all day and is re-readable) — just mark it read
+  // locally so its crow stays put.
+  const readScroll = useCallback((id) => {
+    const s = (perchScrolls || []).find((x) => x.id === id);
+    if (s && s.from_label) {
+      setPerchScrolls((prev) => prev.map((x) => (x.id === id ? { ...x, read_at: new Date().toISOString() } : x)));
+      return;
+    }
+    setPerchScrolls((prev) => prev.filter((x) => x.id !== id));
+    scrolls.markRead(id);
+  }, [perchScrolls, scrolls]);
 
   // On-map geometry for each crow STILL IN FLIGHT: its straight-line position (from
   // progress) and the road ahead to its destination. Arrived crows drop out here
@@ -355,19 +360,17 @@ export default function CrowTrackerPage() {
               <OverlayViewF key={p.key} position={{ lat: p.lat, lng: p.lng }} mapPaneName="overlayMouseTarget"
                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -(h / 2) })}>
                 <div
-                  onClick={() => { if (p.forecast) setOpenForecast(p); else if (p.openable) setOpenLocKey(p.key); }}
-                  style={{ position: 'relative', width: 52, height: 52, cursor: (p.openable || p.forecast) ? 'pointer' : 'default' }}
+                  onClick={() => p.openable && setOpenLocKey(p.key)}
+                  style={{ position: 'relative', width: 52, height: 52, cursor: p.openable ? 'pointer' : 'default' }}
                 >
                   <img src={PERCH_SPRITE} alt="" draggable={false}
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-                  {!p.forecast && (
-                    <span style={{
-                      position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, boxSizing: 'border-box',
-                      padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
-                      fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
-                      border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                    }}>{p.count}</span>
-                  )}
+                  <span style={{
+                    position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, boxSizing: 'border-box',
+                    padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
+                    fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
+                    border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                  }}>{p.count}</span>
                 </div>
               </OverlayViewF>
             ))}
@@ -421,9 +424,9 @@ export default function CrowTrackerPage() {
         {focusFlight === null && (
           <>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>No crow in flight</p>
-            {unreadPerches.length > 0 ? (
+            {perchScrolls.length > 0 ? (
               <p style={{ margin: '4px 0 0', opacity: 0.65, fontSize: 13 }}>
-                {scrolls.unread} scroll{scrolls.unread === 1 ? '' : 's'} waiting — tap a crow to open.
+                {perchScrolls.length} scroll{perchScrolls.length === 1 ? '' : 's'} waiting — tap a crow to open.
               </p>
             ) : (
               <p style={{ margin: '4px 0 0', opacity: 0.65, fontSize: 13 }}>This opens live when a scroll is on its way.</p>
@@ -491,34 +494,12 @@ export default function CrowTrackerPage() {
         <ScrollsListModal
           scrolls={openLocScrolls || []}
           settings={scrollSettings}
-          title="Unread scrolls"
+          title="Scrolls"
           light
           cardBg={CARD_BG}
-          onRead={scrolls.markRead}
-          onClose={() => { setOpenLocKey(null); scrolls.refresh(); fetchFlights(); }}
+          onRead={readScroll}
+          onClose={() => { setOpenLocKey(null); fetchPerchScrolls(); scrolls.refresh(); fetchFlights(); }}
         />
-      )}
-
-      {/* Tap the perched forecast crow → read the day's weather (forecasts aren't
-          readable scrolls, so this is a light read-only card rather than the reader). */}
-      {openForecast && (
-        <div
-          onClick={() => setOpenForecast(null)}
-          style={{ position: 'absolute', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: CARD_BG, borderRadius: 20, padding: '18px 20px', maxWidth: 360, width: '100%', color: '#000', boxShadow: '0 16px 50px rgba(0,0,0,0.55)' }}>
-            <p style={{ margin: 0, fontWeight: 800, fontSize: 17 }}>{openForecast.title || 'The Three-Eyed Crow'}</p>
-            {openForecast.label && <p style={{ margin: '2px 0 12px', fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>Forecast for {openForecast.label}</p>}
-            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, whiteSpace: 'pre-line' }}>{openForecast.message || 'No forecast text.'}</p>
-            <button
-              type="button"
-              onClick={() => setOpenForecast(null)}
-              style={{ marginTop: 16, width: '100%', border: 'none', borderRadius: 999, padding: '10px 0', cursor: 'pointer', background: ROUTE, color: '#fff', fontSize: 14, fontWeight: 800 }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );

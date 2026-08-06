@@ -1,7 +1,7 @@
 import {
   getSettings, getFrames, updateSettings, replaceFrames,
   createScroll, listReceived, listIncoming, unreadCount, markRead, resolveDueScrolls,
-  getActiveCrowFlights,
+  getActiveCrowFlights, listPerchScrolls,
   pushStreetSubtitleUpdates, saveLiveActivityToken,
   getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
@@ -101,6 +101,12 @@ export default async function scrollRoutes(fastify) {
   fastify.get('/api/scrolls/active-flight', async (req) => {
     const accountId = getEffectiveAccountId(req);
     return { flights: await getActiveCrowFlights(accountId) };
+  });
+
+  // Scrolls held by the perched crows on the tracker (delivered messages + the day's
+  // forecast). Full rows so the tracker opens them in the real scroll reader.
+  fastify.get('/api/scrolls/perch-scrolls', async (req) => {
+    return { scrolls: await listPerchScrolls(getEffectiveAccountId(req)) };
   });
 
   // Register a Live Activity push token (push-to-start or per-scroll update).
