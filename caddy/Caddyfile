@@ -65,3 +65,12 @@ sneakypoints.com {
 www.sneakypoints.com {
     redir https://sneakypoints.com{uri} permanent
 }
+
+# Named HTTPS host for a companion app to use as its base URL. Serves a blank
+# page; Caddy auto-issues the TLS cert once frames.sneakypoints.com resolves to
+# this box. Nobody using the app ever sees this page.
+frames.sneakypoints.com {
+    encode gzip zstd
+    root * /srv-frames
+    file_server
+}

@@ -11,4 +11,6 @@ RUN npm run build
 
 FROM caddy:2-alpine
 COPY --from=frontend-builder /build/dist /srv
+# Blank placeholder site for the companion app's HTTPS base URL.
+COPY caddy/frames /srv-frames
 COPY caddy/Caddyfile /etc/caddy/Caddyfile
