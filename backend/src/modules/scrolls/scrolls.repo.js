@@ -209,12 +209,31 @@ function routeStreet(scroll, frac) {
 // Phases 1–3 narrate the three waypoint streets; phase 4 = landing approach.
 const PHASE_FRAC = { 1: WAYPOINT_FRACS[0], 2: WAYPOINT_FRACS[1], 3: WAYPOINT_FRACS[2] };
 
+// A local (Cambridge-area) hop, ≤40 km end-to-end. Beyond that the crow has left the
+// curated-street area, so the Cambridge fallbacks must NOT be used.
+function isLocalJourney(scroll) {
+  const km = haversineKm(Number(scroll.origin_lat), Number(scroll.origin_lng), Number(scroll.dest_lat), Number(scroll.dest_lng));
+  return Number.isFinite(km) && km <= 40;
+}
+
 function streetMessage(phase, scroll) {
   if (phase === 4) return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
-  // 1) real reverse-geocoded street on the path, 2) nearest curated street,
-  // 3) deterministic Cambridge fallback.
+  // 1) real reverse-geocoded street on the path, 2) nearest curated street. The
+  // curated Cambridge fallbacks (routeStreet / pickStreets) only apply to a LOCAL hop —
+  // on a long-distance flight we narrate generically rather than name a random
+  // Cambridge street the crow is nowhere near.
   const routed = Array.isArray(scroll.route_streets) ? scroll.route_streets[phase - 1] : null;
-  const street = routed || routeStreet(scroll, PHASE_FRAC[phase]) || pickStreets(scroll.id)[phase - 1];
+  const local = isLocalJourney(scroll);
+  let street = routed || (local ? routeStreet(scroll, PHASE_FRAC[phase]) : null);
+  if (!street && local) street = pickStreets(scroll.id)[phase - 1];
+  if (!street) {
+    switch (phase) {
+      case 1: return 'Probably somewhere over open country';
+      case 2: return 'Likely soaring high over the fields';
+      case 3: return 'Last spotted crossing open country';
+      default: return '';
+    }
+  }
   switch (phase) {
     case 1: return `Probably somewhere over ${street}`;
     case 2: return `Likely soaring over ${street}`;
