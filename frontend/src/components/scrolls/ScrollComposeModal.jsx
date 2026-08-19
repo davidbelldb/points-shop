@@ -11,6 +11,10 @@ const DROPDOWN_BG = '#d2a469';
 
 // Cambridge, UK bounding box for the destination lookup.
 const CAMBRIDGE_VIEWBOX = '0.02,52.27,0.25,52.12';
+// Ellesmere Port / CH66 area (Cheshire) — searched instead of Cambridge when the query
+// is a CH66 postcode, so scrolls can be sent there too. Format: lonW,latN,lonE,latS.
+const CH66_VIEWBOX = '-3.06,53.34,-2.82,53.22';
+const isCH66Query = (q) => /^\s*ch\s?66/i.test(q);
 
 // Message constraints. Up to SHRINK_AT characters render at full size; beyond
 // that the text steps down to a medium size so up to MAX_TOTAL chars still fit
@@ -75,22 +79,29 @@ function DestinationPicker({ value, onPick, font }) {
   async function search(query) {
     if (!query.trim()) { setResults([]); setOpen(false); return; }
     const customs = customMatches(query);
+    // CH66 postcodes look up in the Cheshire (Ellesmere Port) box; everything else
+    // stays bounded to Cambridge. For CH66 we also accept postcode/place results (they
+    // have no street road), so a full postcode like "CH66 3AB" is selectable.
+    const ch66 = isCH66Query(query);
+    const viewbox = ch66 ? CH66_VIEWBOX : CAMBRIDGE_VIEWBOX;
     setBusy(true);
     let streets = [];
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`
-        + `&limit=6&addressdetails=1&countrycodes=gb&viewbox=${CAMBRIDGE_VIEWBOX}&bounded=1`,
+        + `&limit=6&addressdetails=1&countrycodes=gb&viewbox=${viewbox}&bounded=1`,
         { headers: { 'Accept-Language': 'en' } },
       );
       const data = await res.json();
-      // Street names only, de-duplicated.
+      // Street names, de-duplicated. In the CH66 area, fall back to the postcode (or the
+      // first part of the address) when there's no road, so postcodes still appear.
       const seen = new Set();
       for (const r of (Array.isArray(data) ? data : [])) {
-        const road = r.address?.road;
-        if (!road || seen.has(road)) continue;
-        seen.add(road);
-        streets.push({ ...r, road });
+        const label = r.address?.road
+          || (ch66 ? (r.address?.postcode || r.display_name?.split(',')[0].trim()) : null);
+        if (!label || seen.has(label)) continue;
+        seen.add(label);
+        streets.push({ ...r, road: label });
       }
     } catch { /* fall back to customs only */ }
     // Curated matches first (e.g. Bishop's Court), then OSM streets.
