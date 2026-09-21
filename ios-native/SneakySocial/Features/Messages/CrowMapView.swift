@@ -170,6 +170,12 @@ struct GoogleCrowMap: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(onTapCrow: onTapCrow) }
 
+    /// The flap task outlives the view otherwise, holding the marker alive and
+    /// redrawing a crow nobody is looking at.
+    static func dismantleUIView(_ container: CrowMapContainer, coordinator: Coordinator) {
+        coordinator.stopFlapping()
+    }
+
     /// Explicitly main-actor: subclassing NSObject to become a delegate loses
     /// the isolation a plain coordinator would have inferred, and everything in
     /// here touches UIKit. GMSMapViewDelegate is an Objective-C protocol whose
@@ -181,7 +187,12 @@ struct GoogleCrowMap: UIViewRepresentable {
         private var line: GMSPolyline?
         private var start: GMSMarker?
         private var frame = 0
-        private var lastFlap = Date.distantPast
+        /// Wing beats run on their own clock. The sheet only republishes this
+        /// view once a second, so driving the flap from `moveCrow` capped the
+        /// crow at one beat a second no matter what interval it asked for.
+        private var flapTask: Task<Void, Never>?
+        /// Decided once per flight from its bearing — see `sprite(_:flipped:)`.
+        private var facesLeft = false
         /// True once the person has panned or zoomed. After that the camera is
         /// theirs and we stop moving it under them.
         private var userMoved = false
@@ -290,12 +301,36 @@ struct GoogleCrowMap: UIViewRepresentable {
             // opened, the crow slid down the route to where it belonged.
             let bird = GMSMarker(position: CrowMapView.position(
                 flight, progress: CrowMapView.liveProgress(flight)))
-            bird.icon = sprite(flight.arrived ? "crow_land_10" : "crow_send_03")
+            facesLeft = flight.destLng < flight.originLng
+            bird.icon = flight.arrived ? sprite("crow_land_10")
+                                       : sprite("crow_send_03", flipped: facesLeft)
             bird.groundAnchor = CGPoint(x: 0.5, y: 0.5)
             bird.zIndex = 10
             bird.map = map
             crow = bird
             landed = flight.arrived
+            if !flight.arrived { startFlapping() }
+        }
+
+        /// Alternates the two wing poses at roughly seven beats a second,
+        /// independently of how often SwiftUI gets round to updating the map.
+        func startFlapping() {
+            flapTask?.cancel()
+            flapTask = Task { @MainActor [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(140))
+                    guard let self, !Task.isCancelled else { return }
+                    guard let crow = self.crow, !self.landed else { return }
+                    self.frame = 1 - self.frame
+                    crow.icon = self.sprite(self.frame == 0 ? "crow_send_03" : "crow_send_04",
+                                            flipped: self.facesLeft)
+                }
+            }
+        }
+
+        func stopFlapping() {
+            flapTask?.cancel()
+            flapTask = nil
         }
 
         /// Moves the crow along the line, alternating the two wing poses so it
@@ -328,14 +363,12 @@ struct GoogleCrowMap: UIViewRepresentable {
 
             landed = flight.arrived
             guard !flight.arrived else {
+                stopFlapping()
                 crow.icon = sprite("crow_land_10")
                 return
             }
-            if Date.now.timeIntervalSince(lastFlap) > 0.28 {
-                lastFlap = .now
-                frame = 1 - frame
-                crow.icon = sprite(frame == 0 ? "crow_send_03" : "crow_send_04")
-            }
+            // The wings are the flap task's job; this only moves the bird.
+            if flapTask == nil { startFlapping() }
         }
 
         /// Where a finished journey sits: the whole route, both ends on screen.
@@ -354,12 +387,19 @@ struct GoogleCrowMap: UIViewRepresentable {
             }
         }
 
-        private func sprite(_ name: String) -> UIImage? {
+        /// The art is drawn facing east. `flipped` mirrors it for a westward
+        /// journey, so the crow faces where it's going rather than flying
+        /// backwards down its own route.
+        private func sprite(_ name: String, flipped: Bool = false) -> UIImage? {
             guard let image = UIImage(named: name) ?? bundled(name) else { return nil }
             // 38 read as a dot, 76 as a cartoon; 57 is the middle of the two.
             let side: CGFloat = 57
             let size = CGSize(width: side, height: side * (image.size.height / max(image.size.width, 1)))
-            return UIGraphicsImageRenderer(size: size).image { _ in
+            return UIGraphicsImageRenderer(size: size).image { context in
+                if flipped {
+                    context.cgContext.translateBy(x: size.width, y: 0)
+                    context.cgContext.scaleBy(x: -1, y: 1)
+                }
                 image.draw(in: CGRect(origin: .zero, size: size))
             }
         }
@@ -419,6 +459,9 @@ struct AppleCrowMap: View {
 
             Annotation("The crow", coordinate: CrowMapView.position(flight, progress: progress)) {
                 CrowSprite(name: flight.arrived ? CrowArt.right : CrowArt.mover, size: 51)
+                    // Drawn facing east; a westward journey mirrors it so the
+                    // crow faces its direction of travel.
+                    .scaleEffect(x: flight.destLng < flight.originLng ? -1 : 1, y: 1)
                     .shadow(radius: 3)
                     .contentShape(.rect)
                     .onTapGesture {
