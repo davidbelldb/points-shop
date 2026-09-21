@@ -131,11 +131,11 @@ export default async function scrollRoutes(fastify) {
   // body: { kind: 'pts' | 'update', token, scrollId? }
   fastify.post('/api/scrolls/live-activity-token', async (req, reply) => {
     const accountId = getActualAccountId(req);
-    const { kind, token, scrollId } = req.body ?? {};
+    const { kind, token, scrollId, app, environment } = req.body ?? {};
     if ((kind !== 'pts' && kind !== 'update') || !token) {
       return reply.code(400).send({ error: 'kind (pts|update) and token required' });
     }
-    await saveLiveActivityToken({ accountId, kind, scrollId: scrollId || null, token });
+    await saveLiveActivityToken({ accountId, kind, scrollId: scrollId || null, token, app, environment });
     return { ok: true };
   });
 
@@ -201,7 +201,7 @@ export default async function scrollRoutes(fastify) {
   fastify.get('/api/scrolls/:id/flight', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
     const flight = await getScrollFlight(req.params.id, accountId);
-    if (!flight) return reply.code(404).send({ error: 'No such crow' });
+    if (!flight) return reply.code(404).send({ error: 'No such crow', code: 'no_route' });
     return { flight };
   });
 

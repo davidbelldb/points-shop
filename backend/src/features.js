@@ -31,7 +31,7 @@ export const FEATURE_ROUTES = {
   shop: ['/api/products', '/api/basket', '/api/orders', '/api/delivery-options', '/api/shopping'],
   ducky_derby: ['/api/games/ducky'],
   shut_the_box: ['/api/games/shut-the-box-15'],
-  messaging: ['/api/messages'],
+  messaging: ['/api/messages', '/api/giphy'],
   scrolls: ['/api/scrolls'],
 
   stories: ['/api/stories', '/api/reels', '/api/moments'],

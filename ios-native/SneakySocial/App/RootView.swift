@@ -30,6 +30,8 @@ struct MainTabView: View {
     @Environment(SessionStore.self) private var session
     @Environment(FeatureStore.self) private var features
     @Environment(AppCopy.self) private var copy
+    @Environment(LocationStore.self) private var location
+    @Environment(LiveActivityStore.self) private var liveActivities
     @State private var selection: TabSelection = .home
 
     /// Deliberately not `Tab` or `Section` — both are SwiftUI types used below.
@@ -54,7 +56,7 @@ struct MainTabView: View {
                 }
             }
             if features.has(.messaging) {
-                Tab("Messages", systemImage: "bubble.left.and.bubble.right.fill", value: TabSelection.messages) {
+                Tab("Messages", systemImage: "scroll.fill", value: TabSelection.messages) {
                     NavigationStack { MessagesView() }
                 }
             }
@@ -72,6 +74,20 @@ struct MainTabView: View {
         .task {
             await features.load()
             await copy.load()
+
+            // Everything here travels by crow, and a crow needs somewhere to
+            // leave from — so the location is asked for once, on opening,
+            // rather than being something to discover later in a thread.
+            // Already set means nothing happens; declined means the thread
+            // still offers the button.
+            // Registering the push-to-start token only means anything once
+            // we're signed in, which by here we are.
+            liveActivities.start()
+
+            await location.load()
+            if !location.place.isSet {
+                await location.useCurrentLocation()
+            }
         }
     }
 }

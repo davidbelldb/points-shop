@@ -18,6 +18,11 @@ settings:
     SWIFT_EMIT_LOC_STRINGS: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 
+packages:
+  GoogleMaps:
+    url: https://github.com/googlemaps/ios-maps-sdk
+    from: "9.0.0"
+
 targets:
   SneakySocial:
     type: application
@@ -39,11 +44,75 @@ targets:
         NSMicrophoneUsageDescription: Sneaky Social uses the microphone for audio notes.
         NSPhotoLibraryUsageDescription: Sneaky Social uses your photo library to send pictures.
         NSLocationWhenInUseUsageDescription: Sneaky Social uses your location to send scrolls from where you are.
+        # Filled from Secrets.xcconfig; empty is fine and falls back to Apple Maps.
+        GMSApiKey: $(GOOGLE_MAPS_API_KEY)
+        # Live Activities — without this the crow banner never appears.
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.david.sneakysocial
+            CFBundleURLSchemes: [sneakysocial]
+    dependencies:
+      - package: GoogleMaps
+        product: GoogleMaps
+      - target: SneakySocialWidgets
+    # The Maps key lives in Secrets.xcconfig, which is NOT committed. Copy
+    # Secrets.xcconfig.example to Secrets.xcconfig and put your iOS-restricted
+    # key in it. Without one the tracker quietly falls back to Apple Maps.
+    configFiles:
+      Debug: Secrets.xcconfig
+      Release: Secrets.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.david.sneakysocial
         PRODUCT_NAME: SneakySocial
         TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: SneakySocial/SneakySocial.entitlements
+      configs:
+        # A build run from Xcode gets a SANDBOX token; an archive gets a
+        # production one. They are not interchangeable — APNs answers
+        # BadDeviceToken if you mix them up.
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
+
+  SneakySocialWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SneakySocialWidgets
+      # Shared with the app so the attributes can never drift apart.
+      - path: SneakySocial/Shared
+      # The widget has its own bundle, so it needs its own copy of the art
+      # and the font the banner is set in. Listed as files rather than a folder
+      # reference: a folder reference would nest them under Resources/ inside
+      # the bundle, where Bundle.main.url(forResource:) can't find them — and
+      # an unsigned directory in an extension is a codesign problem besides.
+      - path: SneakySocial/Resources
+        buildPhase: resources
+        excludes:
+          - "*.usdz"          # only the app rains
+          - "*.webp"          # duck sprites, app only
+          - "*.mp3"           # race sounds, app only
+          - "marauders-map.json"
+    info:
+      path: SneakySocialWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Sneaky Social Widgets
+        UIAppFonts:
+          - ImperialBlack.ttf
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.david.sneakysocial.widgets
+        PRODUCT_NAME: SneakySocialWidgets
+        SKIP_INSTALL: YES
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
 
   SneakySocialTests:
     type: bundle.unit-test

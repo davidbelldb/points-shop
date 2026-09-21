@@ -1,5 +1,4 @@
 import SwiftUI
-import MapKit
 
 /// The map that slides up from a crow bubble.
 ///
@@ -9,12 +8,17 @@ import MapKit
 /// tracker and the Live Activity are built from, so all three narrate the crow's
 /// journey with the same lines at the same points.
 struct CrowTrackerSheet: View {
-    let scrollID: String
+    /// The API path this journey lives at. A scroll and a chat message describe
+    /// their flights identically, so the sheet doesn't need to know which it's
+    /// looking at.
+    let flightPath: String
     @Binding var detent: PresentationDetent
 
     @State private var flight: CrowFlight?
     @State private var error: String?
-    @State private var camera: MapCameraPosition = .automatic
+    /// A journey that was never recorded — a gesture, or a message sent before
+    /// anyone had set a location. Not a failure, just nothing to draw.
+    @State private var noRoute = false
     @State private var poll: Task<Void, Never>?
     /// Ticked once a second so the crow keeps moving between polls.
     @State private var now: Date = .now
@@ -25,8 +29,17 @@ struct CrowTrackerSheet: View {
 
             if let flight {
                 map(flight)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if noRoute {
+                ContentUnavailableView(
+                    "No route for this one",
+                    systemImage: "bird",
+                    description: Text("It was sent before anyone had said where they were, so there's no journey to follow.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error {
                 ContentUnavailableView("Can't follow this crow", systemImage: "bird", description: Text(error))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -34,9 +47,11 @@ struct CrowTrackerSheet: View {
         .background(Color(hex: "#1f1f1e").opacity(0.001))
         .presentationDetents([.medium, .large], selection: $detent)
         .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+        // Deliberately NOT presentationBackgroundInteraction: with the thread
+        // live behind the sheet, the tap that dismissed it landed on a bubble
+        // and opened the thing straight back up.
         .appTheme()
-        .task(id: scrollID) { await load() }
+        .task(id: flightPath) { await load() }
         .task { await tick() }
         .onDisappear { poll?.cancel(); poll = nil }
     }
@@ -45,7 +60,7 @@ struct CrowTrackerSheet: View {
 
     private var header: some View {
         VStack(spacing: 6) {
-            Text(flight?.line(at: liveProgress) ?? "Finding the crow…")
+            Text(headline)
                 .font(CrowArt.font(size: 16))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -78,6 +93,14 @@ struct CrowTrackerSheet: View {
             withAnimation { detent = detent == .large ? .medium : .large }
             Haptics.tap()
         }
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var headline: String {
+        if let flight { return flight.line(at: liveProgress) }
+        if noRoute { return "No crow to follow" }
+        if error != nil { return "Lost the trail" }
+        return "Finding the crow…"
     }
 
     private func distance(_ flight: CrowFlight) -> String {
@@ -89,53 +112,7 @@ struct CrowTrackerSheet: View {
     // MARK: - Map
 
     private func map(_ flight: CrowFlight) -> some View {
-        Group {
-            let progress = liveProgress
-            Map(position: $camera, interactionModes: [.pan, .zoom]) {
-                MapPolyline(coordinates: [origin(flight), destination(flight)])
-                    .stroke(Palette.oxblood, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [6, 8]))
-
-                Annotation(flight.originLabel ?? "Sent from", coordinate: origin(flight)) {
-                    Circle()
-                        .fill(Palette.parchment)
-                        .stroke(Palette.oxblood, lineWidth: 2)
-                        .frame(width: 12, height: 12)
-                }
-
-                Annotation(flight.destLabel ?? "Heading for", coordinate: destination(flight)) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(Palette.oxblood)
-                        .background(Circle().fill(Palette.parchment).padding(3))
-                }
-
-                Annotation("The crow", coordinate: position(flight, progress: progress)) {
-                    CrowSprite(name: CrowArt.mover, size: 36)
-                        .shadow(radius: 3)
-                }
-            }
-            .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-        }
-        .onAppear { frame(flight) }
-    }
-
-    private func origin(_ flight: CrowFlight) -> CLLocationCoordinate2D {
-        .init(latitude: flight.originLat, longitude: flight.originLng)
-    }
-
-    private func destination(_ flight: CrowFlight) -> CLLocationCoordinate2D {
-        .init(latitude: flight.destLat, longitude: flight.destLng)
-    }
-
-    /// Straight-line interpolation, matching how the server describes the
-    /// journey: as the crow flies, no roads.
-    private func position(_ flight: CrowFlight, progress: Double) -> CLLocationCoordinate2D {
-        guard !flight.arrived else { return destination(flight) }
-        let fraction = max(0, min(1, progress))
-        return .init(
-            latitude: flight.originLat + (flight.destLat - flight.originLat) * fraction,
-            longitude: flight.originLng + (flight.destLng - flight.originLng) * fraction
-        )
+        CrowMapView(flight: flight, progress: liveProgress)
     }
 
     /// Progress from the flight's own clock rather than the server's snapshot,
@@ -159,27 +136,25 @@ struct CrowTrackerSheet: View {
         }
     }
 
-    /// Fit both ends of the journey, with room around them.
-    private func frame(_ flight: CrowFlight) {
-        let midLat = (flight.originLat + flight.destLat) / 2
-        let midLng = (flight.originLng + flight.destLng) / 2
-        let spanLat = max(abs(flight.originLat - flight.destLat) * 1.8, 0.02)
-        let spanLng = max(abs(flight.originLng - flight.destLng) * 1.8, 0.02)
-        camera = .region(MKCoordinateRegion(
-            center: .init(latitude: midLat, longitude: midLng),
-            span: MKCoordinateSpan(latitudeDelta: spanLat, longitudeDelta: spanLng)
-        ))
-    }
-
     // MARK: - Loading
 
     private func load() async {
+        noRoute = false
         do {
-            let response = try await APIClient.shared.get("/scrolls/\(scrollID)/flight", as: CrowFlightResponse.self)
+            let response = try await APIClient.shared.get(flightPath, as: CrowFlightResponse.self)
             flight = response.flight
             error = nil
-            frame(response.flight)
             startPolling()
+        } catch APIError.http(let status, let message) where status == 404 {
+            // Fastify's own 404 says "Not Found"; ours names itself. Treating
+            // both as "no route recorded" hid an undeployed endpoint behind a
+            // reassuring message, which cost an evening.
+            if message.localizedCaseInsensitiveContains("no route")
+                || message.localizedCaseInsensitiveContains("no such crow") {
+                noRoute = true
+            } else {
+                error = "This endpoint isn't on the server yet (\(message))."
+            }
         } catch {
             self.error = (error as? APIError)?.errorDescription ?? error.localizedDescription
         }
@@ -194,7 +169,7 @@ struct CrowTrackerSheet: View {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(6))
                 guard !Task.isCancelled else { return }
-                let updated = try? await APIClient.shared.get("/scrolls/\(scrollID)/flight", as: CrowFlightResponse.self)
+                let updated = try? await APIClient.shared.get(flightPath, as: CrowFlightResponse.self)
                 guard let updated else { continue }
                 flight = updated.flight
                 if updated.flight.arrived { return }

@@ -18,8 +18,21 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.david.sneakysocial</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>sneakysocial</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>GMSApiKey</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Sneaky Social uses the camera to send photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -28,6 +41,10 @@
 	<string>Sneaky Social uses the microphone for audio notes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Sneaky Social uses your photo library to send pictures.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UIAppFonts</key>
 	<array>
 		<string>ImperialBlack.ttf</string>

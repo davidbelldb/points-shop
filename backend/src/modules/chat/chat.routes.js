@@ -1,7 +1,8 @@
 import {
   findOtherUser, findPartner, listPartners, listMessages, sendMessage, markAllRead, messageFlight,
   deleteMessage, editMessage, setReaction, toggleSparkle, setTyping, votePoll,
-  revealSecretMessage, unreadCountTotal, findLatestSender,
+  revealSecretMessage, unreadCountTotal, findLatestSender, getMessageFlight, hasLocation,
+  resolveDueMessageActivities,
 } from './chat.repo.js';
 import { unreadCount as scrollsUnreadCount } from '../scrolls/scrolls.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
@@ -11,7 +12,19 @@ import { areFriends } from '../friends/friends.repo.js';
 // per key in the frontend, so adding new ones requires both ends to know.
 const ALLOWED_REACTIONS = new Set(['heart', '😂', '💜', '🍆', '🫦', '😲']);
 
+// Keeps every in-flight message's Live Activity moving: waypoint updates while
+// the crow travels, and the landing when it gets there. Polled a touch tighter
+// than the waypoints are spaced so a node pops close to when it's due.
+let activityTimer = false;
+function startMessageActivityResolver() {
+  if (activityTimer) return;
+  activityTimer = true;
+  setInterval(() => { resolveDueMessageActivities().catch(() => {}); }, 3_000);
+}
+
 export default async function chatRoutes(fastify) {
+  startMessageActivityResolver();
+
   // Resolve who a request is addressed to. An explicit id always wins; without
   // one we fall back to the old "the other user" guess so clients that haven't
   // been taught about partners yet keep working unchanged.
@@ -68,7 +81,10 @@ export default async function chatRoutes(fastify) {
   const SYSTEM_BODIES = new Set(['__nudge__', '__rain_twirl__', '__rain_popcorn__', '__rain_duck__']);
 
   fastify.post('/api/messages', async (req, reply) => {
-    const { body, reply_to_story_id, reply_to_message_id, slider_response, recipient_id } = req.body ?? {};
+    const {
+      body, reply_to_story_id, reply_to_message_id, slider_response, recipient_id,
+      crows,
+    } = req.body ?? {};
     if (typeof body !== 'string' || !body.trim()) {
       return reply.code(400).send({ error: 'body required' });
     }
@@ -77,6 +93,20 @@ export default async function chatRoutes(fastify) {
       return reply.code(400).send({ error: 'system messages cannot be replies' });
     }
     const accountId = getEffectiveAccountId(req);
+
+    // A crow-aware client (the native app) has to say where it's sending from:
+    // without it there's no distance, and the whole conceit falls over.
+    //
+    // Deliberately gated on `crows` rather than applied to everyone. The web
+    // client has no screen for setting a location, so enforcing it there would
+    // lock Katie out of messaging with no way to fix it.
+    if (crows && !(await hasLocation(accountId))) {
+      return reply.code(400).send({
+        error: 'Set where you are before sending — a crow needs to know how far to fly.',
+        code: 'location_required',
+      });
+    }
+
     const other = await resolvePartner(accountId, recipient_id);
     if (!other) {
       return reply.code(recipient_id ? 404 : 400).send({
@@ -133,6 +163,18 @@ export default async function chatRoutes(fastify) {
       await markAllRead(accountId, null);
     }
     return { ok: true };
+  });
+
+  // One message's journey, for the tracker sheet that slides up from its
+  // bubble. Either participant may watch it; a message with no route recorded
+  // (a gesture, or one sent before anyone set a location) has nothing to show.
+  fastify.get('/api/messages/:id/flight', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const flight = await getMessageFlight(req.params.id, accountId);
+    if (!flight) {
+      return reply.code(404).send({ error: 'No route recorded for this one', code: 'no_route' });
+    }
+    return { flight };
   });
 
   fastify.delete('/api/messages/:id', async (req) => {

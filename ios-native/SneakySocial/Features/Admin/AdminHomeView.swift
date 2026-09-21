@@ -42,7 +42,7 @@ struct AdminHomeView: View {
             Section {
                 Label("Crow & scrolls", systemImage: "bird")
                     .foregroundStyle(.tertiary)
-                Label("Messages", systemImage: "bubble.left.and.bubble.right")
+                Label("Messages", systemImage: "scroll.fill")
                     .foregroundStyle(.tertiary)
             } header: {
                 Text("Not ported yet")

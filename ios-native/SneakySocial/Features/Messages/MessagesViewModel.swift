@@ -57,14 +57,25 @@ final class MessagesViewModel {
     private var pollTask: Task<Void, Never>?
     /// Scrolls already reported as seen, so a poll doesn't re-POST every cycle.
     private var seenScrolls = Set<String>()
+    /// The last inbound message we reacted to, so a nudge doesn't shake the
+    /// screen again every four seconds.
+    private var lastAnnounced: String?
+
+    /// A gesture that just landed — the thread shakes or rains, then clears it.
+    var arrived: SystemMessage?
 
     init(api: APIClient = .shared) {
         self.api = api
     }
 
+    /// Set from the thread, which owns the location store. Without a location
+    /// there's no distance, so there's nothing for a crow to fly.
+    var hasLocation = false
+
     var canSend: Bool {
         !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && partner != nil
+            && hasLocation
             && !isSending
     }
 
@@ -103,6 +114,8 @@ final class MessagesViewModel {
         inFlight = []
         flights = [:]
         flightEstimate = nil
+        lastAnnounced = nil
+        arrived = nil
     }
 
     /// One pass: chat and scrolls together, merged and sorted.
@@ -148,12 +161,11 @@ final class MessagesViewModel {
             error = nil
             merged.sort { $0.sortDate < $1.sortDate }
 
-            // Anything still in the air gets a flight window the moment we see
-            // it, and keeps it afterwards — so a bubble watched through its
-            // landing stays a crow rather than snapping back to plain
-            // parchment on the next poll.
+            // Every message that HAS a journey keeps its journey — landed ones
+            // included. Registering only the in-flight ones meant history lost
+            // its trail and reappeared as a plain bubble on the next poll.
             for case .chat(let message) in merged
-            where message.hasFlight && !message.hasArrived && flights[message.id] == nil {
+            where message.hasFlight && flights[message.id] == nil {
                 flights[message.id] = FlightWindow(startedAt: message.departedAt,
                                                    arrivesAt: message.arrivesAt)
             }
@@ -203,7 +215,7 @@ final class MessagesViewModel {
 
     func send() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let partnerID = partner?.id, !isSending else { return }
+        guard !text.isEmpty, let partnerID = partner?.id, !isSending, hasLocation else { return }
         isSending = true
         defer { isSending = false }
 
@@ -248,6 +260,71 @@ final class MessagesViewModel {
     /// The journey a message in the thread should show, if it has one. Only
     /// messages sent from this screen do — history is history.
     func flight(for messageID: String) -> FlightWindow? { flights[messageID] }
+
+    /// Sends a body that isn't typed text: a media URL, a nudge, a shower, a
+    /// poll. These skip the composer entirely, and the wordless ones skip the
+    /// crow too — the server delivers them immediately.
+    @discardableResult
+    func sendRaw(_ body: String) async -> Bool {
+        guard let partnerID = partner?.id, hasLocation else { return false }
+        do {
+            _ = try await api.post(
+                "/messages",
+                body: SendMessageRequest(body: body, recipient_id: partnerID),
+                as: Ignored.self
+            )
+            await refresh()
+            return true
+        } catch {
+            report(error)
+            Haptics.failure()
+            return false
+        }
+    }
+
+    func sendNudge() async {
+        Haptics.nudge()
+        await sendRaw("__nudge__")
+    }
+
+    func sendRain(_ kind: RainKind) async {
+        await sendRaw(kind.body)
+    }
+
+    func sendPoll(question: String, options: [String]) async {
+        let payload: [String: Any] = ["question": question, "options": options]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let json = String(data: data, encoding: .utf8) else { return }
+        await sendRaw("\(ChatMessage.pollPrefix)\(json)")
+    }
+
+    /// Uploads a file and sends the URL it comes back as. Photos, GIFs saved
+    /// from the picker and voice notes are all this.
+    func sendUpload(_ data: Data, filename: String, mimeType: String) async {
+        guard hasLocation else { return }
+        isSending = true
+        defer { isSending = false }
+        do {
+            let uploaded = try await api.upload(data, filename: filename, mimeType: mimeType)
+            await sendRaw(uploaded.url)
+            Haptics.tap()
+        } catch {
+            report(error)
+            Haptics.failure()
+        }
+    }
+
+    func vote(_ message: ChatMessage, option: Int) async {
+        struct Body: Encodable, Sendable { let option_idx: Int }
+        do {
+            _ = try await api.put("/messages/\(message.id)/vote",
+                                  body: Body(option_idx: option), as: Ignored.self)
+            await refresh()
+            Haptics.tap()
+        } catch {
+            report(error)
+        }
+    }
 
     func react(to message: ChatMessage, with reaction: String?) async {
         struct Body: Encodable, Sendable { let reaction: String? }
@@ -308,10 +385,10 @@ final class MessagesViewModel {
     private struct Ignored: Codable, Sendable {
         init() {}
         init(from decoder: Decoder) throws {}
+        /// Encodes as `{}` — some of these endpoints want a body they'll ignore.
         func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: Key.self)
-            _ = container
+            var container = encoder.singleValueContainer()
+            try container.encode([String: String]())
         }
-        private enum Key: CodingKey {}
     }
 }

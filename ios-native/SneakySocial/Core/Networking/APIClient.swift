@@ -98,6 +98,55 @@ final class APIClient: Sendable {
         _ = try? await send(path, method: method, body: Optional<NoBody>.none, as: OKResponse.self)
     }
 
+    func fireAndForget<B: Encodable & Sendable>(_ path: String, method: String = "POST", body: B) async {
+        _ = try? await send(path, method: method, body: body, as: OKResponse.self)
+    }
+
+    // MARK: - Uploads
+
+    /// Sends a file to `POST /api/upload` as multipart/form-data — photos, GIFs
+    /// saved from the picker, and voice notes all come back as a `/media/...`
+    /// URL, which is what a media message's body actually is.
+    func upload(_ data: Data, filename: String, mimeType: String) async throws -> UploadResponse {
+        guard let url = URL(string: "/api/upload", relativeTo: Self.origin)?.absoluteURL else {
+            throw APIError.network("Bad upload path")
+        }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        // Uploads can be slow on a phone; the default 20s is not enough.
+        request.timeoutInterval = 120
+
+        var body = Data()
+        func append(_ text: String) { body.append(Data(text.utf8)) }
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n")
+        append("Content-Type: \(mimeType)\r\n\r\n")
+        body.append(data)
+        append("\r\n--\(boundary)--\r\n")
+        request.httpBody = body
+
+        do {
+            let (responseData, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.network("No response from the server")
+            }
+            if http.statusCode == 401 { throw APIError.notAuthenticated }
+            guard (200..<300).contains(http.statusCode) else {
+                throw APIError.http(status: http.statusCode,
+                                    message: Self.errorMessage(from: responseData, status: http.statusCode))
+            }
+            return try Self.decoder.decode(UploadResponse.self, from: responseData)
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.network(error.localizedDescription)
+        }
+    }
+
     // MARK: - Media
 
     /// Backend payloads embed uploads as root-relative paths ("/media/..."), which
@@ -210,6 +259,17 @@ final class APIClient: Sendable {
     // Format styles are value types, so these are safe to share.
     private static let fractionalISO8601 = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     private static let plainISO8601 = Date.ISO8601FormatStyle()
+}
+
+/// What `/api/upload` answers with.
+struct UploadResponse: Decodable, Sendable {
+    let url: String
+    var thumbnailURL: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case url
+        case thumbnailURL = "thumbnail_url"
+    }
 }
 
 /// The `{ ok: true }` shape a handful of endpoints return.

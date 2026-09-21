@@ -1,4 +1,5 @@
 import { query, pool } from '../../db.js';
+import { config } from '../../config.js';
 import { sendPush, isMuted } from '../notifications/push.js';
 import {
   sendLiveActivityPush, crowContentState, sendSilentWake,
@@ -12,25 +13,55 @@ import { fetchForecastBody } from './forecast.js';
 // ---------------------------------------------------------------------------
 
 /** Upsert a Live Activity token (push-to-start, or per-scroll update). */
-export async function saveLiveActivityToken({ accountId, kind, scrollId = null, token }) {
+export async function saveLiveActivityToken({ accountId, kind, scrollId = null, token, app = 'capacitor', environment = 'production' }) {
   if (!token) return;
+  // `app` decides which APNs topic this token is later addressed at. It
+  // defaults to 'capacitor', so a client that doesn't send one behaves exactly
+  // as it always has.
+  const which = app === 'native' ? 'native' : 'capacitor';
+  const env = environment === 'development' ? 'development' : 'production';
   await query(
-    `INSERT INTO live_activity_tokens (account_id, kind, scroll_id, token)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO live_activity_tokens (account_id, kind, scroll_id, token, app, environment)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (token) DO UPDATE
        SET account_id = EXCLUDED.account_id, kind = EXCLUDED.kind,
-           scroll_id = EXCLUDED.scroll_id, updated_at = NOW()`,
-    [accountId, kind, scrollId, token],
+           scroll_id = EXCLUDED.scroll_id, app = EXCLUDED.app,
+           environment = EXCLUDED.environment, updated_at = NOW()`,
+    [accountId, kind, scrollId, token, which, env],
   );
 }
 
 async function ptsTokenFor(accountId) {
   const { rows } = await query(
     `SELECT token FROM live_activity_tokens
-      WHERE account_id = $1 AND kind = 'pts' ORDER BY updated_at DESC LIMIT 1`,
+      WHERE account_id = $1 AND kind = 'pts' AND app = 'capacitor'
+      ORDER BY updated_at DESC LIMIT 1`,
     [accountId],
   );
   return rows[0]?.token || null;
+}
+
+/**
+ * The newest push-to-start token per app — one Live Activity each.
+ *
+ * The Capacitor app's row is untouched by this: it still resolves the same
+ * token it always did, and is pushed to the same topic. The native app is an
+ * additional recipient, addressed at its own bundle id.
+ */
+async function ptsTokensByApp(accountId) {
+  const { rows } = await query(
+    `SELECT DISTINCT ON (app) app, token, environment
+       FROM live_activity_tokens
+      WHERE account_id = $1 AND kind = 'pts'
+      ORDER BY app, updated_at DESC`,
+    [accountId],
+  );
+  return rows.map((r) => ({
+    token: r.token,
+    bundleId: r.app === 'native' ? config.apns.bundleIdNative : config.apns.bundleId,
+    // A development build's token only answers on the sandbox gateway.
+    sandbox: r.environment === 'development',
+  }));
 }
 
 async function updateTokensFor(scrollId) {
@@ -41,13 +72,53 @@ async function updateTokensFor(scrollId) {
   return rows.map((r) => r.token);
 }
 
+/**
+ * Push-to-start a crow activity on someone's device, for anything that flies.
+ *
+ * Extracted so a chat message can raise the same banner a scroll does — the
+ * activity doesn't care which table the journey came from, only when the crow
+ * left, when it lands, and what the two ends are called.
+ *
+ * Returns the broadcast channel id, so the caller can store it and drive the
+ * updates and the landing through it.
+ */
+export async function startCrowActivity({
+  recipientId, id, startedAtMs, arrivesAtMs,
+  originLabel = 'afar', destLabel = '', kind = 'scroll',
+  message = '', alert,
+}) {
+  // Respect the recipient's mute window — no new Live Activity while muted.
+  if (await isMuted(recipientId)) return null;
+  const targets = await ptsTokensByApp(recipientId);
+  if (!targets.length) return null;
+
+  // A broadcast channel means updates and the landing reach the device even
+  // with the app fully closed; the device-token path is the fallback.
+  let channelId = null;
+  try { channelId = await createBroadcastChannel(); } catch { /* fall back */ }
+
+  for (const target of targets) {
+    await sendLiveActivityPush(target.token, {
+      event: 'start',
+      channelId,
+      bundleId: target.bundleId,
+      sandbox: target.sandbox,
+      contentState: crowContentState({ startedAtMs, arrivesAtMs, landed: false, message }),
+      attributes: { kind, originLabel, destLabel, scrollId: id },
+      alert,
+    });
+  }
+  if (!channelId) setTimeout(() => { sendSilentWake(recipientId).catch(() => {}); }, 3000);
+  return channelId;
+}
+
 // Push-to-start the crow activity on the recipient's device (works app-closed).
 async function startLiveActivityFor(scroll) {
   try {
     // Respect the recipient's mute window — no new Live Activity while muted.
     if (await isMuted(scroll.recipient_id)) return;
-    const token = await ptsTokenFor(scroll.recipient_id);
-    if (!token) return;
+    const targets = await ptsTokensByApp(scroll.recipient_id);
+    if (!targets.length) return;
     const arrivesAtMs = new Date(scroll.deliver_at).getTime();
     const startedAtMs = arrivesAtMs - (Number(scroll.flight_seconds) || 0) * 1000;
     // Create a broadcast channel so live updates + the landing reach the recipient
@@ -58,9 +129,14 @@ async function startLiveActivityFor(scroll) {
     if (channelId) {
       await query(`UPDATE scrolls SET la_channel_id = $1 WHERE id = $2`, [channelId, scroll.id]).catch(() => {});
     }
-    await sendLiveActivityPush(token, {
+    // One start per app the recipient has installed. A channel is shared, so
+    // the same broadcast updates reach both.
+    for (const target of targets) {
+    await sendLiveActivityPush(target.token, {
       event: 'start',
       channelId,
+      bundleId: target.bundleId,
+      sandbox: target.sandbox,
       contentState: crowContentState({
         startedAtMs, arrivesAtMs, landed: false,
         // Forecast scrolls open with their own line before street narration.
@@ -79,6 +155,7 @@ async function startLiveActivityFor(scroll) {
           : `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
       },
     });
+    }
     // Only the device-token fallback needs the app awake; with a channel the
     // updates broadcast regardless, so skip the wake when we have one.
     if (!channelId) setTimeout(() => { sendSilentWake(scroll.recipient_id).catch(() => {}); }, 3000);
@@ -667,7 +744,7 @@ const CROW_TRACKER_LINGER_MIN = 5;
 // the flight's timestamps (deliver_at / flight_seconds), so progress is purely
 // time-based — the crow flies a STRAIGHT LINE from origin to destination, "as the
 // crow flies", with no road/street routing.
-function buildCrowFlight(s) {
+export function buildCrowFlight(s) {
   const arrivesMs = new Date(s.deliver_at).getTime();
   const startedMs = arrivesMs - (Number(s.flight_seconds) || 0) * 1000;
   const now = Date.now();

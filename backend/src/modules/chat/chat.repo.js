@@ -1,6 +1,7 @@
 import { query } from '../../db.js';
 import { sendPush } from '../notifications/push.js';
-import { haversineKm } from '../scrolls/scrolls.repo.js';
+import { crowContentState, sendBroadcast, deleteBroadcastChannel } from '../notifications/apns.js';
+import { haversineKm, buildCrowFlight, startCrowActivity } from '../scrolls/scrolls.repo.js';
 
 // ---------------------------------------------------------------------------
 // How long a message's crow is in the air.
@@ -28,6 +29,79 @@ const SYSTEM_BODIES_INSTANT = new Set([
   '__nudge__', '__rain_twirl__', '__rain_popcorn__', '__rain_duck__',
 ]);
 
+/* The crow's progress, narrated. Same waypoints as a scroll's; the streets are
+   a scroll's own trick (it stores a reverse-geocoded route), so a message gets
+   the generic lines a scroll falls back to. */
+const MESSAGE_PHASES = [
+  { at: 0.25, line: 'Probably somewhere over open country' },
+  { at: 0.50, line: 'Likely soaring high over the fields' },
+  { at: 0.75, line: 'Last spotted crossing open country' },
+  { at: 0.92, line: 'Coming in to land' },
+];
+
+/**
+ * Drives every in-flight message's Live Activity: the waypoint updates while
+ * it travels, and the landing when it arrives.
+ *
+ * Scrolls have `pushStreetSubtitleUpdates` and `resolveDueScrolls` doing this
+ * against the scrolls table; messages live in a different table, so they need
+ * their own pass. Both end up broadcasting the same CrowActivityAttributes.
+ */
+export async function resolveDueMessageActivities() {
+  const { rows } = await query(
+    `SELECT id, created_at, deliver_at, la_channel_id, la_phase, dest_label
+       FROM chat_messages
+      WHERE la_channel_id IS NOT NULL AND la_ended = FALSE`,
+  );
+
+  for (const m of rows) {
+    const arrivesAtMs = new Date(m.deliver_at).getTime();
+    const startedAtMs = new Date(m.created_at).getTime();
+    const now = Date.now();
+
+    if (now >= arrivesAtMs) {
+      const state = crowContentState({ startedAtMs, arrivesAtMs, landed: true, phase: 4 });
+      await sendBroadcast(m.la_channel_id, {
+        event: 'end',
+        contentState: state,
+        // Let it sit for a moment rather than vanishing the instant it lands.
+        dismissalMs: now + 30_000,
+        alert: { title: 'A crow has arrived', body: 'Your scroll has landed.' },
+      }).catch(() => {});
+      deleteBroadcastChannel(m.la_channel_id).catch(() => {});
+      await query(`UPDATE chat_messages SET la_ended = TRUE WHERE id = $1`, [m.id]).catch(() => {});
+      continue;
+    }
+
+    const total = Math.max(1, arrivesAtMs - startedAtMs);
+    const progress = (now - startedAtMs) / total;
+    let phase = 0;
+    for (let i = 0; i < MESSAGE_PHASES.length; i += 1) {
+      if (progress >= MESSAGE_PHASES[i].at) phase = i + 1;
+    }
+    if (phase === m.la_phase) continue;
+
+    await sendBroadcast(m.la_channel_id, {
+      event: 'update',
+      contentState: crowContentState({
+        startedAtMs, arrivesAtMs, landed: false, phase,
+        message: MESSAGE_PHASES[phase - 1]?.line ?? '',
+      }),
+    }).catch(() => {});
+    await query(`UPDATE chat_messages SET la_phase = $1 WHERE id = $2`, [phase, m.id]).catch(() => {});
+  }
+}
+
+/** Has this account said where it is? */
+export async function hasLocation(accountId) {
+  const { rows } = await query(
+    `SELECT 1 FROM accounts
+      WHERE id = $1 AND location_lat IS NOT NULL AND location_lng IS NOT NULL`,
+    [accountId],
+  );
+  return rows.length > 0;
+}
+
 /**
  * The journey between two people, from the locations they've set.
  *
@@ -53,6 +127,8 @@ export async function messageFlight(senderId, recipientId) {
       distanceKm: null,
       originLabel: from?.location_label ?? null,
       destLabel: to?.location_label ?? null,
+      origin: senderLocated ? { lat: from.location_lat, lng: from.location_lng } : null,
+      dest: recipientLocated ? { lat: to.location_lat, lng: to.location_lng } : null,
       senderLocated,
       recipientLocated,
     };
@@ -71,6 +147,10 @@ export async function messageFlight(senderId, recipientId) {
     distanceKm,
     originLabel: from.location_label ?? null,
     destLabel: to.location_label ?? null,
+    // Snapshotted onto the message, because the crow flew THIS route and
+    // either of them may have moved by the time anyone looks at it again.
+    origin: { lat: from.location_lat, lng: from.location_lng },
+    dest: { lat: to.location_lat, lng: to.location_lng },
     senderLocated,
     recipientLocated,
   };
@@ -190,6 +270,40 @@ export async function findLatestSender(accountId) {
     [accountId],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * One message's flight, shaped exactly like a scroll's so the tracker sheet
+ * doesn't care which it's looking at. Either participant may watch it.
+ *
+ * Returns null for a message with no route recorded — a gesture, or anything
+ * sent before locations existed.
+ */
+export async function getMessageFlight(messageId, accountId) {
+  const { rows } = await query(
+    `SELECT m.id, m.sender_id, m.recipient_id,
+            m.origin_label, m.dest_label,
+            m.origin_lat, m.origin_lng, m.dest_lat, m.dest_lng,
+            m.deliver_at, m.flight_seconds,
+            a.name AS sender_name
+       FROM chat_messages m
+       JOIN accounts a ON a.id = m.sender_id
+      WHERE m.id = $1 AND $2 IN (m.sender_id, m.recipient_id)`,
+    [messageId, accountId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  if (row.origin_lat == null || row.dest_lat == null) return null;
+
+  return buildCrowFlight({
+    ...row,
+    from_label: null,
+    body: '',
+    route_streets: null,
+    // A message has no 'delivered' flag of its own; deliver_at is the truth.
+    delivered: row.deliver_at != null && new Date(row.deliver_at) <= new Date(),
+    delivered_at: row.deliver_at,
+  });
 }
 
 export async function setTyping(accountId) {
@@ -414,15 +528,17 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
   // they land at once rather than waiting on a bird.
   const instant = SYSTEM_BODIES_INSTANT.has(trimmed);
   const flight = instant
-    ? { seconds: 0, distanceKm: null, originLabel: null, destLabel: null }
+    ? { seconds: 0, distanceKm: null, originLabel: null, destLabel: null, origin: null, dest: null }
     : await messageFlight(senderId, recipientId);
 
   const { rows } = await query(
     `INSERT INTO chat_messages
        (sender_id, recipient_id, body, reply_to_story_id, reply_to_message_id, slider_response,
-        flight_seconds, distance_km, origin_label, dest_label, deliver_at)
+        flight_seconds, distance_km, origin_label, dest_label,
+        origin_lat, origin_lng, dest_lat, dest_lng, deliver_at)
      VALUES ($1, $2, $3, $4, $5, $6::jsonb,
-             $7, $8, $9, $10, NOW() + ($7::int * interval '1 second'))
+             $7, $8, $9, $10, $11, $12, $13, $14,
+             NOW() + ($7::int * interval '1 second'))
      RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction,
                reply_to_story_id, reply_to_message_id, slider_response,
                flight_seconds, deliver_at, origin_label, dest_label, distance_km`,
@@ -431,11 +547,36 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
       replyToStoryId || null, replyToMessageId || null,
       safeSlider ? JSON.stringify(safeSlider) : null,
       flight.seconds, flight.distanceKm, flight.originLabel, flight.destLabel,
+      flight.origin?.lat ?? null, flight.origin?.lng ?? null,
+      flight.dest?.lat ?? null, flight.dest?.lng ?? null,
     ],
   );
 
   const senderRes = await query(`SELECT name FROM accounts WHERE id = $1`, [senderId]);
   const senderName = senderRes.rows[0]?.name ?? 'Someone';
+
+  // A message that flies gets the same Live Activity a scroll does. Only the
+  // ones with a real journey — a nudge has nothing to watch.
+  const created = rows[0];
+  if (!instant && flight.seconds > 0) {
+    startCrowActivity({
+      recipientId,
+      id: created.id,
+      startedAtMs: new Date(created.created_at).getTime(),
+      arrivesAtMs: new Date(created.deliver_at).getTime(),
+      originLabel: flight.originLabel || 'afar',
+      destLabel: flight.destLabel || '',
+      alert: {
+        title: 'A scroll will shortly be arriving.',
+        body: `A crow has been dispatched from ${flight.originLabel || 'afar'}`,
+      },
+    }).then((channelId) => {
+      if (channelId) {
+        return query(`UPDATE chat_messages SET la_channel_id = $1 WHERE id = $2`,
+                     [channelId, created.id]);
+      }
+    }).catch(() => { /* best effort — the message is sent regardless */ });
+  }
 
   const isSecret = trimmed.startsWith('__secret__:');
   const type = classifyMessage(trimmed);

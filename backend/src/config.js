@@ -24,6 +24,9 @@ export const config = {
     keyId: process.env.APNS_KEY_ID ?? '',
     teamId: process.env.APNS_TEAM_ID ?? '',
     bundleId: process.env.APNS_BUNDLE_ID ?? 'com.david.sneakystuff',
+    // The native SwiftUI app. Live Activity pushes are addressed per bundle id,
+    // so a token from that app has to be sent to this topic instead.
+    bundleIdNative: process.env.APNS_BUNDLE_ID_NATIVE ?? 'com.david.sneakysocial',
     keyBase64: process.env.APNS_AUTH_KEY_BASE64 ?? '',
     // TestFlight and App Store builds use the PRODUCTION APNs gateway.
     // Set APNS_PRODUCTION=false only for a development (Xcode-to-device) build.

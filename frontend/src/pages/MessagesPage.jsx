@@ -1468,7 +1468,7 @@ export default function MessagesPage() {
   // Send to whoever's selected. Same signature as api.sendMessage, with the
   // recipient bolted on, so every caller below stays as it was.
   const sendToPartner = (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>
-    sendToPartner(body, replyToStoryId, replyToMessageId, sliderResponse, partnerId);
+    api.sendMessage(body, replyToStoryId, replyToMessageId, sliderResponse, partnerId);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);

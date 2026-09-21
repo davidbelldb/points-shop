@@ -55,6 +55,27 @@ enum Palette {
     static let pill = Color(hex: "#263f39")          // the points pill body, sampled from the web app
     static let cardBorder = Color(hex: "#e5e5e5")
 
+    /// Message bubbles, lifted straight from the web app so the two clients
+    /// look like the same product. Mine is teal, theirs is pink, and each has
+    /// its own pair for light and dark.
+    enum Bubble {
+        static func background(mine: Bool, night: Bool) -> Color {
+            switch (mine, night) {
+            case (true, true):   Color(hex: "#21433b")
+            case (true, false):  Color(hex: "#c8ede4")
+            case (false, true):  Color(hex: "#4e1d37")
+            case (false, false): Color(hex: "#f0d5e8")
+            }
+        }
+
+        static func foreground(mine: Bool, night: Bool) -> Color {
+            night ? .white : Color(hex: mine ? "#0d3d2e" : "#3b0f2a")
+        }
+
+        /// A secret that hasn't been opened yet — neither side's colour.
+        static let sealed = Color(hex: "#3b3b3b")
+    }
+
     // Crow tracker — "The Marauder's Map"
     static let parchment = Color(hex: "#ebc876")
     static let oxblood = Color(hex: "#5e1a13")

@@ -27,6 +27,13 @@ struct ChatPartner: Codable, Sendable, Identifiable, Equatable, Hashable {
         if let system = SystemMessage(body: lastBody) { return system.line }
         if lastBody.hasPrefix(ChatMessage.secretPrefix) { return "A secret" }
         if lastBody.hasPrefix(ChatMessage.pollPrefix) { return "A poll" }
+        if let media = ChatMessage.Media(body: lastBody) {
+            switch media.shape {
+            case .photo: return "A photo"
+            case .gif: return "A GIF"
+            case .audio: return "A voice note"
+            }
+        }
         return lastBody
     }
 
@@ -75,6 +82,8 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
     var senderName: String?
     var replyToBody: String?
     var replyToSenderName: String?
+    /// Who voted for what, for a poll message.
+    var pollVotes: [PollVote] = []
 
     // The journey. `body` comes back empty for an inbound message still in the
     // air, so the bubble has nothing to reveal until its crow lands.
@@ -106,6 +115,7 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
         case senderName = "sender_name"
         case replyToBody = "reply_to_body"
         case replyToSenderName = "reply_to_sender_name"
+        case pollVotes = "poll_votes"
         case flightSeconds = "flight_seconds"
         case deliverAt = "deliver_at"
         case originLabel = "origin_label"
@@ -128,6 +138,7 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
         senderName = try c.decodeIfPresent(String.self, forKey: .senderName)
         replyToBody = try c.decodeIfPresent(String.self, forKey: .replyToBody)
         replyToSenderName = try c.decodeIfPresent(String.self, forKey: .replyToSenderName)
+        pollVotes = (try? c.decodeIfPresent([PollVote].self, forKey: .pollVotes)) ?? []
         flightSeconds = try c.decodeIfPresent(Int.self, forKey: .flightSeconds)
         deliverAt = try c.decodeIfPresent(Date.self, forKey: .deliverAt)
         originLabel = try c.decodeIfPresent(String.self, forKey: .originLabel)
@@ -145,9 +156,12 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
                            revealed: secretRevealedAt != nil)
         }
         if body.hasPrefix(Self.pollPrefix),
-           let poll = Poll(json: String(body.dropFirst(Self.pollPrefix.count))) {
+           var poll = Poll(json: String(body.dropFirst(Self.pollPrefix.count))) {
+            poll.votes = Dictionary(pollVotes.map { ($0.accountID, $0.optionIndex) },
+                                    uniquingKeysWith: { _, latest in latest })
             return .poll(poll)
         }
+        if let media = Media(body: body) { return .media(media) }
         return .text(body)
     }
 
@@ -155,12 +169,48 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
         case text(String)
         case secret(String, revealed: Bool)
         case poll(Poll)
+        case media(Media)
         case system(SystemMessage)
+    }
+
+    /// A photo, a GIF or a voice note. All three are stored the same way — the
+    /// body IS the URL — so which one it is comes down to where it points and
+    /// what it ends in, exactly as the web app works it out.
+    struct Media: Sendable, Equatable {
+        enum Shape: Sendable { case photo, gif, audio }
+
+        let shape: Shape
+        let url: URL
+        let raw: String
+
+        init?(body: String) {
+            let isRemote = body.hasPrefix("http://") || body.hasPrefix("https://")
+            guard body.hasPrefix("/media/") || isRemote else { return nil }
+            guard let url = APIClient.mediaURL(body) else { return nil }
+
+            let path = body.split(separator: "?").first.map(String.init) ?? body
+            let ext = (path as NSString).pathExtension.lowercased()
+
+            if body.contains("giphy.com"), ext == "gif" {
+                shape = .gif
+            } else if ["mp3", "ogg", "webm", "m4a", "wav", "aac", "opus"].contains(ext) {
+                shape = .audio
+            } else if ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif"].contains(ext) {
+                shape = .photo
+            } else {
+                return nil
+            }
+
+            self.url = url
+            self.raw = body
+        }
     }
 
     struct Poll: Sendable, Equatable {
         var question: String
         var options: [String]
+        /// account id -> option index, filled in from `poll_votes`.
+        var votes: [String: Int] = [:]
 
         init?(json: String) {
             guard let data = json.data(using: .utf8),
@@ -170,6 +220,16 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
             self.question = question
             self.options = (object["options"] as? [String]) ?? []
         }
+    }
+}
+
+struct PollVote: Codable, Sendable, Equatable {
+    let accountID: String
+    let optionIndex: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case accountID = "account_id"
+        case optionIndex = "option_idx"
     }
 }
 
@@ -243,6 +303,9 @@ struct FlightEstimate: Decodable, Sendable, Equatable {
 struct SendMessageRequest: Encodable, Sendable {
     let body: String
     let recipient_id: String?
+    /// Tells the server this client draws the journey — and can therefore be
+    /// held to having a location set.
+    let crows = true
 }
 
 // MARK: - Scrolls

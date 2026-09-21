@@ -16,3 +16,6 @@ frontend/calc*.mjs
 *.ipa
 *.xcarchive/
 frontend/ios/App/App/CrowWidgetExtension */
+
+# Local-only API keys for the native app (see Secrets.xcconfig.example)
+ios-native/Secrets.xcconfig

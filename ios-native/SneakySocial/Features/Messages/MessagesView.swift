@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Messages: the whole messaging app now. Chat and crows share one thread, and
 /// every bubble is parchment, so an arriving scroll reads as part of the
@@ -40,7 +41,7 @@ struct MessagesView: View {
             if model.partners.isEmpty && !model.isLoading {
                 Section {
                     ContentUnavailableView("Nobody to write to",
-                                           systemImage: "bubble.left.and.bubble.right",
+                                           systemImage: "scroll.fill",
                                            description: Text("Connect with someone first — tap People."))
                         .listRowBackground(Color.clear)
                 }
@@ -150,8 +151,18 @@ struct ThreadView: View {
     var onBack: () -> Void = {}
 
     @Environment(SessionStore.self) private var session
+    @Environment(LocationStore.self) private var location
     @State private var model = MessagesViewModel()
-    @State private var trackingScrollID: String?
+    @State private var trackingFlight: TrackedFlight?
+    @State private var showingTray = false
+    @State private var showingGifs = false
+    @State private var showingPoll = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var showingCamera = false
+    @State private var raining: RainKind?
+    @State private var shake = 0
+    @State private var recorder = VoiceRecorder()
+    @State private var showingPhotos = false
     @State private var trackerDetent: PresentationDetent = .medium
     @FocusState private var composerFocused: Bool
 
@@ -159,8 +170,33 @@ struct ThreadView: View {
         VStack(spacing: 0) {
             threadHeading
             thread
-            flightBar
-            composer
+            if location.place.isSet {
+                if recorder.isRecording {
+                    recordingBar
+                } else if showingTray {
+                    MediaTray(
+                        partnerName: partner.displayName,
+                        isBusy: model.isSending,
+                        onGif: { closeTray(); showingGifs = true },
+                        onPhoto: { closeTray(); showingPhotos = true },
+                        onCamera: { closeTray(); showingCamera = true },
+                        onVoice: { closeTray(); Task { _ = await recorder.start() } },
+                        onPoll: { closeTray(); showingPoll = true },
+                        onNudge: { closeTray(); Task { await model.sendNudge() } },
+                        onRain: { kind in
+                            closeTray()
+                            // The sender sees it straight away rather than
+                            // waiting for their own message to come back.
+                            raining = kind
+                            Task { await model.sendRain(kind) }
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                composer
+            } else {
+                locationGate
+            }
         }
         // Swipe in from the left edge, as a pushed screen would — without the
         // chevron that comes with one.
@@ -173,25 +209,90 @@ struct ThreadView: View {
                     onBack()
                 }
         )
-        .sheet(item: Binding(
-            get: { trackingScrollID.map(TrackedCrow.init) },
-            set: { trackingScrollID = $0?.id }
-        )) { tracked in
-            CrowTrackerSheet(scrollID: tracked.id, detent: $trackerDetent)
+        .sheet(item: $trackingFlight, onDismiss: {
+            // Next crow opens at half height, whatever this one ended up at.
+            trackerDetent = .medium
+        }) { tracked in
+            CrowTrackerSheet(flightPath: tracked.path, detent: $trackerDetent)
         }
+        .sheet(isPresented: $showingGifs) {
+            GifPicker { url in Task { await model.sendRaw(url) } }
+        }
+        .sheet(isPresented: $showingPoll) {
+            PollComposer { question, options in
+                Task { await model.sendPoll(question: question, options: options) }
+            }
+        }
+        .sheet(isPresented: $showingCamera) {
+            CameraPicker { data in
+                Task { await model.sendUpload(data, filename: "photo.jpg", mimeType: "image/jpeg") }
+            }
+            .ignoresSafeArea()
+        }
+        .photosPicker(isPresented: $showingPhotos, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task {
+                defer { photoItem = nil }
+                guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+                await model.sendUpload(data, filename: "photo.jpg", mimeType: "image/jpeg")
+            }
+        }
+        // A nudge shakes the thread; a shower rains over it. Either way the
+        // model hands it over once and we clear it.
+        .onChange(of: model.arrived) { _, gesture in
+            guard let gesture else { return }
+            switch gesture {
+            case .nudge:
+                Haptics.nudge()
+                withAnimation(.default) { shake += 1 }
+            case .twirl: raining = .twirl
+            case .popcorn: raining = .popcorn
+            case .duck: raining = .duck
+            }
+            model.arrived = nil
+        }
+        .overlay {
+            if let raining {
+                ChatRainView(kind: raining) { self.raining = nil }
+            }
+        }
+        .modifier(ShakeEffect(travel: CGFloat(shake)))
         .task {
             model.meID = session.account?.id
             model.open(partner)
             await location.load()
+            model.hasLocation = location.place.isSet
             await model.refresh(showSpinner: true)
             model.startPolling()
         }
         .onDisappear { model.stopPolling() }
     }
 
-    /// `sheet(item:)` wants something Identifiable; the scroll's id alone is it.
-    private struct TrackedCrow: Identifiable, Hashable {
+    /// The journey the tracker is showing. A scroll and a message describe
+    /// their flights the same way, so only the path differs.
+    private struct TrackedFlight: Identifiable, Hashable {
         let id: String
+        var path: String { "/\(kind)/\(id)/flight" }
+        let kind: String
+
+        static func scroll(_ id: String) -> TrackedFlight { .init(id: id, kind: "scrolls") }
+        static func message(_ id: String) -> TrackedFlight { .init(id: id, kind: "messages") }
+    }
+
+    /// Opening a journey. Always at half height — full height is a swipe up or
+    /// a tap on the sheet's own header.
+    ///
+    /// It used to expand when you tapped the same crow twice, which only worked
+    /// while the thread behind the sheet was tappable. That in turn meant the
+    /// tap that dismissed the sheet landed on a bubble and reopened it, so it
+    /// bounced straight back at full height. Both are gone.
+    private func track(_ flight: TrackedFlight) {
+        // The map comes up from the bottom, which is where the keyboard already
+        // is. Let go of the composer first so the two don't fight over it.
+        composerFocused = false
+        trackerDetent = .medium
+        trackingFlight = flight
     }
 
     /// Who you're talking to — under the bar, like every other page's name.
@@ -216,7 +317,18 @@ struct ThreadView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+
+            // How long the next crow takes, opposite the name it's going to.
+            if let estimate = model.flightEstimate, location.place.isSet {
+                HStack(spacing: 5) {
+                    Image(systemName: "bird")
+                    Text(estimate.spoken.capitalisedFirst)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -319,6 +431,7 @@ struct ThreadView: View {
                         isMine: mine,
                         style: .message,
                         delivered: message.hasArrived,
+                        onTapFlight: { track(.message(message.id)) },
                         onLanded: {
                             // The words are only released on arrival, so go and
                             // fetch them rather than waiting for the next poll.
@@ -327,7 +440,7 @@ struct ThreadView: View {
                     )
                     .contextMenu { reactions(for: message) }
                 } else {
-                    ParchmentBubble(
+                    ChatBubble(
                         text: text,
                         isMine: mine,
                         timestamp: message.createdAt,
@@ -336,6 +449,11 @@ struct ThreadView: View {
                         replyToName: message.replyToSenderName,
                         replyToBody: message.replyToBody
                     )
+                    // Every bubble opens its route. One sent before anyone had
+                    // a location has none to show, and the sheet says so rather
+                    // than drawing a map of nowhere.
+                    .contentShape(.rect)
+                    .onTapGesture { track(.message(message.id)) }
                     .contextMenu { reactions(for: message) }
                 }
             }
@@ -349,7 +467,24 @@ struct ThreadView: View {
             }
 
         case .poll(let poll):
-            aligned(mine) { PollBubble(poll: poll, isMine: mine) }
+            aligned(mine) {
+                PollBubble(poll: poll, isMine: mine, myID: model.meID) { option in
+                    Task { await model.vote(message, option: option) }
+                }
+            }
+
+        case .media(let media):
+            aligned(mine) {
+                switch media.shape {
+                case .audio:
+                    AudioBubble(media: media, isMine: mine, timestamp: message.createdAt)
+                        .contextMenu { reactions(for: message) }
+                case .photo, .gif:
+                    PhotoBubble(media: media, isMine: mine,
+                                timestamp: message.createdAt, reaction: message.reaction)
+                        .contextMenu { reactions(for: message) }
+                }
+            }
         }
     }
 
@@ -362,16 +497,7 @@ struct ThreadView: View {
             arrivesAt: scroll.deliverAt,
             isMine: model.isMine(scroll.senderID),
             delivered: scroll.delivered,
-            onTapFlight: {
-                // Tapping the same crow again takes the sheet full height —
-                // the "second tap" that a swipe would otherwise do.
-                if trackingScrollID == scroll.id {
-                    withAnimation { trackerDetent = .large }
-                } else {
-                    trackerDetent = .medium
-                    trackingScrollID = scroll.id
-                }
-            },
+            onTapFlight: { track(.scroll(scroll.id)) },
             onLanded: {
                 Task { await model.markScrollSeen(scroll) }
             }
@@ -398,67 +524,117 @@ struct ThreadView: View {
 
     // MARK: Composer
 
-    /// How far the next crow has to fly — and, if nobody's said, a way to say.
-    @ViewBuilder
-    private var flightBar: some View {
-        if let estimate = model.flightEstimate {
-            HStack(spacing: 8) {
-                Image(systemName: estimate.isGuess ? "location.slash" : "bird")
-                    .font(.caption)
+    private func closeTray() {
+        withAnimation(.snappy(duration: 0.2)) { showingTray = false }
+    }
+
+    /// While a voice note is being recorded, the composer is the recorder.
+    private var recordingBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                recorder.cancel()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.secondary)
-
-                if estimate.isGuess && !location.place.isSet {
-                    Text("Crows take \(estimate.spoken). Say where you are and they'll fly the real distance.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if estimate.isGuess {
-                    Text("\(partner.displayName) hasn't said where they are — crows take \(estimate.spoken).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("\(estimate.spoken) from \(estimate.originLabel ?? "you") to \(estimate.destLabel ?? partner.displayName)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 4)
-
-                Button {
-                    Task {
-                        await location.useCurrentLocation()
-                        await model.refresh()
-                    }
-                } label: {
-                    if location.isWorking {
-                        ProgressView().controlSize(.mini)
-                    } else {
-                        Label(location.place.isSet ? "Update" : "Set",
-                              systemImage: "location.fill")
-                            .font(.caption.weight(.medium))
-                            .labelStyle(.titleAndIcon)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .disabled(location.isWorking)
+                    .frame(width: 38, height: 38)
+                    .background(.quaternary, in: .circle)
             }
-            .lineLimit(2)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-        }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Discard recording")
 
-        if let locationError = location.error {
-            Text(locationError)
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
+            // A live level, so it's obvious the microphone is hearing you.
+            Capsule()
+                .fill(Palette.basket)
+                .frame(width: 10, height: 10)
+                .scaleEffect(1 + recorder.level)
+                .animation(.easeOut(duration: 0.12), value: recorder.level)
+
+            Text(String(format: "%d:%02d", Int(recorder.elapsed) / 60, Int(recorder.elapsed) % 60))
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
+
+            Button {
+                guard let data = recorder.stop() else { return }
+                Task { await model.sendUpload(data, filename: "voice.m4a", mimeType: "audio/m4a") }
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(Palette.basket, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Send voice note")
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    /// Nothing can be sent until you've said where from. Rather than a disabled
+    /// field and an explanation, the way out replaces the composer entirely.
+    private var locationGate: some View {
+        VStack(spacing: 10) {
+            Text("Where are you sending from?")
+                .font(.subheadline.weight(.semibold))
+
+            Text("A crow flies the real distance, so it needs somewhere to leave from.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let locationError = location.error {
+                Text(locationError)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button {
+                Task {
+                    await location.useCurrentLocation()
+                    model.hasLocation = location.place.isSet
+                    await model.refresh()
+                }
+            } label: {
+                if location.isWorking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Label("Set location", systemImage: "location.fill")
+                        .font(.subheadline.weight(.medium))
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(location.isWorking)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .background(.bar)
     }
 
     private var composer: some View {
         HStack(spacing: 10) {
-            TextField("Message \(partner.displayName)", text: $model.draft, axis: .vertical)
+            Button {
+                Haptics.tap()
+                composerFocused = false
+                withAnimation(.snappy(duration: 0.22)) { showingTray.toggle() }
+            } label: {
+                Image(systemName: showingTray ? "xmark" : "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 38, height: 38)
+                    .background(.quaternary, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(showingTray ? "Close" : "Add")
+
+            TextField("Say something…", text: $model.draft, axis: .vertical)
                 .lineLimit(1...5)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 14)

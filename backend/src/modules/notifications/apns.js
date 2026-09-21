@@ -18,6 +18,12 @@ const HOST = config.apns.production
   ? 'https://api.push.apple.com'
   : 'https://api.sandbox.push.apple.com';
 
+/* A development build's token only works against the sandbox gateway, whatever
+   the server is configured for. Callers that don't ask get HOST, so nothing
+   that works today changes. */
+const SANDBOX_HOST = 'https://api.sandbox.push.apple.com';
+const SANDBOX_MANAGE_HOST = 'https://api-manage-broadcast.sandbox.push.apple.com:2195';
+
 // Channel management endpoint (broadcast Live Activities) — note the ports.
 const MANAGE_HOST = config.apns.production
   ? 'https://api-manage-broadcast.push.apple.com:2196'
@@ -137,7 +143,7 @@ export function omwContentState({
  *  - event 'end'    → dismiss the activity
  * Returns the HTTP status (0 on transport failure). Never throws.
  */
-export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs, channelId, sound, attributesType = 'CrowActivityAttributes' } = {}) {
+export async function sendLiveActivityPush(token, { event, contentState, attributes, alert, dismissalMs, channelId, sound, attributesType = 'CrowActivityAttributes', bundleId = config.apns.bundleId, sandbox = false } = {}) {
   if (!enabled || !token) return 0;
   const aps = {
     timestamp: Math.floor(Date.now() / 1000),
@@ -159,7 +165,7 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
   return new Promise((resolve) => {
     let client;
     try {
-      client = http2.connect(HOST);
+      client = http2.connect(sandbox ? SANDBOX_HOST : HOST);
       client.on('error', () => resolve(0));
       const jwt = providerToken();
       let status = 0;
@@ -168,7 +174,8 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
         ':method': 'POST',
         ':path': `/3/device/${token}`,
         authorization: `bearer ${jwt}`,
-        'apns-topic': `${config.apns.bundleId}.push-type.liveactivity`,
+        // Defaults to the Capacitor app's id, so existing callers are unchanged.
+        'apns-topic': `${bundleId}.push-type.liveactivity`,
         'apns-push-type': 'liveactivity',
         'apns-priority': '10',
       });

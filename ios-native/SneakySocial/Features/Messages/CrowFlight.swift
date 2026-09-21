@@ -15,29 +15,11 @@ enum CrowArt {
     static let right = "crow_land_10"
     /// The one that glides along the trail while the scroll is travelling.
     static let mover = "crow_land_00"
-    /// Parchment background behind a scroll bubble.
-    static let tile = "tile"
 
+    /// The system font. Messages used to be set in ImperialBlack on parchment;
+    /// they now match the web app, which is plain text on a coloured bubble.
     static func font(size: CGFloat) -> Font {
-        // Falls back to the system font if ImperialBlack isn't registered.
-        .custom("ImperialBlack", size: size)
-    }
-}
-
-/// The parchment a bubble is drawn on.
-///
-/// The artwork is a loose file in the bundle, not an asset catalog entry, so
-/// `Image("tile")` finds nothing and the bubble renders as a transparent box
-/// with black text — invisible in dark mode. Sprites knows how to load it, and
-/// the flat colour underneath means the bubble is legible even if it doesn't.
-struct Parchment: View {
-    var body: some View {
-        ZStack {
-            Palette.parchment
-            if let tile = Sprites.image(CrowArt.tile) {
-                tile.resizable().scaledToFill()
-            }
-        }
+        .system(size: size)
     }
 }
 
@@ -170,7 +152,7 @@ struct CrowFlightBanner: View {
 
     var body: some View {
         ZStack {
-            Parchment()
+            Palette.Bubble.background(mine: false, night: false)
 
             VStack(spacing: 8) {
                 Text(title)

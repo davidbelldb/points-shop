@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import CoreLocation
+import MapKit
 
 /// Where you're sending from.
 ///
@@ -35,6 +36,11 @@ final class LocationStore: NSObject, CLLocationManagerDelegate {
     /// Resumed once CoreLocation answers — the delegate callbacks are the only
     /// way it will talk to us.
     private var waiting: CheckedContinuation<CLLocation, Error>?
+    /// Separate, because the permission answer and the fix are two different
+    /// conversations and the first has to finish before the second starts.
+    private var waitingOnPermission: CheckedContinuation<CLAuthorizationStatus, Never>?
+    /// `locationUnknown` means "not yet", not "no" — worth one more ask.
+    private var hasRetried = false
 
     init(api: APIClient = .shared) {
         self.api = api
@@ -65,6 +71,7 @@ final class LocationStore: NSObject, CLLocationManagerDelegate {
         } catch let locationError as LocationError {
             error = locationError.message
             Haptics.failure()
+            return
         } catch {
             self.error = (error as? APIError)?.errorDescription ?? error.localizedDescription
             Haptics.failure()
@@ -93,28 +100,39 @@ final class LocationStore: NSObject, CLLocationManagerDelegate {
 
     enum LocationError: Error {
         case denied
+        case dismissed
         case unavailable
 
         var message: String {
             switch self {
             case .denied:
                 "Location is turned off for this app. Settings → Sneaky Social → Location."
+            case .dismissed:
+                "Tap Set again and allow location so crows know how far to fly."
             case .unavailable:
-                "Couldn't work out where you are just now."
+                "Couldn't get a fix just now — try again in a moment."
             }
         }
     }
 
     private func currentFix() async throws -> CLLocation {
-        switch manager.authorizationStatus {
-        case .denied, .restricted:
-            throw LocationError.denied
-        case .notDetermined:
-            manager.requestWhenInUseAuthorization()
-        default:
-            break
+        // Asking for a fix while the permission sheet is still on screen fails
+        // immediately — the answer has to come back first.
+        var status = manager.authorizationStatus
+        if status == .notDetermined {
+            status = await withCheckedContinuation { continuation in
+                waitingOnPermission = continuation
+                manager.requestWhenInUseAuthorization()
+            }
         }
 
+        switch status {
+        case .denied, .restricted: throw LocationError.denied
+        case .notDetermined: throw LocationError.dismissed
+        default: break
+        }
+
+        hasRetried = false
         return try await withCheckedThrowingContinuation { continuation in
             waiting = continuation
             manager.requestLocation()
@@ -122,13 +140,14 @@ final class LocationStore: NSObject, CLLocationManagerDelegate {
     }
 
     /// A coordinate is no use to a person; "Cambridge" is.
+    ///
+    /// MapKit rather than CLGeocoder — the latter is gone as of iOS 26. A
+    /// failed lookup is not a failed save: the location is still worth storing
+    /// without a name, since the distance is what the crow actually needs.
     private func placeName(for location: CLLocation) async -> String? {
-        let marks = try? await CLGeocoder().reverseGeocodeLocation(location)
-        guard let mark = marks?.first else { return nil }
-        return mark.locality
-            ?? mark.subLocality
-            ?? mark.name
-            ?? mark.administrativeArea
+        guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
+        let items = try? await request.mapItems
+        return items?.first?.name
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -140,7 +159,14 @@ final class LocationStore: NSObject, CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let isTransient = (error as? CLError)?.code == .locationUnknown
         Task { @MainActor in
+            // "Location unknown" is the device saying it hasn't got one YET.
+            if isTransient, !hasRetried, waiting != nil {
+                hasRetried = true
+                self.manager.requestLocation()
+                return
+            }
             waiting?.resume(throwing: LocationError.unavailable)
             waiting = nil
         }
@@ -148,8 +174,15 @@ final class LocationStore: NSObject, CLLocationManagerDelegate {
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
-        guard status == .denied || status == .restricted else { return }
         Task { @MainActor in
+            // The answer to the permission sheet, if that's what we're waiting on.
+            if let pending = waitingOnPermission {
+                waitingOnPermission = nil
+                pending.resume(returning: status)
+                return
+            }
+            // Otherwise: permission pulled out from under an in-flight request.
+            guard status == .denied || status == .restricted else { return }
             waiting?.resume(throwing: LocationError.denied)
             waiting = nil
         }
