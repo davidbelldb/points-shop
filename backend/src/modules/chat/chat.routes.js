@@ -1,7 +1,7 @@
 import {
-  findOtherUser, listMessages, sendMessage, markAllRead, deleteMessage,
-  editMessage, setReaction, toggleSparkle, setTyping, votePoll, revealSecretMessage,
-  unreadCountFrom,
+  findOtherUser, findPartner, listPartners, listMessages, sendMessage, markAllRead,
+  deleteMessage, editMessage, setReaction, toggleSparkle, setTyping, votePoll,
+  revealSecretMessage, unreadCountTotal, findLatestSender,
 } from './chat.repo.js';
 import { unreadCount as scrollsUnreadCount } from '../scrolls/scrolls.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
@@ -11,10 +11,28 @@ import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 const ALLOWED_REACTIONS = new Set(['heart', '😂', '💜', '🍆', '🫦', '😲']);
 
 export default async function chatRoutes(fastify) {
-  fastify.get('/api/messages', async (req) => {
+  // Resolve who a request is addressed to. An explicit id always wins; without
+  // one we fall back to the old "the other user" guess so clients that haven't
+  // been taught about partners yet keep working unchanged.
+  async function resolvePartner(accountId, explicitId) {
+    if (explicitId) return findPartner(accountId, explicitId);
+    return findOtherUser(accountId);
+  }
+
+  // The conversation list: everyone else, their unread count, and the last
+  // thing either of you said.
+  fastify.get('/api/messages/partners', async (req) => {
     const accountId = getEffectiveAccountId(req);
-    const other = await findOtherUser(accountId);
-    if (!other) return { other: null, messages: [] };
+    return { partners: await listPartners(accountId) };
+  });
+
+  fastify.get('/api/messages', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const other = await resolvePartner(accountId, req.query?.with);
+    if (!other) {
+      if (req.query?.with) return reply.code(404).send({ error: 'No such person' });
+      return { other: null, messages: [] };
+    }
     const messages = await listMessages(accountId, other.id);
     return { other, messages };
   });
@@ -23,7 +41,7 @@ export default async function chatRoutes(fastify) {
   const SYSTEM_BODIES = new Set(['__nudge__', '__rain_twirl__', '__rain_popcorn__', '__rain_duck__']);
 
   fastify.post('/api/messages', async (req, reply) => {
-    const { body, reply_to_story_id, reply_to_message_id, slider_response } = req.body ?? {};
+    const { body, reply_to_story_id, reply_to_message_id, slider_response, recipient_id } = req.body ?? {};
     if (typeof body !== 'string' || !body.trim()) {
       return reply.code(400).send({ error: 'body required' });
     }
@@ -32,8 +50,12 @@ export default async function chatRoutes(fastify) {
       return reply.code(400).send({ error: 'system messages cannot be replies' });
     }
     const accountId = getEffectiveAccountId(req);
-    const other = await findOtherUser(accountId);
-    if (!other) return reply.code(400).send({ error: 'No recipient available' });
+    const other = await resolvePartner(accountId, recipient_id);
+    if (!other) {
+      return reply.code(recipient_id ? 404 : 400).send({
+        error: recipient_id ? 'No such person' : 'No recipient available',
+      });
+    }
     try {
       return reply.code(201).send(
         await sendMessage(
@@ -48,27 +70,40 @@ export default async function chatRoutes(fastify) {
     }
   });
 
-  // Lightweight poll target for the floating head: the partner's photo plus
-  // how many of their messages I haven't read yet.
+  // Lightweight poll target for the floating head: how much is waiting across
+  // every conversation, plus whoever most recently messaged you (the face the
+  // bubble wears). `other` is kept for older clients that expect one partner.
   fastify.get('/api/messages/unread-count', async (req) => {
     const accountId = getEffectiveAccountId(req);
-    const other = await findOtherUser(accountId);
-    if (!other) return { count: 0, other: null };
-    // Floating-head bubble reflects everything waiting in the messages feature:
-    // unread chat (text, photos, nudges, rain) + arrived-but-unread scrolls.
-    // Scrolls are summed defensively so a scrolls failure never zeroes the badge.
-    const [msgCount, scrollCount] = await Promise.all([
-      unreadCountFrom(accountId, other.id),
+    // Unread chat (text, photos, nudges, rain) from anyone + arrived-but-unread
+    // scrolls. Scrolls are summed defensively so a scrolls failure never zeroes
+    // the badge.
+    const [msgCount, scrollCount, latest] = await Promise.all([
+      unreadCountTotal(accountId),
       scrollsUnreadCount(accountId).catch(() => 0),
+      findLatestSender(accountId),
     ]);
     const count = msgCount + scrollCount;
-    return { count, other: { id: other.id, name: other.name, photo_url: other.photo_url ?? null } };
+    const other = latest ?? await findOtherUser(accountId);
+    if (!other) return { count, other: null };
+    return {
+      count,
+      other: { id: other.id, name: other.name, photo_url: other.photo_url ?? null },
+    };
   });
 
+  // With a partner, marks that conversation read; without one, marks the lot.
   fastify.post('/api/messages/mark-read', async (req) => {
     const accountId = getEffectiveAccountId(req);
-    const other = await findOtherUser(accountId);
-    if (other) await markAllRead(accountId, other.id);
+    const partnerId = req.body?.partner_id ?? req.query?.with ?? null;
+    if (partnerId) {
+      const other = await findPartner(accountId, partnerId);
+      if (other) await markAllRead(accountId, other.id);
+    } else {
+      // No partner named: clear everything, so the badge (which counts every
+      // conversation) can't be left stuck by an older client.
+      await markAllRead(accountId, null);
+    }
     return { ok: true };
   });
 

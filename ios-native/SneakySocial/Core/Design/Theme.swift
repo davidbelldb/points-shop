@@ -28,6 +28,23 @@ extension Color {
     }
 }
 
+extension Color {
+    /// Lighten (positive) or darken (negative) a hex colour by a flat amount per
+    /// channel — the web app's `shade()` helper, used for wave and grass layers.
+    static func shade(_ hex: String, by amount: Int) -> Color {
+        var value = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("#") { value.removeFirst() }
+        guard value.count == 6 else { return Color(hex: hex) }
+
+        var int: UInt64 = 0
+        Scanner(string: value).scanHexInt64(&int)
+        let channels = [(int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF].map { channel -> Double in
+            Double(min(255, max(0, Int(channel) + amount))) / 255
+        }
+        return Color(.sRGB, red: channels[0], green: channels[1], blue: channels[2], opacity: 1)
+    }
+}
+
 /// The app's fixed palette. Anything the admin can change (water, grass, buoys)
 /// comes from the API at runtime — these are only the values baked into the
 /// web app's own stylesheet.
@@ -56,13 +73,18 @@ enum Palette {
     static let dayConfetti = ["#ffd23f", "#ff5d8f", "#4aa3c7", "#5bbf3a", "#ff8c42", "#a878ff", "#ffffff"].map(Color.init(hex:))
     static let nightConfetti = ["#ffe600", "#ff1a6e", "#00d4ff", "#39ff14", "#ff7700", "#bf3eff", "#ffffff"].map(Color.init(hex:))
 
-    // Form-guide placing pills
-    static func placing(_ place: Int) -> (background: Color, foreground: Color) {
-        switch place {
-        case 0: return (Color(hex: "#fbcfe8"), Color(hex: "#be185d"))   // DNF — sank
-        case 1: return (Color(hex: "#fbbf24"), Color(hex: "#451a03"))   // winner
-        case 2, 3: return (Color(hex: "#10b981"), .white)               // podium
-        default: return (Color(hex: "#e5e5e5"), Color(hex: "#525252"))
+    // Form-guide placing pills. The web app has no dark variants for these —
+    // these are the night equivalents, keeping the same gold/green/pink coding.
+    static func placing(_ place: Int, night: Bool = false) -> (background: Color, foreground: Color) {
+        switch (place, night) {
+        case (0, false): (Color(hex: "#fbcfe8"), Color(hex: "#be185d"))   // DNF — sank
+        case (0, true):  (Color(hex: "#831843"), Color(hex: "#fbcfe8"))
+        case (1, false): (Color(hex: "#fbbf24"), Color(hex: "#451a03"))   // winner
+        case (1, true):  (Color(hex: "#b45309"), Color(hex: "#fde68a"))
+        case (2, false), (3, false): (Color(hex: "#10b981"), .white)      // podium
+        case (2, true), (3, true):   (Color(hex: "#065f46"), Color(hex: "#6ee7b7"))
+        case (_, false): (Color(hex: "#e5e5e5"), Color(hex: "#525252"))
+        case (_, true):  (Color(hex: "#3f3f46"), Color(hex: "#d4d4d8"))
         }
     }
 }

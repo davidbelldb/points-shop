@@ -4,19 +4,6 @@ import SwiftUI
 /// so a fresh install proves the whole pipe — cookie session, TLS, decoding —
 /// before any of the heavy UI lands.
 
-struct DerbyPlaceholderView: View {
-    var body: some View {
-        FeatureProbeView(
-            title: "Ducky Derby",
-            subtitle: "Phase 2",
-            probe: "GET /api/games/ducky/config"
-        ) {
-            let config = try await APIClient.shared.get("/games/ducky/config", as: DuckyConfigProbe.self)
-            return "\(config.ducks.count) ducks configured, \(config.raceDuckCount ?? 10) race at a time"
-        }
-    }
-}
-
 struct CrowPlaceholderView: View {
     var body: some View {
         FeatureProbeView(
@@ -106,6 +93,7 @@ private struct FeatureProbeView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) { ThemeToggleButton() }
             ToolbarItem(placement: .topBarTrailing) { PointsBadge() }
         }
         .task { load() }
@@ -128,17 +116,6 @@ private struct FeatureProbeView: View {
 }
 
 // MARK: - Throwaway probe models (replaced by the real ones in later phases)
-
-private struct DuckyConfigProbe: Decodable, Sendable {
-    struct Duck: Decodable, Sendable { let ord: Int }
-    let ducks: [Duck]
-    let raceDuckCount: Int?
-
-    private enum CodingKeys: String, CodingKey {
-        case ducks
-        case raceDuckCount = "race_duck_count"
-    }
-}
 
 private struct ScrollsConfigProbe: Decodable, Sendable {
     struct Settings: Decodable, Sendable { let enabled: Bool? }

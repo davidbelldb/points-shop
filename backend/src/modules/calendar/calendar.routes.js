@@ -5,15 +5,16 @@ import {
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { syncEventSnacks } from '../shopping/shopping.routes.js';
 import { sendPush } from '../notifications/push.js';
-import { findOtherUser } from '../chat/chat.repo.js';
+import { findOtherUsers, findOtherUser } from '../chat/chat.repo.js';
 import { query } from '../../db.js';
 
 // Notify the partner that an event was created: "{creator} created an event."
 // with "{title} {date} {time}". Best-effort; never blocks the create.
 async function notifyPartnerOfEvent(creatorId, ev) {
   try {
-    const other = await findOtherUser(creatorId);
-    if (!other) return;
+    // An invite goes to the whole house, not one inferred partner.
+    const others = await findOtherUsers(creatorId);
+    if (!others.length) return;
     const me = await query(`SELECT name FROM accounts WHERE id = $1`, [creatorId]);
     const creatorName = me.rows[0]?.name ?? 'Someone';
     const start = new Date(ev.starts_at);
@@ -22,12 +23,14 @@ async function notifyPartnerOfEvent(creatorId, ev) {
     const timeStr = ev.all_day ? '' : ` ${new Intl.DateTimeFormat('en-GB', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false }).format(start)}`;
     const title = `${creatorName} created an event.`;
     const body = `${ev.title} ${dateStr}${timeStr}`.trim();
-    await query(
-      `INSERT INTO notifications (account_id, type, title, body, link_url)
-       VALUES ($1, 'calendar', $2, $3, '/calendar')`,
-      [other.id, title, body],
-    );
-    await sendPush(other.id, { title, body, url: '/calendar', tag: 'calendar-event' });
+    await Promise.all(others.map(async (other) => {
+      await query(
+        `INSERT INTO notifications (account_id, type, title, body, link_url)
+         VALUES ($1, 'calendar', $2, $3, '/calendar')`,
+        [other.id, title, body],
+      );
+      await sendPush(other.id, { title, body, url: '/calendar', tag: 'calendar-event' });
+    }));
   } catch { /* best effort */ }
 }
 

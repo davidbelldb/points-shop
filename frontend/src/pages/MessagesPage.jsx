@@ -379,8 +379,8 @@ function SparkleInstance({ color, size, style }) {
 // Shared avatar
 // ---------------------------------------------------------------------------
 function Avatar({ url, name, size = 'md' }) {
-  const cls = size === 'lg' ? 'h-12 w-12' : 'h-9 w-9';
-  const iconSize = size === 'lg' ? 22 : 16;
+  const cls = size === 'lg' ? 'h-12 w-12' : size === 'xs' ? 'h-6 w-6' : 'h-9 w-9';
+  const iconSize = size === 'lg' ? 22 : size === 'xs' ? 12 : 16;
   return (
     <div className={`flex ${cls} shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-100 text-neutral-400`}>
       {url ? (
@@ -1453,6 +1453,22 @@ export default function MessagesPage() {
   // on mount (no empty "No one to chat yet" flash) — the background refresh below
   // then reconciles it. Cached under a stable key; see refresh() for the write.
   const [data, setData] = useState(() => getCached('messages:thread') ?? { other: null, messages: [] });
+  // Who you're talking to. Null means "let the backend pick", which is the old
+  // two-person behaviour and what a first visit gets.
+  const [partners, setPartners] = useState([]);
+  const [partnerId, setPartnerId] = useState(() => {
+    try { return window.localStorage.getItem('messages:partner') || null; } catch { return null; }
+  });
+
+  function choosePartner(id) {
+    setPartnerId(id);
+    try { window.localStorage.setItem('messages:partner', id ?? ''); } catch { /* ignore */ }
+  }
+
+  // Send to whoever's selected. Same signature as api.sendMessage, with the
+  // recipient bolted on, so every caller below stays as it was.
+  const sendToPartner = (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>
+    sendToPartner(body, replyToStoryId, replyToMessageId, sliderResponse, partnerId);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -1501,7 +1517,7 @@ export default function MessagesPage() {
 
   async function refresh(markRead = true) {
     try {
-      const result = await api.getMessages();
+      const result = await api.getMessages(partnerId);
       // Shake if there's an unread nudge from the other person.
       const hasUnreadNudge = result.messages.some(
         (m) => m.body === NUDGE_BODY && !m.read_at && m.sender_id !== user?.id,
@@ -1526,7 +1542,7 @@ export default function MessagesPage() {
       setData(result);
       setCached('messages:thread', result); // keep the instant-paint snapshot fresh
       if (markRead && result.messages.length > 0) {
-        await api.markMessagesRead();
+        await api.markMessagesRead(partnerId);
         await refreshBasket();
       }
     } catch (e) {
@@ -1552,11 +1568,15 @@ export default function MessagesPage() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => { if (mounted) await refresh(true); })();
-    const id = setInterval(() => { if (mounted) refresh(true); }, POLL_MS);
+    const loadPartners = () => api.getMessagePartners()
+      .then((r) => { if (mounted) setPartners(r.partners ?? []); })
+      .catch(() => { /* the thread still works without the list */ });
+
+    (async () => { if (mounted) { await refresh(true); loadPartners(); } })();
+    const id = setInterval(() => { if (mounted) { refresh(true); loadPartners(); } }, POLL_MS);
     return () => { mounted = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [partnerId]);
 
   useEffect(() => {
     if (!data.messages.length) return;
@@ -1696,7 +1716,7 @@ export default function MessagesPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.sendMessage(RAIN_BODY[kind], null, null);
+      await sendToPartner(RAIN_BODY[kind], null, null);
       await refresh(false);
     } catch (e) {
       setError(e.message);
@@ -1710,7 +1730,7 @@ export default function MessagesPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.sendMessage(NUDGE_BODY, null, null);
+      await sendToPartner(NUDGE_BODY, null, null);
       triggerShake();  // shake your own screen as you send (MSN-style)
       hapticNudge();   // and the strong jiggle haptic
       await refresh(false);
@@ -1730,7 +1750,7 @@ export default function MessagesPage() {
     setError(null);
     setSecretSendPrimed(false);
     try {
-      const sent = await api.sendMessage(body, null, replyTo?.id ?? null);
+      const sent = await sendToPartner(body, null, replyTo?.id ?? null);
       setDraft('');
       if (inputRef.current) inputRef.current.style.height = '40px';
       setReplyTo(null);
@@ -1813,7 +1833,7 @@ export default function MessagesPage() {
     setBusy(true); setError(null);
     try {
       const { url } = await api.upload(file);
-      await api.sendMessage(url, null, replyTo?.id ?? null);
+      await sendToPartner(url, null, replyTo?.id ?? null);
       setReplyTo(null);
       await refresh(false);
       await refreshBasket();
@@ -1833,7 +1853,7 @@ export default function MessagesPage() {
     setBusy(true); setError(null);
     try {
       const { url } = await api.upload(file);
-      await api.sendMessage(url, null, replyTo?.id ?? null);
+      await sendToPartner(url, null, replyTo?.id ?? null);
       setReplyTo(null);
       await refresh(false);
       await refreshBasket();
@@ -1846,7 +1866,7 @@ export default function MessagesPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.sendMessage(gifUrl, null, replyTo?.id ?? null);
+      await sendToPartner(gifUrl, null, replyTo?.id ?? null);
       setReplyTo(null);
       await refresh(false);
       await refreshBasket();
@@ -1902,7 +1922,7 @@ export default function MessagesPage() {
     const body = `__poll__:${JSON.stringify({ question: q, options: opts })}`;
     setBusy(true);
     try {
-      await api.sendMessage(body);
+      await sendToPartner(body);
       setPollOpen(false);
       setPollQuestion('');
       setPollOptions(['', '']);
@@ -2106,6 +2126,34 @@ export default function MessagesPage() {
           </div>
           <Link to="/account" className="shrink-0 text-sm text-neutral-500">Back</Link>
         </div>
+
+        {/* Conversation picker — hidden while there's only one person to talk to. */}
+        {partners.length > 1 && (
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            {partners.map((p) => {
+              const active = data.other?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => choosePartner(p.id)}
+                  className={`relative flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
+                    active
+                      ? 'border-pink-400 bg-pink-50 font-semibold text-pink-700 dark:border-pink-500 dark:bg-pink-950/40 dark:text-pink-200'
+                      : 'border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300'
+                  }`}
+                >
+                  <Avatar url={p.photo_url} name={p.name} size="xs" />
+                  <span>{p.name}</span>
+                  {p.unread > 0 && !active && (
+                    <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-pink-500 px-1 text-[11px] font-bold text-white">
+                      {p.unread}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {!data.other && (
           <p className="text-sm text-neutral-500">No one to chat with yet.</p>

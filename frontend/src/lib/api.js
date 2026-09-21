@@ -154,8 +154,13 @@ export const api = {
     saveFloorplan: (config) => request('/footprints/floorplan', { method: 'PUT', body: JSON.stringify(config) }),
   },
 
-  getMessages: () => request('/messages'),
-  sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) =>
+  // Everyone you can talk to, with unread counts and the last line of each thread.
+  getMessagePartners: () => request('/messages/partners'),
+  // partnerId is optional: without it the backend falls back to the old
+  // "the other user" behaviour, so nothing breaks mid-deploy.
+  getMessages: (partnerId = null) =>
+    request(partnerId ? `/messages?with=${encodeURIComponent(partnerId)}` : '/messages'),
+  sendMessage: (body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null, recipientId = null) =>
     request('/messages', {
       method: 'POST',
       body: JSON.stringify({
@@ -163,9 +168,14 @@ export const api = {
         reply_to_story_id: replyToStoryId,
         reply_to_message_id: replyToMessageId,
         slider_response: sliderResponse,
+        recipient_id: recipientId,
       }),
     }),
-  markMessagesRead: () => request('/messages/mark-read', { method: 'POST' }),
+  markMessagesRead: (partnerId = null) =>
+    request('/messages/mark-read', {
+      method: 'POST',
+      body: JSON.stringify({ partner_id: partnerId }),
+    }),
   messagesUnreadCount: () => request('/messages/unread-count'),
   deleteMessage: (id) => request(`/messages/${id}`, { method: 'DELETE' }),
   editMessage: (id, body) =>

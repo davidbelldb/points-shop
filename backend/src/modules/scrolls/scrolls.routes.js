@@ -5,7 +5,7 @@ import {
   pushStreetSubtitleUpdates, saveLiveActivityToken,
   getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
-import { findOtherUser } from '../chat/chat.repo.js';
+import { findOtherUser, findPartner } from '../chat/chat.repo.js';
 import { buildFlightPath } from './flightPath.js';
 import { getEffectiveAccountId, getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
@@ -122,7 +122,7 @@ export default async function scrollRoutes(fastify) {
   });
 
   fastify.post('/api/scrolls', async (req, reply) => {
-    const { body, origin, dest, simulate } = req.body ?? {};
+    const { body, origin, dest, simulate, recipient_id: recipientIdInput } = req.body ?? {};
 
     // Simulation (the /new-chat test harness): the scroll loops back to your
     // own actual account — full pipeline, but the partner is never the
@@ -134,8 +134,16 @@ export default async function scrollRoutes(fastify) {
       senderId = recipientId = getActualAccountId(req);
     } else {
       senderId = getEffectiveAccountId(req);
-      const other = await findOtherUser(senderId);
-      if (!other) return reply.code(400).send({ error: 'No recipient available' });
+      // An explicit recipient wins; without one we fall back to the old guess so
+      // the existing web composer keeps working.
+      const other = recipientIdInput
+        ? await findPartner(senderId, recipientIdInput)
+        : await findOtherUser(senderId);
+      if (!other) {
+        return reply.code(recipientIdInput ? 404 : 400).send({
+          error: recipientIdInput ? 'No such person' : 'No recipient available',
+        });
+      }
       recipientId = other.id;
     }
 

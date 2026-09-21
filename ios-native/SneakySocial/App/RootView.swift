@@ -27,23 +27,31 @@ private struct LaunchView: View {
 }
 
 struct MainTabView: View {
+    @Environment(SessionStore.self) private var session
     @State private var selection: TabSelection = .messages
 
     /// Deliberately not `Tab` or `Section` — both are SwiftUI types used below.
     enum TabSelection: Hashable {
-        case derby, crow, messages
+        case derby, crow, messages, admin
     }
 
     var body: some View {
         TabView(selection: $selection) {
             Tab("Derby", systemImage: "flag.checkered", value: TabSelection.derby) {
-                NavigationStack { DerbyPlaceholderView() }
+                NavigationStack { DerbyView() }
             }
             Tab("Crow", systemImage: "map", value: TabSelection.crow) {
                 NavigationStack { CrowPlaceholderView() }
             }
             Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: TabSelection.messages) {
                 NavigationStack { MessagesPlaceholderView() }
+            }
+            // Admin-only: for anyone else this tab is never built, and every
+            // endpoint behind it re-checks the role server-side anyway.
+            if session.account?.isAdmin == true {
+                Tab("Admin", systemImage: "wrench.and.screwdriver", value: TabSelection.admin) {
+                    NavigationStack { AdminHomeView() }
+                }
             }
         }
     }

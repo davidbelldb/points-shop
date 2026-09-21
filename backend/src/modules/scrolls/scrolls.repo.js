@@ -4,7 +4,7 @@ import {
   sendLiveActivityPush, crowContentState, sendSilentWake,
   createBroadcastChannel, deleteBroadcastChannel, sendBroadcast,
 } from '../notifications/apns.js';
-import { findOtherUser } from '../chat/chat.repo.js';
+import { findOtherUsers } from '../chat/chat.repo.js';
 import { fetchForecastBody } from './forecast.js';
 
 // ---------------------------------------------------------------------------
@@ -348,13 +348,13 @@ function londonNow() {
 }
 
 // Send today's forecast as a scroll from the admin (David). `recipient` controls
-// who receives it: 'partner' (Katie), 'me' (David only, for testing — never
-// notifies the partner), or 'both'.
+// who receives it: 'partner' (everyone else in the house), 'me' (David only,
+// for testing — never notifies anyone else), or 'both'.
 async function sendForecastScroll(cfg) {
   const adminRes = await query(`SELECT id FROM accounts WHERE role = 'admin' ORDER BY created_at LIMIT 1`);
   const adminId = adminRes.rows[0]?.id;
   if (!adminId) return false;
-  const other = await findOtherUser(adminId);
+  const others = await findOtherUsers(adminId);
 
   const body = await fetchForecastBody(cfg.location_lat, cfg.location_lng);
   if (!body) return false; // weather lookup failed — skip this slot, try next time
@@ -362,10 +362,11 @@ async function sendForecastScroll(cfg) {
   // Resolve the recipient list. 'me' loops back to the admin's own account, so a
   // test can never land on the partner.
   const mode = cfg.recipient || 'partner';
+  const otherIds = others.map((o) => o.id);
   const recipients = [];
   if (mode === 'me') recipients.push(adminId);
-  else if (mode === 'both') { recipients.push(adminId); if (other) recipients.push(other.id); }
-  else if (other) recipients.push(other.id); // 'partner'
+  else if (mode === 'both') recipients.push(adminId, ...otherIds);
+  else recipients.push(...otherIds); // 'partner' — everyone else
   if (recipients.length === 0) return false;
 
   for (const recipientId of recipients) {

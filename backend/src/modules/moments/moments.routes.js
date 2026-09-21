@@ -1,5 +1,5 @@
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
-import { findOtherUser } from '../chat/chat.repo.js';
+import { findOtherUsers, findOtherUser } from '../chat/chat.repo.js';
 import { sendPush } from '../notifications/push.js';
 import { query } from '../../db.js';
 import {
@@ -22,14 +22,15 @@ async function getSenderName(accountId) {
 
 async function notifyPartner(actorId, action) {
   try {
-    const [other, name] = await Promise.all([findOtherUser(actorId), getSenderName(actorId)]);
-    if (!other) return;
-    await sendPush(other.id, {
+    // Everyone else in the house, not just whoever sorts first.
+    const [others, name] = await Promise.all([findOtherUsers(actorId), getSenderName(actorId)]);
+    if (!others.length) return;
+    await Promise.all(others.map((other) => sendPush(other.id, {
       title: `${name} just ${action} a sneaky moment`,
       body: 'Best go take a look, ey?',
       url: '/moments',
       tag: 'sneaky-moment',
-    });
+    })));
   } catch { /* never bubble */ }
 }
 

@@ -1,6 +1,11 @@
 import { query } from '../../db.js';
 import { sendPush } from '../notifications/push.js';
 
+// The app began life as a two-person thing, so "the other user" was a safe
+// idea. With three or more accounts it isn't: it silently pairs everyone with
+// whoever sorts first. It survives only as the fallback for callers that
+// haven't been given an explicit partner yet (the old web client), so its
+// behaviour is deliberately unchanged.
 export async function findOtherUser(accountId) {
   const { rows } = await query(
     `SELECT id, username, name, photo_url, role, typing_at
@@ -9,6 +14,89 @@ export async function findOtherUser(accountId) {
       ORDER BY
         CASE role WHEN 'admin' THEN 0 ELSE 1 END,
         created_at
+      LIMIT 1`,
+    [accountId],
+  );
+  return rows[0] ?? null;
+}
+
+// Everyone except the caller — for notifications that should reach the whole
+// household rather than one inferred partner.
+export async function findOtherUsers(accountId) {
+  const { rows } = await query(
+    `SELECT id, username, name, photo_url, role, typing_at
+       FROM accounts
+      WHERE id != $1
+      ORDER BY
+        CASE role WHEN 'admin' THEN 0 ELSE 1 END,
+        created_at`,
+    [accountId],
+  );
+  return rows;
+}
+
+// Resolve an explicitly-addressed partner, making sure it's a real account and
+// not the caller themselves.
+export async function findPartner(accountId, partnerId) {
+  if (!partnerId || partnerId === accountId) return null;
+  const { rows } = await query(
+    `SELECT id, username, name, photo_url, role, typing_at
+       FROM accounts
+      WHERE id = $1`,
+    [partnerId],
+  );
+  return rows[0] ?? null;
+}
+
+// Everyone the caller can talk to, with their unread count and the last thing
+// either of them said — the conversation list.
+export async function listPartners(accountId) {
+  const { rows } = await query(
+    `SELECT a.id, a.username, a.name, a.photo_url, a.role, a.typing_at,
+            COALESCE(u.unread, 0)::int AS unread,
+            lm.body       AS last_body,
+            lm.created_at AS last_at,
+            lm.sender_id  AS last_sender_id
+       FROM accounts a
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) AS unread
+           FROM chat_messages m
+          WHERE m.recipient_id = $1 AND m.sender_id = a.id AND m.read_at IS NULL
+       ) u ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT m.body, m.created_at, m.sender_id
+           FROM chat_messages m
+          WHERE (m.sender_id = $1 AND m.recipient_id = a.id)
+             OR (m.sender_id = a.id AND m.recipient_id = $1)
+          ORDER BY m.created_at DESC
+          LIMIT 1
+       ) lm ON TRUE
+      WHERE a.id != $1
+      ORDER BY (lm.created_at IS NULL), lm.created_at DESC, a.created_at`,
+    [accountId],
+  );
+  return rows;
+}
+
+// Unread across every conversation, for the floating head and the app badge.
+export async function unreadCountTotal(accountId) {
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS count
+       FROM chat_messages
+      WHERE recipient_id = $1 AND read_at IS NULL`,
+    [accountId],
+  );
+  return rows[0]?.count ?? 0;
+}
+
+// Whoever last messaged the caller — the face the floating head should wear.
+export async function findLatestSender(accountId) {
+  const { rows } = await query(
+    `SELECT a.id, a.username, a.name, a.photo_url
+       FROM chat_messages m
+       JOIN accounts a ON a.id = m.sender_id
+      WHERE m.recipient_id = $1 AND m.read_at IS NULL
+      ORDER BY m.created_at DESC
       LIMIT 1`,
     [accountId],
   );
@@ -286,12 +374,21 @@ export async function unreadCountFrom(accountId, fromUserId) {
   return rows[0]?.count ?? 0;
 }
 
-export async function markAllRead(accountId, fromUserId) {
-  await query(
-    `UPDATE chat_messages SET read_at = NOW()
-      WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL`,
-    [accountId, fromUserId],
-  );
+// Passing no sender marks every conversation read.
+export async function markAllRead(accountId, fromUserId = null) {
+  if (fromUserId) {
+    await query(
+      `UPDATE chat_messages SET read_at = NOW()
+        WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL`,
+      [accountId, fromUserId],
+    );
+  } else {
+    await query(
+      `UPDATE chat_messages SET read_at = NOW()
+        WHERE recipient_id = $1 AND read_at IS NULL`,
+      [accountId],
+    );
+  }
   await query(
     `UPDATE notifications SET read_at = NOW()
       WHERE account_id = $1 AND type = 'message' AND read_at IS NULL`,
