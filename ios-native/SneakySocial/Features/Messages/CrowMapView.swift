@@ -2,11 +2,12 @@ import SwiftUI
 import MapKit
 #if canImport(GoogleMaps)
 import GoogleMaps
+import QuartzCore
 #endif
 
-/// The crow's route on a map — the Marauder's Map, as the web tracker draws it:
-/// parchment land, oxblood route, cream roads, and the crow flapping along the
-/// line between two points.
+/// The crow's route on a map, in the same dark styling the On My Way map uses:
+/// near-black land, dim roads, no points of interest, and the crow flapping
+/// along the line between two points.
 ///
 /// Google Maps when a key is configured, Apple Maps when it isn't. A missing
 /// key is a setup step, not a crash, so the sheet still works either way.
@@ -14,17 +15,28 @@ struct CrowMapView: View {
     let flight: CrowFlight
     /// 0…1 along the route, recomputed by the sheet every second.
     let progress: Double
+    /// Tapping a crow that has landed takes you back to what it delivered.
+    var onTapCrow: () -> Void = {}
 
     var body: some View {
         #if canImport(GoogleMaps)
         if MapsKey.isConfigured {
-            GoogleCrowMap(flight: flight, progress: progress)
+            GoogleCrowMap(flight: flight, progress: progress, onTapCrow: onTapCrow)
         } else {
-            AppleCrowMap(flight: flight, progress: progress)
+            AppleCrowMap(flight: flight, progress: progress, onTapCrow: onTapCrow)
         }
         #else
-        AppleCrowMap(flight: flight, progress: progress)
+        AppleCrowMap(flight: flight, progress: progress, onTapCrow: onTapCrow)
         #endif
+    }
+
+    /// Where the crow is right now, from the flight's own clock. Used to place
+    /// the marker correctly the instant it's created.
+    static func liveProgress(_ flight: CrowFlight) -> Double {
+        guard !flight.arrived else { return 1 }
+        let total = flight.arrivesAt.timeIntervalSince(flight.startedAt)
+        guard total > 0 else { return 1 }
+        return max(0, min(1, Date.now.timeIntervalSince(flight.startedAt) / total))
     }
 
     /// Straight-line interpolation, matching how the server describes the
@@ -65,42 +77,127 @@ enum MapsKey {
 struct GoogleCrowMap: UIViewRepresentable {
     let flight: CrowFlight
     let progress: Double
+    var onTapCrow: () -> Void = {}
 
-    /// Oxblood route and destination node, as the web tracker uses.
-    private static let route = UIColor(Palette.oxblood)
 
     func makeUIView(context: Context) -> GMSMapView {
         let options = GMSMapViewOptions()
         options.camera = GMSCameraPosition(latitude: flight.originLat,
                                            longitude: flight.originLng, zoom: 13)
         let map = GMSMapView(options: options)
+        map.delegate = context.coordinator
         map.isBuildingsEnabled = false
         map.isIndoorEnabled = false
         map.settings.rotateGestures = false
         map.settings.tiltGestures = false
         // Painted under the tiles so there's no grey flash before they load.
-        map.backgroundColor = UIColor(Palette.parchment)
+        map.backgroundColor = UIColor(Palette.mapBackground)
 
-        if let url = Bundle.main.url(forResource: "marauders-map", withExtension: "json"),
+        if let url = Bundle.main.url(forResource: "omw-dark-map", withExtension: "json"),
            let style = try? GMSMapStyle(contentsOfFileURL: url) {
             map.mapStyle = style
         }
 
         context.coordinator.build(on: map, flight: flight)
-        context.coordinator.fit(map, flight: flight)
+        // Don't wait for updateUIView to do the framing: a landed crow has a
+        // constant progress, so SwiftUI stops calling it — and the calls it
+        // does make happen before the map has been laid out, when its bounds
+        // are still zero and there's nothing to fit against.
+        context.coordinator.fitWhenLaidOut(map, flight: flight, progress: progress)
         return map
     }
 
     func updateUIView(_ map: GMSMapView, context: Context) {
+        // Fitting in makeUIView is too early — the map has no size yet, so the
+        // camera lands on something arbitrary. Do it once the view has real
+        // bounds, and keep doing it until the person takes over by panning.
+        context.coordinator.fitIfNeeded(map, flight: flight, progress: progress)
         context.coordinator.moveCrow(on: map, flight: flight, progress: progress)
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { Coordinator(onTapCrow: onTapCrow) }
 
-    final class Coordinator {
+    /// Explicitly main-actor: subclassing NSObject to become a delegate loses
+    /// the isolation a plain coordinator would have inferred, and everything in
+    /// here touches UIKit. GMSMapViewDelegate is an Objective-C protocol whose
+    /// callbacks arrive on the main thread, so `@preconcurrency` is accurate
+    /// rather than a silencer.
+    @MainActor
+    final class Coordinator: NSObject, @preconcurrency GMSMapViewDelegate {
         private var crow: GMSMarker?
+        private var line: GMSPolyline?
+        private var start: GMSMarker?
         private var frame = 0
         private var lastFlap = Date.distantPast
+        /// True once the person has panned or zoomed. After that the camera is
+        /// theirs and we stop moving it under them.
+        private var userMoved = false
+        private var fitted = false
+        private var landed = false
+        private var placed = false
+        private let onTapCrow: () -> Void
+
+        init(onTapCrow: @escaping () -> Void) {
+            self.onTapCrow = onTapCrow
+        }
+
+        /// Only a crow that has arrived is worth tapping — it's standing on the
+        /// thing it delivered.
+        func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
+            guard marker === crow, landed else { return false }
+            Haptics.tap()
+            onTapCrow()
+            return true
+        }
+
+        func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
+            if gesture { userMoved = true }
+        }
+
+        /// Waits for the map to have real bounds, then frames it. Gives up after
+        /// a second — by then something else is wrong and a wrong camera is
+        /// better than a spinning task.
+        func fitWhenLaidOut(_ map: GMSMapView, flight: CrowFlight, progress: Double) {
+            Task { @MainActor in
+                for _ in 0..<20 {
+                    if map.bounds.width > 1, map.bounds.height > 1 {
+                        fitIfNeeded(map, flight: flight, progress: progress)
+                        return
+                    }
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+            }
+        }
+
+        /// Frames what's left of the journey, until the person takes over.
+        ///
+        /// While the crow is flying this is CROW → DESTINATION, not the whole
+        /// original route: the remaining distance is what matters, so the view
+        /// tightens as the bird closes in. A landed crow is framed once and
+        /// left alone.
+        func fitIfNeeded(_ map: GMSMapView, flight: CrowFlight, progress: Double) {
+            guard !userMoved else { return }
+            guard map.bounds.width > 1, map.bounds.height > 1 else { return }
+
+            if flight.arrived {
+                guard !fitted else { return }
+                fitted = true
+                fitLanded(map, flight: flight)
+                return
+            }
+
+            fitted = true
+            let bounds = GMSCoordinateBounds(
+                coordinate: CrowMapView.position(flight, progress: progress),
+                coordinate: .init(latitude: flight.destLat, longitude: flight.destLng))
+            // Animated rather than moved, so the tightening reads as the camera
+            // following the crow rather than jumping every second.
+            map.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 80))
+            // The last hundred metres would otherwise zoom into the roof.
+            if map.camera.zoom > 17 {
+                map.animate(toZoom: 17)
+            }
+        }
 
         func build(on map: GMSMapView, flight: CrowFlight) {
             let origin = CLLocationCoordinate2D(latitude: flight.originLat, longitude: flight.originLng)
@@ -109,35 +206,68 @@ struct GoogleCrowMap: UIViewRepresentable {
             let path = GMSMutablePath()
             path.add(origin)
             path.add(dest)
-            let line = GMSPolyline(path: path)
-            line.strokeColor = GoogleCrowMap.route.withAlphaComponent(0.95)
-            line.strokeWidth = 6
-            line.map = map
+            let route = GMSPolyline(path: path)
+            route.strokeColor = UIColor(Palette.mapRoute).withAlphaComponent(0.95)
+            route.strokeWidth = 6
+            route.map = map
+            line = route
 
-            let start = GMSMarker(position: origin)
-            start.icon = dot(fill: UIColor(Palette.parchment), ring: GoogleCrowMap.route)
-            start.groundAnchor = CGPoint(x: 0.5, y: 0.5)
-            start.map = map
+            let from = GMSMarker(position: origin)
+            from.icon = dot(fill: UIColor(Palette.mapBackground), ring: UIColor(Palette.mapRoute))
+            from.groundAnchor = CGPoint(x: 0.5, y: 0.5)
+            // While the crow is flying the line starts at the bird, so an origin
+            // dot would sit on its own with nothing joining it.
+            from.map = flight.arrived ? map : nil
+            start = from
 
             let end = GMSMarker(position: dest)
-            end.icon = dot(fill: GoogleCrowMap.route, ring: .white)
+            end.icon = dot(fill: UIColor(Palette.mapRoute), ring: .white)
             end.groundAnchor = CGPoint(x: 0.5, y: 0.5)
             end.map = map
 
-            let bird = GMSMarker(position: origin)
+            // Placed where it actually is, not at the origin. Creating it at
+            // the origin and correcting it a frame later meant the correction
+            // rode the sheet's presentation animation — so every time the map
+            // opened, the crow slid down the route to where it belonged.
+            let bird = GMSMarker(position: CrowMapView.position(
+                flight, progress: CrowMapView.liveProgress(flight)))
             bird.icon = sprite(flight.arrived ? "crow_land_10" : "crow_send_03")
             bird.groundAnchor = CGPoint(x: 0.5, y: 0.5)
             bird.zIndex = 10
             bird.map = map
             crow = bird
+            landed = flight.arrived
         }
 
         /// Moves the crow along the line, alternating the two wing poses so it
         /// reads as flying rather than sliding.
         func moveCrow(on map: GMSMapView, flight: CrowFlight, progress: Double) {
             guard let crow else { return }
-            crow.position = CrowMapView.position(flight, progress: progress)
+            let here = CrowMapView.position(flight, progress: progress)
+            // The first placement must not animate; later ones may, because
+            // that's what makes the crow glide rather than hop each second.
+            if placed {
+                crow.position = here
+            } else {
+                placed = true
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                crow.position = here
+                CATransaction.commit()
+            }
 
+            // The line is what's LEFT of the journey: crow to destination. The
+            // part already flown isn't drawn — it would trail off the edge of a
+            // view that's framed on the remaining distance.
+            let path = GMSMutablePath()
+            path.add(flight.arrived
+                     ? CLLocationCoordinate2D(latitude: flight.originLat, longitude: flight.originLng)
+                     : here)
+            path.add(.init(latitude: flight.destLat, longitude: flight.destLng))
+            line?.path = path
+            start?.map = flight.arrived ? map : nil
+
+            landed = flight.arrived
             guard !flight.arrived else {
                 crow.icon = sprite("crow_land_10")
                 return
@@ -149,21 +279,25 @@ struct GoogleCrowMap: UIViewRepresentable {
             }
         }
 
-        /// Both ends on screen, with room around them.
-        func fit(_ map: GMSMapView, flight: CrowFlight) {
+        /// Where a finished journey sits: the whole route, both ends on screen.
+        func fitLanded(_ map: GMSMapView, flight: CrowFlight) {
             let bounds = GMSCoordinateBounds(
                 coordinate: .init(latitude: flight.originLat, longitude: flight.originLng),
                 coordinate: .init(latitude: flight.destLat, longitude: flight.destLng))
-            map.moveCamera(GMSCameraUpdate.fit(bounds, withPadding: 60))
+            map.moveCamera(GMSCameraUpdate.fit(bounds, withPadding: 48))
             // Two people in the same postcode would otherwise zoom to the roof.
             if map.camera.zoom > 16 {
                 map.moveCamera(GMSCameraUpdate.zoom(to: 16))
             }
+            // No zoom offset: a landed crow shows the WHOLE journey, both ends
+            // on screen. Zooming in past the fit crops the route and leaves you
+            // looking at one end wondering where the rest went.
         }
 
         private func sprite(_ name: String) -> UIImage? {
             guard let image = UIImage(named: name) ?? bundled(name) else { return nil }
-            let side: CGFloat = 38
+            // 38 read as a dot, 76 as a cartoon; 57 is the middle of the two.
+            let side: CGFloat = 57
             let size = CGSize(width: side, height: side * (image.size.height / max(image.size.width, 1)))
             return UIGraphicsImageRenderer(size: size).image { _ in
                 image.draw(in: CGRect(origin: .zero, size: size))
@@ -197,6 +331,7 @@ struct GoogleCrowMap: UIViewRepresentable {
 struct AppleCrowMap: View {
     let flight: CrowFlight
     let progress: Double
+    var onTapCrow: () -> Void = {}
 
     @State private var camera: MapCameraPosition = .automatic
 
@@ -206,11 +341,11 @@ struct AppleCrowMap: View {
                 .init(latitude: flight.originLat, longitude: flight.originLng),
                 .init(latitude: flight.destLat, longitude: flight.destLng),
             ])
-            .stroke(Palette.oxblood, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+            .stroke(Palette.mapRoute, style: StrokeStyle(lineWidth: 5, lineCap: .round))
 
             Annotation(flight.originLabel ?? "Sent from",
                        coordinate: .init(latitude: flight.originLat, longitude: flight.originLng)) {
-                Circle().fill(Palette.parchment).stroke(Palette.oxblood, lineWidth: 2)
+                Circle().fill(Palette.mapBackground).stroke(Palette.mapRoute, lineWidth: 2)
                     .frame(width: 12, height: 12)
             }
 
@@ -218,26 +353,44 @@ struct AppleCrowMap: View {
                        coordinate: .init(latitude: flight.destLat, longitude: flight.destLng)) {
                 Image(systemName: "mappin.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(Palette.oxblood)
-                    .background(Circle().fill(Palette.parchment).padding(3))
+                    .foregroundStyle(Palette.mapRoute)
+                    .background(Circle().fill(Palette.mapBackground).padding(3))
             }
 
             Annotation("The crow", coordinate: CrowMapView.position(flight, progress: progress)) {
-                CrowSprite(name: flight.arrived ? CrowArt.right : CrowArt.mover, size: 34)
+                CrowSprite(name: flight.arrived ? CrowArt.right : CrowArt.mover, size: 51)
                     .shadow(radius: 3)
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        guard flight.arrived else { return }
+                        Haptics.tap()
+                        onTapCrow()
+                    }
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
         .onAppear(perform: fit)
+        .onChange(of: progress) { _, _ in
+            guard !flight.arrived else { return }
+            withAnimation(.easeInOut(duration: 0.9)) { fit() }
+        }
     }
 
+    /// In flight, frames crow → destination so the view tightens as it closes
+    /// in; landed, frames the whole journey a level out.
     private func fit() {
-        let midLat = (flight.originLat + flight.destLat) / 2
-        let midLng = (flight.originLng + flight.destLng) / 2
+        let crow = CrowMapView.position(flight, progress: progress)
+        let from = flight.arrived
+            ? CLLocationCoordinate2D(latitude: flight.originLat, longitude: flight.originLng)
+            : crow
+        let to = CLLocationCoordinate2D(latitude: flight.destLat, longitude: flight.destLng)
+        // No offset either way — the fit is the frame.
+        let out: Double = 1
         camera = .region(MKCoordinateRegion(
-            center: .init(latitude: midLat, longitude: midLng),
+            center: .init(latitude: (from.latitude + to.latitude) / 2,
+                          longitude: (from.longitude + to.longitude) / 2),
             span: MKCoordinateSpan(
-                latitudeDelta: max(abs(flight.originLat - flight.destLat) * 1.8, 0.02),
-                longitudeDelta: max(abs(flight.originLng - flight.destLng) * 1.8, 0.02))))
+                latitudeDelta: max(abs(from.latitude - to.latitude) * 1.8, 0.004) * out,
+                longitudeDelta: max(abs(from.longitude - to.longitude) * 1.8, 0.004) * out)))
     }
 }

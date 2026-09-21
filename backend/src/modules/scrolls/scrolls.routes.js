@@ -2,6 +2,8 @@ import {
   getSettings, getFrames, updateSettings, replaceFrames,
   createScroll, listReceived, listIncoming, listThread, unreadCount, markRead, resolveDueScrolls,
   getActiveCrowFlights, listPerchScrolls, getScrollFlight, markSeen,
+  streetsAlong, streetMessage, WAYPOINT_FRACS, LANDING_FRAC,
+  haversineKm, flightSeconds,
   pushStreetSubtitleUpdates, saveLiveActivityToken,
   getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
@@ -208,6 +210,62 @@ export default async function scrollRoutes(fastify) {
   // Crow flight path — plots a road-following route between sender and recipient
   // for the in-app map / Live Activity to animate the crow along. Self-contained
   // (no push needed): the client polls/animates against flight_seconds itself.
+  /**
+   * The test rig's data source: everything about a hypothetical flight between
+   * two points, without sending anything to anyone.
+   *
+   * Returns the straight line the crow takes, the three waypoints with the
+   * street under each, and the exact narration the Live Activity would show at
+   * each phase — so "as the crow flies, over these streets" can be checked
+   * against a map rather than by sending a real message and waiting.
+   *
+   * body: { origin: {lat,lng,label}, dest: {lat,lng,label} }
+   */
+  fastify.post('/api/scrolls/flight-preview', async (req, reply) => {
+    getEffectiveAccountId(req);
+    const { origin, dest } = req.body ?? {};
+    if (origin?.lat == null || origin?.lng == null || dest?.lat == null || dest?.lng == null) {
+      return reply.code(400).send({ error: 'origin and dest {lat,lng} required' });
+    }
+
+    const shape = {
+      origin_lat: origin.lat, origin_lng: origin.lng,
+      dest_lat: dest.lat, dest_lng: dest.lng,
+      origin_label: origin.label ?? null,
+      dest_label: dest.label ?? null,
+      id: 'preview',
+    };
+
+    const streets = await streetsAlong({
+      originLat: origin.lat, originLng: origin.lng,
+      destLat: dest.lat, destLng: dest.lng,
+    });
+    const withStreets = { ...shape, route_streets: streets };
+
+    const fracs = [...WAYPOINT_FRACS, LANDING_FRAC];
+    const waypoints = fracs.map((frac, index) => ({
+      frac,
+      lat: Number(origin.lat) + (Number(dest.lat) - Number(origin.lat)) * frac,
+      lng: Number(origin.lng) + (Number(dest.lng) - Number(origin.lng)) * frac,
+      // The landing beat has no street of its own; it names the destination.
+      street: index < streets.length ? streets[index] : null,
+      narration: streetMessage(index + 1, withStreets),
+    }));
+
+    const distanceKm = haversineKm(origin.lat, origin.lng, dest.lat, dest.lng);
+    return {
+      origin_label: origin.label ?? null,
+      dest_label: dest.label ?? null,
+      distance_km: Math.round(distanceKm * 100) / 100,
+      // Both clocks, because they are deliberately different: a scroll is
+      // compressed 60x, a message flies at a real 30mph.
+      scroll_seconds: flightSeconds(distanceKm, await getSettings()),
+      message_seconds: Math.round(Math.min(3600, Math.max(20, (distanceKm / 48) * 3600))),
+      streets,
+      waypoints,
+    };
+  });
+
   fastify.post('/api/scrolls/flight-path', async (req, reply) => {
     getEffectiveAccountId(req); // require an authenticated session
     const { origin, dest } = req.body ?? {};

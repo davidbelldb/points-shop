@@ -2,8 +2,8 @@ import SwiftUI
 
 /// The map that slides up from a crow bubble.
 ///
-/// Half height to begin with — enough to see the crow, the line it's flying and
-/// where it's headed — and full height on a swipe, or on tapping the header.
+/// Half height to begin with — enough to see the crow and the line it's flying
+/// — and full height on a swipe. No chrome: the map is the whole sheet.
 /// The flight comes from `GET /api/scrolls/:id/flight`, the same object the web
 /// tracker and the Live Activity are built from, so all three narrate the crow's
 /// journey with the same lines at the same points.
@@ -13,6 +13,8 @@ struct CrowTrackerSheet: View {
     /// looking at.
     let flightPath: String
     @Binding var detent: PresentationDetent
+    /// Tapping a landed crow closes the map and goes back to what it carried.
+    var onTapCrow: () -> Void = {}
 
     @State private var flight: CrowFlight?
     @State private var error: String?
@@ -25,11 +27,13 @@ struct CrowTrackerSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-
             if let flight {
                 map(flight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // The sheet's bottom inset is the home indicator's; the map
+                    // should run under it rather than stopping short and
+                    // leaving a band of sheet colour at both detents.
+                    .ignoresSafeArea(edges: .bottom)
             } else if noRoute {
                 ContentUnavailableView(
                     "No route for this one",
@@ -44,7 +48,7 @@ struct CrowTrackerSheet: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(Color(hex: "#1f1f1e").opacity(0.001))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .presentationDetents([.medium, .large], selection: $detent)
         .presentationDragIndicator(.visible)
         // Deliberately NOT presentationBackgroundInteraction: with the thread
@@ -58,61 +62,10 @@ struct CrowTrackerSheet: View {
 
     // MARK: - Header
 
-    private var header: some View {
-        VStack(spacing: 6) {
-            Text(headline)
-                .font(CrowArt.font(size: 16))
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let flight {
-                HStack(spacing: 12) {
-                    if flight.arrived {
-                        Label("Landed", systemImage: "checkmark.circle.fill")
-                    } else {
-                        Label("\(flight.etaMinutes) min", systemImage: "clock")
-                        Label(distance(flight), systemImage: "arrow.left.and.right")
-                    }
-                    if let dest = flight.destLabel, !dest.isEmpty {
-                        Label(dest, systemImage: "mappin.and.ellipse").lineLimit(1)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 12)
-        .frame(maxWidth: .infinity)
-        // The "second tap" that takes the sheet full height, for anyone who
-        // doesn't think to swipe it.
-        .contentShape(.rect)
-        .onTapGesture {
-            withAnimation { detent = detent == .large ? .medium : .large }
-            Haptics.tap()
-        }
-        .accessibilityAddTraits(.isButton)
-    }
-
-    private var headline: String {
-        if let flight { return flight.line(at: liveProgress) }
-        if noRoute { return "No crow to follow" }
-        if error != nil { return "Lost the trail" }
-        return "Finding the crow…"
-    }
-
-    private func distance(_ flight: CrowFlight) -> String {
-        flight.distanceKm >= 10
-            ? "\(Int(flight.distanceKm.rounded())) km to go"
-            : String(format: "%.1f km to go", flight.distanceKm)
-    }
-
     // MARK: - Map
 
     private func map(_ flight: CrowFlight) -> some View {
-        CrowMapView(flight: flight, progress: liveProgress)
+        CrowMapView(flight: flight, progress: liveProgress, onTapCrow: onTapCrow)
     }
 
     /// Progress from the flight's own clock rather than the server's snapshot,

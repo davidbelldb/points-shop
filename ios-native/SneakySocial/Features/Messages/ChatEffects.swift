@@ -19,6 +19,37 @@ struct ShakeEffect: GeometryEffect {
     }
 }
 
+/// A bubble drawing attention to itself — used when you come back from the map
+/// by tapping the crow that delivered it.
+///
+/// Two swells rather than one: a single scale reads as a layout glitch, a
+/// double beat reads as "this one".
+struct PulseModifier: ViewModifier {
+    let active: Bool
+
+    @State private var swell: CGFloat = 1
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(swell)
+            .onChange(of: active) { _, isActive in
+                guard isActive else { return }
+                Task {
+                    for scale in [1.07, 1.0, 1.05, 1.0] as [CGFloat] {
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
+                            swell = scale
+                        }
+                        try? await Task.sleep(for: .milliseconds(180))
+                    }
+                }
+            }
+    }
+}
+
+extension View {
+    func pulse(_ active: Bool) -> some View { modifier(PulseModifier(active: active)) }
+}
+
 /// The camera, for a photo taken there and then.
 ///
 /// `PhotosPicker` covers the library; the camera still needs the UIKit

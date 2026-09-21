@@ -1,7 +1,9 @@
 import { query } from '../../db.js';
 import { sendPush } from '../notifications/push.js';
 import { crowContentState, sendBroadcast, deleteBroadcastChannel } from '../notifications/apns.js';
-import { haversineKm, buildCrowFlight, startCrowActivity } from '../scrolls/scrolls.repo.js';
+import {
+  haversineKm, buildCrowFlight, startCrowActivity, streetsAlong, streetMessage,
+} from '../scrolls/scrolls.repo.js';
 
 // ---------------------------------------------------------------------------
 // How long a message's crow is in the air.
@@ -32,12 +34,7 @@ const SYSTEM_BODIES_INSTANT = new Set([
 /* The crow's progress, narrated. Same waypoints as a scroll's; the streets are
    a scroll's own trick (it stores a reverse-geocoded route), so a message gets
    the generic lines a scroll falls back to. */
-const MESSAGE_PHASES = [
-  { at: 0.25, line: 'Probably somewhere over open country' },
-  { at: 0.50, line: 'Likely soaring high over the fields' },
-  { at: 0.75, line: 'Last spotted crossing open country' },
-  { at: 0.92, line: 'Coming in to land' },
-];
+const MESSAGE_PHASE_FRACS = [0.25, 0.50, 0.75, 0.92];
 
 /**
  * Drives every in-flight message's Live Activity: the waypoint updates while
@@ -49,7 +46,9 @@ const MESSAGE_PHASES = [
  */
 export async function resolveDueMessageActivities() {
   const { rows } = await query(
-    `SELECT id, created_at, deliver_at, la_channel_id, la_phase, dest_label
+    `SELECT id, created_at, deliver_at, la_channel_id, la_phase,
+            origin_lat, origin_lng, dest_lat, dest_lng,
+            origin_label, dest_label, route_streets
        FROM chat_messages
       WHERE la_channel_id IS NOT NULL AND la_ended = FALSE`,
   );
@@ -76,16 +75,19 @@ export async function resolveDueMessageActivities() {
     const total = Math.max(1, arrivesAtMs - startedAtMs);
     const progress = (now - startedAtMs) / total;
     let phase = 0;
-    for (let i = 0; i < MESSAGE_PHASES.length; i += 1) {
-      if (progress >= MESSAGE_PHASES[i].at) phase = i + 1;
+    for (let i = 0; i < MESSAGE_PHASE_FRACS.length; i += 1) {
+      if (progress >= MESSAGE_PHASE_FRACS[i]) phase = i + 1;
     }
     if (phase === m.la_phase) continue;
 
+    // The same narrator scrolls use, fed the message's own row — so it names
+    // the real streets when the reverse-geocode found them, and falls back to
+    // "somewhere over open country" when it didn't.
     await sendBroadcast(m.la_channel_id, {
       event: 'update',
       contentState: crowContentState({
         startedAtMs, arrivesAtMs, landed: false, phase,
-        message: MESSAGE_PHASES[phase - 1]?.line ?? '',
+        message: streetMessage(phase, m),
       }),
     }).catch(() => {});
     await query(`UPDATE chat_messages SET la_phase = $1 WHERE id = $2`, [phase, m.id]).catch(() => {});
@@ -332,6 +334,7 @@ export async function listMessages(accountId, otherId, limit = 200, { crows = fa
                         AND m.deliver_at > NOW()
                    THEN NULL ELSE m.body END AS body,
               m.flight_seconds, m.deliver_at, m.origin_label, m.dest_label, m.distance_km,
+              m.route_streets,
               m.read_at, m.created_at,
               m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
               m.slider_response, m.sparkled, m.secret_revealed_at,
@@ -576,6 +579,20 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
                      [channelId, created.id]);
       }
     }).catch(() => { /* best effort — the message is sent regardless */ });
+
+    // Nominatim is rate-limited to one request a second, so this runs behind
+    // the send rather than holding it up. A crow that takes off before the
+    // streets are known simply narrates generically for its first waypoint.
+    if (flight.origin && flight.dest) {
+      streetsAlong({
+        originLat: flight.origin.lat, originLng: flight.origin.lng,
+        destLat: flight.dest.lat, destLng: flight.dest.lng,
+      }).then((streets) => {
+        if (!streets.some(Boolean)) return;
+        return query(`UPDATE chat_messages SET route_streets = $1 WHERE id = $2`,
+                     [JSON.stringify(streets), created.id]);
+      }).catch(() => {});
+    }
   }
 
   const isSecret = trimmed.startsWith('__secret__:');

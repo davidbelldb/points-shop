@@ -7,6 +7,7 @@ import {
 import { unreadCount as scrollsUnreadCount } from '../scrolls/scrolls.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 import { areFriends } from '../friends/friends.repo.js';
+import { streetMessage } from '../scrolls/scrolls.repo.js';
 
 // Whitelist of allowed reaction keys. Keep tiny — we render a fixed emoji
 // per key in the frontend, so adding new ones requires both ends to know.
@@ -60,12 +61,20 @@ export default async function chatRoutes(fastify) {
     const messages = await listMessages(accountId, other.id, 200, { crows });
     if (!crows) return { other, messages };
 
+    // A message still in the air has no body to show, so it shows where its
+    // crow has got to instead — the same four lines the Live Activity uses, so
+    // the bubble and the lock screen never disagree.
+    const narrated = messages.map((m) => {
+      if (!m.deliver_at || new Date(m.deliver_at) <= new Date()) return m;
+      return { ...m, narration: [1, 2, 3, 4].map((phase) => streetMessage(phase, m)) };
+    });
+
     // What the NEXT message's journey would be, so the composer can say how
     // long it'll take and whose location is missing.
     const flight = await messageFlight(accountId, other.id);
     return {
       other,
-      messages,
+      messages: narrated,
       flight: {
         seconds: flight.seconds,
         distance_km: flight.distanceKm,

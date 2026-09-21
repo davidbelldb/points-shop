@@ -231,6 +231,9 @@ struct CrowMessageBubble: View {
     let arrivesAt: Date
     let isMine: Bool
     var style: Style = .scroll
+    /// One line per waypoint, from the server — the same wording the Live
+    /// Activity shows, so the two never disagree.
+    var narration: [String] = []
 
     /// True once the scroll has been delivered, as far as the server knows.
     let delivered: Bool
@@ -267,6 +270,13 @@ struct CrowMessageBubble: View {
         landed ? "Delivered" : "On its way"
     }
 
+    /// Where the crow is now, in place of the message it hasn't delivered yet.
+    private var whereabouts: String? {
+        guard !landed, !narration.isEmpty else { return nil }
+        let index = min(max(phase, 1), narration.count) - 1
+        return narration[index]
+    }
+
     private var subtitle: String {
         if landed { return "Delivered by crow" }
         let from = originLabel.map { " from \($0)" } ?? ""
@@ -298,6 +308,19 @@ struct CrowMessageBubble: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
                 flightLine
+
+                // Until it lands, the bubble says where the crow has got to —
+                // in the space the message itself will occupy.
+                if let whereabouts {
+                    Text(whereabouts)
+                        .font(.subheadline)
+                        .foregroundStyle(ink.opacity(0.75))
+                        .multilineTextAlignment(style == .scroll ? .center : .leading)
+                        .frame(maxWidth: .infinity, alignment: style == .scroll ? .center : .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.4), value: phase)
+                }
 
                 // The reveal: the bubble drops open to show the message.
                 if revealed, text?.isEmpty == false {

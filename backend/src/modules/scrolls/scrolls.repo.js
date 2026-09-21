@@ -210,7 +210,7 @@ function pickStreets(scrollId) {
 
 // Reverse-geocode a single point to its street name (Nominatim, same source the
 // client uses to pick origin/destination). Returns null on any failure.
-async function reverseStreet(lat, lng) {
+export async function reverseStreet(lat, lng) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=17&addressdetails=1`
       + `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
@@ -226,9 +226,9 @@ async function reverseStreet(lat, lng) {
 // Single source of truth: the three waypoint nodes sit at these fractions of the
 // journey. The widget draws nodes here, the geocoder samples streets here, and
 // the scheduler fires each node's update as the progress bar reaches it.
-const WAYPOINT_FRACS = [0.25, 0.50, 0.75];
+export const WAYPOINT_FRACS = [0.25, 0.50, 0.75];
 // A final "coming into land" beat just before arrival (no node, text only).
-const LANDING_FRAC = 0.92;
+export const LANDING_FRAC = 0.92;
 // Fire each update this far ahead of the bar reaching the mark, to absorb poll +
 // push-delivery latency so the node pops exactly as the fill arrives (capped at
 // 10% of the flight so short hops don't fire too early).
@@ -237,6 +237,34 @@ const LEAD_MS = 1800;
 // Sample each waypoint along the origin→dest line and reverse-geocode it, so the
 // narrated streets genuinely lie between the two addresses. Stored once on the
 // scroll row; the scheduler reads them. Best-effort — never throws.
+/**
+ * The streets a straight origin→destination flight passes over, sampled at the
+ * three waypoint fractions.
+ *
+ * Nominatim asks for one request a second and means it, so this paces itself —
+ * three waypoints take a little over two seconds. Pulled out of
+ * computeRouteStreets so the test rig and chat messages can use it without
+ * going through the scrolls table.
+ */
+export async function streetsAlong({ originLat, originLng, destLat, destLng }) {
+  const a = [Number(originLat), Number(originLng)];
+  const b = [Number(destLat), Number(destLng)];
+  if (![...a, ...b].every(Number.isFinite)) return [];
+
+  const out = [];
+  for (const t of WAYPOINT_FRACS) {
+    const lat = a[0] + (b[0] - a[0]) * t;
+    const lng = a[1] + (b[1] - a[1]) * t;
+    /* eslint-disable no-await-in-loop */
+    const name = await reverseStreet(lat, lng);
+    // Avoid repeating the previous street back-to-back.
+    out.push(name && name !== out[out.length - 1] ? name : null);
+    await new Promise((r) => setTimeout(r, 1100));
+    /* eslint-enable no-await-in-loop */
+  }
+  return out;
+}
+
 async function computeRouteStreets(scroll) {
   const aLat = Number(scroll.origin_lat); const aLng = Number(scroll.origin_lng);
   const bLat = Number(scroll.dest_lat); const bLng = Number(scroll.dest_lng);
@@ -293,7 +321,7 @@ function isLocalJourney(scroll) {
   return Number.isFinite(km) && km <= 40;
 }
 
-function streetMessage(phase, scroll) {
+export function streetMessage(phase, scroll) {
   if (phase === 4) return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
   // 1) real reverse-geocoded street on the path, 2) nearest curated street. The
   // curated Cambridge fallbacks (routeStreet / pickStreets) only apply to a LOCAL hop —
@@ -704,6 +732,7 @@ export async function listThread(accountId, partnerId) {
             CASE WHEN s.sender_id = $1 OR s.deliver_at <= NOW()
                  THEN s.body ELSE NULL END AS body,
             s.origin_label, s.dest_label,
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets,
             s.sent_at, s.deliver_at, s.flight_seconds,
             s.delivered, s.delivered_at, s.read_at,
             a.name AS sender_name, a.username AS sender_username, a.photo_url AS sender_photo
@@ -715,7 +744,16 @@ export async function listThread(accountId, partnerId) {
       ORDER BY s.sent_at ASC`,
     [accountId, partnerId],
   );
-  return rows;
+  // A scroll still in the air has no body to show, so it shows where its crow
+  // has got to instead — the same four lines the Live Activity narrates, so the
+  // bubble and the lock screen never disagree. Landed scrolls get an empty
+  // array and simply read as themselves.
+  const now = Date.now();
+  return rows.map((s) => (
+    new Date(s.deliver_at).getTime() > now
+      ? { ...s, narration: [1, 2, 3, 4].map((phase) => streetMessage(phase, s)) }
+      : s
+  ));
 }
 
 // Recipient's IN-FLIGHT scrolls (crow still on its way). Drives the "crow

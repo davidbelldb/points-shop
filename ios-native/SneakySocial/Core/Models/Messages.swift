@@ -92,6 +92,9 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
     var originLabel: String?
     var destLabel: String?
     var distanceKm: Double?
+    /// Where the crow has got to, one line per waypoint — only sent for a
+    /// message still in the air.
+    var narration: [String] = []
 
     /// When the crow left. `created_at` is when you hit send.
     var departedAt: Date { createdAt }
@@ -121,6 +124,7 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
         case originLabel = "origin_label"
         case destLabel = "dest_label"
         case distanceKm = "distance_km"
+        case narration
     }
 
     init(from decoder: Decoder) throws {
@@ -144,6 +148,7 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
         originLabel = try c.decodeIfPresent(String.self, forKey: .originLabel)
         destLabel = try c.decodeIfPresent(String.self, forKey: .destLabel)
         distanceKm = try c.decodeIfPresent(Double.self, forKey: .distanceKm)
+        narration = (try? c.decodeIfPresent([String].self, forKey: .narration)) ?? []
     }
 
     /// What this message actually is. The backend keeps every kind in one TEXT
@@ -326,6 +331,10 @@ struct ScrollMessage: Codable, Sendable, Identifiable, Equatable {
     var delivered: Bool = false
     var readAt: Date?
     var senderName: String?
+    /// One line per waypoint, from the server — the same wording the Live
+    /// Activity shows, so the bubble and the lock screen never disagree. Empty
+    /// once the crow has landed, because then there is a body to read instead.
+    var narration: [String] = []
 
     /// Landed as far as the server knows. The bubble watches the clock as well,
     /// so it doesn't sit there waiting for the next poll.
@@ -336,7 +345,7 @@ struct ScrollMessage: Codable, Sendable, Identifiable, Equatable {
     var departedAt: Date { deliverAt.addingTimeInterval(-Double(flightSeconds)) }
 
     private enum CodingKeys: String, CodingKey {
-        case id, body, delivered
+        case id, body, delivered, narration
         case senderID = "sender_id"
         case recipientID = "recipient_id"
         case originLabel = "origin_label"
@@ -362,6 +371,7 @@ struct ScrollMessage: Codable, Sendable, Identifiable, Equatable {
         delivered = try c.decodeIfPresent(Bool.self, forKey: .delivered) ?? false
         readAt = try c.decodeIfPresent(Date.self, forKey: .readAt)
         senderName = try c.decodeIfPresent(String.self, forKey: .senderName)
+        narration = try c.decodeIfPresent([String].self, forKey: .narration) ?? []
     }
 }
 

@@ -76,6 +76,10 @@ enum Palette {
         static let sealed = Color(hex: "#3b3b3b")
     }
 
+    // Crow tracker map — the On My Way styling: near-black land, pink route.
+    static let mapBackground = Color(hex: "#1f1f1f")   // painted under the tiles
+    static let mapRoute = Color(hex: "#ee70bd")        // OMW's pink
+
     // Crow tracker — "The Marauder's Map"
     static let parchment = Color(hex: "#ebc876")
     static let oxblood = Color(hex: "#5e1a13")

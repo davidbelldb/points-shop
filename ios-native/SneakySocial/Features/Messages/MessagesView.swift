@@ -28,36 +28,48 @@ struct MessagesView: View {
     }
 
     private var conversations: some View {
-        List {
-            HStack(alignment: .firstTextBaseline) {
-                PageHeading(title: "Messages")
-                Spacer(minLength: 8)
-                peopleButton
-            }
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-            .listRowInsets(.init(top: 4, leading: 4, bottom: 8, trailing: 4))
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                // The heading sits with the list rather than floating above a
+                // card: an inset-grouped List put a third of the screen between
+                // the title and the first name.
+                HStack(alignment: .firstTextBaseline) {
+                    PageHeading(title: "Messages")
+                    Spacer(minLength: 8)
+                    peopleButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 10)
 
-            if model.partners.isEmpty && !model.isLoading {
-                Section {
+                if model.partners.isEmpty && !model.isLoading {
                     ContentUnavailableView("Nobody to write to",
                                            systemImage: "scroll.fill",
                                            description: Text("Connect with someone first — tap People."))
-                        .listRowBackground(Color.clear)
+                        .padding(.top, 40)
                 }
-            }
 
-            ForEach(model.partners) { partner in
-                Button {
-                    Haptics.tap()
-                    withAnimation(.snappy(duration: 0.28)) { openPartner = partner }
-                } label: {
-                    PartnerRow(partner: partner, meID: session.account?.id)
+                ForEach(Array(model.partners.enumerated()), id: \.element.id) { index, partner in
+                    Button {
+                        Haptics.tap()
+                        withAnimation(.snappy(duration: 0.28)) { openPartner = partner }
+                    } label: {
+                        PartnerRow(partner: partner, meID: session.account?.id)
+                    }
+                    .buttonStyle(RowPressStyle())
+
+                    // Hairline starting where the text does, as every list on
+                    // the phone draws it — not floating in from both edges.
+                    if index < model.partners.count - 1 {
+                        Rectangle()
+                            .fill(.separator)
+                            .frame(height: 0.5)
+                            .padding(.leading, 76)
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
-        .listStyle(.insetGrouped)
+        .scrollBounceBehavior(.basedOnSize)
         .refreshable { await model.loadPartners() }
         .sheet(isPresented: $showingPeople, onDismiss: {
             // Connections decide who's in the list, so it has to be re-read.
@@ -108,25 +120,36 @@ private struct PartnerRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Avatar(url: partner.photo, size: 44)
+            Avatar(url: partner.photo, size: 52)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(partner.displayName).font(.headline)
-                if let preview = partner.preview {
-                    Text(partner.lastSenderID == meID ? "You: \(preview)" : preview)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(partner.displayName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                // A name on its own reads as a broken row, so a conversation
+                // with nothing in it says so.
+                Group {
+                    if let preview = partner.preview {
+                        Text(partner.lastSenderID == meID ? "You: \(preview)" : preview)
+                    } else {
+                        Text("No messages yet").italic()
+                    }
                 }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
 
             Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: 6) {
                 if let lastAt = partner.lastAt {
                     Text(lastAt, format: .relative(presentation: .numeric, unitsStyle: .narrow))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 if partner.unread > 0 {
                     Text("\(partner.unread)")
@@ -135,10 +158,25 @@ private struct PartnerRow: View {
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(Palette.basket, in: .capsule)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .contentShape(.rect)
+    }
+}
+
+/// A row that dims while held, the way a list row does — `.plain` gives no
+/// feedback at all, which makes a tappable row feel dead.
+private struct RowPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Color.primary.opacity(0.08) : .clear)
     }
 }
 
@@ -154,6 +192,10 @@ struct ThreadView: View {
     @Environment(LocationStore.self) private var location
     @State private var model = MessagesViewModel()
     @State private var trackingFlight: TrackedFlight?
+    /// The entry to draw attention to after coming back from the map.
+    @State private var pulsing: String?
+    /// Set to scroll the thread to a particular entry.
+    @State private var scrollTarget: String?
     @State private var showingTray = false
     @State private var showingGifs = false
     @State private var showingPoll = false
@@ -213,7 +255,13 @@ struct ThreadView: View {
             // Next crow opens at half height, whatever this one ended up at.
             trackerDetent = .medium
         }) { tracked in
-            CrowTrackerSheet(flightPath: tracked.path, detent: $trackerDetent)
+            CrowTrackerSheet(flightPath: tracked.path, detent: $trackerDetent) {
+                // Tapping the landed crow: shut the map and point at what it
+                // brought, rather than leaving you to find it yourself.
+                let entryID = tracked.kind == "messages" ? "chat-\(tracked.id)" : "scroll-\(tracked.id)"
+                trackingFlight = nil
+                pulse(entryID)
+            }
         }
         .sheet(isPresented: $showingGifs) {
             GifPicker { url in Task { await model.sendRaw(url) } }
@@ -280,6 +328,19 @@ struct ThreadView: View {
         static func message(_ id: String) -> TrackedFlight { .init(id: id, kind: "messages") }
     }
 
+    /// Brings a bubble back into view and makes it announce itself.
+    private func pulse(_ entryID: String) {
+        pulsing = entryID
+        Task {
+            // Let the sheet finish closing before moving the thread underneath.
+            try? await Task.sleep(for: .milliseconds(320))
+            withAnimation(.easeOut(duration: 0.3)) { scrollTarget = entryID }
+            Haptics.tap()
+            try? await Task.sleep(for: .seconds(1.2))
+            pulsing = nil
+        }
+    }
+
     /// Opening a journey. Always at half height — full height is a swipe up or
     /// a tap on the sheet's own header.
     ///
@@ -320,14 +381,21 @@ struct ThreadView: View {
             Spacer(minLength: 8)
 
             // How long the next crow takes, opposite the name it's going to.
+            //
+            // A guessed time and a measured one look the same otherwise, and
+            // that matters: a guess means nobody's location was used, so the
+            // message won't have a route to show on the map afterwards.
             if let estimate = model.flightEstimate, location.place.isSet {
                 HStack(spacing: 5) {
-                    Image(systemName: "bird")
+                    Image(systemName: estimate.isGuess ? "location.slash" : "bird")
                     Text(estimate.spoken.capitalisedFirst)
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(estimate.isGuess ? Color.orange : Color.secondary)
                 .lineLimit(1)
+                .help(estimate.isGuess
+                      ? "\(partner.displayName) hasn't said where they are"
+                      : "Measured from where you both are")
             }
         }
         .padding(.horizontal, 16)
@@ -355,6 +423,7 @@ struct ThreadView: View {
                     ForEach(model.entries) { entry in
                         row(entry)
                             .id(entry.id)
+                            .pulse(pulsing == entry.id)
                             .transition(.move(edge: .leading).combined(with: .opacity))
                     }
 
@@ -390,6 +459,11 @@ struct ThreadView: View {
             }
             .onChange(of: model.inFlight.count) { _, _ in
                 withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(bottomAnchor, anchor: .bottom) }
+            }
+            .onChange(of: scrollTarget) { _, target in
+                guard let target else { return }
+                withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(target, anchor: .center) }
+                scrollTarget = nil
             }
             .onAppear { proxy.scrollTo(bottomAnchor, anchor: .bottom) }
         }
@@ -430,6 +504,7 @@ struct ThreadView: View {
                         arrivesAt: flight.arrivesAt,
                         isMine: mine,
                         style: .message,
+                        narration: message.narration,
                         delivered: message.hasArrived,
                         onTapFlight: { track(.message(message.id)) },
                         onLanded: {
@@ -496,6 +571,7 @@ struct ThreadView: View {
             startedAt: scroll.departedAt,
             arrivesAt: scroll.deliverAt,
             isMine: model.isMine(scroll.senderID),
+            narration: scroll.narration,
             delivered: scroll.delivered,
             onTapFlight: { track(.scroll(scroll.id)) },
             onLanded: {
