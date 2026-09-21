@@ -39,6 +39,13 @@ struct CrowMapView: View {
         return max(0, min(1, Date.now.timeIntervalSince(flight.startedAt) / total))
     }
 
+    /// One coordinate part of the way to another.
+    static func blend(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D,
+                      _ t: Double) -> CLLocationCoordinate2D {
+        .init(latitude: a.latitude + (b.latitude - a.latitude) * t,
+              longitude: a.longitude + (b.longitude - a.longitude) * t)
+    }
+
     /// Straight-line interpolation, matching how the server describes the
     /// journey: as the crow flies, no roads.
     static func position(_ flight: CrowFlight, progress: Double) -> CLLocationCoordinate2D {
@@ -266,8 +273,6 @@ struct GoogleCrowMap: UIViewRepresentable {
                 coordinate: .init(latitude: flight.originLat, longitude: flight.originLng),
                 coordinate: .init(latitude: flight.destLat, longitude: flight.destLng))
             let inset = padding(for: size)
-            guard let cruise = map.camera(for: whole, insets: UIEdgeInsets(
-                top: inset, left: inset, bottom: inset, right: inset)) else { return }
 
             // Takeoff. The camera opens at the same zoom a landing ends on,
             // close over the bird, and climbs out to the whole-route framing
@@ -283,17 +288,57 @@ struct GoogleCrowMap: UIViewRepresentable {
             if eased >= 1, cruiseSize == size { return }
             cruiseSize = eased >= 1 ? size : .zero
 
-            let cruiseZoom = Double(min(cruise.zoom, Float(Self.perchZoom)))
-            let zoom = Self.perchZoom + (cruiseZoom - Self.perchZoom) * eased
+            // Interpolate the BOUNDS, not the camera.
+            //
+            // Blending target and zoom separately is what threw the crow out of
+            // shot: the target slid toward the middle of the route faster than
+            // the zoom widened to cover it, so for a few seconds the viewport
+            // was somewhere between the two, framing neither. Growing a box
+            // from "just around the bird" to "the whole route" can't do that —
+            // the crow sits inside both boxes, and a coordinate between two
+            // values that both contain it still contains it. It is in frame for
+            // every value of `eased`, on any route length.
+            let box = perchBox(around: here, size: size, inset: inset)
+            let framed = GMSCoordinateBounds(
+                coordinate: CrowMapView.blend(box.southWest, whole.southWest, eased),
+                coordinate: CrowMapView.blend(box.northEast, whole.northEast, eased))
 
-            // Pans out from over the bird to the centre of the route on the
-            // same curve, so the climb doesn't also lurch sideways.
-            let target = CLLocationCoordinate2D(
-                latitude: here.latitude + (cruise.target.latitude - here.latitude) * eased,
-                longitude: here.longitude + (cruise.target.longitude - here.longitude) * eased)
+            animateCamera(map, to: GMSCameraUpdate.fit(framed, withPadding: inset))
+        }
 
-            map.animate(with: GMSCameraUpdate.setCamera(
-                GMSCameraPosition(target: target, zoom: Float(zoom))))
+        /// The patch of ground `perchZoom` covers at this view size — the box
+        /// the takeoff starts from, centred on the bird.
+        ///
+        /// Google's world is 256pt wide at zoom 0 and doubles each level, so a
+        /// degree of longitude is a known number of points; latitude is the
+        /// same scaled by cos(lat), which is Mercator to well within a pixel at
+        /// the sizes this drawer uses.
+        private func perchBox(around centre: CLLocationCoordinate2D,
+                              size: CGSize, inset: CGFloat) -> GMSCoordinateBounds {
+            let worldPoints = 256 * pow(2, Self.perchZoom)
+            let degreesPerPoint = 360 / worldPoints
+            // The fit reserves its padding, so measure the box against the room
+            // that actually remains — otherwise takeoff starts a notch wide.
+            let usableW = max(1, Double(size.width - inset * 2))
+            let usableH = max(1, Double(size.height - inset * 2))
+            let halfLng = usableW * degreesPerPoint / 2
+            let halfLat = usableH * degreesPerPoint * cos(centre.latitude * .pi / 180) / 2
+            return GMSCoordinateBounds(
+                coordinate: .init(latitude: centre.latitude - halfLat,
+                                  longitude: centre.longitude - halfLng),
+                coordinate: .init(latitude: centre.latitude + halfLat,
+                                  longitude: centre.longitude + halfLng))
+        }
+
+        /// Camera moves are stretched to exactly one tick, so each one is still
+        /// arriving as the next is issued. On Google's own (much shorter)
+        /// duration the camera darted and then sat still for most of every
+        /// second, which is most of what read as jank.
+        private func animateCamera(_ map: GMSMapView, to update: GMSCameraUpdate) {
+            CATransaction.begin()
+            CATransaction.setValue(Self.tick, forKey: kCATransactionAnimationDuration)
+            map.animate(with: update)
+            CATransaction.commit()
         }
 
         /// Where the last seconds of a flight end up: the crow over a street.
@@ -304,6 +349,9 @@ struct GoogleCrowMap: UIViewRepresentable {
         /// The road ahead, and the part already flown behind it.
         private static let aheadAlpha: CGFloat = 0.95
         private static let flownAlpha: CGFloat = 0.95 * 0.5
+        /// How often the sheet republishes the flight — see `CrowTrackerSheet`.
+        /// Movement is stretched to exactly this, so nothing waits.
+        private static let tick: CFTimeInterval = 1.0
 
         /// Below this a fit is meaningless — see `frameRoute`.
         private static let minFitSide: CGFloat = 180
@@ -396,10 +444,14 @@ struct GoogleCrowMap: UIViewRepresentable {
         func moveCrow(on map: GMSMapView, flight: CrowFlight, progress: Double) {
             guard let crow else { return }
             let here = CrowMapView.position(flight, progress: progress)
-            // The first placement must not animate; later ones may, because
-            // that's what makes the crow glide rather than hop each second.
+            // The first placement must not animate — see `build`. Later ones
+            // are stretched across a whole tick so the bird glides from one
+            // second to the next instead of darting and waiting.
             if placed {
+                CATransaction.begin()
+                CATransaction.setValue(Self.tick, forKey: kCATransactionAnimationDuration)
                 crow.position = here
+                CATransaction.commit()
             } else {
                 placed = true
                 CATransaction.begin()
