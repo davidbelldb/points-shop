@@ -100,11 +100,13 @@ struct BasketItem: Codable, Sendable, Identifiable, Equatable {
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
         qty = try c.decodeIfPresent(Int.self, forKey: .qty) ?? 0
         pricePoints = try c.decodeIfPresent(Int.self, forKey: .pricePoints) ?? 0
-        // line_total arrives as a string from some Postgres drivers.
+        // line_total arrives as a string from some Postgres drivers. `try?` on a
+        // decodeIfPresent flattens Int?? to Int?, so these bind non-optionals —
+        // a missing key simply leaves the property at its default.
         if let int = try? c.decodeIfPresent(Int.self, forKey: .lineTotal) {
-            lineTotal = int ?? 0
+            lineTotal = int
         } else if let text = try? c.decodeIfPresent(String.self, forKey: .lineTotal) {
-            lineTotal = Int(text ?? "0") ?? 0
+            lineTotal = Int(text) ?? 0
         }
         stockQty = try c.decodeIfPresent(Int.self, forKey: .stockQty) ?? 0
         thumbnailURL = try c.decodeIfPresent(String.self, forKey: .thumbnailURL)

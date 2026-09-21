@@ -71,26 +71,52 @@ final class MessagesViewModel {
         if showSpinner { isLoading = true }
         defer { if showSpinner { isLoading = false } }
 
-        do {
-            async let chat = api.get("/messages?with=\(partnerID)", as: ChatThreadResponse.self)
-            async let scrolls = api.get("/scrolls/thread?with=\(partnerID)", as: ScrollThreadResponse.self)
-            let (chatThread, scrollThread) = try await (chat, scrolls)
+        // The two halves are fetched together but fail apart. Crows are the
+        // newer endpoint, so a backend that hasn't caught up must not be able
+        // to blank out the chat — the thread degrades to messages only.
+        // Captured locally so the two child tasks touch the client, not this
+        // main-actor object.
+        let api = self.api
+        async let chatResult = Self.attempt { try await api.get("/messages?with=\(partnerID)", as: ChatThreadResponse.self) }
+        async let scrollResult = Self.attempt { try await api.get("/scrolls/thread?with=\(partnerID)", as: ScrollThreadResponse.self) }
+        let (chatThread, scrollThread) = await (chatResult, scrollResult)
 
-            // The conversation may have been closed between the call going out
-            // and the reply landing — don't paint someone else's thread.
-            guard partner?.id == partnerID else { return }
+        // The conversation may have been closed between the calls going out and
+        // the replies landing — don't paint someone else's thread.
+        guard partner?.id == partnerID else { return }
 
-            var merged: [ThreadEntry] = chatThread.messages.map(ThreadEntry.chat)
-            merged.append(contentsOf: scrollThread.scrolls.map(ThreadEntry.scroll))
+        switch (chatThread, scrollThread) {
+        case (.failure(let failure), _) where failure.isUnauthorised:
+            return                              // the session store signs us out
+        case (.failure(let failure), _):
+            report(failure)                     // no chat is a real failure
+            return
+        case (.success(let chat), let scrolls):
+            var merged: [ThreadEntry] = chat.messages.map(ThreadEntry.chat)
+            if case .success(let crows) = scrolls {
+                merged.append(contentsOf: crows.scrolls.map(ThreadEntry.scroll))
+                error = nil
+            } else {
+                // Say it once, quietly, and still show the conversation.
+                error = "Crows are unavailable just now."
+            }
             merged.sort { $0.sortDate < $1.sortDate }
             entries = merged
-
-            error = nil
             await markChatRead(partnerID)
-        } catch let apiError as APIError where apiError.isUnauthorised {
-            // As above — nothing useful to say here.
+        }
+    }
+
+    /// Runs a call and hands back its outcome rather than throwing, so two
+    /// concurrent fetches can succeed and fail independently.
+    nonisolated private static func attempt<T: Sendable>(
+        _ work: @Sendable () async throws -> T
+    ) async -> Result<T, APIError> {
+        do {
+            return .success(try await work())
+        } catch let apiError as APIError {
+            return .failure(apiError)
         } catch {
-            report(error)
+            return .failure(.network(error.localizedDescription))
         }
     }
 
