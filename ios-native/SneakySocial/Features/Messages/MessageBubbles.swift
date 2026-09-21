@@ -270,9 +270,13 @@ struct CrowMessageBubble: View {
         landed ? "Delivered" : "On its way"
     }
 
+    /// Your own message is yours to read the moment you send it; only an
+    /// inbound crow keeps its scroll sealed until it lands.
+    private var showsText: Bool { isMine || revealed }
+
     /// Where the crow is now, in place of the message it hasn't delivered yet.
     private var whereabouts: String? {
-        guard !landed, !narration.isEmpty else { return nil }
+        guard !isMine, !landed, !narration.isEmpty else { return nil }
         let index = min(max(phase, 1), narration.count) - 1
         return narration[index]
     }
@@ -297,46 +301,47 @@ struct CrowMessageBubble: View {
                     .lineLimit(1)
             }
 
-            // Your own message reads first and carries its flight underneath;
-            // theirs is the other way round, because the arrival is the event.
+            // One layout both ways round: the journey on top, then a rule,
+            // then the words. Your own message used to read first with its
+            // flight tacked underneath, which made the two sides of the thread
+            // look like different features.
+            flightLine
+
+            // Until it lands, a message you're waiting on says where the crow
+            // has got to — in the space the words themselves will occupy. Your
+            // own message doesn't need it: the words are already there.
+            if let whereabouts {
+                Text(whereabouts)
+                    .font(.subheadline)
+                    .foregroundStyle(ink.opacity(0.75))
+                    .multilineTextAlignment(style == .scroll ? .center : .leading)
+                    .frame(maxWidth: .infinity, alignment: style == .scroll ? .center : .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.4), value: phase)
+            }
+
+            // Theirs drops open when the crow lands; yours was never sealed.
+            if showsText, text?.isEmpty == false {
+                VStack(spacing: 6) {
+                    Rectangle()
+                        .fill(ink.opacity(0.25))
+                        .frame(height: 1)
+                        .padding(.horizontal, 8)
+
+                    messageText
+                }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .opacity
+                ))
+            }
+
             if isMine, style == .message {
-                messageText
-                flightLine
                 Text(progressNote)
                     .font(.caption2)
                     .foregroundStyle(ink.opacity(0.6))
                     .frame(maxWidth: .infinity, alignment: .trailing)
-            } else {
-                flightLine
-
-                // Until it lands, the bubble says where the crow has got to —
-                // in the space the message itself will occupy.
-                if let whereabouts {
-                    Text(whereabouts)
-                        .font(.subheadline)
-                        .foregroundStyle(ink.opacity(0.75))
-                        .multilineTextAlignment(style == .scroll ? .center : .leading)
-                        .frame(maxWidth: .infinity, alignment: style == .scroll ? .center : .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.4), value: phase)
-                }
-
-                // The reveal: the bubble drops open to show the message.
-                if revealed, text?.isEmpty == false {
-                    VStack(spacing: 6) {
-                        Rectangle()
-                            .fill(ink.opacity(0.25))
-                            .frame(height: 1)
-                            .padding(.horizontal, 8)
-
-                        messageText
-                    }
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .opacity
-                    ))
-                }
             }
         }
         .padding(.horizontal, style == .scroll ? 16 : 12)
