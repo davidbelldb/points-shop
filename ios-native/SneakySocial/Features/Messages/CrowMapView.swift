@@ -248,17 +248,48 @@ struct GoogleCrowMap: UIViewRepresentable {
             }
 
             fittedSize = size
-            let bounds = GMSCoordinateBounds(
-                coordinate: CrowMapView.position(flight, progress: progress),
+            let here = CrowMapView.position(flight, progress: progress)
+            let remaining = GMSCoordinateBounds(
+                coordinate: here,
                 coordinate: .init(latitude: flight.destLat, longitude: flight.destLng))
-            // Animated rather than moved, so the tightening reads as the camera
-            // following the crow rather than jumping every second.
-            map.animate(with: GMSCameraUpdate.fit(bounds, withPadding: padding(for: size)))
-            // The last hundred metres would otherwise zoom into the roof.
-            if map.camera.zoom > 17 {
-                map.animate(toZoom: 17)
-            }
+            let inset = padding(for: size)
+            guard let cruise = map.camera(for: remaining, insets: UIEdgeInsets(
+                top: inset, left: inset, bottom: inset, right: inset)) else { return }
+
+            // Takeoff.
+            //
+            // Fitting the remaining route alone starts a long journey at its
+            // widest and tightens all the way in, so the only moment with any
+            // movement in it is the landing. Starting at the SAME zoom the
+            // landing ends on and climbing out of it over the first stretch
+            // gives the departure its own beat — the ground dropping away as
+            // the crow gains height — and leaves the arrival something to
+            // tighten back into.
+            //
+            // A map opened on a crow already halfway there gets `climb` = 1 and
+            // no invented takeoff: the bird is long since up.
+            let climb = min(1, max(0, progress / Self.climbFraction))
+            let eased = climb * climb * (3 - 2 * climb)     // smoothstep
+            let cruiseZoom = Double(min(cruise.zoom, Float(Self.perchZoom)))
+            let zoom = Self.perchZoom + (cruiseZoom - Self.perchZoom) * eased
+
+            // The camera pans out from over the bird to the framing of the
+            // route on the same curve, so the climb doesn't also lurch.
+            let target = CLLocationCoordinate2D(
+                latitude: here.latitude + (cruise.target.latitude - here.latitude) * eased,
+                longitude: here.longitude + (cruise.target.longitude - here.longitude) * eased)
+
+            // Animated rather than moved, so this reads as the camera following
+            // the crow rather than jumping every second.
+            map.animate(with: GMSCameraUpdate.setCamera(
+                GMSCameraPosition(target: target, zoom: Float(zoom))))
         }
+
+        /// Where the last seconds of a flight end up: the crow over a street.
+        /// The first seconds start here too, and climb out of it.
+        private static let perchZoom: Double = 17
+        /// How much of the journey the crow spends gaining height.
+        private static let climbFraction: Double = 0.2
 
         /// Below this a fit is meaningless — see `frameRoute`.
         private static let minFitSide: CGFloat = 180
