@@ -1,0 +1,66 @@
+name: SneakySocial
+
+options:
+  bundleIdPrefix: com.david
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: "799WF8VK5C"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_EMIT_LOC_STRINGS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  SneakySocial:
+    type: application
+    platform: iOS
+    sources:
+      - path: SneakySocial
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.david.sneakysocial
+        PRODUCT_NAME: SneakySocial
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Sneaky Social
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+        INFOPLIST_KEY_NSCameraUsageDescription: "Sneaky Social uses the camera to send photos."
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Sneaky Social uses the microphone for audio notes."
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Sneaky Social uses your photo library to send pictures."
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Sneaky Social uses your location to send scrolls from where you are."
+        TARGETED_DEVICE_FAMILY: "1"
+
+  SneakySocialTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: SneakySocial
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.david.sneakysocial.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  SneakySocial:
+    build:
+      targets:
+        SneakySocial: all
+        SneakySocialTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SneakySocialTests
