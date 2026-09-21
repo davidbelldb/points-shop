@@ -8,10 +8,13 @@ import { query } from '../../db.js';
  * columns — hence the CASE in the joins.
  */
 
-/* A friendship involving a kids account needs an admin to agree as well as the
-   person being asked. Flip this to false to make a child's account behave like
-   anyone else's. */
-const KIDS_FRIENDSHIPS_NEED_ADMIN = true;
+/* Off for now: a child's account connects like anyone else's — the person
+   asked says yes, and that's the whole handshake.
+   Turn this back on and a friendship involving a kids account needs a second
+   signature from an admin (Admin -> Connections) before the two can message.
+   Nothing else has to change; the 'awaiting_approval' status and the approval
+   endpoints stay wired up either way. */
+const KIDS_FRIENDSHIPS_NEED_ADMIN = false;
 
 /** The other side of the pair, with their account details and the row's state. */
 const SELECT_OTHER = `

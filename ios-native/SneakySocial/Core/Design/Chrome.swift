@@ -6,6 +6,11 @@ struct Avatar: View {
     let url: URL?
     var size: CGFloat = 28
     var fallbackSymbol: String = "person.fill"
+    /// Set when the avatar sits on a fixed-colour background rather than the
+    /// page. `.secondary` follows the colour scheme, which is wrong on the
+    /// points pill: in light mode it renders a dark glyph on dark teal and
+    /// disappears.
+    var onDarkBackground: Bool = false
 
     var body: some View {
         Group {
@@ -28,10 +33,11 @@ struct Avatar: View {
 
     private var placeholder: some View {
         ZStack {
-            Color.secondary.opacity(0.2)
+            (onDarkBackground ? Color.white.opacity(0.18) : Color.secondary.opacity(0.2))
             Image(systemName: fallbackSymbol)
                 .font(.system(size: size * 0.5))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(onDarkBackground ? AnyShapeStyle(Color.white.opacity(0.85))
+                                                  : AnyShapeStyle(HierarchicalShapeStyle.secondary))
         }
     }
 }
@@ -72,7 +78,8 @@ struct PointsPill: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Avatar(url: session.account?.photo, size: Self.height - 8)
+            Avatar(url: session.account?.photo, size: Self.height - 8,
+                   onDarkBackground: true)
                 .onTapGesture { onTapAvatar?() }
                 .accessibilityAddTraits(.isButton)
                 .accessibilityLabel("Your account")

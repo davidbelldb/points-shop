@@ -159,6 +159,7 @@ struct ThreadView: View {
         VStack(spacing: 0) {
             threadHeading
             thread
+            flightBar
             composer
         }
         // Swipe in from the left edge, as a pushed screen would — without the
@@ -181,6 +182,7 @@ struct ThreadView: View {
         .task {
             model.meID = session.account?.id
             model.open(partner)
+            await location.load()
             await model.refresh(showSpinner: true)
             model.startPolling()
         }
@@ -205,12 +207,20 @@ struct ThreadView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("All conversations")
 
-            Avatar(url: partner.photo, size: 34)
-            PageHeading(title: partner.displayName)
+            Avatar(url: partner.photo, size: 30)
+
+            // Not a PageHeading: inside a conversation the other person's name
+            // is a row label, not the name of the page.
+            Text(partner.displayName)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
     }
 
     // MARK: Thread
@@ -231,7 +241,26 @@ struct ThreadView: View {
                     }
 
                     ForEach(model.entries) { entry in
-                        row(entry).id(entry.id)
+                        row(entry)
+                            .id(entry.id)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+
+                    // Sent, airborne, not yet acknowledged by the server.
+                    ForEach(model.inFlight) { outgoing in
+                        aligned(true) {
+                            CrowMessageBubble(
+                                senderName: partner.displayName,
+                                originLabel: nil,
+                                text: outgoing.text,
+                                startedAt: outgoing.startedAt,
+                                arrivesAt: outgoing.arrivesAt,
+                                isMine: true,
+                                style: .message,
+                                delivered: false
+                            )
+                        }
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                     }
 
                     // Something to scroll to that isn't the last bubble itself,
@@ -242,7 +271,12 @@ struct ThreadView: View {
                 .padding(.vertical, 14)
             }
             .scrollDismissesKeyboard(.interactively)
+            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.inFlight)
+            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.entries.count)
             .onChange(of: model.entries.count) { _, _ in
+                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(bottomAnchor, anchor: .bottom) }
+            }
+            .onChange(of: model.inFlight.count) { _, _ in
                 withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(bottomAnchor, anchor: .bottom) }
             }
             .onAppear { proxy.scrollTo(bottomAnchor, anchor: .bottom) }
@@ -271,16 +305,39 @@ struct ThreadView: View {
 
         case .text(let text):
             aligned(mine) {
-                ParchmentBubble(
-                    text: text,
-                    isMine: mine,
-                    timestamp: message.createdAt,
-                    reaction: message.reaction,
-                    edited: message.editedAt != nil,
-                    replyToName: message.replyToSenderName,
-                    replyToBody: message.replyToBody
-                )
-                .contextMenu { reactions(for: message) }
+                // A message sent from this screen keeps flying where it landed
+                // in the thread; everything else is already delivered.
+                if let flight = model.flight(for: message.id) {
+                    CrowMessageBubble(
+                        senderName: partner.displayName,
+                        originLabel: mine ? nil : message.originLabel,
+                        // An inbound message in the air arrives without its
+                        // body — there is deliberately nothing to reveal early.
+                        text: text.isEmpty ? nil : text,
+                        startedAt: flight.startedAt,
+                        arrivesAt: flight.arrivesAt,
+                        isMine: mine,
+                        style: .message,
+                        delivered: message.hasArrived,
+                        onLanded: {
+                            // The words are only released on arrival, so go and
+                            // fetch them rather than waiting for the next poll.
+                            if !mine { Task { await model.refresh() } }
+                        }
+                    )
+                    .contextMenu { reactions(for: message) }
+                } else {
+                    ParchmentBubble(
+                        text: text,
+                        isMine: mine,
+                        timestamp: message.createdAt,
+                        reaction: message.reaction,
+                        edited: message.editedAt != nil,
+                        replyToName: message.replyToSenderName,
+                        replyToBody: message.replyToBody
+                    )
+                    .contextMenu { reactions(for: message) }
+                }
             }
 
         case .secret(let text, let revealed):
@@ -340,6 +397,64 @@ struct ThreadView: View {
     }
 
     // MARK: Composer
+
+    /// How far the next crow has to fly — and, if nobody's said, a way to say.
+    @ViewBuilder
+    private var flightBar: some View {
+        if let estimate = model.flightEstimate {
+            HStack(spacing: 8) {
+                Image(systemName: estimate.isGuess ? "location.slash" : "bird")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if estimate.isGuess && !location.place.isSet {
+                    Text("Crows take \(estimate.spoken). Say where you are and they'll fly the real distance.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if estimate.isGuess {
+                    Text("\(partner.displayName) hasn't said where they are — crows take \(estimate.spoken).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("\(estimate.spoken) from \(estimate.originLabel ?? "you") to \(estimate.destLabel ?? partner.displayName)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 4)
+
+                Button {
+                    Task {
+                        await location.useCurrentLocation()
+                        await model.refresh()
+                    }
+                } label: {
+                    if location.isWorking {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Label(location.place.isSet ? "Update" : "Set",
+                              systemImage: "location.fill")
+                            .font(.caption.weight(.medium))
+                            .labelStyle(.titleAndIcon)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .disabled(location.isWorking)
+            }
+            .lineLimit(2)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+        }
+
+        if let locationError = location.error {
+            Text(locationError)
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+        }
+    }
 
     private var composer: some View {
         HStack(spacing: 10) {

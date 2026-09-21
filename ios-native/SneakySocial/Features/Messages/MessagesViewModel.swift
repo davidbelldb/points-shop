@@ -17,6 +17,36 @@ final class MessagesViewModel {
     private(set) var isSending = false
     /// People waiting on an answer from you — the dot on the People button.
     private(set) var friendRequests = 0
+
+    /// Messages that have left but aren't in the thread yet — they exist only
+    /// here, for the moment between hitting send and the server answering.
+    private(set) var inFlight: [OutgoingMessage] = []
+    /// How long the next message will take, and whether both people have said
+    /// where they are.
+    private(set) var flightEstimate: FlightEstimate?
+
+    /// Flight windows for messages that HAVE landed in the thread, keyed by id.
+    /// Kept for the life of the screen so a bubble that has already played its
+    /// journey doesn't play it again on the next poll.
+    private(set) var flights: [String: FlightWindow] = [:]
+
+    /// Fallback journey, for the moment before the server has told us what the
+    /// real one is. It matches the backend's own default.
+    static let messageFlight: TimeInterval = 240
+
+    struct FlightWindow: Sendable, Equatable {
+        let startedAt: Date
+        let arrivesAt: Date
+    }
+
+    /// A message drawn from nothing but the draft, so the crow leaves the
+    /// instant you hit send rather than when the network gets round to it.
+    struct OutgoingMessage: Sendable, Identifiable, Equatable {
+        let id: String
+        let text: String
+        let startedAt: Date
+        let arrivesAt: Date
+    }
     var error: String?
     var draft = ""
 
@@ -70,6 +100,9 @@ final class MessagesViewModel {
         self.partner = partner
         entries = []
         seenScrolls = []
+        inFlight = []
+        flights = [:]
+        flightEstimate = nil
     }
 
     /// One pass: chat and scrolls together, merged and sorted.
@@ -84,7 +117,7 @@ final class MessagesViewModel {
         // Captured locally so the two child tasks touch the client, not this
         // main-actor object.
         let api = self.api
-        async let chatResult = Self.attempt { try await api.get("/messages?with=\(partnerID)", as: ChatThreadResponse.self) }
+        async let chatResult = Self.attempt { try await api.get("/messages?with=\(partnerID)&crows=1", as: ChatThreadResponse.self) }
         async let scrollResult = Self.attempt { try await api.get("/scrolls/thread?with=\(partnerID)", as: ScrollThreadResponse.self) }
         let (chatThread, scrollThread) = await (chatResult, scrollResult)
 
@@ -99,15 +132,32 @@ final class MessagesViewModel {
             report(failure)                     // no chat is a real failure
             return
         case (.success(let chat), let scrolls):
+            if let estimate = chat.flight { flightEstimate = estimate }
             var merged: [ThreadEntry] = chat.messages.map(ThreadEntry.chat)
             if case .success(let crows) = scrolls {
                 merged.append(contentsOf: crows.scrolls.map(ThreadEntry.scroll))
-                error = nil
             } else {
-                // Say it once, quietly, and still show the conversation.
-                error = "Crows are unavailable just now."
+                // No crows and unreachable crows look the same to the person
+                // reading: an empty sky. Keep whatever we last had and say
+                // nothing — there's no action for them to take.
+                merged.append(contentsOf: entries.compactMap {
+                    if case .scroll(let scroll) = $0 { return ThreadEntry.scroll(scroll) }
+                    return nil
+                })
             }
+            error = nil
             merged.sort { $0.sortDate < $1.sortDate }
+
+            // Anything still in the air gets a flight window the moment we see
+            // it, and keeps it afterwards — so a bubble watched through its
+            // landing stays a crow rather than snapping back to plain
+            // parchment on the next poll.
+            for case .chat(let message) in merged
+            where message.hasFlight && !message.hasArrived && flights[message.id] == nil {
+                flights[message.id] = FlightWindow(startedAt: message.departedAt,
+                                                   arrivesAt: message.arrivesAt)
+            }
+
             entries = merged
             await markChatRead(partnerID)
         }
@@ -157,22 +207,47 @@ final class MessagesViewModel {
         isSending = true
         defer { isSending = false }
 
+        // The crow leaves on the tap, not on the round trip. The bubble is in
+        // the thread and already flying before the request has been answered.
+        let departure = Date.now
+        // The server decides the real journey; this is the same sum, so the
+        // bubble starts flying for the right length of time straight away and
+        // the answer only corrects it if we were out.
+        let estimated = Double(flightEstimate?.seconds ?? Int(Self.messageFlight))
+        let arrival = departure.addingTimeInterval(estimated)
+        let outgoing = OutgoingMessage(id: UUID().uuidString, text: text,
+                                       startedAt: departure, arrivesAt: arrival)
         draft = ""
+        inFlight.append(outgoing)
+        Haptics.tap()
+
         do {
-            _ = try await api.post(
+            let created = try await api.post(
                 "/messages",
                 body: SendMessageRequest(body: text, recipient_id: partnerID),
-                as: Ignored.self
+                as: ChatMessage.self
             )
-            await refresh()
-            Haptics.tap()
+            // Hand the flight over to the real message and swap them in one
+            // update, so the bubble never blinks out between the two.
+            // Take the server's word for the arrival — it owns deliver_at.
+            flights[created.id] = FlightWindow(startedAt: created.departedAt,
+                                               arrivesAt: created.arrivesAt)
+            if !entries.contains(where: { $0.id == "chat-\(created.id)" }) {
+                entries.append(.chat(created))
+            }
+            inFlight.removeAll { $0.id == outgoing.id }
         } catch {
             // Hand the text back rather than swallowing it.
+            inFlight.removeAll { $0.id == outgoing.id }
             draft = text
             report(error)
             Haptics.failure()
         }
     }
+
+    /// The journey a message in the thread should show, if it has one. Only
+    /// messages sent from this screen do — history is history.
+    func flight(for messageID: String) -> FlightWindow? { flights[messageID] }
 
     func react(to message: ChatMessage, with reaction: String?) async {
         struct Body: Encodable, Sendable { let reaction: String? }

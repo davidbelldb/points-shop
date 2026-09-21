@@ -50,7 +50,7 @@ struct ParchmentBubble: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background { Image(CrowArt.tile).resizable().scaledToFill() }
+        .background { Parchment() }
         .clipShape(.rect(cornerRadius: 16))
         // The parchment is the same on both sides; a darker edge on your own
         // messages separates the two without inventing a second colour.
@@ -90,7 +90,7 @@ struct SecretBubble: View {
                 .foregroundStyle(.black.opacity(0.8))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background { Image(CrowArt.tile).resizable().scaledToFill() }
+                .background { Parchment() }
                 .clipShape(.rect(cornerRadius: 16))
                 .overlay {
                     RoundedRectangle(cornerRadius: 16)
@@ -126,7 +126,7 @@ struct PollBubble: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background { Image(CrowArt.tile).resizable().scaledToFill() }
+        .background { Parchment() }
         .clipShape(.rect(cornerRadius: 16))
         .overlay {
             RoundedRectangle(cornerRadius: 16)
@@ -161,12 +161,22 @@ struct SystemLine: View {
 /// it. On arrival the crow settles at the right-hand end and the bubble drops
 /// open beneath it to reveal the message. Tapping the trail opens the tracker.
 struct CrowMessageBubble: View {
+    /// How much ceremony the bubble deserves.
+    enum Style {
+        /// A real scroll: where it came from, who sent it, and a tappable map.
+        case scroll
+        /// An ordinary message. Everything here travels by crow, but a chat
+        /// message gets one line of flight rather than a dispatch notice.
+        case message
+    }
+
     let senderName: String
     let originLabel: String?
     let text: String?
     let startedAt: Date
     let arrivesAt: Date
     let isMine: Bool
+    var style: Style = .scroll
 
     /// True once the scroll has been delivered, as far as the server knows.
     let delivered: Bool
@@ -201,36 +211,22 @@ struct CrowMessageBubble: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            Text(title)
-                .font(CrowArt.font(size: 17))
-                .foregroundStyle(.black)
-                .multilineTextAlignment(.center)
+        VStack(spacing: style == .scroll ? 10 : 8) {
+            if style == .scroll {
+                Text(title)
+                    .font(CrowArt.font(size: 17))
+                    .foregroundStyle(.black)
+                    .multilineTextAlignment(.center)
 
-            Text(subtitle)
-                .font(CrowArt.font(size: 11))
-                .foregroundStyle(.black.opacity(0.85))
-                .lineLimit(1)
-
-            HStack(spacing: 10) {
-                Image(CrowArt.left).resizable().scaledToFit().frame(width: 28, height: 28)
-                CrowTrail(startedAt: startedAt, arrivesAt: arrivesAt,
-                          landed: landed, phase: phase)
-                // The perched crow the glider settles into once it arrives.
-                Image(CrowArt.right).resizable().scaledToFit().frame(width: 28, height: 28)
+                Text(subtitle)
+                    .font(CrowArt.font(size: 11))
+                    .foregroundStyle(.black.opacity(0.85))
+                    .lineLimit(1)
             }
-            // A generous target: the trail itself is 12pt tall, which is no use
-            // as a tap area.
-            .padding(.vertical, 8)
-            .contentShape(.rect)
-            .onTapGesture {
-                Haptics.tap()
-                onTapFlight()
-            }
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("Track this crow")
 
-            // The reveal: the bubble drops open to show the scroll.
+            flightLine
+
+            // The reveal: the bubble drops open to show the message.
             if revealed, let text, !text.isEmpty {
                 VStack(spacing: 6) {
                     Rectangle()
@@ -241,7 +237,8 @@ struct CrowMessageBubble: View {
                     Text(text)
                         .font(CrowArt.font(size: 15))
                         .foregroundStyle(.black)
-                        .multilineTextAlignment(.center)
+                        .multilineTextAlignment(style == .scroll ? .center : .leading)
+                        .frame(maxWidth: .infinity, alignment: style == .scroll ? .center : .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .transition(.asymmetric(
@@ -250,10 +247,13 @@ struct CrowMessageBubble: View {
                 ))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity)
-        .background { Image(CrowArt.tile).resizable().scaledToFill() }
+        .padding(.horizontal, style == .scroll ? 16 : 14)
+        .padding(.vertical, style == .scroll ? 14 : 10)
+        // A scroll takes the width of the thread; a message is only as wide as
+        // it needs to be, starting at the width of its own flight line.
+        .frame(maxWidth: style == .scroll ? .infinity : 270,
+               alignment: style == .scroll ? .center : .leading)
+        .background { Parchment() }
         // Clipped so the revealed text slides out from under the trail rather
         // than appearing over the edge of the parchment.
         .clipShape(.rect(cornerRadius: 18))
@@ -273,6 +273,32 @@ struct CrowMessageBubble: View {
                 phase = 4
             }
         }
+    }
+
+    /// Crow, dashed line, crow. The whole bubble in flight.
+    private var flightLine: some View {
+        let sprite: CGFloat = style == .scroll ? 28 : 22
+
+        return HStack(spacing: style == .scroll ? 10 : 8) {
+            CrowSprite(name: CrowArt.left, size: sprite)
+            CrowTrail(startedAt: startedAt, arrivesAt: arrivesAt,
+                      landed: landed, phase: phase)
+                .frame(minWidth: style == .scroll ? nil : 120)
+            // The perched crow the glider settles into once it arrives.
+            CrowSprite(name: CrowArt.right, size: sprite)
+        }
+        // A generous target: the trail itself is 12pt tall, which is no use as
+        // a tap area.
+        .padding(.vertical, style == .scroll ? 8 : 4)
+        .contentShape(.rect)
+        .onTapGesture {
+            // Only a real scroll has a journey worth watching on a map.
+            guard style == .scroll else { return }
+            Haptics.tap()
+            onTapFlight()
+        }
+        .accessibilityAddTraits(style == .scroll ? [.isButton] : [])
+        .accessibilityLabel(style == .scroll ? "Track this crow" : "In flight")
     }
 
     private func open() {

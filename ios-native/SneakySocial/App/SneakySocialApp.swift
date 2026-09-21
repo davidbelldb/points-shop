@@ -8,6 +8,7 @@ struct SneakySocialApp: App {
     @State private var features = FeatureStore()
     @State private var copy = AppCopy()
     @State private var basket = BasketStore()
+    @State private var location = LocationStore()
 
     var body: some Scene {
         WindowGroup {
@@ -18,6 +19,7 @@ struct SneakySocialApp: App {
                 .environment(features)
                 .environment(copy)
                 .environment(basket)
+                .environment(location)
                 .preferredColorScheme(theme.colorScheme)
                 .task { await session.bootstrap() }
         }

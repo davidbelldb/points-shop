@@ -76,6 +76,22 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
     var replyToBody: String?
     var replyToSenderName: String?
 
+    // The journey. `body` comes back empty for an inbound message still in the
+    // air, so the bubble has nothing to reveal until its crow lands.
+    var flightSeconds: Int?
+    var deliverAt: Date?
+    var originLabel: String?
+    var destLabel: String?
+    var distanceKm: Double?
+
+    /// When the crow left. `created_at` is when you hit send.
+    var departedAt: Date { createdAt }
+    /// When it lands. Anything from before flights existed landed on arrival.
+    var arrivesAt: Date { deliverAt ?? createdAt }
+    var hasArrived: Bool { arrivesAt <= .now }
+    /// Worth drawing a journey for at all.
+    var hasFlight: Bool { (flightSeconds ?? 0) > 0 }
+
     static let secretPrefix = "__secret__:"
     static let pollPrefix = "__poll__:"
 
@@ -90,6 +106,11 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
         case senderName = "sender_name"
         case replyToBody = "reply_to_body"
         case replyToSenderName = "reply_to_sender_name"
+        case flightSeconds = "flight_seconds"
+        case deliverAt = "deliver_at"
+        case originLabel = "origin_label"
+        case destLabel = "dest_label"
+        case distanceKm = "distance_km"
     }
 
     init(from decoder: Decoder) throws {
@@ -107,6 +128,11 @@ struct ChatMessage: Codable, Sendable, Identifiable, Equatable {
         senderName = try c.decodeIfPresent(String.self, forKey: .senderName)
         replyToBody = try c.decodeIfPresent(String.self, forKey: .replyToBody)
         replyToSenderName = try c.decodeIfPresent(String.self, forKey: .replyToSenderName)
+        flightSeconds = try c.decodeIfPresent(Int.self, forKey: .flightSeconds)
+        deliverAt = try c.decodeIfPresent(Date.self, forKey: .deliverAt)
+        originLabel = try c.decodeIfPresent(String.self, forKey: .originLabel)
+        destLabel = try c.decodeIfPresent(String.self, forKey: .destLabel)
+        distanceKm = try c.decodeIfPresent(Double.self, forKey: .distanceKm)
     }
 
     /// What this message actually is. The backend keeps every kind in one TEXT
@@ -180,6 +206,38 @@ enum SystemMessage: String, Sendable, CaseIterable {
 struct ChatThreadResponse: Decodable, Sendable {
     let other: ChatPartner?
     let messages: [ChatMessage]
+    /// What the next message's journey would be — only sent when the client
+    /// asked for crows.
+    var flight: FlightEstimate?
+}
+
+/// How far the next crow has to go, and whether anyone's told us where they are.
+struct FlightEstimate: Decodable, Sendable, Equatable {
+    var seconds: Int = 240
+    var distanceKm: Double?
+    var originLabel: String?
+    var destLabel: String?
+    var senderLocated: Bool = false
+    var recipientLocated: Bool = false
+
+    /// True when the journey is the fallback rather than a measured distance.
+    var isGuess: Bool { !senderLocated || !recipientLocated }
+
+    /// "about 6 min" — the phrase the composer puts under the field.
+    var spoken: String {
+        if seconds < 60 { return "under a minute" }
+        let minutes = Int((Double(seconds) / 60).rounded())
+        return minutes == 1 ? "about a minute" : "about \(minutes) min"
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case seconds
+        case distanceKm = "distance_km"
+        case originLabel = "origin_label"
+        case destLabel = "dest_label"
+        case senderLocated = "sender_located"
+        case recipientLocated = "recipient_located"
+    }
 }
 
 struct SendMessageRequest: Encodable, Sendable {

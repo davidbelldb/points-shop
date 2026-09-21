@@ -1,5 +1,80 @@
 import { query } from '../../db.js';
 import { sendPush } from '../notifications/push.js';
+import { haversineKm } from '../scrolls/scrolls.repo.js';
+
+// ---------------------------------------------------------------------------
+// How long a message's crow is in the air.
+//
+// Deliberately NOT the scrolls settings: those carry a 60x time compression, so
+// a scroll across Cambridge lands in a couple of seconds. A message is supposed
+// to feel like a bird actually flying it, so the crow travels at its real speed
+// and no compression is applied. 5 km works out at a little over 6 minutes.
+//
+// These are constants rather than admin settings because there's no screen for
+// them yet; each is one line to change.
+// ---------------------------------------------------------------------------
+
+/** 30 mph, in km/h — a crow going somewhere rather than a crow in a hurry. */
+const MESSAGE_CROW_KMH = 48;
+/** Neither person has said where they are: a middling journey, ~3 km worth. */
+const DEFAULT_FLIGHT_SECONDS = 240;
+/** Even to the next room, the crow has to get up and go. */
+const MIN_FLIGHT_SECONDS = 20;
+/** A ceiling, so a message from the other side of the world isn't a lost cause. */
+const MAX_FLIGHT_SECONDS = 3600;
+
+/** Gestures rather than letters: these arrive the moment they're sent. */
+const SYSTEM_BODIES_INSTANT = new Set([
+  '__nudge__', '__rain_twirl__', '__rain_popcorn__', '__rain_duck__',
+]);
+
+/**
+ * The journey between two people, from the locations they've set.
+ *
+ * If either of them hasn't set one there's no distance to measure, so the crow
+ * flies the default instead — it still has to travel, we just can't say how far.
+ */
+export async function messageFlight(senderId, recipientId) {
+  const { rows } = await query(
+    `SELECT id, location_lat, location_lng, location_label
+       FROM accounts WHERE id IN ($1, $2)`,
+    [senderId, recipientId],
+  );
+  const from = rows.find((r) => r.id === senderId);
+  const to = rows.find((r) => r.id === recipientId);
+
+  const located = (a) => a && a.location_lat != null && a.location_lng != null;
+  const senderLocated = located(from);
+  const recipientLocated = located(to);
+
+  if (!senderLocated || !recipientLocated) {
+    return {
+      seconds: DEFAULT_FLIGHT_SECONDS,
+      distanceKm: null,
+      originLabel: from?.location_label ?? null,
+      destLabel: to?.location_label ?? null,
+      senderLocated,
+      recipientLocated,
+    };
+  }
+
+  const distanceKm = haversineKm(
+    from.location_lat, from.location_lng,
+    to.location_lat, to.location_lng,
+  );
+  const seconds = Math.round(Math.min(
+    MAX_FLIGHT_SECONDS,
+    Math.max(MIN_FLIGHT_SECONDS, (distanceKm / MESSAGE_CROW_KMH) * 3600),
+  ));
+  return {
+    seconds,
+    distanceKm,
+    originLabel: from.location_label ?? null,
+    destLabel: to.location_label ?? null,
+    senderLocated,
+    recipientLocated,
+  };
+}
 
 // The app began life as a two-person thing, so "the other user" was a safe
 // idea. With three or more accounts it isn't: it silently pairs everyone with
@@ -64,12 +139,16 @@ export async function listPartners(accountId) {
          SELECT COUNT(*) AS unread
            FROM chat_messages m
           WHERE m.recipient_id = $1 AND m.sender_id = a.id AND m.read_at IS NULL
+            AND (m.deliver_at IS NULL OR m.deliver_at <= NOW())
        ) u ON TRUE
        LEFT JOIN LATERAL (
          SELECT m.body, m.created_at, m.sender_id
            FROM chat_messages m
-          WHERE (m.sender_id = $1 AND m.recipient_id = a.id)
-             OR (m.sender_id = a.id AND m.recipient_id = $1)
+          WHERE ((m.sender_id = $1 AND m.recipient_id = a.id)
+              OR (m.sender_id = a.id AND m.recipient_id = $1))
+            -- Your own is yours to see; theirs only once it has landed, so the
+            -- preview can't give away a message still in the air.
+            AND (m.sender_id = $1 OR m.deliver_at IS NULL OR m.deliver_at <= NOW())
           ORDER BY m.created_at DESC
           LIMIT 1
        ) lm ON TRUE
@@ -91,7 +170,8 @@ export async function unreadCountTotal(accountId) {
   const { rows } = await query(
     `SELECT COUNT(*)::int AS count
        FROM chat_messages
-      WHERE recipient_id = $1 AND read_at IS NULL`,
+      WHERE recipient_id = $1 AND read_at IS NULL
+        AND (deliver_at IS NULL OR deliver_at <= NOW())`,
     [accountId],
   );
   return rows[0]?.count ?? 0;
@@ -104,6 +184,7 @@ export async function findLatestSender(accountId) {
        FROM chat_messages m
        JOIN accounts a ON a.id = m.sender_id
       WHERE m.recipient_id = $1 AND m.read_at IS NULL
+        AND (m.deliver_at IS NULL OR m.deliver_at <= NOW())
       ORDER BY m.created_at DESC
       LIMIT 1`,
     [accountId],
@@ -118,10 +199,26 @@ export async function setTyping(accountId) {
   );
 }
 
-export async function listMessages(accountId, otherId, limit = 200) {
+/**
+ * One conversation.
+ *
+ * `crows` is opt-in, and what it buys is honesty about the journey: a message
+ * still in the air comes back WITHOUT its body, so a client that draws the
+ * flight can't accidentally show what hasn't landed. Clients that don't ask —
+ * the web app — read the thread exactly as they always have, which is why
+ * turning this on changed nothing for anyone on Capacitor.
+ */
+export async function listMessages(accountId, otherId, limit = 200, { crows = false } = {}) {
   const { rows } = await query(
     `SELECT * FROM (
-       SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at,
+       SELECT m.id, m.sender_id, m.recipient_id,
+              CASE WHEN $4::boolean
+                        AND m.recipient_id = $1
+                        AND m.deliver_at IS NOT NULL
+                        AND m.deliver_at > NOW()
+                   THEN NULL ELSE m.body END AS body,
+              m.flight_seconds, m.deliver_at, m.origin_label, m.dest_label, m.distance_km,
+              m.read_at, m.created_at,
               m.edited_at, m.reaction, m.reply_to_story_id, m.reply_to_message_id,
               m.slider_response, m.sparkled, m.secret_revealed_at,
               COALESCE((
@@ -152,7 +249,7 @@ export async function listMessages(accountId, otherId, limit = 200) {
         LIMIT $3
      ) sub
      ORDER BY created_at ASC`,
-    [accountId, otherId, limit],
+    [accountId, otherId, limit, crows],
   );
   return rows;
 }
@@ -313,11 +410,28 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
       emoji: typeof sliderResponse.emoji === 'string' ? sliderResponse.emoji.slice(0, 16) : null,
     };
   }
+  // System messages (a nudge, a shower of ducks) are gestures, not letters —
+  // they land at once rather than waiting on a bird.
+  const instant = SYSTEM_BODIES_INSTANT.has(trimmed);
+  const flight = instant
+    ? { seconds: 0, distanceKm: null, originLabel: null, destLabel: null }
+    : await messageFlight(senderId, recipientId);
+
   const { rows } = await query(
-    `INSERT INTO chat_messages (sender_id, recipient_id, body, reply_to_story_id, reply_to_message_id, slider_response)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-     RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction, reply_to_story_id, reply_to_message_id, slider_response`,
-    [senderId, recipientId, trimmed, replyToStoryId || null, replyToMessageId || null, safeSlider ? JSON.stringify(safeSlider) : null],
+    `INSERT INTO chat_messages
+       (sender_id, recipient_id, body, reply_to_story_id, reply_to_message_id, slider_response,
+        flight_seconds, distance_km, origin_label, dest_label, deliver_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb,
+             $7, $8, $9, $10, NOW() + ($7::int * interval '1 second'))
+     RETURNING id, sender_id, recipient_id, body, created_at, read_at, edited_at, reaction,
+               reply_to_story_id, reply_to_message_id, slider_response,
+               flight_seconds, deliver_at, origin_label, dest_label, distance_km`,
+    [
+      senderId, recipientId, trimmed,
+      replyToStoryId || null, replyToMessageId || null,
+      safeSlider ? JSON.stringify(safeSlider) : null,
+      flight.seconds, flight.distanceKm, flight.originLabel, flight.destLabel,
+    ],
   );
 
   const senderRes = await query(`SELECT name FROM accounts WHERE id = $1`, [senderId]);
@@ -387,13 +501,15 @@ export async function markAllRead(accountId, fromUserId = null) {
   if (fromUserId) {
     await query(
       `UPDATE chat_messages SET read_at = NOW()
-        WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL`,
+        WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL
+          AND (deliver_at IS NULL OR deliver_at <= NOW())`,
       [accountId, fromUserId],
     );
   } else {
     await query(
       `UPDATE chat_messages SET read_at = NOW()
-        WHERE recipient_id = $1 AND read_at IS NULL`,
+        WHERE recipient_id = $1 AND read_at IS NULL
+          AND (deliver_at IS NULL OR deliver_at <= NOW())`,
       [accountId],
     );
   }

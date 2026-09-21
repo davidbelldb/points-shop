@@ -110,10 +110,7 @@ struct CrowTrackerSheet: View {
                 }
 
                 Annotation("The crow", coordinate: position(flight, progress: progress)) {
-                    Image(CrowArt.mover)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 36, height: 36)
+                    CrowSprite(name: CrowArt.mover, size: 36)
                         .shadow(radius: 3)
                 }
             }

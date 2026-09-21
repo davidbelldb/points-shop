@@ -2,6 +2,12 @@ import SwiftUI
 
 /// Friendships involving a child's account, waiting on a grown-up.
 ///
+/// NOT CURRENTLY REACHABLE. Admin sign-off is switched off
+/// (`KIDS_FRIENDSHIPS_NEED_ADMIN` in `backend/src/modules/friends/friends.repo.js`),
+/// so nothing ever reaches `awaiting_approval` and this screen would always be
+/// empty. It is kept wired to its endpoints so switching the constant back on
+/// only needs a link adding to AdminHomeView.
+///
 /// The other person has already said yes; this is the second signature. Until
 /// it's given, the two accounts can't message each other at all — the backend
 /// treats them as strangers.

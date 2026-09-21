@@ -24,6 +24,43 @@ enum CrowArt {
     }
 }
 
+/// The parchment a bubble is drawn on.
+///
+/// The artwork is a loose file in the bundle, not an asset catalog entry, so
+/// `Image("tile")` finds nothing and the bubble renders as a transparent box
+/// with black text — invisible in dark mode. Sprites knows how to load it, and
+/// the flat colour underneath means the bubble is legible even if it doesn't.
+struct Parchment: View {
+    var body: some View {
+        ZStack {
+            Palette.parchment
+            if let tile = Sprites.image(CrowArt.tile) {
+                tile.resizable().scaledToFill()
+            }
+        }
+    }
+}
+
+/// A crow, loaded the same way, with a glyph to fall back on.
+struct CrowSprite: View {
+    let name: String
+    var size: CGFloat
+
+    var body: some View {
+        Group {
+            if let sprite = Sprites.image(name) {
+                sprite.resizable().scaledToFit()
+            } else {
+                Image(systemName: "bird.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.black.opacity(0.75))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 /// Where the gliding crow sits, as a fraction of the trail, for each phase.
 /// It leaves just off the left crow, lands on each waypoint as it's spotted,
 /// then eases in before the delivered state hides it.
@@ -109,10 +146,7 @@ struct CrowTrail: View {
 
             if !landed {
                 GeometryReader { geo in
-                    Image(CrowArt.mover)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 30, height: 30)
+                    CrowSprite(name: CrowArt.mover, size: 30)
                         .position(x: crowMoverFraction(phase) * geo.size.width,
                                   y: geo.size.height / 2)
                         .animation(.easeInOut(duration: 1.2), value: phase)
@@ -136,7 +170,7 @@ struct CrowFlightBanner: View {
 
     var body: some View {
         ZStack {
-            Image(CrowArt.tile).resizable().scaledToFill()
+            Parchment()
 
             VStack(spacing: 8) {
                 Text(title)
@@ -153,10 +187,10 @@ struct CrowFlightBanner: View {
                     .padding(.horizontal, 16)
 
                 HStack(spacing: 10) {
-                    Image(CrowArt.left).resizable().scaledToFit().frame(width: 30, height: 30)
+                    CrowSprite(name: CrowArt.left, size: 30)
                     CrowTrail(startedAt: startedAt, arrivesAt: arrivesAt,
                               landed: landed, phase: phase)
-                    Image(CrowArt.right).resizable().scaledToFit().frame(width: 30, height: 30)
+                    CrowSprite(name: CrowArt.right, size: 30)
                 }
             }
             .padding(.horizontal, 16)

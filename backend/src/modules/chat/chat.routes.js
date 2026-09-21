@@ -1,5 +1,5 @@
 import {
-  findOtherUser, findPartner, listPartners, listMessages, sendMessage, markAllRead,
+  findOtherUser, findPartner, listPartners, listMessages, sendMessage, markAllRead, messageFlight,
   deleteMessage, editMessage, setReaction, toggleSparkle, setTyping, votePoll,
   revealSecretMessage, unreadCountTotal, findLatestSender,
 } from './chat.repo.js';
@@ -40,8 +40,28 @@ export default async function chatRoutes(fastify) {
       if (req.query?.with) return reply.code(404).send({ error: 'No such person' });
       return { other: null, messages: [] };
     }
-    const messages = await listMessages(accountId, other.id);
-    return { other, messages };
+    // `?crows=1` is the native app saying "I draw the journey, so don't hand me
+    // anything that hasn't landed". Without it the thread reads as it always
+    // has, which is what keeps the web app unchanged.
+    const crows = req.query?.crows === '1' || req.query?.crows === 'true';
+    const messages = await listMessages(accountId, other.id, 200, { crows });
+    if (!crows) return { other, messages };
+
+    // What the NEXT message's journey would be, so the composer can say how
+    // long it'll take and whose location is missing.
+    const flight = await messageFlight(accountId, other.id);
+    return {
+      other,
+      messages,
+      flight: {
+        seconds: flight.seconds,
+        distance_km: flight.distanceKm,
+        origin_label: flight.originLabel,
+        dest_label: flight.destLabel,
+        sender_located: flight.senderLocated,
+        recipient_located: flight.recipientLocated,
+      },
+    };
   });
 
   const NUDGE_BODY = '__nudge__';

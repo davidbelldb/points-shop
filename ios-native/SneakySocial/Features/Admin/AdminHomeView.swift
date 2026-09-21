@@ -40,18 +40,6 @@ struct AdminHomeView: View {
             }
 
             Section {
-                NavigationLink {
-                    FriendApprovalsView()
-                } label: {
-                    Label("Connections", systemImage: "person.2.badge.key")
-                }
-            } header: {
-                Text("People")
-            } footer: {
-                Text("A connection involving a child's account needs your say-so before either of them can message the other.")
-            }
-
-            Section {
                 Label("Crow & scrolls", systemImage: "bird")
                     .foregroundStyle(.tertiary)
                 Label("Messages", systemImage: "bubble.left.and.bubble.right")
