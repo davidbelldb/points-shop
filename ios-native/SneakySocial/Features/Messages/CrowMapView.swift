@@ -184,7 +184,12 @@ struct GoogleCrowMap: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, @preconcurrency GMSMapViewDelegate {
         private var crow: GMSMarker?
+        /// The road ahead: crow → destination, at full strength.
         private var line: GMSPolyline?
+        /// The part already flown: origin → crow, at half. Drawn as its own
+        /// line rather than by trimming `line`, so the whole journey stays on
+        /// the map and you can see how far the bird has come.
+        private var flown: GMSPolyline?
         private var start: GMSMarker?
         private var frame = 0
         /// Wing beats run on their own clock. The sheet only republishes this
@@ -199,6 +204,10 @@ struct GoogleCrowMap: UIViewRepresentable {
         /// The view size the camera was last framed against, so a resize
         /// re-frames and a redraw at the same size doesn't.
         private var fittedSize: CGSize = .zero
+        /// The size the camera settled at once the takeoff climb finished. The
+        /// whole-route framing doesn't change after that, so there's no reason
+        /// to re-issue it every second.
+        private var cruiseSize: CGSize = .zero
         private var landed = false
         private var placed = false
         private let onTapCrow: () -> Void
@@ -249,38 +258,40 @@ struct GoogleCrowMap: UIViewRepresentable {
 
             fittedSize = size
             let here = CrowMapView.position(flight, progress: progress)
-            let remaining = GMSCoordinateBounds(
-                coordinate: here,
+            // The WHOLE route, not what's left of it. The line behind the crow
+            // stays on the map (dimmed), so the camera holds both ends and the
+            // bird travels across the view — rather than the camera chasing it
+            // and leaving it pinned in the middle of the screen.
+            let whole = GMSCoordinateBounds(
+                coordinate: .init(latitude: flight.originLat, longitude: flight.originLng),
                 coordinate: .init(latitude: flight.destLat, longitude: flight.destLng))
             let inset = padding(for: size)
-            guard let cruise = map.camera(for: remaining, insets: UIEdgeInsets(
+            guard let cruise = map.camera(for: whole, insets: UIEdgeInsets(
                 top: inset, left: inset, bottom: inset, right: inset)) else { return }
 
-            // Takeoff.
-            //
-            // Fitting the remaining route alone starts a long journey at its
-            // widest and tightens all the way in, so the only moment with any
-            // movement in it is the landing. Starting at the SAME zoom the
-            // landing ends on and climbing out of it over the first stretch
-            // gives the departure its own beat — the ground dropping away as
-            // the crow gains height — and leaves the arrival something to
-            // tighten back into.
-            //
-            // A map opened on a crow already halfway there gets `climb` = 1 and
-            // no invented takeoff: the bird is long since up.
+            // Takeoff. The camera opens at the same zoom a landing ends on,
+            // close over the bird, and climbs out to the whole-route framing
+            // across the first stretch — the ground dropping away as the crow
+            // gains height. A map opened on a crow already halfway there gets
+            // `climb` = 1 and no invented takeoff: that bird is long since up.
             let climb = min(1, max(0, progress / Self.climbFraction))
             let eased = climb * climb * (3 - 2 * climb)     // smoothstep
+
+            // Once the climb is done the camera is simply the whole route and
+            // stays put; the crow does the moving. Nothing more to do here
+            // until the drawer changes size.
+            if eased >= 1, cruiseSize == size { return }
+            cruiseSize = eased >= 1 ? size : .zero
+
             let cruiseZoom = Double(min(cruise.zoom, Float(Self.perchZoom)))
             let zoom = Self.perchZoom + (cruiseZoom - Self.perchZoom) * eased
 
-            // The camera pans out from over the bird to the framing of the
-            // route on the same curve, so the climb doesn't also lurch.
+            // Pans out from over the bird to the centre of the route on the
+            // same curve, so the climb doesn't also lurch sideways.
             let target = CLLocationCoordinate2D(
                 latitude: here.latitude + (cruise.target.latitude - here.latitude) * eased,
                 longitude: here.longitude + (cruise.target.longitude - here.longitude) * eased)
 
-            // Animated rather than moved, so this reads as the camera following
-            // the crow rather than jumping every second.
             map.animate(with: GMSCameraUpdate.setCamera(
                 GMSCameraPosition(target: target, zoom: Float(zoom))))
         }
@@ -290,6 +301,9 @@ struct GoogleCrowMap: UIViewRepresentable {
         private static let perchZoom: Double = 17
         /// How much of the journey the crow spends gaining height.
         private static let climbFraction: Double = 0.2
+        /// The road ahead, and the part already flown behind it.
+        private static let aheadAlpha: CGFloat = 0.95
+        private static let flownAlpha: CGFloat = 0.95 * 0.5
 
         /// Below this a fit is meaningless — see `frameRoute`.
         private static let minFitSide: CGFloat = 180
@@ -304,21 +318,34 @@ struct GoogleCrowMap: UIViewRepresentable {
             let origin = CLLocationCoordinate2D(latitude: flight.originLat, longitude: flight.originLng)
             let dest = CLLocationCoordinate2D(latitude: flight.destLat, longitude: flight.destLng)
 
-            let path = GMSMutablePath()
-            path.add(origin)
-            path.add(dest)
-            let route = GMSPolyline(path: path)
-            route.strokeColor = UIColor(Palette.mapRoute).withAlphaComponent(0.95)
+            let here = CrowMapView.position(flight, progress: CrowMapView.liveProgress(flight))
+
+            let ahead = GMSMutablePath()
+            ahead.add(flight.arrived ? origin : here)
+            ahead.add(dest)
+            let route = GMSPolyline(path: ahead)
+            route.strokeColor = UIColor(Palette.mapRoute).withAlphaComponent(Self.aheadAlpha)
             route.strokeWidth = 6
+            route.zIndex = 2
             route.map = map
             line = route
+
+            let behind = GMSMutablePath()
+            behind.add(origin)
+            behind.add(here)
+            let tail = GMSPolyline(path: behind)
+            tail.strokeColor = UIColor(Palette.mapRoute).withAlphaComponent(Self.flownAlpha)
+            tail.strokeWidth = 6
+            tail.zIndex = 1
+            // A finished journey is all one road again — the whole thing at
+            // full strength, because by then none of it is "still to come".
+            tail.map = flight.arrived ? nil : map
+            flown = tail
 
             let from = GMSMarker(position: origin)
             from.icon = dot(fill: UIColor(Palette.mapBackground), ring: UIColor(Palette.mapRoute))
             from.groundAnchor = CGPoint(x: 0.5, y: 0.5)
-            // While the crow is flying the line starts at the bird, so an origin
-            // dot would sit on its own with nothing joining it.
-            from.map = flight.arrived ? map : nil
+            from.map = map
             start = from
 
             let end = GMSMarker(position: dest)
@@ -381,16 +408,31 @@ struct GoogleCrowMap: UIViewRepresentable {
                 CATransaction.commit()
             }
 
-            // The line is what's LEFT of the journey: crow to destination. The
-            // part already flown isn't drawn — it would trail off the edge of a
-            // view that's framed on the remaining distance.
-            let path = GMSMutablePath()
-            path.add(flight.arrived
-                     ? CLLocationCoordinate2D(latitude: flight.originLat, longitude: flight.originLng)
-                     : here)
-            path.add(.init(latitude: flight.destLat, longitude: flight.destLng))
-            line?.path = path
-            start?.map = flight.arrived ? map : nil
+            // The whole journey stays on the map. It's drawn as two lines
+            // meeting at the bird: the road ahead at full strength, the part
+            // already flown at half — so the route doesn't shrink, it dims
+            // behind the crow.
+            let origin = CLLocationCoordinate2D(latitude: flight.originLat,
+                                                longitude: flight.originLng)
+            let dest = CLLocationCoordinate2D(latitude: flight.destLat,
+                                              longitude: flight.destLng)
+
+            let ahead = GMSMutablePath()
+            ahead.add(flight.arrived ? origin : here)
+            ahead.add(dest)
+            line?.path = ahead
+
+            if flight.arrived {
+                // One road again: nothing is "still to come", so the whole
+                // journey reads at full strength.
+                flown?.map = nil
+            } else {
+                let behind = GMSMutablePath()
+                behind.add(origin)
+                behind.add(here)
+                flown?.path = behind
+                if flown?.map == nil { flown?.map = map }
+            }
 
             landed = flight.arrived
             guard !flight.arrived else {
