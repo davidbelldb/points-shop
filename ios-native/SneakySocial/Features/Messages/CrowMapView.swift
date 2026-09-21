@@ -358,8 +358,13 @@ struct GoogleCrowMap: UIViewRepresentable {
 
         /// Padding scaled to the view, so the route is inset rather than
         /// squeezed when the drawer is at half height.
+        ///
+        /// Generous on purpose: the endpoints are markers, not points, and the
+        /// crow is a 57pt sprite anchored at its centre — so a route fitted
+        /// tight to its own coordinates still has half a bird hanging over the
+        /// edge at each end.
         private func padding(for size: CGSize) -> CGFloat {
-            max(24, min(64, min(size.width, size.height) * 0.12))
+            max(36, min(96, min(size.width, size.height) * 0.16))
         }
 
         func build(on map: GMSMapView, flight: CrowFlight) {
