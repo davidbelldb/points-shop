@@ -8,6 +8,9 @@ import Observation
 final class DerbyAdminViewModel {
     private(set) var config: DuckyConfig?
     private(set) var isSaving = false
+
+    /// Which content set is being edited. Defaults to the one this app plays.
+    var variant: DuckyVariant = .app
     var errorMessage: String?
     var lastSavedAt: Date?
 
@@ -23,24 +26,36 @@ final class DerbyAdminViewModel {
 
     func load() async {
         do {
-            config = try await api.get(Self.basePath, as: DuckyConfig.self)
+            config = try await api.get(Self.basePath + variant.query, as: DuckyConfig.self)
         } catch {
             errorMessage = message(for: error)
         }
     }
 
+    /// Switch variants and pull that set's content.
+    func select(_ newVariant: DuckyVariant) async {
+        guard newVariant != variant else { return }
+        variant = newVariant
+        config = nil
+        await load()
+    }
+
     // MARK: - Saves
 
     func saveRaceSettings(_ patch: DuckyConfigPatch) async {
-        await save { try await self.api.patch(Self.basePath, body: patch, as: DuckyConfig.self) }
+        let path = Self.basePath + variant.query
+        await save { try await self.api.patch(path, body: patch, as: DuckyConfig.self) }
     }
 
+    /// Ducks are shared by both variants — editing one edits both.
     func saveDuck(ord: Int, _ patch: DuckPatch) async {
-        await save { try await self.api.patch("\(Self.basePath)/ducks/\(ord)", body: patch, as: DuckyConfig.self) }
+        let path = "\(Self.basePath)/ducks/\(ord)\(variant.query)"
+        await save { try await self.api.patch(path, body: patch, as: DuckyConfig.self) }
     }
 
     func saveRow(_ list: DuckyTextList, ord: Int, _ patch: TextRowPatch) async {
-        await save { try await self.api.patch("\(Self.basePath)/\(list.path)/\(ord)", body: patch, as: DuckyConfig.self) }
+        let path = "\(Self.basePath)/\(list.path)/\(ord)\(variant.query)"
+        await save { try await self.api.patch(path, body: patch, as: DuckyConfig.self) }
     }
 
     func toggleActive(_ list: DuckyTextList, row: DuckyTextRow) async {

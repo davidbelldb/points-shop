@@ -163,3 +163,54 @@ Phases 1-4 need **no backend changes at all** — every endpoint already exists.
   cookie jars), but impersonation/admin state won't be shared between them.
 * iPhone 13 mini at 375pt is the binding constraint for the derby track height
   (10 lanes × 15pt gap + banks) — lane gap may need to shrink below 10 ducks.
+
+---
+
+## Status — 21 Sep 2026
+
+### Done
+- **Phase 1 — shell.** XcodeGen project in `ios-native/`, `APIClient` on the shared
+  cookie jar (`sneaky_session`), login, tab shell, points badge. Verified against
+  the live API on a simulator.
+- **Phase 2 — Ducky Derby.** `RaceEngine` port (deterministic replay, photo-finish
+  slow-mo), `Canvas` + `TimelineView` track with obstacles, sinking, confetti,
+  commentary ticker, speech bubbles, form guide, day/night. 29 unit tests.
+- **Derby admin plane.** Every setting from `AdminDuckySection.jsx`: colours,
+  counts, iceberg sizing, per-duck name/colours/odds/bench, and all seven text
+  lists. Lives in an admin-only tab.
+- **Race feel.** Event-keyed haptics (bump, sink, shutter, win/lose) built from
+  the same determined result. `SoundPlayer` wired; only `caw.mp3` exists so far —
+  drop `race_start` / `quack` / `splash` / `cheer` / `groan` into
+  `ios-native/SneakySocial/Resources/` and they play with no code change.
+- **Betting.** Quick-stake chips, remembered stake, tappable form guide.
+- **Accessibility.** Reduce Motion, VoiceOver commentary announcements,
+  Dynamic Type on the picker.
+- **Dark mode toggle.** App-wide, remembered on device, drives the night scene.
+- **Multi-user (backend + web).** Explicit recipients for messages and scrolls,
+  `GET /api/messages/partners`, notification fan-out to everyone, web
+  conversation picker. `findOtherUser` kept as the no-recipient fallback.
+
+### Deliberately not done
+- Icebergs are night-only **client-side**; the server still generates their
+  effects in daylight, so a duck can sink with no visible cause. Proper fix is a
+  `night` flag on `POST /api/games/ducky/lineup`.
+- Four 1:1 features still pair you with Katie and ignore George: WebRTC game
+  netplay (`rtc.routes.js`), the On My Way live viewer, the Dirdle widget's
+  partner status, and the "Invite {name}" labels on calendar and notes. Each
+  needs a pick-a-person decision rather than fan-out.
+
+### Next
+1. **Kid-friendly derby variant.** Decided: derby only for now; keeps the points
+   staking exactly as-is; content scoped by a `variant` column
+   (`'original'` / `'kids'`) on the ducky content tables, with the native app
+   requesting `kids`, the web app defaulting to `original`, and a variant
+   switcher in the admin plane.
+2. **Phase 3 — Crow tracker.** Needs the Google Maps iOS SDK as a Swift Package
+   and an API key restricted to `com.david.sneakysocial`.
+3. **Phase 4 — Messages.** Build against the new partner-aware endpoints.
+
+### Working notes
+- `xcodegen generate` after any change that **adds** a file — a new file is
+  invisible to Xcode until then.
+- The Linux VM Claude works in can't run Xcode, Swift, or the frontend build
+  (macOS native binaries in `node_modules`).

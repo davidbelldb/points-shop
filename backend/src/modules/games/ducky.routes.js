@@ -67,18 +67,28 @@ async function maybeRerollOdds() {
   await query(`UPDATE ducky_config SET odds_updated_at = NOW() WHERE id = 1`);
 }
 
-async function getDuckyConfig() {
+// Content variants: 'original' (the Capacitor app) and 'kids' (the native iOS
+// app). Only the words differ — the ducks, odds, form and race maths are shared,
+// so both apps race the same field. Anything unrecognised falls back to the
+// original, so an old client can never accidentally be served the wrong set.
+const VARIANTS = new Set(['original', 'kids']);
+function safeVariant(value) {
+  return VARIANTS.has(value) ? value : 'original';
+}
+
+async function getDuckyConfig(variant = 'original') {
+  const v = safeVariant(variant);
   const { rows: cfgRows } = await query(`SELECT * FROM ducky_config WHERE id = 1`);
   const cfg = cfgRows[0] || null;
   if (!cfg) return null;
   const { rows: ducks } = await query(`SELECT * FROM ducky_ducks ORDER BY ord`);
-  const { rows: banners } = await query(`SELECT ord, text, active, placement, colour FROM ducky_banners ORDER BY ord`);
-  const { rows: phrases } = await query(`SELECT ord, text, active FROM ducky_phrases ORDER BY ord`);
-  const { rows: commentary } = await query(`SELECT ord, text, active FROM ducky_commentary ORDER BY ord`);
-  const { rows: intro } = await query(`SELECT ord, text, active FROM ducky_intro ORDER BY ord`);
-  const { rows: nightPhrases } = await query(`SELECT ord, text, active FROM ducky_night_phrases ORDER BY ord`);
-  const { rows: nightCommentary } = await query(`SELECT ord, text, active FROM ducky_night_commentary ORDER BY ord`);
-  const { rows: nightIntro } = await query(`SELECT ord, text, active FROM ducky_night_intro ORDER BY ord`);
+  const { rows: banners } = await query(`SELECT ord, text, active, placement, colour FROM ducky_banners WHERE variant = $1 ORDER BY ord`, [v]);
+  const { rows: phrases } = await query(`SELECT ord, text, active FROM ducky_phrases WHERE variant = $1 ORDER BY ord`, [v]);
+  const { rows: commentary } = await query(`SELECT ord, text, active FROM ducky_commentary WHERE variant = $1 ORDER BY ord`, [v]);
+  const { rows: intro } = await query(`SELECT ord, text, active FROM ducky_intro WHERE variant = $1 ORDER BY ord`, [v]);
+  const { rows: nightPhrases } = await query(`SELECT ord, text, active FROM ducky_night_phrases WHERE variant = $1 ORDER BY ord`, [v]);
+  const { rows: nightCommentary } = await query(`SELECT ord, text, active FROM ducky_night_commentary WHERE variant = $1 ORDER BY ord`, [v]);
+  const { rows: nightIntro } = await query(`SELECT ord, text, active FROM ducky_night_intro WHERE variant = $1 ORDER BY ord`, [v]);
   cfg.ducks = ducks;
   cfg.banners = banners;
   cfg.phrases = phrases;
@@ -87,6 +97,7 @@ async function getDuckyConfig() {
   cfg.night_phrases = nightPhrases;
   cfg.night_commentary = nightCommentary;
   cfg.night_intro = nightIntro;
+  cfg.variant = v;
   return cfg;
 }
 
@@ -111,8 +122,8 @@ function makeWhirlpools() {
 }
 
 export default async function duckyRoutes(fastify) {
-  fastify.get('/api/games/ducky/config', async () => {
-    return await getDuckyConfig();
+  fastify.get('/api/games/ducky/config', async (req) => {
+    return await getDuckyConfig(req.query?.variant);
   });
 
   // Per-duck recent finishing positions for the form-guide table.
@@ -350,7 +361,7 @@ export default async function duckyRoutes(fastify) {
 
   fastify.get('/api/admin/games/ducky', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await getDuckyConfig();
+    return await getDuckyConfig(req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky', async (req, reply) => {
@@ -385,7 +396,7 @@ export default async function duckyRoutes(fastify) {
       updates.push('updated_at = NOW()');
       await query(`UPDATE ducky_config SET ${updates.join(', ')} WHERE id = 1`, values);
     }
-    return await getDuckyConfig();
+    return await getDuckyConfig(req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky/ducks/:ord', async (req, reply) => {
@@ -413,10 +424,10 @@ export default async function duckyRoutes(fastify) {
       values.push(ord);
       await query(`UPDATE ducky_ducks SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
-    return await getDuckyConfig();
+    return await getDuckyConfig(req.query?.variant);
   });
 
-  async function updateRowTable(table, maxOrd, ord, patch, reply) {
+  async function updateRowTable(table, maxOrd, ord, patch, reply, variant) {
     if (!Number.isInteger(ord) || ord < 1 || ord > maxOrd) {
       reply.code(400).send({ error: `ord must be 1-${maxOrd}` });
       return null;
@@ -429,9 +440,14 @@ export default async function duckyRoutes(fastify) {
     if (updates.length) {
       updates.push('updated_at = NOW()');
       values.push(ord);
-      await query(`UPDATE ${table} SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
+      values.push(safeVariant(variant));
+      await query(
+        `UPDATE ${table} SET ${updates.join(', ')}
+          WHERE ord = $${values.length - 1} AND variant = $${values.length}`,
+        values,
+      );
     }
-    return getDuckyConfig();
+    return getDuckyConfig(variant);
   }
 
   fastify.patch('/api/admin/games/ducky/banners/:ord', async (req, reply) => {
@@ -453,38 +469,43 @@ export default async function duckyRoutes(fastify) {
     if (updates.length) {
       updates.push('updated_at = NOW()');
       values.push(ord);
-      await query(`UPDATE ducky_banners SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
+      values.push(safeVariant(req.query?.variant));
+      await query(
+        `UPDATE ducky_banners SET ${updates.join(', ')}
+          WHERE ord = $${values.length - 1} AND variant = $${values.length}`,
+        values,
+      );
     }
-    return await getDuckyConfig();
+    return await getDuckyConfig(req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky/phrases/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await updateRowTable('ducky_phrases', 12, Number(req.params.ord), req.body ?? {}, reply);
+    return await updateRowTable('ducky_phrases', 12, Number(req.params.ord), req.body ?? {}, reply, req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky/commentary/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await updateRowTable('ducky_commentary', 16, Number(req.params.ord), req.body ?? {}, reply);
+    return await updateRowTable('ducky_commentary', 16, Number(req.params.ord), req.body ?? {}, reply, req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky/intro/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await updateRowTable('ducky_intro', 8, Number(req.params.ord), req.body ?? {}, reply);
+    return await updateRowTable('ducky_intro', 8, Number(req.params.ord), req.body ?? {}, reply, req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky/night-phrases/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await updateRowTable('ducky_night_phrases', 12, Number(req.params.ord), req.body ?? {}, reply);
+    return await updateRowTable('ducky_night_phrases', 12, Number(req.params.ord), req.body ?? {}, reply, req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky/night-commentary/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await updateRowTable('ducky_night_commentary', 16, Number(req.params.ord), req.body ?? {}, reply);
+    return await updateRowTable('ducky_night_commentary', 16, Number(req.params.ord), req.body ?? {}, reply, req.query?.variant);
   });
 
   fastify.patch('/api/admin/games/ducky/night-intro/:ord', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
-    return await updateRowTable('ducky_night_intro', 8, Number(req.params.ord), req.body ?? {}, reply);
+    return await updateRowTable('ducky_night_intro', 8, Number(req.params.ord), req.body ?? {}, reply, req.query?.variant);
   });
 }

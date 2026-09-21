@@ -128,7 +128,33 @@ struct DuckyTextRow: Codable, Sendable, Identifiable, Equatable {
     }
 }
 
+/// Which set of words the derby speaks. The ducks, odds, form and race maths
+/// are shared — only the content differs, so both apps race the same field.
+enum DuckyVariant: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// What the Capacitor app has always shown.
+    case original
+    /// The kid-friendly set this app plays.
+    case kids
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .original: "Original"
+        case .kids: "Kid-friendly"
+        }
+    }
+
+    /// The variant this app races with.
+    static let app: DuckyVariant = .kids
+
+    var query: String { "?variant=\(rawValue)" }
+}
+
 struct DuckyConfig: Codable, Sendable, Equatable {
+    /// Defaults to original: an older backend that doesn't echo a variant is,
+    /// by definition, serving the original content.
+    var variant: DuckyVariant = .original
     var waterColour: String?
     var grassColour: String?
     var mudColour: String?
@@ -172,6 +198,7 @@ struct DuckyConfig: Codable, Sendable, Equatable {
         case icebergSize = "iceberg_size"
         case icebergSizeMin = "iceberg_size_min"
         case icebergCount = "iceberg_count"
+        case variant
         case ducks, banners, phrases, commentary, intro
         case nightPhrases = "night_phrases"
         case nightCommentary = "night_commentary"
@@ -180,6 +207,7 @@ struct DuckyConfig: Codable, Sendable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        variant = (try? c.decode(DuckyVariant.self, forKey: .variant)) ?? .original
         waterColour = try c.decodeIfPresent(String.self, forKey: .waterColour)
         grassColour = try c.decodeIfPresent(String.self, forKey: .grassColour)
         mudColour = try c.decodeIfPresent(String.self, forKey: .mudColour)

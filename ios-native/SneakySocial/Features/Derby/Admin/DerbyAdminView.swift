@@ -21,6 +21,24 @@ struct DerbyAdminView: View {
                         Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
                     }
 
+                    Section {
+                        Picker("Editing", selection: Binding(
+                            get: { model.variant },
+                            set: { newValue in Task { await model.select(newValue) } }
+                        )) {
+                            ForEach(DuckyVariant.allCases) { variant in
+                                Text(variant.title).tag(variant)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    } header: {
+                        Text("Content set")
+                    } footer: {
+                        Text(model.variant == .kids
+                             ? "What this app shows. The Capacitor app keeps the original."
+                             : "What the Capacitor app shows. This app plays the kid-friendly set.")
+                    }
+
                     RaceSettingsSection(model: model)
 
                     Section {
@@ -29,6 +47,7 @@ struct DerbyAdminView: View {
                         } label: {
                             LabeledContent("Ducks", value: "\(model.ducks.filter(\.active).count) racing")
                         }
+                        .badge(Text("shared"))
 
                         ForEach(DuckyTextList.allCases) { list in
                             NavigationLink {
@@ -45,6 +64,7 @@ struct DerbyAdminView: View {
         }
         .navigationTitle("Ducky Derby")
         .navigationBarTitleDisplayMode(.inline)
+        .animation(.default, value: model.variant)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if model.isSaving {
@@ -128,7 +148,7 @@ private struct RaceSettingsSection: View {
         } header: {
             Text("Race")
         } footer: {
-            Text("Colours apply to day races; night races use their own fixed palette.")
+            Text("Shared by both content sets \u{2014} the scene and the field are the same race. Colours apply to day races; night races use their own fixed palette.")
         }
         .onAppear(perform: fill)
         .onChange(of: icebergSizeMin) { _, value in
