@@ -74,13 +74,53 @@ enum MapsKey {
 // MARK: - Google
 
 #if canImport(GoogleMaps)
+
+/// Holds the map and reports its size the moment the size is real.
+///
+/// `UIViewRepresentable` gives no resize callback — `updateUIView` fires when
+/// SwiftUI's state changes, which is not the same thing as the view having been
+/// laid out. The drawer animates from nothing to half height to full, and a
+/// camera fitted against any of the in-between frames is a camera on nowhere.
+/// A plain container makes `layoutSubviews` the trigger instead, which is the
+/// one callback that only ever runs with a real size.
+final class CrowMapContainer: UIView {
+    let map: GMSMapView
+    /// Called on each genuine size change, never for the same size twice.
+    var onLayout: (@MainActor (CGSize) -> Void)?
+    private var lastSize: CGSize = .zero
+
+    init(map: GMSMapView) {
+        self.map = map
+        super.init(frame: .zero)
+        addSubview(map)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        map.frame = bounds
+        guard bounds.size != lastSize else { return }
+        lastSize = bounds.size
+        let size = bounds.size
+        // One turn later, so the map has taken the new frame before it's asked
+        // to fit a route into it. If another layout beat us to it the size has
+        // already moved on and that pass will do the framing instead.
+        Task { @MainActor [weak self] in
+            guard let self, self.bounds.size == size else { return }
+            self.onLayout?(size)
+        }
+    }
+}
+
 struct GoogleCrowMap: UIViewRepresentable {
     let flight: CrowFlight
     let progress: Double
     var onTapCrow: () -> Void = {}
 
 
-    func makeUIView(context: Context) -> GMSMapView {
+    func makeUIView(context: Context) -> CrowMapContainer {
         let options = GMSMapViewOptions()
         options.camera = GMSCameraPosition(latitude: flight.originLat,
                                            longitude: flight.originLng, zoom: 13)
@@ -99,19 +139,32 @@ struct GoogleCrowMap: UIViewRepresentable {
         }
 
         context.coordinator.build(on: map, flight: flight)
-        // Don't wait for updateUIView to do the framing: a landed crow has a
-        // constant progress, so SwiftUI stops calling it — and the calls it
-        // does make happen before the map has been laid out, when its bounds
-        // are still zero and there's nothing to fit against.
-        context.coordinator.fitWhenLaidOut(map, flight: flight, progress: progress)
-        return map
+
+        // The framing is driven by layout, not by SwiftUI's update cycle. A
+        // landed crow's progress never changes, so `updateUIView` stops being
+        // called; and while the drawer is animating open the map is a few
+        // points tall, where `fit` has less room than its own padding and
+        // returns a camera on nothing. Only `layoutSubviews` knows the size is
+        // real — and it fires again when the drawer goes half → full, which is
+        // exactly when the route wants re-framing anyway.
+        let container = CrowMapContainer(map: map)
+        let coordinator = context.coordinator
+        let flight = self.flight
+        container.onLayout = { [weak map] size in
+            guard let map else { return }
+            // Read the clock here rather than closing over `progress`: by the
+            // time a layout lands, the value captured at build time is stale.
+            coordinator.frameRoute(map, flight: flight,
+                                   progress: CrowMapView.liveProgress(flight),
+                                   size: size)
+        }
+        return container
     }
 
-    func updateUIView(_ map: GMSMapView, context: Context) {
-        // Fitting in makeUIView is too early — the map has no size yet, so the
-        // camera lands on something arbitrary. Do it once the view has real
-        // bounds, and keep doing it until the person takes over by panning.
-        context.coordinator.fitIfNeeded(map, flight: flight, progress: progress)
+    func updateUIView(_ container: CrowMapContainer, context: Context) {
+        let map = container.map
+        context.coordinator.frameRoute(map, flight: flight, progress: progress,
+                                       size: container.bounds.size)
         context.coordinator.moveCrow(on: map, flight: flight, progress: progress)
     }
 
@@ -132,7 +185,9 @@ struct GoogleCrowMap: UIViewRepresentable {
         /// True once the person has panned or zoomed. After that the camera is
         /// theirs and we stop moving it under them.
         private var userMoved = false
-        private var fitted = false
+        /// The view size the camera was last framed against, so a resize
+        /// re-frames and a redraw at the same size doesn't.
+        private var fittedSize: CGSize = .zero
         private var landed = false
         private var placed = false
         private let onTapCrow: () -> Void
@@ -154,49 +209,53 @@ struct GoogleCrowMap: UIViewRepresentable {
             if gesture { userMoved = true }
         }
 
-        /// Waits for the map to have real bounds, then frames it. Gives up after
-        /// a second — by then something else is wrong and a wrong camera is
-        /// better than a spinning task.
-        func fitWhenLaidOut(_ map: GMSMapView, flight: CrowFlight, progress: Double) {
-            Task { @MainActor in
-                for _ in 0..<20 {
-                    if map.bounds.width > 1, map.bounds.height > 1 {
-                        fitIfNeeded(map, flight: flight, progress: progress)
-                        return
-                    }
-                    try? await Task.sleep(for: .milliseconds(50))
-                }
-            }
-        }
-
         /// Frames what's left of the journey, until the person takes over.
         ///
         /// While the crow is flying this is CROW → DESTINATION, not the whole
         /// original route: the remaining distance is what matters, so the view
-        /// tightens as the bird closes in. A landed crow is framed once and
-        /// left alone.
-        func fitIfNeeded(_ map: GMSMapView, flight: CrowFlight, progress: Double) {
+        /// tightens as the bird closes in. A landed crow shows the whole route,
+        /// re-framed whenever the drawer changes size and not otherwise.
+        ///
+        /// `size` is passed in rather than read off the map because this is
+        /// called from inside a layout pass, where the map's own bounds may not
+        /// have caught up yet.
+        func frameRoute(_ map: GMSMapView, flight: CrowFlight, progress: Double, size: CGSize) {
             guard !userMoved else { return }
-            guard map.bounds.width > 1, map.bounds.height > 1 else { return }
+            // `fit` reserves its padding out of the viewport, so anything this
+            // small has nothing left to fit into and hands back a camera
+            // pointing at nowhere in particular. That is the half-open drawer,
+            // and framing against it is what left the route off the screen.
+            guard size.width >= Self.minFitSide, size.height >= Self.minFitSide else { return }
 
             if flight.arrived {
-                guard !fitted else { return }
-                fitted = true
-                fitLanded(map, flight: flight)
+                // Nothing moves on a finished journey, so re-frame only when
+                // the drawer itself changes size (opening, half → full).
+                guard size != fittedSize else { return }
+                fittedSize = size
+                fitLanded(map, flight: flight, size: size)
                 return
             }
 
-            fitted = true
+            fittedSize = size
             let bounds = GMSCoordinateBounds(
                 coordinate: CrowMapView.position(flight, progress: progress),
                 coordinate: .init(latitude: flight.destLat, longitude: flight.destLng))
             // Animated rather than moved, so the tightening reads as the camera
             // following the crow rather than jumping every second.
-            map.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 80))
+            map.animate(with: GMSCameraUpdate.fit(bounds, withPadding: padding(for: size)))
             // The last hundred metres would otherwise zoom into the roof.
             if map.camera.zoom > 17 {
                 map.animate(toZoom: 17)
             }
+        }
+
+        /// Below this a fit is meaningless — see `frameRoute`.
+        private static let minFitSide: CGFloat = 180
+
+        /// Padding scaled to the view, so the route is inset rather than
+        /// squeezed when the drawer is at half height.
+        private func padding(for size: CGSize) -> CGFloat {
+            max(24, min(64, min(size.width, size.height) * 0.12))
         }
 
         func build(on map: GMSMapView, flight: CrowFlight) {
@@ -280,18 +339,19 @@ struct GoogleCrowMap: UIViewRepresentable {
         }
 
         /// Where a finished journey sits: the whole route, both ends on screen.
-        func fitLanded(_ map: GMSMapView, flight: CrowFlight) {
+        ///
+        /// No zoom offset — a landed crow shows the WHOLE journey. Zooming in
+        /// past the fit crops the route and leaves you looking at one end
+        /// wondering where the rest of it went.
+        func fitLanded(_ map: GMSMapView, flight: CrowFlight, size: CGSize) {
             let bounds = GMSCoordinateBounds(
                 coordinate: .init(latitude: flight.originLat, longitude: flight.originLng),
                 coordinate: .init(latitude: flight.destLat, longitude: flight.destLng))
-            map.moveCamera(GMSCameraUpdate.fit(bounds, withPadding: 48))
+            map.moveCamera(GMSCameraUpdate.fit(bounds, withPadding: padding(for: size)))
             // Two people in the same postcode would otherwise zoom to the roof.
             if map.camera.zoom > 16 {
                 map.moveCamera(GMSCameraUpdate.zoom(to: 16))
             }
-            // No zoom offset: a landed crow shows the WHOLE journey, both ends
-            // on screen. Zooming in past the fit crops the route and leaves you
-            // looking at one end wondering where the rest went.
         }
 
         private func sprite(_ name: String) -> UIImage? {
