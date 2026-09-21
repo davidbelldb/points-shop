@@ -15,6 +15,11 @@ enum CrowArt {
     static let right = "crow_land_10"
     /// The one that glides along the trail while the scroll is travelling.
     static let mover = "crow_land_00"
+    /// The two flying poses, alternated to beat the wings. The same pair the
+    /// crow tracker uses on the map, so a bird in a bubble and a bird on a map
+    /// fly at the same rate.
+    static let flyA = "crow_send_03"
+    static let flyB = "crow_send_04"
 
     /// The system font. Messages used to be set in ImperialBlack on parchment;
     /// they now match the web app, which is plain text on a coloured bubble.
@@ -40,6 +45,26 @@ struct CrowSprite: View {
             }
         }
         .frame(width: size, height: size)
+    }
+}
+
+/// A crow with its wings going, for the trail.
+///
+/// The beat runs off `TimelineView` rather than a timer: the clock is the
+/// source, so every crow on screen flaps in step and none of them keep beating
+/// when the thread is scrolled away. Only the image swaps — the position lives
+/// on the view around this one, so a waypoint move still animates smoothly
+/// underneath the flapping.
+struct FlappingCrow: View {
+    var size: CGFloat
+    /// One frame per 140ms — a beat every 280ms, matching the map tracker.
+    private static let frameInterval: TimeInterval = 0.14
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: Self.frameInterval)) { context in
+            let tick = Int(context.date.timeIntervalSinceReferenceDate / Self.frameInterval)
+            CrowSprite(name: tick.isMultiple(of: 2) ? CrowArt.flyA : CrowArt.flyB, size: size)
+        }
     }
 }
 
@@ -128,7 +153,7 @@ struct CrowTrail: View {
 
             if !landed {
                 GeometryReader { geo in
-                    CrowSprite(name: CrowArt.mover, size: 30)
+                    FlappingCrow(size: 30)
                         .position(x: crowMoverFraction(phase) * geo.size.width,
                                   y: geo.size.height / 2)
                         .animation(.easeInOut(duration: 1.2), value: phase)

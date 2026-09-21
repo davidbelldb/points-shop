@@ -458,7 +458,13 @@ struct AppleCrowMap: View {
             }
 
             Annotation("The crow", coordinate: CrowMapView.position(flight, progress: progress)) {
-                CrowSprite(name: flight.arrived ? CrowArt.right : CrowArt.mover, size: 51)
+                Group {
+                    if flight.arrived {
+                        CrowSprite(name: CrowArt.right, size: 51)
+                    } else {
+                        FlappingCrow(size: 51)
+                    }
+                }
                     // Drawn facing east; a westward journey mirrors it so the
                     // crow faces its direction of travel.
                     .scaleEffect(x: flight.destLng < flight.originLng ? -1 : 1, y: 1)
