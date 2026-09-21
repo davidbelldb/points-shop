@@ -77,36 +77,46 @@ CREATE INDEX IF NOT EXISTS message_deliveries_pending
 
 -- ---------------------------------------------------------------------------
 -- Backfill: one direct conversation per pair that has ever spoken.
+--
+-- The conversation's id is DERIVED from the pair (md5 of the two account ids,
+-- lowest first, which is exactly 32 hex characters and so casts straight to a
+-- uuid). That makes this whole block idempotent: re-running it recomputes the
+-- same ids and every insert hits its ON CONFLICT. The alternative — INSERT
+-- ... RETURNING joined back by ROW_NUMBER — has no stable mapping and quietly
+-- creates a second set of conversations every time it runs.
 -- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION direct_conversation_id(a UUID, b UUID)
+RETURNS UUID LANGUAGE SQL IMMUTABLE AS $$
+  SELECT md5(LEAST(a, b)::text || GREATEST(a, b)::text)::uuid;
+$$;
+
 WITH pairs AS (
-  SELECT DISTINCT LEAST(sender_id, recipient_id) AS a, GREATEST(sender_id, recipient_id) AS b
+  SELECT DISTINCT LEAST(sender_id, recipient_id) AS a,
+                  GREATEST(sender_id, recipient_id) AS b
     FROM chat_messages
    WHERE recipient_id IS NOT NULL
-), made AS (
-  INSERT INTO conversations (kind, created_at)
-  SELECT 'direct', NOW() FROM pairs
-  RETURNING id
-), numbered AS (
-  SELECT id, ROW_NUMBER() OVER () AS rn FROM made
-), pairs_numbered AS (
-  SELECT a, b, ROW_NUMBER() OVER () AS rn FROM pairs
+)
+INSERT INTO conversations (id, kind)
+SELECT direct_conversation_id(a, b), 'direct' FROM pairs
+ON CONFLICT (id) DO NOTHING;
+
+WITH pairs AS (
+  SELECT DISTINCT LEAST(sender_id, recipient_id) AS a,
+                  GREATEST(sender_id, recipient_id) AS b
+    FROM chat_messages
+   WHERE recipient_id IS NOT NULL
 )
 INSERT INTO conversation_members (conversation_id, account_id)
-SELECT n.id, p.a FROM numbered n JOIN pairs_numbered p ON p.rn = n.rn
+SELECT direct_conversation_id(a, b), a FROM pairs
 UNION ALL
-SELECT n.id, p.b FROM numbered n JOIN pairs_numbered p ON p.rn = n.rn
+SELECT direct_conversation_id(a, b), b FROM pairs
 ON CONFLICT DO NOTHING;
 
 -- Point every existing message at its pair's conversation.
-UPDATE chat_messages m
-   SET conversation_id = c.id
-  FROM conversations c
- WHERE m.conversation_id IS NULL
-   AND m.recipient_id IS NOT NULL
-   AND c.kind = 'direct'
-   AND (SELECT COUNT(*) FROM conversation_members cm
-         WHERE cm.conversation_id = c.id
-           AND cm.account_id IN (m.sender_id, m.recipient_id)) = 2;
+UPDATE chat_messages
+   SET conversation_id = direct_conversation_id(sender_id, recipient_id)
+ WHERE conversation_id IS NULL
+   AND recipient_id IS NOT NULL;
 
 -- And give every already-delivered message a delivery row for its recipient.
 INSERT INTO message_deliveries (
