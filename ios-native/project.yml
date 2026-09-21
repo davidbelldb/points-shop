@@ -24,20 +24,25 @@ targets:
     platform: iOS
     sources:
       - path: SneakySocial
+    info:
+      path: SneakySocial/Info.plist
+      properties:
+        CFBundleDisplayName: Sneaky Social
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Registers the bundled font so .custom("ImperialBlack") resolves —
+        # without this it silently falls back to the system font.
+        UIAppFonts:
+          - ImperialBlack.ttf
+        NSCameraUsageDescription: Sneaky Social uses the camera to send photos.
+        NSMicrophoneUsageDescription: Sneaky Social uses the microphone for audio notes.
+        NSPhotoLibraryUsageDescription: Sneaky Social uses your photo library to send pictures.
+        NSLocationWhenInUseUsageDescription: Sneaky Social uses your location to send scrolls from where you are.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.david.sneakysocial
         PRODUCT_NAME: SneakySocial
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Sneaky Social
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
-        INFOPLIST_KEY_NSCameraUsageDescription: "Sneaky Social uses the camera to send photos."
-        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Sneaky Social uses the microphone for audio notes."
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Sneaky Social uses your photo library to send pictures."
-        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Sneaky Social uses your location to send scrolls from where you are."
         TARGETED_DEVICE_FAMILY: "1"
 
   SneakySocialTests:

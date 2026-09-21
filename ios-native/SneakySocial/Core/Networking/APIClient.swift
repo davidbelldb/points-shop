@@ -87,6 +87,12 @@ final class APIClient: Sendable {
         try await send(path, method: "DELETE", body: Optional<NoBody>.none, as: OKResponse.self)
     }
 
+    /// Some deletes answer with the updated resource rather than `{ ok: true }`
+    /// — removing a basket line returns the whole basket, for instance.
+    func delete<T: Decodable & Sendable>(_ path: String, as type: T.Type) async throws -> T {
+        try await send(path, method: "DELETE", body: Optional<NoBody>.none, as: type)
+    }
+
     /// Fire-and-forget calls whose reply we don't care about (typing pings, reads).
     func fireAndForget(_ path: String, method: String = "POST") async {
         _ = try? await send(path, method: method, body: Optional<NoBody>.none, as: OKResponse.self)

@@ -199,6 +199,15 @@ Phases 1-4 need **no backend changes at all** — every endpoint already exists.
   partner status, and the "Invite {name}" labels on calendar and notes. Each
   needs a pick-a-person decision rather than fan-out.
 
+### Decisions since
+- **Tabs are Home / Games / Messages / Portals** (+ Admin for admins). Games is a
+  hub; the derby is pushed from it rather than being a tab of its own.
+- **Crow lives inside Messages.** Messages is the whole messaging surface now —
+  chat and crow-delivered scrolls together — and how crows are presented there is
+  being redesigned. This merges the old phases 3 and 4 into one piece of work, so
+  there is no separate "crow tracker" screen to build.
+- **Portals** is a fifth idea, still to be defined.
+
 ### Next
 1. **Kid-friendly derby variant.** Decided: derby only for now; keeps the points
    staking exactly as-is; content scoped by a `variant` column

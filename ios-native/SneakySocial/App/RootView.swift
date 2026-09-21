@@ -28,23 +28,38 @@ private struct LaunchView: View {
 
 struct MainTabView: View {
     @Environment(SessionStore.self) private var session
-    @State private var selection: TabSelection = .messages
+    @Environment(FeatureStore.self) private var features
+    @Environment(AppCopy.self) private var copy
+    @State private var selection: TabSelection = .home
 
     /// Deliberately not `Tab` or `Section` — both are SwiftUI types used below.
     enum TabSelection: Hashable {
-        case derby, crow, messages, admin
+        case home, games, messages, portals, admin
     }
 
     var body: some View {
+        // Tabs follow what the account may actually reach. The backend is the
+        // real boundary — this just avoids offering a tab that would 404.
         TabView(selection: $selection) {
-            Tab("Derby", systemImage: "flag.checkered", value: TabSelection.derby) {
-                NavigationStack { DerbyView() }
+            if features.has(.shop) {
+                Tab("Home", systemImage: "house.fill", value: TabSelection.home) {
+                    NavigationStack { ShopView() }
+                }
             }
-            Tab("Crow", systemImage: "map", value: TabSelection.crow) {
-                NavigationStack { CrowPlaceholderView() }
+            // Games is its own hub now — the derby lives inside it, and
+            // anything else playable joins it there.
+            if features.has(.duckyDerby) || features.has(.shutTheBox) {
+                Tab("Games", systemImage: "gamecontroller.fill", value: TabSelection.games) {
+                    NavigationStack { GamesHubView() }
+                }
             }
-            Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: TabSelection.messages) {
-                NavigationStack { MessagesPlaceholderView() }
+            if features.has(.messaging) {
+                Tab("Messages", systemImage: "bubble.left.and.bubble.right.fill", value: TabSelection.messages) {
+                    NavigationStack { MessagesPlaceholderView() }
+                }
+            }
+            Tab("Portals", systemImage: "circle.hexagongrid.fill", value: TabSelection.portals) {
+                NavigationStack { PortalsView() }
             }
             // Admin-only: for anyone else this tab is never built, and every
             // endpoint behind it re-checks the role server-side anyway.
@@ -54,18 +69,9 @@ struct MainTabView: View {
                 }
             }
         }
-    }
-}
-
-/// The points figure that sits in every feature's navigation bar.
-struct PointsBadge: View {
-    @Environment(SessionStore.self) private var session
-
-    var body: some View {
-        Text("\(session.pointsBalance) pts")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Palette.points)
-            .contentTransition(.numericText())
-            .animation(.snappy, value: session.pointsBalance)
+        .task {
+            await features.load()
+            await copy.load()
+        }
     }
 }

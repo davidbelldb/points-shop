@@ -8,6 +8,7 @@ struct DerbyView: View {
 
     @Environment(DerbyConfigBroadcast.self) private var derbyConfig
     @State private var model = DerbyViewModel()
+    @State private var showingAccount = false
 
     private var night: Bool { colorScheme == .dark }
 
@@ -32,9 +33,13 @@ struct DerbyView: View {
         }
         .navigationTitle("Ducky Derby")
         .navigationBarTitleDisplayMode(.inline)
+        // Pushed from the Games hub, so it gets a back button rather than the
+        // app icon in the leading slot.
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) { PointsBadge() }
-            ToolbarItem(placement: .topBarLeading) { ThemeToggleButton() }
+            ToolbarItem(placement: .topBarTrailing) {
+                PointsPill(onTapAvatar: { showingAccount = true })
+            }
+            .sharedBackgroundVisibility(.hidden)
         }
         .overlay {
             if model.phase == .result {
@@ -43,6 +48,7 @@ struct DerbyView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingAccount) { AccountSheet() }
         .animation(.easeOut(duration: 0.25), value: model.phase)
         .task {
             model.isNight = night

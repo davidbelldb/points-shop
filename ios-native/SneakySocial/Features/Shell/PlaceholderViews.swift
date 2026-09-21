@@ -45,6 +45,7 @@ private struct FeatureProbeView: View {
     @State private var result: String?
     @State private var error: String?
     @State private var isLoading = false
+    @State private var showingAccount = false
 
     var body: some View {
         List {
@@ -90,11 +91,16 @@ private struct FeatureProbeView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingAccount) { AccountSheet() }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { ThemeToggleButton() }
-            ToolbarItem(placement: .topBarTrailing) { PointsBadge() }
+            ToolbarItem(placement: .topBarLeading) { AppIconBadge() }
+                .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .topBarTrailing) {
+                PointsPill(onTapAvatar: { showingAccount = true })
+            }
+            .sharedBackgroundVisibility(.hidden)
         }
         .task { load() }
     }

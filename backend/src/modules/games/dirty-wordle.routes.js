@@ -194,7 +194,7 @@ export default async function dirtyWordleRoutes(fastify) {
   fastify.get('/api/games/dirty-wordle/leaderboard', async (req) => {
     const date = req.query.date ?? new Date().toISOString().slice(0, 10);
 
-    // Today's results for all accounts
+    // Today's results for dirdle-enabled accounts only
     const { rows: todayRows } = await query(
       `SELECT r.account_id, r.won, r.guesses_taken, r.guess_grid,
               a.name, a.photo_url,
@@ -205,6 +205,7 @@ export default async function dirtyWordleRoutes(fastify) {
            ON pl.account_id = r.account_id
           AND pl.reason = $1
         WHERE r.date = $2
+          AND a.dirdle = TRUE
         ORDER BY r.guesses_taken ASC, r.created_at ASC`,
       [`dirty-wordle:${date}`, date],
     );
@@ -242,6 +243,7 @@ export default async function dirtyWordleRoutes(fastify) {
            ON pl.account_id = a.id
           AND pl.reason = 'dirty-wordle:' || r.date::text
           AND r.won = true
+        WHERE a.dirdle = TRUE
         GROUP BY a.id, a.name, a.photo_url
         ORDER BY wins DESC, avg_guesses ASC NULLS LAST`,
       [seriesStartStr, seriesEndStr],

@@ -10,13 +10,12 @@ import Observation
 @Observable
 final class ThemeStore {
     enum Preference: String, CaseIterable, Identifiable, Sendable {
-        case system, light, dark
+        case light, dark
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
-            case .system: "Match phone"
             case .light: "Light"
             case .dark: "Dark"
             }
@@ -24,7 +23,6 @@ final class ThemeStore {
 
         var icon: String {
             switch self {
-            case .system: "iphone"
             case .light: "sun.max"
             case .dark: "moon"
             }
@@ -41,14 +39,14 @@ final class ThemeStore {
     }
 
     init() {
+        // Anyone carrying the old "system" value — or a fresh install — lands on
+        // dark, which is how the app is designed to look.
         let stored = UserDefaults.standard.string(forKey: Self.key)
-        preference = stored.flatMap(Preference.init(rawValue:)) ?? .system
+        preference = stored.flatMap(Preference.init(rawValue:)) ?? .dark
     }
 
-    /// nil hands control back to the system.
-    var colorScheme: ColorScheme? {
+    var colorScheme: ColorScheme {
         switch preference {
-        case .system: nil
         case .light: .light
         case .dark: .dark
         }
@@ -59,6 +57,26 @@ final class ThemeStore {
     func toggle(currentlyDark: Bool) {
         preference = currentlyDark ? .light : .dark
         Haptics.tap()
+    }
+}
+
+/// Applies the chosen appearance to a view.
+///
+/// A sheet is its own presentation context: the `.preferredColorScheme` set at
+/// the app root doesn't reach one that's already on screen, so a sheet that can
+/// CHANGE the theme has to apply it to itself or it stays stale until reopened.
+private struct AppThemeModifier: ViewModifier {
+    @Environment(ThemeStore.self) private var theme
+
+    func body(content: Content) -> some View {
+        content.preferredColorScheme(theme.colorScheme)
+    }
+}
+
+extension View {
+    /// Put this on the root of any sheet so it follows the theme live.
+    func appTheme() -> some View {
+        modifier(AppThemeModifier())
     }
 }
 

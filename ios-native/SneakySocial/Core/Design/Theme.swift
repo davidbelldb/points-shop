@@ -51,6 +51,8 @@ extension Color {
 enum Palette {
     // Shell
     static let points = Color(hex: "#b45309")        // amber-700, the points figure
+    static let basket = Color(hex: "#ed70bd")        // the basket button beside the pill
+    static let pill = Color(hex: "#263f39")          // the points pill body, sampled from the web app
     static let cardBorder = Color(hex: "#e5e5e5")
 
     // Crow tracker — "The Marauder's Map"

@@ -6,6 +6,7 @@ import SwiftUI
 struct AdminHomeView: View {
     @Environment(SessionStore.self) private var session
     @Environment(DerbyConfigBroadcast.self) private var derbyConfig
+    @State private var showingAccount = false
 
     var body: some View {
         List {
@@ -45,16 +46,17 @@ struct AdminHomeView: View {
                 Text("These arrive with phases 3 and 4. Use the web admin for them in the meantime.")
             }
 
-            Section {
-                Button("Sign out", role: .destructive) {
-                    Task { await session.logOut() }
-                }
-            }
         }
+        .sheet(isPresented: $showingAccount) { AccountSheet() }
         .navigationTitle("Admin")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { ThemeToggleButton() }
+            ToolbarItem(placement: .topBarLeading) { AppIconBadge() }
+                .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .topBarTrailing) {
+                PointsPill(onTapAvatar: { showingAccount = true })
+            }
+            .sharedBackgroundVisibility(.hidden)
         }
     }
 }
