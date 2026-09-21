@@ -5,7 +5,9 @@ import { sendPush } from '../notifications/push.js';
 // idea. With three or more accounts it isn't: it silently pairs everyone with
 // whoever sorts first. It survives only as the fallback for callers that
 // haven't been given an explicit partner yet (the old web client), so its
-// behaviour is deliberately unchanged.
+// behaviour is deliberately unchanged — including that it does NOT check
+// friendships. Callers that care enforce that themselves (chat.routes,
+// scrolls.routes); this is only "who did the old two-person app mean".
 export async function findOtherUser(accountId) {
   const { rows } = await query(
     `SELECT id, username, name, photo_url, role, typing_at
@@ -72,6 +74,12 @@ export async function listPartners(accountId) {
           LIMIT 1
        ) lm ON TRUE
       WHERE a.id != $1
+        AND EXISTS (
+          SELECT 1 FROM friendships f
+           WHERE f.status = 'accepted'
+             AND f.account_a = LEAST($1::uuid, a.id)
+             AND f.account_b = GREATEST($1::uuid, a.id)
+        )
       ORDER BY (lm.created_at IS NULL), lm.created_at DESC, a.created_at`,
     [accountId],
   );

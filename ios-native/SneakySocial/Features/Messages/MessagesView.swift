@@ -6,39 +6,97 @@ import SwiftUI
 struct MessagesView: View {
     @Environment(SessionStore.self) private var session
     @State private var model = MessagesViewModel()
+    /// Open conversation, if any. Deliberately NOT a navigation push: a push
+    /// puts a back chevron in the top-left, and the bar is the app icon's.
+    @State private var openPartner: ChatPartner?
+    @State private var showingPeople = false
 
     var body: some View {
+        ZStack {
+            if let openPartner {
+                ThreadView(partner: openPartner) {
+                    withAnimation(.snappy(duration: 0.28)) { self.openPartner = nil }
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                conversations
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+        }
+        .appTopBar()
+    }
+
+    private var conversations: some View {
         List {
-            PageHeading(title: "Messages")
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(.init(top: 4, leading: 4, bottom: 8, trailing: 4))
+            HStack(alignment: .firstTextBaseline) {
+                PageHeading(title: "Messages")
+                Spacer(minLength: 8)
+                peopleButton
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(.init(top: 4, leading: 4, bottom: 8, trailing: 4))
 
             if model.partners.isEmpty && !model.isLoading {
                 Section {
                     ContentUnavailableView("Nobody to write to",
                                            systemImage: "bubble.left.and.bubble.right",
-                                           description: Text("There's no one else on the account yet."))
+                                           description: Text("Connect with someone first — tap People."))
                         .listRowBackground(Color.clear)
                 }
             }
 
             ForEach(model.partners) { partner in
-                NavigationLink(value: partner) {
+                Button {
+                    Haptics.tap()
+                    withAnimation(.snappy(duration: 0.28)) { openPartner = partner }
+                } label: {
                     PartnerRow(partner: partner, meID: session.account?.id)
                 }
+                .buttonStyle(.plain)
             }
         }
         .listStyle(.insetGrouped)
-        .navigationDestination(for: ChatPartner.self) { partner in
-            ThreadView(partner: partner)
-        }
-        .appTopBar()
         .refreshable { await model.loadPartners() }
+        .sheet(isPresented: $showingPeople, onDismiss: {
+            // Connections decide who's in the list, so it has to be re-read.
+            Task { await model.loadPartners() }
+        }) {
+            FriendsSheet()
+        }
         .task {
             model.meID = session.account?.id
             await model.loadPartners()
         }
+    }
+
+    /// The way in to connections — and where a request announces itself.
+    private var peopleButton: some View {
+        Button {
+            Haptics.tap()
+            showingPeople = true
+        } label: {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 36, height: 36)
+                .background(.quaternary, in: .circle)
+                .overlay(alignment: .topTrailing) {
+                    if model.friendRequests > 0 {
+                        Text("\(model.friendRequests)")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Palette.basket, in: .capsule)
+                            .offset(x: 4, y: -2)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(model.friendRequests > 0
+                            ? "People, \(model.friendRequests) waiting"
+                            : "People")
     }
 }
 
@@ -87,6 +145,9 @@ private struct PartnerRow: View {
 
 struct ThreadView: View {
     let partner: ChatPartner
+    /// Back to the conversation list. The control lives in the thread's own
+    /// heading, under the bar, so the top bar never changes shape.
+    var onBack: () -> Void = {}
 
     @Environment(SessionStore.self) private var session
     @State private var model = MessagesViewModel()
@@ -100,7 +161,17 @@ struct ThreadView: View {
             thread
             composer
         }
-        .appTopBar()
+        // Swipe in from the left edge, as a pushed screen would — without the
+        // chevron that comes with one.
+        .gesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    guard value.startLocation.x < 40,
+                          value.translation.width > 70,
+                          abs(value.translation.height) < 60 else { return }
+                    onBack()
+                }
+        )
         .sheet(item: Binding(
             get: { trackingScrollID.map(TrackedCrow.init) },
             set: { trackingScrollID = $0?.id }
@@ -124,6 +195,16 @@ struct ThreadView: View {
     /// Who you're talking to — under the bar, like every other page's name.
     private var threadHeading: some View {
         HStack(spacing: 10) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 32, height: 32)
+                    .background(.quaternary, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("All conversations")
+
             Avatar(url: partner.photo, size: 34)
             PageHeading(title: partner.displayName)
         }

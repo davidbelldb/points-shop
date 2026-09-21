@@ -5,6 +5,7 @@ import {
 } from './chat.repo.js';
 import { unreadCount as scrollsUnreadCount } from '../scrolls/scrolls.repo.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { areFriends } from '../friends/friends.repo.js';
 
 // Whitelist of allowed reaction keys. Keep tiny — we render a fixed emoji
 // per key in the frontend, so adding new ones requires both ends to know.
@@ -15,8 +16,14 @@ export default async function chatRoutes(fastify) {
   // one we fall back to the old "the other user" guess so clients that haven't
   // been taught about partners yet keep working unchanged.
   async function resolvePartner(accountId, explicitId) {
-    if (explicitId) return findPartner(accountId, explicitId);
-    return findOtherUser(accountId);
+    const other = explicitId
+      ? await findPartner(accountId, explicitId)
+      : await findOtherUser(accountId);
+    // Being an account is no longer enough to be reachable — you have to be
+    // connected. Not-a-friend reads as not-found so the endpoint can't be used
+    // to work out who else exists.
+    if (!other) return null;
+    return (await areFriends(accountId, other.id)) ? other : null;
   }
 
   // The conversation list: everyone else, their unread count, and the last
@@ -84,7 +91,8 @@ export default async function chatRoutes(fastify) {
       findLatestSender(accountId),
     ]);
     const count = msgCount + scrollCount;
-    const other = latest ?? await findOtherUser(accountId);
+    let other = latest ?? await findOtherUser(accountId);
+    if (other && !(await areFriends(accountId, other.id))) other = null;
     if (!other) return { count, other: null };
     return {
       count,

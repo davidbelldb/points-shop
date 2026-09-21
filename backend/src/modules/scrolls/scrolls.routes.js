@@ -6,6 +6,7 @@ import {
   getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
 import { findOtherUser, findPartner } from '../chat/chat.repo.js';
+import { areFriends } from '../friends/friends.repo.js';
 import { buildFlightPath } from './flightPath.js';
 import { getEffectiveAccountId, getActualAccountId, isAdmin } from '../auth/auth.helpers.js';
 
@@ -100,9 +101,10 @@ export default async function scrollRoutes(fastify) {
   // that hasn't been taught about partners breaks.
   fastify.get('/api/scrolls/thread', async (req, reply) => {
     const accountId = getEffectiveAccountId(req);
-    const other = req.query?.with
+    let other = req.query?.with
       ? await findPartner(accountId, req.query.with)
       : await findOtherUser(accountId);
+    if (other && !(await areFriends(accountId, other.id))) other = null;
     if (!other) {
       if (req.query?.with) return reply.code(404).send({ error: 'No such person' });
       return { other: null, scrolls: [] };
@@ -152,9 +154,11 @@ export default async function scrollRoutes(fastify) {
       senderId = getEffectiveAccountId(req);
       // An explicit recipient wins; without one we fall back to the old guess so
       // the existing web composer keeps working.
-      const other = recipientIdInput
+      let other = recipientIdInput
         ? await findPartner(senderId, recipientIdInput)
         : await findOtherUser(senderId);
+      // You can only send a crow to someone you're connected to.
+      if (other && !(await areFriends(senderId, other.id))) other = null;
       if (!other) {
         return reply.code(recipientIdInput ? 404 : 400).send({
           error: recipientIdInput ? 'No such person' : 'No recipient available',

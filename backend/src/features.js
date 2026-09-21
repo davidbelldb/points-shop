@@ -19,6 +19,7 @@ const CORE_PREFIXES = [
   '/api/account',
   '/api/settings',
   '/api/features',
+  '/api/friends',
   '/api/bootstrap',
   '/api/upload',
   '/api/notifications',

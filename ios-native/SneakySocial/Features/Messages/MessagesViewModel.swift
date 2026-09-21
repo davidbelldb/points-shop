@@ -15,6 +15,8 @@ final class MessagesViewModel {
     private(set) var partner: ChatPartner?
     private(set) var isLoading = false
     private(set) var isSending = false
+    /// People waiting on an answer from you — the dot on the People button.
+    private(set) var friendRequests = 0
     var error: String?
     var draft = ""
 
@@ -44,6 +46,11 @@ final class MessagesViewModel {
     // MARK: - Loading
 
     func loadPartners() async {
+        // A request count is cheap and belongs on the same screen refresh; a
+        // failure here must not cost us the conversation list.
+        if let count = try? await api.get("/friends/requests/count", as: FriendRequestCount.self) {
+            friendRequests = count.count
+        }
         do {
             let response = try await api.get("/messages/partners", as: PartnersResponse.self)
             partners = response.partners
@@ -217,6 +224,8 @@ final class MessagesViewModel {
     private func report(_ error: Error) {
         self.error = (error as? APIError)?.errorDescription ?? error.localizedDescription
     }
+
+    struct FriendRequestCount: Decodable, Sendable { let count: Int }
 
     /// For calls whose reply we don't read. The endpoints answer with varying
     /// shapes (an updated row here, `{ok:true}` there) and a strict decode would
