@@ -1,7 +1,7 @@
 import {
   getSettings, getFrames, updateSettings, replaceFrames,
-  createScroll, listReceived, listIncoming, unreadCount, markRead, resolveDueScrolls,
-  getActiveCrowFlights, listPerchScrolls,
+  createScroll, listReceived, listIncoming, listThread, unreadCount, markRead, resolveDueScrolls,
+  getActiveCrowFlights, listPerchScrolls, getScrollFlight, markSeen,
   pushStreetSubtitleUpdates, saveLiveActivityToken,
   getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
@@ -94,6 +94,22 @@ export default async function scrollRoutes(fastify) {
     return { incoming: await listIncoming(accountId) };
   });
 
+  // One conversation's scrolls, both directions, in-flight included — the
+  // native Messages thread, which shows crows and chat in a single timeline.
+  // Without `?with=` it falls back to the old "the other user" guess so nothing
+  // that hasn't been taught about partners breaks.
+  fastify.get('/api/scrolls/thread', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const other = req.query?.with
+      ? await findPartner(accountId, req.query.with)
+      : await findOtherUser(accountId);
+    if (!other) {
+      if (req.query?.with) return reply.code(404).send({ error: 'No such person' });
+      return { other: null, scrolls: [] };
+    }
+    return { other, scrolls: await listThread(accountId, other.id) };
+  });
+
   // The caller's active crow flights — powers the in-app /crow-tracker live map
   // (opened by tapping the crow / weather Live Activity). Straight-line routes,
   // time-based progress; returns every in-flight + recently-landed crow (empty
@@ -165,6 +181,24 @@ export default async function scrollRoutes(fastify) {
   fastify.post('/api/scrolls/:id/read', async (req) => {
     const accountId = getEffectiveAccountId(req);
     return markRead(req.params.id, accountId);
+  });
+
+  // Mark an arrived scroll as seen without destroying it. The web app's
+  // /read is a reading ceremony that consumes the scroll; the native Messages
+  // thread keeps it as a bubble, so it needs the badge cleared and the row kept.
+  fastify.post('/api/scrolls/:id/seen', async (req) => {
+    const accountId = getEffectiveAccountId(req);
+    return { ok: await markSeen(req.params.id, accountId) };
+  });
+
+  // One crow's flight, for the tracker sheet that slides up from a chat bubble.
+  // Either participant may watch it — unlike /active-flight, which is the
+  // recipient's own inbox of incoming crows.
+  fastify.get('/api/scrolls/:id/flight', async (req, reply) => {
+    const accountId = getEffectiveAccountId(req);
+    const flight = await getScrollFlight(req.params.id, accountId);
+    if (!flight) return reply.code(404).send({ error: 'No such crow' });
+    return { flight };
   });
 
   // Crow flight path — plots a road-following route between sender and recipient

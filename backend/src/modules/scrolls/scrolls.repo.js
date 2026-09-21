@@ -616,6 +616,31 @@ export async function listPerchScrolls(recipientId) {
   return [...msgs, ...forecasts];
 }
 
+// Every scroll between two people, both directions, oldest first — the native
+// Messages thread. Forecast scrolls (from_label set) stay out; they belong to
+// the tracker. A scroll you've been sent keeps its body hidden until its crow
+// lands, so an in-flight bubble can't be peeked at by reading the payload;
+// your own scrolls are always legible to you.
+export async function listThread(accountId, partnerId) {
+  const { rows } = await query(
+    `SELECT s.id, s.sender_id, s.recipient_id,
+            CASE WHEN s.sender_id = $1 OR s.deliver_at <= NOW()
+                 THEN s.body ELSE NULL END AS body,
+            s.origin_label, s.dest_label,
+            s.sent_at, s.deliver_at, s.flight_seconds,
+            s.delivered, s.delivered_at, s.read_at,
+            a.name AS sender_name, a.username AS sender_username, a.photo_url AS sender_photo
+       FROM scrolls s
+       JOIN accounts a ON a.id = s.sender_id
+      WHERE s.from_label IS NULL
+        AND ((s.sender_id = $1 AND s.recipient_id = $2)
+          OR (s.sender_id = $2 AND s.recipient_id = $1))
+      ORDER BY s.sent_at ASC`,
+    [accountId, partnerId],
+  );
+  return rows;
+}
+
 // Recipient's IN-FLIGHT scrolls (crow still on its way). Drives the "crow
 // incoming" countdown toast — earliest arrival first.
 export async function listIncoming(recipientId) {
@@ -725,6 +750,43 @@ export async function getActiveCrowFlights(recipientId) {
     [recipientId, CROW_TRACKER_LINGER_MIN],
   );
   return rows.map(buildCrowFlight);
+}
+
+// One flight, for either participant — what the crow-tracker sheet opens when
+// you tap a bubble's progress line. getActiveCrowFlights is recipient-scoped
+// (the tracker only ever shows crows coming TO you); here the sender may watch
+// their own crow go, because they're looking at the scroll they sent.
+export async function getScrollFlight(scrollId, accountId) {
+  const { rows } = await query(
+    `SELECT s.id, s.sender_id, s.recipient_id,
+            s.origin_label, s.dest_label, s.from_label, s.body,
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets,
+            s.deliver_at, s.flight_seconds, s.delivered, s.delivered_at,
+            a.name AS sender_name
+       FROM scrolls s JOIN accounts a ON a.id = s.sender_id
+      WHERE s.id = $1 AND (s.sender_id = $2 OR s.recipient_id = $2)`,
+    [scrollId, accountId],
+  );
+  if (!rows[0]) return null;
+  // buildCrowFlight only ever puts a body in `message` for forecast scrolls, so
+  // a sender watching their own crow still doesn't get the reading ceremony
+  // spoiled for the person it's addressed to.
+  return buildCrowFlight(rows[0]);
+}
+
+// Mark an arrived scroll as seen WITHOUT destroying it.
+//
+// markRead() is the web app's behaviour: a scroll is ephemeral there, read once
+// and gone. The native Messages thread keeps scrolls as bubbles in the
+// conversation, so it needs the badge cleared and the row left alone.
+export async function markSeen(scrollId, accountId) {
+  const { rowCount } = await query(
+    `UPDATE scrolls
+        SET read_at = NOW()
+      WHERE id = $1 AND recipient_id = $2 AND read_at IS NULL AND deliver_at <= NOW()`,
+    [scrollId, accountId],
+  );
+  return rowCount > 0;
 }
 
 // Count of arrived-but-unread scrolls (drives the "crow has arrived" badge).

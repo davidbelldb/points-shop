@@ -12,8 +12,6 @@ struct ShopView: View {
     @State private var sort: SortOrder = .newest
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var showingBasket = false
-    @State private var showingAccount = false
 
     enum SortOrder: String, CaseIterable, Identifiable {
         case newest, cheapest, dearest, name
@@ -61,23 +59,7 @@ struct ShopView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
         }
-        .navigationTitle(copy.shopName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) { AppIconBadge() }
-                .sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .topBarTrailing) {
-                ShopChrome(openBasket: { showingBasket = true },
-                           openAccount: { showingAccount = true })
-            }
-            // No shared glass container around the items — the pill and the
-            // basket carry their own backgrounds.
-            .sharedBackgroundVisibility(.hidden)
-        }
-        .sheet(isPresented: $showingBasket) {
-            NavigationStack { BasketView() }
-        }
-        .sheet(isPresented: $showingAccount) { AccountSheet() }
+        .appTopBar()
         .task {
             await load()
             await basket.refresh()

@@ -6,10 +6,14 @@ import SwiftUI
 struct AdminHomeView: View {
     @Environment(SessionStore.self) private var session
     @Environment(DerbyConfigBroadcast.self) private var derbyConfig
-    @State private var showingAccount = false
 
     var body: some View {
         List {
+            PageHeading(title: "Admin")
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(.init(top: 4, leading: 4, bottom: 8, trailing: 4))
+
             Section {
                 LabeledContent("Signed in as", value: session.account?.displayName ?? "—")
                 LabeledContent("Username", value: session.account?.actualUsername ?? session.account?.username ?? "—")
@@ -47,16 +51,6 @@ struct AdminHomeView: View {
             }
 
         }
-        .sheet(isPresented: $showingAccount) { AccountSheet() }
-        .navigationTitle("Admin")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) { AppIconBadge() }
-                .sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .topBarTrailing) {
-                PointsPill(onTapAvatar: { showingAccount = true })
-            }
-            .sharedBackgroundVisibility(.hidden)
-        }
+        .appTopBar()
     }
 }

@@ -9,8 +9,6 @@ struct ProductDetailView: View {
 
     @State private var detail: Product?
     @State private var qty = 1
-    @State private var showingBasket = false
-    @State private var showingAccount = false
     @State private var justAdded = false
 
     private var shown: Product { detail ?? product }
@@ -22,7 +20,7 @@ struct ProductDetailView: View {
                 gallery
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(shown.name).font(.title2.weight(.bold))
+                    PageHeading(title: shown.name)
 
                     HStack(spacing: 10) {
                         Text("\(shown.pricePoints) pts")
@@ -61,24 +59,8 @@ struct ProductDetailView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
         }
-        .navigationTitle(shown.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) { AppIconBadge() }
-                .sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .topBarTrailing) {
-                ShopChrome(openBasket: { showingBasket = true },
-                           openAccount: { showingAccount = true })
-            }
-            // No shared glass container around the items — the pill and the
-            // basket carry their own backgrounds.
-            .sharedBackgroundVisibility(.hidden)
-        }
+        .appTopBar()
         .safeAreaInset(edge: .bottom) { addBar }
-        .sheet(isPresented: $showingBasket) {
-            NavigationStack { BasketView() }
-        }
-        .sheet(isPresented: $showingAccount) { AccountSheet() }
         .task {
             // The grid's payload has no media; fetch the full record.
             detail = try? await APIClient.shared.get("/products/\(product.id)", as: Product.self)

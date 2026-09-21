@@ -6,11 +6,13 @@ import SwiftUI
 /// the games switched on for it and nothing has to be hardcoded per audience.
 struct GamesHubView: View {
     @Environment(FeatureStore.self) private var features
-    @State private var showingAccount = false
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
+                PageHeading(title: "Games", subtitle: "Everything you can play.")
+                    .padding(.bottom, 2)
+
                 if features.has(.duckyDerby) {
                     NavigationLink {
                         DerbyView()
@@ -48,17 +50,7 @@ struct GamesHubView: View {
             .padding(.top, 8)
             .padding(.bottom, 24)
         }
-        .navigationTitle("Games")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) { AppIconBadge() }
-                .sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .topBarTrailing) {
-                PointsPill(onTapAvatar: { showingAccount = true })
-            }
-            .sharedBackgroundVisibility(.hidden)
-        }
-        .sheet(isPresented: $showingAccount) { AccountSheet() }
+        .appTopBar()
     }
 }
 

@@ -55,7 +55,7 @@ struct MainTabView: View {
             }
             if features.has(.messaging) {
                 Tab("Messages", systemImage: "bubble.left.and.bubble.right.fill", value: TabSelection.messages) {
-                    NavigationStack { MessagesPlaceholderView() }
+                    NavigationStack { MessagesView() }
                 }
             }
             Tab("Portals", systemImage: "circle.hexagongrid.fill", value: TabSelection.portals) {

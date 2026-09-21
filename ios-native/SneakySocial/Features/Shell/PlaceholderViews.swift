@@ -18,20 +18,6 @@ struct CrowPlaceholderView: View {
     }
 }
 
-struct MessagesPlaceholderView: View {
-    var body: some View {
-        FeatureProbeView(
-            title: "Messages",
-            subtitle: "Phase 4",
-            probe: "GET /api/messages"
-        ) {
-            let thread = try await APIClient.shared.get("/messages", as: MessagesProbe.self)
-            let partner = thread.other?.name ?? thread.other?.username ?? "nobody"
-            return "\(thread.messages.count) messages with \(partner)"
-        }
-    }
-}
-
 // MARK: - Shared probe scaffolding
 
 private struct FeatureProbeView: View {
@@ -131,12 +117,3 @@ private struct ScrollsConfigProbe: Decodable, Sendable {
     let land: [Frame]
 }
 
-private struct MessagesProbe: Decodable, Sendable {
-    struct Partner: Decodable, Sendable {
-        let username: String?
-        let name: String?
-    }
-    struct Message: Decodable, Sendable { let id: String }
-    let other: Partner?
-    let messages: [Message]
-}
