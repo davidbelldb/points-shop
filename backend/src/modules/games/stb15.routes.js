@@ -1,3 +1,4 @@
+import { getAudience } from '../auth/auth.helpers.js';
 import { query } from '../../db.js';
 import { getEffectiveAccountId } from '../auth/auth.helpers.js';
 
@@ -14,8 +15,11 @@ async function creditPts(accountId, delta, reason) {
   );
 }
 
-async function getConfig() {
-  const { rows } = await query(`SELECT * FROM stb15_config WHERE id = 1`);
+// Board, colours and hidden phrases are per audience: the kids set starts blank
+// so nothing personal carries across.
+async function getConfig(audience = 'adult') {
+  const a = audience === 'kids' ? 'kids' : 'adult';
+  const { rows } = await query(`SELECT * FROM stb15_config WHERE audience = $1`, [a]);
   const cfg = rows[0] || null;
   if (!cfg) return null;
   const { rows: sets } = await query(`SELECT ord, back, front, active FROM stb15_scattered_sets ORDER BY ord`);
@@ -24,7 +28,8 @@ async function getConfig() {
   cfg.table_colours = tableColours;
   const { rows: dicePalettes } = await query(`SELECT ord, body, pip, active FROM stb15_dice_palettes ORDER BY ord`);
   cfg.dice_palettes = dicePalettes;
-  const { rows: tileMessages } = await query(`SELECT ord, message, active FROM stb15_tile_messages ORDER BY ord`);
+  const { rows: tileMessages } = await query(
+    `SELECT ord, message, active FROM stb15_tile_messages WHERE audience = $1 ORDER BY ord`, [a]);
   cfg.tile_messages = tileMessages;
   return cfg;
 }
@@ -72,8 +77,8 @@ async function getProps() {
 }
 
 export default async function stb15Routes(fastify) {
-  fastify.get('/api/games/shut-the-box-15/config', async () => {
-    return await getConfig();
+  fastify.get('/api/games/shut-the-box-15/config', async (req) => {
+    return await getConfig(getAudience(req));
   });
 
   fastify.get('/api/games/shut-the-box-15/props', async () => {
@@ -156,7 +161,7 @@ export default async function stb15Routes(fastify) {
 
   fastify.get('/api/admin/shut-the-box-15', async (req, reply) => {
     if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
-    return await getConfig();
+    return await getConfig(req.query?.audience);
   });
 
   fastify.patch('/api/admin/shut-the-box-15', async (req, reply) => {
@@ -185,9 +190,13 @@ export default async function stb15Routes(fastify) {
     }
     if (updates.length) {
       updates.push(`updated_at = NOW()`);
-      await query(`UPDATE stb15_config SET ${updates.join(', ')} WHERE id = 1`, values);
+      values.push(req.query?.audience === 'kids' ? 'kids' : 'adult');
+      await query(
+        `UPDATE stb15_config SET ${updates.join(', ')} WHERE audience = $${values.length}`,
+        values,
+      );
     }
-    return await getConfig();
+    return await getConfig(req.query?.audience);
   });
 
   fastify.patch('/api/admin/shut-the-box-15/tile-messages/:ord', async (req, reply) => {
@@ -212,9 +221,14 @@ export default async function stb15Routes(fastify) {
     if (updates.length) {
       updates.push(`updated_at = NOW()`);
       values.push(ord);
-      await query(`UPDATE stb15_tile_messages SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
+      values.push(req.query?.audience === 'kids' ? 'kids' : 'adult');
+      await query(
+        `UPDATE stb15_tile_messages SET ${updates.join(', ')}
+          WHERE ord = $${values.length - 1} AND audience = $${values.length}`,
+        values,
+      );
     }
-    return await getConfig();
+    return await getConfig(req.query?.audience);
   });
 
   fastify.patch('/api/admin/shut-the-box-15/dice-palettes/:ord', async (req, reply) => {
@@ -243,7 +257,7 @@ export default async function stb15Routes(fastify) {
       values.push(ord);
       await query(`UPDATE stb15_dice_palettes SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
-    return await getConfig();
+    return await getConfig(req.query?.audience);
   });
 
   fastify.patch('/api/admin/shut-the-box-15/table-colours/:ord', async (req, reply) => {
@@ -270,7 +284,7 @@ export default async function stb15Routes(fastify) {
       values.push(ord);
       await query(`UPDATE stb15_table_colours SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
-    return await getConfig();
+    return await getConfig(req.query?.audience);
   });
 
   fastify.patch('/api/admin/shut-the-box-15/scattered-sets/:ord', async (req, reply) => {
@@ -293,6 +307,6 @@ export default async function stb15Routes(fastify) {
       values.push(ord);
       await query(`UPDATE stb15_scattered_sets SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
     }
-    return await getConfig();
+    return await getConfig(req.query?.audience);
   });
 }

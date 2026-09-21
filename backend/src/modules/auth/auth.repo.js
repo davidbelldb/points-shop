@@ -46,9 +46,13 @@ export async function createWidgetSession(accountId) {
 export async function findSession(token) {
   const { rows } = await query(
     `SELECT s.account_id, s.impersonating_account_id, s.token, s.expires_at,
-            a.role, a.username
+            a.role, a.username,
+            -- The audience of whoever is being VIEWED AS, so impersonating
+            -- George shows George's world rather than your own.
+            COALESCE(eff.audience, a.audience, 'adult') AS audience
        FROM sessions s
        JOIN accounts a ON a.id = s.account_id
+       LEFT JOIN accounts eff ON eff.id = s.impersonating_account_id
       WHERE s.token = $1 AND s.expires_at > NOW()`,
     [token],
   );

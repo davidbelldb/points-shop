@@ -44,6 +44,7 @@ fastify.addHook('onRequest', async (req) => {
         actualUsername: session.username,
         effectiveAccountId: session.impersonating_account_id || session.account_id,
         impersonating: !!session.impersonating_account_id,
+        audience: session.audience ?? 'adult',
         token,
       };
     }

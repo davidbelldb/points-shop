@@ -2,8 +2,13 @@ import { query } from '../../db.js';
 
 const ALLOWED = ['homepage_visible', 'homepage_days', 'animal_type', 'button_label'];
 
-async function getConfig() {
-  const { rows } = await query(`SELECT * FROM sneaky_button_config WHERE id = 1`);
+// One row per audience, so the kids button can run on different days with a
+// different label from the grown-ups' one.
+async function getConfig(audience = 'adult') {
+  const { rows } = await query(
+    `SELECT * FROM sneaky_button_config WHERE audience = $1`,
+    [audience === 'kids' ? 'kids' : 'adult'],
+  );
   return rows[0] || null;
 }
 
@@ -77,8 +82,8 @@ async function fetchAnimalImage(kind) {
 
 export default async function sneakyButtonRoutes(fastify) {
   // Public — homepage gating info.
-  fastify.get('/api/sneaky-button/config', async () => {
-    const cfg = await getConfig();
+  fastify.get('/api/sneaky-button/config', async (req) => {
+    const cfg = await getConfig(getAudience(req));
     if (!cfg) {
       return { homepage_visible: false, homepage_days: [0, 1, 2, 3, 4, 5, 6], animal_type: 'cat', button_label: '🐾 Sneaky Button' };
     }
@@ -92,7 +97,7 @@ export default async function sneakyButtonRoutes(fastify) {
 
   // Public — fetch one random cute image/gif according to the configured animal type.
   fastify.get('/api/sneaky-button/random', async (req, reply) => {
-    const cfg = await getConfig();
+    const cfg = await getConfig(getAudience(req));
     const animalType = cfg?.animal_type || 'cat';
     const kind = animalType === 'random'
       ? ANIMAL_KINDS[Math.floor(Math.random() * ANIMAL_KINDS.length)]
@@ -106,7 +111,7 @@ export default async function sneakyButtonRoutes(fastify) {
 
   fastify.get('/api/admin/sneaky-button', async (req, reply) => {
     if (req.user?.actualRole !== 'admin') return reply.code(403).send({ error: 'forbidden' });
-    return await getConfig();
+    return await getConfig(req.query?.audience);
   });
 
   fastify.patch('/api/admin/sneaky-button', async (req, reply) => {
@@ -122,8 +127,10 @@ export default async function sneakyButtonRoutes(fastify) {
     }
     if (!updates.length) return reply.code(400).send({ error: 'nothing to update' });
     updates.push('updated_at = NOW()');
+    values.push(req.query?.audience === 'kids' ? 'kids' : 'adult');
     const { rows } = await query(
-      `UPDATE sneaky_button_config SET ${updates.join(', ')} WHERE id = 1 RETURNING *`,
+      `UPDATE sneaky_button_config SET ${updates.join(', ')}
+        WHERE audience = $${values.length} RETURNING *`,
       values,
     );
     return rows[0];

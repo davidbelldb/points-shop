@@ -1,9 +1,10 @@
 import { listActiveSlides, listAllSlides, createSlide, updateSlide, deleteSlide } from './hero.repo.js';
+import { getAudience } from '../auth/auth.helpers.js';
 
 export default async function heroRoutes(fastify) {
   fastify.get('/api/hero-slides', async (req) => {
     const placement = (req.query?.placement || 'top').toString();
-    return listActiveSlides(placement);
+    return listActiveSlides(placement, getAudience(req));
   });
 
   fastify.get('/api/admin/hero-slides', async () => listAllSlides());

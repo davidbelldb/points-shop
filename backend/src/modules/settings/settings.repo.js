@@ -33,23 +33,36 @@ const ALLOWED = [
   'entertainment_home_title', 'entertainment_home_subtitle',
   'floating_head_admin', 'floating_head_partner',
   'crossword_open',
+  // Wording the apps render, so the same screen can say "safe pocket" for one
+  // audience and "basket" for another.
+  'basket_label', 'basket_add_label', 'basket_empty_text',
+  'checkout_label', 'products_title', 'order_done_text',
 ];
 
-export async function getAllSettings() {
-  const { rows } = await query(`SELECT key, value FROM settings`);
+// Adult values are the base; a kids account gets those with its own overrides
+// laid on top, so only the wording that differs needs a second row.
+export async function getAllSettings(audience = 'adult') {
+  const { rows } = await query(
+    `SELECT DISTINCT ON (key) key, value
+       FROM settings
+      WHERE audience = 'adult' OR audience = $1
+      ORDER BY key, (audience = $1) DESC`,
+    [audience],
+  );
   const out = {};
   for (const r of rows) out[r.key] = r.value;
   return out;
 }
 
-export async function updateSettings(patch) {
+export async function updateSettings(patch, audience = 'adult') {
+  const target = audience === 'kids' ? 'kids' : 'adult';
   for (const [key, value] of Object.entries(patch)) {
     if (!ALLOWED.includes(key)) continue;
     await query(
-      `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [key, value],
+      `INSERT INTO settings (audience, key, value, updated_at) VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (audience, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [target, key, value],
     );
   }
-  return getAllSettings();
+  return getAllSettings(target);
 }

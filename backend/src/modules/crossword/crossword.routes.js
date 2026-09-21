@@ -87,7 +87,10 @@ function mediaWordSet(media) {
 }
 
 async function isOpen() {
-  const { rows } = await query(`SELECT value FROM settings WHERE key = 'crossword_open'`);
+  // settings is keyed on (audience, key) now, so pin this to the adult row
+  // rather than relying on which one comes back first.
+  const { rows } = await query(
+    `SELECT value FROM settings WHERE key = 'crossword_open' AND audience = 'adult'`);
   return rows[0]?.value === 'true';
 }
 // Admin (David) can always play; Katie only when the puzzle is opened.

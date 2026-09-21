@@ -158,6 +158,15 @@ struct DuckPicker: View {
     }
 }
 
+/// A button that contributes no styling of its own — the row draws itself.
+private struct FormRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 /// Recent finishing positions per duck — 1 = won, 2+ = placed, D = sank.
 struct FormGuide: View {
     let model: DerbyViewModel
@@ -176,11 +185,17 @@ struct FormGuide: View {
                         } label: {
                             row(for: duck)
                         }
-                        .buttonStyle(.plain)
+                        // Not .plain: that style draws its own rounded highlight
+                        // around the label, which is where the stray corners came
+                        // from. This one adds nothing but a press state.
+                        .buttonStyle(FormRowButtonStyle())
                         .disabled(model.phase != .betting)
                     }
                 }
-                .background(night ? Color(hex: "#262626") : .white, in: .rect(cornerRadius: 12))
+                // Square fill, then clip — so a selected row runs edge to edge and
+                // only the first and last rows get rounded, by the mask.
+                .background(night ? Color(hex: "#262626") : .white)
+                .clipShape(.rect(cornerRadius: 12))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(night ? Color(hex: "#404040") : Palette.cardBorder)
@@ -216,10 +231,13 @@ struct FormGuide: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            model.pickedOrd == duck.ord
-                ? Color(hex: "#ec4899").opacity(night ? 0.22 : 0.10)
-                : Color.clear
+            Rectangle().fill(
+                model.pickedOrd == duck.ord
+                    ? Color(hex: "#ec4899").opacity(night ? 0.22 : 0.10)
+                    : Color.clear
+            )
         )
         .contentShape(.rect)
     }

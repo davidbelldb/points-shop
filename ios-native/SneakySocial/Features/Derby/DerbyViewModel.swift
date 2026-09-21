@@ -136,7 +136,9 @@ final class DerbyViewModel {
     /// Config rarely changes within a session, so it's fetched once and kept.
     private nonisolated static func loadConfig(api: APIClient, existing: DuckyConfig?) async -> DuckyConfig? {
         if let existing { return existing }
-        return try? await api.get("/games/ducky/config\(DuckyVariant.app.query)", as: DuckyConfig.self)
+        // No variant asked for: the backend serves whichever set this account's
+        // audience calls for.
+        return try? await api.get("/games/ducky/config", as: DuckyConfig.self)
     }
 
     /// The form guide is nice-to-have — a failure here shouldn't stop a race.

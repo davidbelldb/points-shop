@@ -1,5 +1,5 @@
 import { query } from '../../db.js';
-import { getEffectiveAccountId } from '../auth/auth.helpers.js';
+import { getEffectiveAccountId, getAudience } from '../auth/auth.helpers.js';
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
@@ -122,8 +122,12 @@ function makeWhirlpools() {
 }
 
 export default async function duckyRoutes(fastify) {
+  // Which words a player gets is a property of their ACCOUNT, not of the app
+  // they happen to be using — so David in the native app still gets the original
+  // derby, and George gets the kid-friendly one wherever he signs in. Admin
+  // routes below still take an explicit ?variant= so both sets can be edited.
   fastify.get('/api/games/ducky/config', async (req) => {
-    return await getDuckyConfig(req.query?.variant);
+    return await getDuckyConfig(getAudience(req) === 'kids' ? 'kids' : 'original');
   });
 
   // Per-duck recent finishing positions for the form-guide table.

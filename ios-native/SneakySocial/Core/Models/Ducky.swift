@@ -145,8 +145,9 @@ enum DuckyVariant: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    /// The variant this app races with.
-    static let app: DuckyVariant = .kids
+    /// The variant the admin plane opens on. Play content is chosen by the
+    /// server from the signed-in account's audience, not by the app.
+    static let adminDefault: DuckyVariant = .kids
 
     var query: String { "?variant=\(rawValue)" }
 }

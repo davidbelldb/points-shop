@@ -3,14 +3,16 @@ import { pool, query } from '../../db.js';
 import { getDefaultAccountId } from '../accounts/accounts.repo.js';
 import { sendPush } from '../notifications/push.js';
 
-const PRODUCT_FIELDS = ['name', 'sku', 'description', 'price_points', 'thumbnail_url', 'is_active'];
+const PRODUCT_FIELDS = ['name', 'sku', 'description', 'price_points', 'thumbnail_url', 'is_active',
+  'audience',
+];
 const ACCOUNT_FIELDS = ['name', 'email', 'photo_url'];
 
 export async function listAllProducts() {
   const { rows } = await query(
     `SELECT
         p.id, p.sku, p.name, p.description, p.price_points,
-        p.thumbnail_url, p.is_active, p.created_at,
+        p.thumbnail_url, p.is_active, p.audience, p.created_at,
         COALESCE(i.stock_qty, 0)      AS stock_qty,
         COALESCE(i.lead_time_days, 0) AS lead_time_days,
         COALESCE(
@@ -62,8 +64,8 @@ export async function createProduct(data) {
   try {
     await client.query('BEGIN');
     const productRes = await client.query(
-      `INSERT INTO products (sku, name, description, price_points, thumbnail_url, is_active)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, TRUE))
+      `INSERT INTO products (sku, name, description, price_points, thumbnail_url, is_active, audience)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, TRUE), COALESCE($7, 'adult'))
        RETURNING id`,
       [
         data.sku,
@@ -72,6 +74,7 @@ export async function createProduct(data) {
         data.price_points,
         data.thumbnail_url ?? null,
         data.is_active,
+        data.audience,
       ],
     );
     const id = productRes.rows[0].id;

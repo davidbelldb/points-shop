@@ -10,7 +10,7 @@ final class DerbyAdminViewModel {
     private(set) var isSaving = false
 
     /// Which content set is being edited. Defaults to the one this app plays.
-    var variant: DuckyVariant = .app
+    var variant: DuckyVariant = .adminDefault
     var errorMessage: String?
     var lastSavedAt: Date?
 
