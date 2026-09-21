@@ -22,7 +22,8 @@ async function getConfig(audience = 'adult') {
   const { rows } = await query(`SELECT * FROM stb15_config WHERE audience = $1`, [a]);
   const cfg = rows[0] || null;
   if (!cfg) return null;
-  const { rows: sets } = await query(`SELECT ord, back, front, active FROM stb15_scattered_sets ORDER BY ord`);
+  const { rows: sets } = await query(
+    `SELECT ord, back, front, active FROM stb15_scattered_sets WHERE audience = $1 ORDER BY ord`, [a]);
   cfg.scattered_sets = sets;
   const { rows: tableColours } = await query(`SELECT ord, colour, active FROM stb15_table_colours ORDER BY ord`);
   cfg.table_colours = tableColours;
@@ -305,7 +306,12 @@ export default async function stb15Routes(fastify) {
     if (updates.length) {
       updates.push(`updated_at = NOW()`);
       values.push(ord);
-      await query(`UPDATE stb15_scattered_sets SET ${updates.join(', ')} WHERE ord = $${values.length}`, values);
+      values.push(req.query?.audience === 'kids' ? 'kids' : 'adult');
+      await query(
+        `UPDATE stb15_scattered_sets SET ${updates.join(', ')}
+          WHERE ord = $${values.length - 1} AND audience = $${values.length}`,
+        values,
+      );
     }
     return await getConfig(req.query?.audience);
   });

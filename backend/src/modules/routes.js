@@ -17,6 +17,7 @@ import basketRoutes from './basket/basket.routes.js';
 import ordersRoutes from './orders/orders.routes.js';
 import adminRoutes from './admin/admin.routes.js';
 import settingsRoutes from './settings/settings.routes.js';
+import featuresRoutes from './features/features.routes.js';
 import discountsRoutes from './discounts/discounts.routes.js';
 import deliveryRoutes from './delivery/delivery.routes.js';
 import heroRoutes from './hero/hero.routes.js';
@@ -70,6 +71,7 @@ export async function registerAppRoutes(fastify) {
   await fastify.register(ordersRoutes);
   await fastify.register(adminRoutes);
   await fastify.register(settingsRoutes);
+  await fastify.register(featuresRoutes);
   await fastify.register(discountsRoutes);
   await fastify.register(deliveryRoutes);
   await fastify.register(heroRoutes);

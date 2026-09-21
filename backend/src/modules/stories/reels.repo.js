@@ -8,12 +8,18 @@ import { query } from '../../db.js';
    When `ownerAccountId` is supplied we only return reels created by that
    account (the curation/edit view on /stories). Pass null for the shared
    "everyone's published reels" view on the home strip. */
-export async function listReels(ownerAccountId = null) {
-  const filter = ownerAccountId ? 'WHERE r.created_by = $1' : '';
-  const params = ownerAccountId ? [ownerAccountId] : [];
+export async function listReels(ownerAccountId = null, audience = 'adult') {
+  // A viewer only ever sees reels for their own audience, plus anything
+  // marked 'both' — so the grown-ups' highlights stay out of a kid's strip.
+  const params = [audience];
+  let filter = `WHERE (r.audience = $1 OR r.audience = 'both')`;
+  if (ownerAccountId) {
+    params.push(ownerAccountId);
+    filter += ` AND r.created_by = $2`;
+  }
   const { rows } = await query(
     `SELECT r.id, r.name, r.cover_story_id, r.cover_image_url,
-            r.created_by, r.created_at, r.updated_at,
+            r.created_by, r.audience, r.created_at, r.updated_at,
             COUNT(rs.story_id)::int AS story_count,
             COALESCE(
               r.cover_image_url,
@@ -68,7 +74,7 @@ export async function getReelOwner(id) {
    plays in chronological order. */
 export async function getReel(id) {
   const r = await query(
-    `SELECT id, name, cover_story_id, cover_image_url, created_by, created_at, updated_at
+    `SELECT id, name, cover_story_id, cover_image_url, created_by, audience, created_at, updated_at
        FROM story_reels WHERE id = $1`,
     [id],
   );
@@ -145,6 +151,11 @@ export async function updateReel(id, patch) {
   }
   if ('cover_image_url' in patch) {
     fields.push(`cover_image_url = $${i++}`); values.push(patch.cover_image_url || null);
+  }
+  // Who the highlight is for: 'adult', 'kids', or 'both'.
+  if ('audience' in patch) {
+    const a = ['adult', 'kids', 'both'].includes(patch.audience) ? patch.audience : 'adult';
+    fields.push(`audience = $${i++}`); values.push(a);
   }
   if (fields.length === 0) return null;
   fields.push(`updated_at = NOW()`);

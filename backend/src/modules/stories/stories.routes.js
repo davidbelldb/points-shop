@@ -6,7 +6,7 @@ import {
   listReels, getReel, getReelOwner, createReel, updateReel, deleteReel,
   addStoryToReel, removeStoryFromReel,
 } from './reels.repo.js';
-import { getEffectiveAccountId, isAdmin } from '../auth/auth.helpers.js';
+import { getEffectiveAccountId, isAdmin, getAudience } from '../auth/auth.helpers.js';
 
 // Mutation gate — only the reel's creator can rename / delete / add / remove.
 async function assertReelOwner(reelId, accountId, reply) {
@@ -91,8 +91,8 @@ export default async function storiesRoutes(fastify) {
   fastify.get('/api/reels', async (req) => {
     const accountId = getEffectiveAccountId(req);
     const scope = String(req.query?.scope ?? 'mine').toLowerCase();
-    if (scope === 'all') return listReels(null);
-    return listReels(accountId);
+    if (scope === 'all') return listReels(null, getAudience(req));
+    return listReels(accountId, getAudience(req));
   });
 
   // Read-only — accessible to either user. Lets the home strip fetch the
@@ -100,6 +100,12 @@ export default async function storiesRoutes(fastify) {
   fastify.get('/api/reels/:id', async (req, reply) => {
     const r = await getReel(req.params.id);
     if (!r) return reply.code(404).send({ error: 'not found' });
+    // Listing already filters by audience; gate the direct fetch too, or a
+    // reel could still be opened by its id.
+    const audience = getAudience(req);
+    if (r.audience !== 'both' && r.audience !== audience) {
+      return reply.code(404).send({ error: 'not found' });
+    }
     return r;
   });
 

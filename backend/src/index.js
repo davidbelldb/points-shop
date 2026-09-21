@@ -6,6 +6,7 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { config } from './config.js';
 import { pool } from './db.js';
+import { assertFeatureAllowed } from './features.js';
 import { registerAppRoutes } from './modules/routes.js';
 import { SESSION_COOKIE } from './modules/auth/auth.routes.js';
 import { findSession, ensureDefaultPasswords } from './modules/auth/auth.repo.js';
@@ -69,6 +70,18 @@ fastify.addHook('onRequest', async (req, reply) => {
     }
   }
 });
+// Feature gate. Adults are unaffected; a kids account can only reach the
+// features switched on for it in feature_access — anything else 404s, including
+// endpoints added later that nobody remembered to think about.
+fastify.addHook('onRequest', async (req, reply) => {
+  if (req.method === 'OPTIONS') return;
+  try {
+    await assertFeatureAllowed(req, reply);
+  } catch (e) {
+    fastify.log.error({ err: e }, 'feature gate error');
+  }
+});
+
 // No upload size cap (@fastify/multipart defaults to 1MB if unset, so we set an
 // effectively-unlimited ceiling). Sneaky stories can be long videos/voice notes.
 await fastify.register(multipart, { limits: { fileSize: Number.MAX_SAFE_INTEGER } });
