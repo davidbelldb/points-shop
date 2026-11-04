@@ -510,7 +510,7 @@ function previewForBody(body) {
   return trimmed.length > 80 ? trimmed.slice(0, 77) + '...' : trimmed;
 }
 
-export async function sendMessage(senderId, recipientId, body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null) {
+export async function sendMessage(senderId, recipientId, body, replyToStoryId = null, replyToMessageId = null, sliderResponse = null, { crows = false } = {}) {
   const trimmed = body.trim();
   if (!trimmed) {
     const err = new Error('Message body required');
@@ -527,9 +527,19 @@ export async function sendMessage(senderId, recipientId, body, replyToStoryId = 
       emoji: typeof sliderResponse.emoji === 'string' ? sliderResponse.emoji.slice(0, 16) : null,
     };
   }
+  // Who flies, and who doesn't.
+  //
+  // `crows` is the SENDING client saying its messages travel by bird. Only the
+  // native app sets it. The web app never has, and must not start: it has no
+  // crow bubble, no tracker and no way to set a location, so a flight there is
+  // simply a message that vanishes until deliver_at passes — which is exactly
+  // what happened when this was applied to everyone. The flag was read on the
+  // route for the location check and then dropped on the floor before it
+  // reached here.
+  //
   // System messages (a nudge, a shower of ducks) are gestures, not letters —
-  // they land at once rather than waiting on a bird.
-  const instant = SYSTEM_BODIES_INSTANT.has(trimmed);
+  // they land at once even from a crow-aware client.
+  const instant = !crows || SYSTEM_BODIES_INSTANT.has(trimmed);
   const flight = instant
     ? { seconds: 0, distanceKm: null, originLabel: null, destLabel: null, origin: null, dest: null }
     : await messageFlight(senderId, recipientId);

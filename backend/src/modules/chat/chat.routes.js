@@ -129,6 +129,10 @@ export default async function chatRoutes(fastify) {
           reply_to_story_id || null,
           reply_to_message_id || null,
           slider_response || null,
+          // Only a client that says it draws the journey gets one. Without
+          // this the web app's messages flew too, and then sat invisible in
+          // its own thread until they landed.
+          { crows: crows === true },
         ),
       );
     } catch (err) {
