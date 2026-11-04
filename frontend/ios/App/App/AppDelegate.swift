@@ -14,9 +14,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var pendingShortcut: UIApplicationShortcutItem?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        if let shortcut = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
-            pendingShortcut = shortcut
-        }
+        // NB: on iOS 13+ with the UIScene lifecycle adopted (see SceneDelegate +
+        // UIApplicationSceneManifest in Info.plist), the window is created by the
+        // scene, a cold-launch Quick Action arrives via the scene's
+        // connectionOptions, and the active/resign callbacks are the scene's — not
+        // this delegate's. This method keeps only the app-wide setup.
         registerChatReplyCategory()
         // Force the custom Capacitor plugin to load so its @objc class is
         // registered with the Objective-C runtime and Capacitor's auto-discovery
@@ -47,10 +49,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         UNUserNotificationCenter.current().setNotificationCategories([category])
     }
 
-    // Warm launch — app already running when the Quick Action is tapped.
-    func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
-        routeShortcut(shortcutItem)
-        completionHandler(true)
+    // Quick Action entry point, called by the SceneDelegate for both the
+    // warm-launch (windowScene:performActionFor:) and cold-launch
+    // (scene:willConnectTo: connectionOptions.shortcutItem) cases.
+    func handleShortcut(_ item: UIApplicationShortcutItem) {
+        routeShortcut(item)
     }
 
     private func routeShortcut(_ item: UIApplicationShortcutItem) {
@@ -74,10 +77,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
 
-    func applicationWillResignActive(_ application: UIApplication) {
-        // Cover the screen with a blur while inactive, so the app-switcher
-        // snapshot doesn't expose the content underneath.
-        guard let window = self.window else { return }
+    // Cover the screen with a blur while inactive, so the app-switcher
+    // snapshot doesn't expose the content underneath. Called by the
+    // SceneDelegate's sceneWillResignActive.
+    func showPrivacyOverlay() {
+        guard let window = self.window, privacyOverlay == nil else { return }
         let overlay = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
         overlay.frame = window.bounds
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -99,28 +103,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         privacyOverlay = overlay
     }
 
-    func applicationDidEnterBackground(_ application: UIApplication) {
-    }
-
-    func applicationWillEnterForeground(_ application: UIApplication) {
-    }
-
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        // Reveal the content again once the app is back in the foreground.
+    // Reveal the content again once the app is back in the foreground, clear the
+    // badge, and run any Quick Action that launched the app from cold. Called by
+    // the SceneDelegate's sceneDidBecomeActive.
+    func handleDidBecomeActive() {
         privacyOverlay?.removeFromSuperview()
         privacyOverlay = nil
-        // Clear the app-icon badge whenever the user opens the app.
-        application.applicationIconBadgeNumber = 0
-        // Handle a Quick Action that launched the app from cold, now the
-        // webview has had a moment to come up.
+        UIApplication.shared.applicationIconBadgeNumber = 0
         if let shortcut = pendingShortcut {
             pendingShortcut = nil
             routeShortcut(shortcut)
         }
-    }
-
-    func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
     // Forward APNs registration results to Capacitor's PushNotifications plugin.
