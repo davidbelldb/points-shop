@@ -214,7 +214,7 @@ struct CrowLockScreenView: View {
 
     var body: some View {
         ZStack {
-            Image("tile").resizable().scaledToFill()
+            Image("tile1").resizable().scaledToFill()
             VStack(spacing: 8) {
                 Text(title(context.state, context.attributes))
                     .font(scrollFont(22))
