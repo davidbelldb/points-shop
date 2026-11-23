@@ -32,43 +32,18 @@ private let scrollGradientOnDark = LinearGradient(
     ],
     startPoint: .leading, endPoint: .trailing)
 
-// A darker shade of the earthy sweep, used as the title's shadow so the halo
-// matches the letters' own colours rather than a flat brown.
-private let scrollGradientShadow = LinearGradient(
-    colors: [
-        Color(red: 0.28, green: 0.15, blue: 0.07), Color(red: 0.26, green: 0.08, blue: 0.08),
-        Color(red: 0.24, green: 0.07, blue: 0.15), Color(red: 0.20, green: 0.09, blue: 0.21),
-        Color(red: 0.12, green: 0.12, blue: 0.25), Color(red: 0.07, green: 0.17, blue: 0.25),
-        Color(red: 0.07, green: 0.21, blue: 0.20),
-    ],
-    startPoint: .topLeading, endPoint: .bottomTrailing)
-
-// Blue flight-trail: a dark→light blue gradient line, blue waypoint nodes, and a
-// blue progress fill.
-private let trailGradient = LinearGradient(
-    colors: [Color(red: 0.05, green: 0.13, blue: 0.33), Color(red: 0.14, green: 0.33, blue: 0.62)],
-    startPoint: .leading, endPoint: .trailing)
+// Blue flight-trail: a solid blue dashed line, blue waypoint nodes, and a blue
+// progress fill (no gradient).
+private let trailLine = Color(red: 0.11, green: 0.27, blue: 0.55)
 private let trailNode = Color(red: 0.08, green: 0.18, blue: 0.44)
 private let trailFill = Color(red: 0.11, green: 0.27, blue: 0.55)
 
-// The banner title: gradient text with a soft shadow painted in a DARKER shade of
-// the same gradient (SwiftUI shadows are single-colour, so we layer a blurred,
-// darkened gradient copy behind the text instead of a flat halo).
-struct GradientTitle: View {
-    let text: String
-    var body: some View {
-        ZStack {
-            Text(text)
-                .font(scrollFont(22))
-                .foregroundStyle(scrollGradientShadow)
-                .multilineTextAlignment(.center)
-                .offset(y: 1)
-                .blur(radius: 1.1)
-            Text(text)
-                .font(scrollFont(22))
-                .foregroundStyle(scrollGradientOnLight)
-                .multilineTextAlignment(.center)
-        }
+// Solid dark halo under the banner title (not a gradient).
+private extension View {
+    func scrollTextShadow() -> some View {
+        self
+            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.55), radius: 1.1, x: 0, y: 0.5)
+            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.35), radius: 0.6, x: 0, y: 0)
     }
 }
 // Tapping the crow / weather Live Activity opens the in-app straight-line flight
@@ -165,7 +140,7 @@ struct DashedLine: View {
                 p.move(to: CGPoint(x: 0, y: y))
                 p.addLine(to: CGPoint(x: geo.size.width, y: y))
             }
-            .stroke(trailGradient, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 7]))
+            .stroke(trailLine, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 7]))
         }
         .frame(height: 12)
     }
@@ -251,9 +226,13 @@ struct CrowLockScreenView: View {
 
     var body: some View {
         ZStack {
-            Image("tile1").resizable().scaledToFill()
+            Image("tile").resizable().scaledToFill()
             VStack(spacing: 8) {
-                GradientTitle(text: title(context.state, context.attributes))
+                Text(title(context.state, context.attributes))
+                    .font(scrollFont(22))
+                    .foregroundStyle(scrollGradientOnLight)
+                    .scrollTextShadow()
+                    .multilineTextAlignment(.center)
 
                 Text(subtitle(context.state, context.attributes))
                     .font(scrollFont(12))

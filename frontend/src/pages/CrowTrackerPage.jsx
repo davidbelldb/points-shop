@@ -21,44 +21,8 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // Marauder's Map palette. Parchment is painted under the map (no grey flash before
 // tiles load); the route line + destination node use the deep oxblood red.
 const PARCHMENT = '#ebc876';  // page + map fallback background (matches the map's land)
-const DEST_DOT = '#ff7a18';   // orange destination node
-
-// The journey line is painted as many short segments along a multi-hue gradient —
-// Google polylines take only a single strokeColor, so a true gradient needs
-// segmenting. Same palette as the scroll font gradient.
-const LINE_GRADIENT = ['#0c2452', '#163a73', '#1f4e94', '#2a63b0'];
-const LINE_SEGMENTS = 24;
-
-function hexLerp(a, b, t) {
-  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
-  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
-  const c = pa.map((v, i) => Math.round(v + (pb[i] - v) * t));
-  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-}
-// Colour along the whole multi-stop gradient at fraction f ∈ [0,1].
-function gradientColor(f) {
-  const n = LINE_GRADIENT.length - 1;
-  const x = Math.max(0, Math.min(1, f)) * n;
-  const i = Math.min(n - 1, Math.floor(x));
-  return hexLerp(LINE_GRADIENT[i], LINE_GRADIENT[i + 1], x - i);
-}
-// Break a 2-point crow→dest line into LINE_SEGMENTS coloured gradient pieces.
-function gradientLineSegments(line) {
-  const [a, b] = line;
-  const segs = [];
-  for (let i = 0; i < LINE_SEGMENTS; i += 1) {
-    const t0 = i / LINE_SEGMENTS;
-    const t1 = (i + 1) / LINE_SEGMENTS;
-    segs.push({
-      path: [
-        { lat: a.lat + (b.lat - a.lat) * t0, lng: a.lng + (b.lng - a.lng) * t0 },
-        { lat: a.lat + (b.lat - a.lat) * t1, lng: a.lng + (b.lng - a.lng) * t1 },
-      ],
-      color: gradientColor((t0 + t1) / 2),
-    });
-  }
-  return segs;
-}
+const DEST_DOT = '#ff7a18';   // orange destination node (solid)
+const LINE_COLOR = '#1f4e94'; // solid blue journey line (no gradient)
 const CARD_BG = '#f7db9b'; // journey tile + "Unread scrolls" modal background
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
@@ -368,18 +332,15 @@ export default function CrowTrackerPage() {
             onLoad={onLoad}
             options={mapOptions}
           >
-            {/* Multi-coloured "as the crow flies" line per in-flight journey — the
-                road ahead of each crow, painted as gradient segments. Arrived crows
-                have no line (route hidden). */}
-            {flightViews.flatMap((fv) =>
-              gradientLineSegments(fv.line).map((s, i) => (
-                <PolylineF
-                  key={`line-${fv.id}-${i}`}
-                  path={s.path}
-                  options={{ strokeColor: s.color, strokeOpacity: 0.95, strokeWeight: 6 }}
-                />
-              )),
-            )}
+            {/* Solid blue "as the crow flies" line per in-flight journey — the road
+                ahead of each crow. Arrived crows have no line (route hidden). */}
+            {flightViews.map((fv) => (
+              <PolylineF
+                key={`line-${fv.id}`}
+                path={fv.line}
+                options={{ strokeColor: LINE_COLOR, strokeOpacity: 0.95, strokeWeight: 6 }}
+              />
+            ))}
             {/* A destination node per in-flight journey. */}
             {destIcon && flightViews.map((fv) => (
               <MarkerF key={`dest-${fv.id}`} position={fv.dest} icon={destIcon} />

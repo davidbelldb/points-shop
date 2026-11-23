@@ -171,7 +171,7 @@ export default function AdminForecastSection({ bare = false }) {
       </label>
 
       <div>
-        <p className="text-xs text-neutral-500">Send times (UK time):</p>
+        <p className="text-xs text-neutral-500">Send times (local to the forecast location — {cfg.timezone || 'Europe/London'}):</p>
         <div className="mt-1 flex flex-wrap items-center gap-1">
           {(cfg.send_times ?? []).map((t) => (
             <span key={t} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">

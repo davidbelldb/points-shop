@@ -516,7 +516,7 @@ export async function getForecastSettings() {
   return rows[0] ?? null;
 }
 
-const FORECAST_COLS = new Set(['enabled', 'send_days', 'send_times', 'recipient', 'location_label', 'location_lat', 'location_lng']);
+const FORECAST_COLS = new Set(['enabled', 'send_days', 'send_times', 'recipient', 'location_label', 'location_lat', 'location_lng', 'timezone']);
 
 export async function updateForecastSettings(patch = {}) {
   const sets = [];
@@ -534,11 +534,14 @@ export async function updateForecastSettings(patch = {}) {
   return getForecastSettings();
 }
 
-// Current Europe/London wall-clock, used to match configured send slots.
-function londonNow() {
+// Current wall-clock in the given IANA timezone, used to match configured send
+// slots. The forecast's send_times are interpreted in the FORECAST LOCATION's own
+// local time (forecast_settings.timezone) — so "08:00" fires at 08:00 Pondicherry
+// when the forecast is for Pondicherry, the same clock reading as 08:00 UK local.
+function zoneNow(timeZone = 'Europe/London') {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit',
+      timeZone, weekday: 'short', hour: '2-digit', minute: '2-digit',
       hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
     }).formatToParts(new Date()).map((p) => [p.type, p.value]),
   );
@@ -597,7 +600,7 @@ async function sendForecastScroll(cfg) {
 export async function runForecastScheduler() {
   const cfg = await getForecastSettings();
   if (!cfg || !cfg.enabled) return;
-  const { hhmm, dateKey, dayIdx } = londonNow();
+  const { hhmm, dateKey, dayIdx } = zoneNow(cfg.timezone || 'Europe/London');
   const days = Array.isArray(cfg.send_days) ? cfg.send_days : [];
   const times = Array.isArray(cfg.send_times) ? cfg.send_times : [];
   if (!days.includes(dayIdx) || !times.includes(hhmm)) return;
