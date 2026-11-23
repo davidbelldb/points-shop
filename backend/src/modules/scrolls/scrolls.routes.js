@@ -28,8 +28,9 @@ function startResolver() {
   setInterval(() => { runForecastScheduler().catch(() => {}); }, 60_000);
   // Long-haul crows outlive the ~8h iOS Live Activity cap, so re-issue a fresh
   // card every 6h (replacing the old) to keep one live the whole flight. Checked
-  // every 5 min — fine granularity against a 6h cycle.
-  setInterval(() => { reissueStaleCrowActivities().catch(() => {}); }, 5 * 60_000);
+  // once a minute — trivial (usually a zero-row query) and keeps a shortened test
+  // cycle (LA_CYCLE_MINUTES) observable.
+  setInterval(() => { reissueStaleCrowActivities().catch(() => {}); }, 60_000);
 }
 
 export default async function scrollRoutes(fastify) {

@@ -409,7 +409,10 @@ export async function pushStreetSubtitleUpdates() {
 
 // iOS ends a Live Activity after ~8 hours. We re-issue a fresh one at 6h (margin)
 // so a multi-day crow keeps a live lock-screen / Dynamic Island card the whole way.
-const LA_CYCLE_MS = 6 * 60 * 60 * 1000;
+// Override with env LA_CYCLE_MINUTES (e.g. 4) to watch the swap happen in minutes
+// during a loop-to-self test; leave unset for the 6h (360-minute) production value.
+const LA_CYCLE_MINUTES = Number(process.env.LA_CYCLE_MINUTES) || 360;
+const LA_CYCLE_MS = LA_CYCLE_MINUTES * 60 * 1000;
 
 // Replace the crow Live Activity for any in-flight scroll whose current card is
 // older than LA_CYCLE_MS. A fresh activity is push-to-started on a NEW broadcast
