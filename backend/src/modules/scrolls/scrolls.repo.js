@@ -116,9 +116,10 @@ export async function startCrowActivity({
 async function startLiveActivityFor(scroll) {
   try {
     // Respect the recipient's mute window — no new Live Activity while muted.
-    if (await isMuted(scroll.recipient_id)) return;
+    if (await isMuted(scroll.recipient_id)) { console.warn(`[crow-la] ${scroll.id} muted — skipped`); return; }
     const targets = await ptsTokensByApp(scroll.recipient_id);
-    if (!targets.length) return;
+    if (!targets.length) { console.warn(`[crow-la] ${scroll.id} no pts token for ${scroll.recipient_id}`); return; }
+    console.log(`[crow-la] ${scroll.id} start: ${targets.length} target(s) [${targets.map((t) => (t.sandbox ? 'sandbox' : 'prod')).join(', ')}] bundle=${targets.map((t) => t.bundleId).join(',')}`);
     const arrivesAtMs = new Date(scroll.deliver_at).getTime();
     const startedAtMs = arrivesAtMs - (Number(scroll.flight_seconds) || 0) * 1000;
     // Create a broadcast channel so live updates + the landing reach the recipient

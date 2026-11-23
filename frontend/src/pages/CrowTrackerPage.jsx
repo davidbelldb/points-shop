@@ -21,8 +21,8 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // Marauder's Map palette. Parchment is painted under the map (no grey flash before
 // tiles load); the route line + destination node use the deep oxblood red.
 const PARCHMENT = '#ebc876';  // page + map fallback background (matches the map's land)
-const DEST_DOT = '#ff7a18';   // orange destination node (solid)
-const LINE_COLOR = '#1f4e94'; // solid blue journey line (no gradient)
+const DEST_DOT = '#5e1a13';   // brown destination node (original)
+const LINE_COLOR = '#5e1a13'; // brown journey line (original)
 const CARD_BG = '#f7db9b'; // journey tile + "Unread scrolls" modal background
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };

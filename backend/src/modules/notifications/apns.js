@@ -184,7 +184,9 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
       req.on('data', (c) => { data += c; });
       req.on('error', () => { try { client.close(); } catch { /* ignore */ } resolve(0); });
       req.on('end', async () => {
-        if (status !== 200) console.error(`[apns-la] ${event} failed: ${status} ${data}`);
+        // Log EVERY result (not just failures) so a "200 but no card" case is
+        // visible — the apns-id lets us correlate with the device console.
+        console.log(`[apns-la] ${event} -> ${status}${status !== 200 ? ' ' + data : ''}`);
         if (status === 410 || (status === 400 && /BadDeviceToken/.test(data))) {
           await query(`DELETE FROM live_activity_tokens WHERE token = $1`, [token]).catch(() => {});
         }
