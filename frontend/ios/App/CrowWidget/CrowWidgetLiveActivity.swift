@@ -27,6 +27,16 @@ private let scrollGradientOnDark = LinearGradient(
         Color(red: 0.37, green: 0.89, blue: 0.75), Color(red: 1.00, green: 0.84, blue: 0.42),
     ],
     startPoint: .leading, endPoint: .trailing)
+
+// Subtle dark halo so the gradient's pale hues (gold/cyan/green) stay legible on
+// the light parchment tile of the lock-screen banner.
+private extension View {
+    func scrollTextShadow() -> some View {
+        self
+            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.55), radius: 1.1, x: 0, y: 0.5)
+            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.35), radius: 0.6, x: 0, y: 0)
+    }
+}
 // Tapping the crow / weather Live Activity opens the in-app straight-line flight
 // tracker (both normal scrolls and forecast scrolls use this same activity).
 private let deepLink = URL(string: "sneakystuff://crow-tracker")
@@ -212,13 +222,13 @@ struct CrowLockScreenView: View {
                 Text(title(context.state, context.attributes))
                     .font(scrollFont(22))
                     .foregroundStyle(scrollGradientOnLight)
-                    .shadow(color: Color(red: 0.24, green: 0.08, blue: 0.04).opacity(0.28), radius: 1, y: 1)
+                    .scrollTextShadow()
                     .multilineTextAlignment(.center)
 
                 Text(subtitle(context.state, context.attributes))
                     .font(scrollFont(12))
-                    .foregroundColor(.black)
-                    .opacity(0.85)
+                    .foregroundStyle(scrollGradientOnLight)
+                    .scrollTextShadow()
                     .multilineTextAlignment(.center)
                     .lineLimit(1)                 // landed scroll text → one line…
                     .truncationMode(.tail)        // …with a trailing ellipsis
