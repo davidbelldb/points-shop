@@ -16,7 +16,6 @@ private let scrollGradientOnLight = LinearGradient(
         Color(red: 0.49, green: 0.11, blue: 0.07), Color(red: 0.70, green: 0.25, blue: 0.18),
         Color(red: 0.75, green: 0.22, blue: 0.17), Color(red: 0.65, green: 0.16, blue: 0.42),
         Color(red: 0.43, green: 0.23, blue: 0.62), Color(red: 0.13, green: 0.25, blue: 0.47),
-        Color(red: 0.16, green: 0.56, blue: 0.56),
     ],
     startPoint: .topLeading, endPoint: .bottomTrailing)
 private let scrollGradientOnDark = LinearGradient(
