@@ -704,15 +704,13 @@ html .ht-theme-main-dark .wtBorder.corner {
 .scroll-gradient-text {
   background-image: linear-gradient(
     125deg,
-    #ff3d8f 0%, #c0392b 30%, #a52a6b 48%,
-    #6d3a9e 70%, #213f78 100%
+    #b5612b 0%, #a83232 17%, #9c2f5e 34%, #7d3b86 51%,
+    #4a4a9e 68%, #2e6ea0 84%, #2f857e 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  /* Keep the pale end of the sweep readable over parchment. */
-  filter: drop-shadow(0 1px 1px rgba(60, 20, 10, 0.28));
   /* On a textarea the transparent fill would also hide the caret. */
   caret-color: #7c1d12;
 }

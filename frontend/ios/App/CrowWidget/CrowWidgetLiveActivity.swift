@@ -11,28 +11,38 @@ private func scrollFont(_ size: CGFloat) -> Font { Font.custom("AnandaNamaste", 
 // Two variants: the oxblood→gold sweep reads on the pale parchment tile of the
 // lock-screen banner, but its dark end would disappear on the Dynamic Island's
 // black background, so the island uses a brightened sweep instead.
+// Earthy watercolour sweep (terracotta → brick → crimson → plum → indigo → blue
+// → teal), matching the Nepali-font inspiration. The lock-screen banner is on the
+// pale tile, so it uses these muted tones; the Dynamic Island is on black, so it
+// uses a brightened set.
 private let scrollGradientOnLight = LinearGradient(
     colors: [
-        Color(red: 1.0, green: 0.24, blue: 0.56),
-        Color(red: 0.75, green: 0.22, blue: 0.17), Color(red: 0.65, green: 0.16, blue: 0.42),
-        Color(red: 0.43, green: 0.23, blue: 0.62), Color(red: 0.13, green: 0.25, blue: 0.47),
+        Color(red: 0.71, green: 0.38, blue: 0.17), Color(red: 0.66, green: 0.20, blue: 0.20),
+        Color(red: 0.61, green: 0.18, blue: 0.37), Color(red: 0.49, green: 0.23, blue: 0.53),
+        Color(red: 0.29, green: 0.29, blue: 0.62), Color(red: 0.18, green: 0.43, blue: 0.63),
+        Color(red: 0.18, green: 0.52, blue: 0.49),
     ],
     startPoint: .topLeading, endPoint: .bottomTrailing)
 private let scrollGradientOnDark = LinearGradient(
     colors: [
-        Color(red: 1.00, green: 0.42, blue: 0.37), Color(red: 1.00, green: 0.55, blue: 0.81),
-        Color(red: 0.72, green: 0.61, blue: 1.00), Color(red: 0.43, green: 0.78, blue: 1.00),
+        Color(red: 0.88, green: 0.54, blue: 0.31), Color(red: 0.88, green: 0.36, blue: 0.33),
+        Color(red: 0.84, green: 0.36, blue: 0.54), Color(red: 0.66, green: 0.47, blue: 0.75),
+        Color(red: 0.49, green: 0.49, blue: 0.82), Color(red: 0.35, green: 0.61, blue: 0.82),
+        Color(red: 0.36, green: 0.75, blue: 0.68),
     ],
     startPoint: .leading, endPoint: .trailing)
 
-// Subtle dark halo so the gradient's pale hues (gold/cyan/green) stay legible on
-// the light parchment tile of the lock-screen banner.
+// Blue flight-trail: a dark→light blue gradient line, blue waypoint nodes, and a
+// blue progress fill.
+private let trailGradient = LinearGradient(
+    colors: [Color(red: 0.10, green: 0.22, blue: 0.48), Color(red: 0.38, green: 0.68, blue: 0.95)],
+    startPoint: .leading, endPoint: .trailing)
+private let trailNode = Color(red: 0.20, green: 0.42, blue: 0.80)
+private let trailFill = Color(red: 0.30, green: 0.55, blue: 0.88)
+
+// Shadow removed — the earthy tones read fine on the tile without a halo.
 private extension View {
-    func scrollTextShadow() -> some View {
-        self
-            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.55), radius: 1.1, x: 0, y: 0.5)
-            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.35), radius: 0.6, x: 0, y: 0)
-    }
+    func scrollTextShadow() -> some View { self }
 }
 // Tapping the crow / weather Live Activity opens the in-app straight-line flight
 // tracker (both normal scrolls and forecast scrolls use this same activity).
@@ -128,7 +138,7 @@ struct DashedLine: View {
                 p.move(to: CGPoint(x: 0, y: y))
                 p.addLine(to: CGPoint(x: geo.size.width, y: y))
             }
-            .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 7]))
+            .stroke(trailGradient, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 7]))
         }
         .frame(height: 12)
     }
@@ -181,14 +191,14 @@ struct CrowTrail: View {
             // Solid fill: full colour once arrived, otherwise the auto-advancing
             // timer bar (draws the fill; dashes show ahead of it).
             if landed {
-                Capsule().fill(tint).frame(height: 3)
+                Capsule().fill(trailFill).frame(height: 3)
             } else {
                 ProgressView(timerInterval: startedAt...arrivesAt, countsDown: false) {
                     EmptyView()
                 } currentValueLabel: { EmptyView() }
-                    .tint(tint)
+                    .tint(trailFill)
             }
-            WaypointNodes(reached: reached, color: tint)
+            WaypointNodes(reached: reached, color: trailNode)
             // The gliding crow — above the trail + nodes, hidden once delivered.
             // Its position steps between waypoints as phase updates arrive, easing
             // between them so it appears to fly rather than teleport.

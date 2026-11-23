@@ -26,7 +26,7 @@ const DEST_DOT = '#ff7a18';   // orange destination node
 // The journey line is painted as many short segments along a multi-hue gradient —
 // Google polylines take only a single strokeColor, so a true gradient needs
 // segmenting. Same palette as the scroll font gradient.
-const LINE_GRADIENT = ['#7c1d12', '#b3402f', '#c0392b', '#a52a6b', '#6d3a9e', '#213f78'];
+const LINE_GRADIENT = ['#19397a', '#2e6ea0', '#4f9bd6', '#79c0ef'];
 const LINE_SEGMENTS = 24;
 
 function hexLerp(a, b, t) {
