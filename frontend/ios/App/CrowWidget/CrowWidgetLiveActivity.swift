@@ -5,7 +5,7 @@ import SwiftUI
 private let bg = Color(red: 0.122, green: 0.122, blue: 0.118)      // #1f1f1e background
 
 // Ananda Namaste display font (bundled as NamasteRegular.ttf via UIAppFonts).
-private func scrollFont(_ size: CGFloat) -> Font { Font.custom("AnandaNamaste", size: size).weight(.bold) }
+private func scrollFont(_ size: CGFloat) -> Font { Font.custom("AnandaNamaste", size: size) }
 
 // Colourful watercolour sweep for the scroll text, matching the in-app reader.
 // Two variants: the oxblood→gold sweep reads on the pale parchment tile of the
@@ -40,9 +40,13 @@ private let trailGradient = LinearGradient(
 private let trailNode = Color(red: 0.08, green: 0.18, blue: 0.44)
 private let trailFill = Color(red: 0.11, green: 0.27, blue: 0.55)
 
-// Shadow removed — the earthy tones read fine on the tile without a halo.
+// Dark halo under the text — applied to the main banner title only.
 private extension View {
-    func scrollTextShadow() -> some View { self }
+    func scrollTextShadow() -> some View {
+        self
+            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.55), radius: 1.1, x: 0, y: 0.5)
+            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.35), radius: 0.6, x: 0, y: 0)
+    }
 }
 // Tapping the crow / weather Live Activity opens the in-app straight-line flight
 // tracker (both normal scrolls and forecast scrolls use this same activity).
@@ -235,7 +239,6 @@ struct CrowLockScreenView: View {
                 Text(subtitle(context.state, context.attributes))
                     .font(scrollFont(12))
                     .foregroundStyle(scrollGradientOnLight)
-                    .scrollTextShadow()
                     .multilineTextAlignment(.center)
                     .lineLimit(1)                 // landed scroll text → one line…
                     .truncationMode(.tail)        // …with a trailing ellipsis
