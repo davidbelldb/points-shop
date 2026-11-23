@@ -127,7 +127,12 @@ async function startLiveActivityFor(scroll) {
     let channelId = null;
     try { channelId = await createBroadcastChannel(); } catch { /* fall back */ }
     if (channelId) {
-      await query(`UPDATE scrolls SET la_channel_id = $1 WHERE id = $2`, [channelId, scroll.id]).catch(() => {});
+      // Stamp the re-issue cycle clock so reissueStaleCrowActivities() knows when
+      // this card was last (re)started and can replace it before the ~8h iOS cap.
+      await query(
+        `UPDATE scrolls SET la_channel_id = $1, la_cycle_started_at = NOW() WHERE id = $2`,
+        [channelId, scroll.id],
+      ).catch(() => {});
     }
     // One start per app the recipient has installed. A channel is shared, so
     // the same broadcast updates reach both.
@@ -402,16 +407,102 @@ export async function pushStreetSubtitleUpdates() {
   return rows.length;
 }
 
+// iOS ends a Live Activity after ~8 hours. We re-issue a fresh one at 6h (margin)
+// so a multi-day crow keeps a live lock-screen / Dynamic Island card the whole way.
+const LA_CYCLE_MS = 6 * 60 * 60 * 1000;
+
+// Replace the crow Live Activity for any in-flight scroll whose current card is
+// older than LA_CYCLE_MS. A fresh activity is push-to-started on a NEW broadcast
+// channel carrying the exact live flight state (same start/arrival, current phase
+// + narration), then the OLD channel is ended so its card is dismissed — leaving
+// exactly one card, no stack, no gap. Absolute start/arrival timestamps mean the
+// new card's native countdown + trail resume seamlessly even with no further
+// update pushes. Runs on the resolver tick; best-effort per scroll.
+export async function reissueStaleCrowActivities() {
+  const { rows } = await query(
+    `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label,
+            s.origin_label, s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng,
+            s.route_streets, s.la_channel_id, s.la_phase, s.from_label
+       FROM scrolls s
+      WHERE s.delivered = FALSE
+        AND s.deliver_at > NOW()
+        AND s.la_channel_id IS NOT NULL
+        AND s.la_cycle_started_at IS NOT NULL
+        AND s.la_cycle_started_at < NOW() - make_interval(secs => $1)`,
+    [Math.round(LA_CYCLE_MS / 1000)],
+  );
+  for (const s of rows) {
+    try {
+      // Muted → let the card lapse rather than re-raising it.
+      if (await isMuted(s.recipient_id)) continue;
+      const targets = await ptsTokensByApp(s.recipient_id);
+      if (!targets.length) continue;
+
+      const arrivesAtMs = new Date(s.deliver_at).getTime();
+      const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
+      const phase = reachedPhase(startedAtMs, arrivesAtMs);
+      const message = phase > 0 ? streetMessage(phase, s) : '';
+      const oldChannel = s.la_channel_id;
+
+      // Fresh channel + fresh activity carrying the current flight state.
+      let newChannel = null;
+      try { newChannel = await createBroadcastChannel(); } catch { /* skip this cycle */ }
+      if (!newChannel) continue;
+
+      const state = crowContentState({ startedAtMs, arrivesAtMs, landed: false, message, phase });
+      for (const target of targets) {
+        await sendLiveActivityPush(target.token, {
+          event: 'start',
+          channelId: newChannel,
+          bundleId: target.bundleId,
+          sandbox: target.sandbox,
+          contentState: state,
+          attributes: {
+            kind: s.from_label ? 'forecast' : 'scroll',
+            originLabel: s.from_label || s.origin_label || 'afar',
+            destLabel: s.dest_label || '',
+            scrollId: s.id,
+          },
+        });
+      }
+
+      // Point the scroll at the new channel BEFORE ending the old one, so a
+      // landing or street update that races in never targets a dead channel.
+      await query(
+        `UPDATE scrolls SET la_channel_id = $1, la_cycle_started_at = NOW() WHERE id = $2`,
+        [newChannel, s.id],
+      );
+
+      // Dismiss the previous card and tear down its channel — only the new remains.
+      sendBroadcast(oldChannel, { event: 'end', contentState: state, dismissalMs: Date.now() })
+        .then(() => deleteBroadcastChannel(oldChannel))
+        .catch(() => {});
+    } catch { /* best effort per scroll */ }
+  }
+  return rows.length;
+}
+
 // ---------------------------------------------------------------------------
 // Daily weather forecast scroll
 // ---------------------------------------------------------------------------
 
-// The flight always lands at the configured forecast location; it sets off from
-// the Met Office Weather Station, Cambridge (CB24 9NZ — north of the city) so the
-// crow genuinely "travels south" with a real journey to narrate.
-const FORECAST_ORIGIN = { lat: 52.24543314352076, lng: 0.10027112765321439 };
-const FORECAST_ORIGIN_LABEL = 'the Met Office Weather Station, Cambridge';
+// The flight always lands at the centre of the configured forecast location and
+// sets off ~10 km due NORTH of it, so the Three-Eyed Crow "travels south with
+// news" on a short, real local journey (streets reverse-geocoded along the way)
+// wherever the forecast is for — Cambridge, Pondicherry, anywhere. 10 km north is
+// a pure latitude offset (≈ 0.0904°; 1° latitude ≈ 110.574 km).
+const FORECAST_ORIGIN_OFFSET_KM = 10;
+const KM_PER_DEG_LAT = 110.574;
 const FORECAST_FROM_LABEL = 'the Three-Eyed Crow';
+
+// Origin point + label for a forecast whose destination is the given location.
+function forecastOrigin(cfg) {
+  return {
+    lat: Number(cfg.location_lat) + FORECAST_ORIGIN_OFFSET_KM / KM_PER_DEG_LAT,
+    lng: Number(cfg.location_lng),
+    label: `10 km north of ${cfg.location_label || 'the forecast'}`,
+  };
+}
 
 export async function getForecastSettings() {
   const { rows } = await query(`SELECT * FROM forecast_settings WHERE id = 1`);
@@ -474,13 +565,14 @@ async function sendForecastScroll(cfg) {
   else recipients.push(...otherIds); // 'partner' — everyone else
   if (recipients.length === 0) return false;
 
+  const origin = forecastOrigin(cfg);
   for (const recipientId of recipients) {
     /* eslint-disable no-await-in-loop */
     await createScroll({
       senderId: adminId,
       recipientId,
       body,
-      origin: { label: FORECAST_ORIGIN_LABEL, lat: FORECAST_ORIGIN.lat, lng: FORECAST_ORIGIN.lng },
+      origin,
       dest: { label: cfg.location_label, lat: cfg.location_lat, lng: cfg.location_lng },
       fromLabel: FORECAST_FROM_LABEL,
       skipMaxChars: true,

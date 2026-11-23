@@ -4,7 +4,7 @@ import {
   getActiveCrowFlights, listPerchScrolls, getScrollFlight, markSeen,
   streetsAlong, streetMessage, WAYPOINT_FRACS, LANDING_FRAC,
   haversineKm, flightSeconds,
-  pushStreetSubtitleUpdates, saveLiveActivityToken,
+  pushStreetSubtitleUpdates, reissueStaleCrowActivities, saveLiveActivityToken,
   getForecastSettings, updateForecastSettings, runForecastScheduler, sendForecastNow,
 } from './scrolls.repo.js';
 import { findOtherUser, findPartner } from '../chat/chat.repo.js';
@@ -26,6 +26,10 @@ function startResolver() {
   setInterval(() => { pushStreetSubtitleUpdates().catch(() => {}); }, 2_000);
   // Daily weather forecast scroll — checked once a minute against the schedule.
   setInterval(() => { runForecastScheduler().catch(() => {}); }, 60_000);
+  // Long-haul crows outlive the ~8h iOS Live Activity cap, so re-issue a fresh
+  // card every 6h (replacing the old) to keep one live the whole flight. Checked
+  // every 5 min — fine granularity against a 6h cycle.
+  setInterval(() => { reissueStaleCrowActivities().catch(() => {}); }, 5 * 60_000);
 }
 
 export default async function scrollRoutes(fastify) {

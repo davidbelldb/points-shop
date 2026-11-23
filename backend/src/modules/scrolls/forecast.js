@@ -41,7 +41,10 @@ export async function fetchForecastBody(lat, lng) {
       + `?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lng)}`
       + '&daily=weather_code,temperature_2m_max,temperature_2m_min,'
       + 'uv_index_max,precipitation_probability_max'
-      + '&timezone=Europe%2FLondon&forecast_days=1';
+      // `auto` → Open-Meteo derives the timezone from the coordinates, so the
+      // daily high/low/UV window matches the forecast location's own day (e.g.
+      // Pondicherry's day, not London's).
+      + '&timezone=auto&forecast_days=1';
     const res = await fetch(url, { headers: { 'User-Agent': 'SneakyStuff/1.0 (forecast scroll)' } });
     if (!res.ok) return null;
     const d = (await res.json())?.daily;
