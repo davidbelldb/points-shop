@@ -709,6 +709,7 @@ html .ht-theme-main-dark .wtBorder.corner {
   );
   -webkit-background-clip: text;
   background-clip: text;
+  font-weight: 700;
   -webkit-text-fill-color: transparent;
   color: transparent;
   /* On a textarea the transparent fill would also hide the caret. */

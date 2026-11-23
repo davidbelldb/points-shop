@@ -5,7 +5,7 @@ import SwiftUI
 private let bg = Color(red: 0.122, green: 0.122, blue: 0.118)      // #1f1f1e background
 
 // Ananda Namaste display font (bundled as NamasteRegular.ttf via UIAppFonts).
-private func scrollFont(_ size: CGFloat) -> Font { Font.custom("AnandaNamaste", size: size) }
+private func scrollFont(_ size: CGFloat) -> Font { Font.custom("AnandaNamaste", size: size).weight(.bold) }
 
 // Colourful watercolour sweep for the scroll text, matching the in-app reader.
 // Two variants: the oxblood→gold sweep reads on the pale parchment tile of the
@@ -35,10 +35,10 @@ private let scrollGradientOnDark = LinearGradient(
 // Blue flight-trail: a dark→light blue gradient line, blue waypoint nodes, and a
 // blue progress fill.
 private let trailGradient = LinearGradient(
-    colors: [Color(red: 0.10, green: 0.22, blue: 0.48), Color(red: 0.38, green: 0.68, blue: 0.95)],
+    colors: [Color(red: 0.05, green: 0.13, blue: 0.33), Color(red: 0.14, green: 0.33, blue: 0.62)],
     startPoint: .leading, endPoint: .trailing)
-private let trailNode = Color(red: 0.20, green: 0.42, blue: 0.80)
-private let trailFill = Color(red: 0.30, green: 0.55, blue: 0.88)
+private let trailNode = Color(red: 0.08, green: 0.18, blue: 0.44)
+private let trailFill = Color(red: 0.11, green: 0.27, blue: 0.55)
 
 // Shadow removed — the earthy tones read fine on the tile without a halo.
 private extension View {
