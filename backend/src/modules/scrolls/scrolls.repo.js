@@ -490,20 +490,24 @@ export async function reissueStaleCrowActivities() {
 // ---------------------------------------------------------------------------
 
 // The flight always lands at the centre of the configured forecast location and
-// sets off ~10 km due NORTH of it, so the Three-Eyed Crow "travels south with
-// news" on a short, real local journey (streets reverse-geocoded along the way)
-// wherever the forecast is for — Cambridge, Pondicherry, anywhere. 10 km north is
-// a pure latitude offset (≈ 0.0904°; 1° latitude ≈ 110.574 km).
-const FORECAST_ORIGIN_OFFSET_KM = 10;
+// sets off to the WEST (with a touch of north) of it, so the Three-Eyed Crow
+// makes a short, real local journey in over the land (streets reverse-geocoded
+// along the way) wherever the forecast is for. Offsets are converted from km to
+// degrees — latitude is ~constant; longitude shrinks by cos(latitude).
+const FORECAST_ORIGIN_NORTH_KM = 4;   // a touch north…
+const FORECAST_ORIGIN_WEST_KM = 12;   // …and well to the west of the centre
 const KM_PER_DEG_LAT = 110.574;
 const FORECAST_FROM_LABEL = 'the Three-Eyed Crow';
 
 // Origin point + label for a forecast whose destination is the given location.
 function forecastOrigin(cfg) {
+  const lat = Number(cfg.location_lat);
+  const lng = Number(cfg.location_lng);
+  const kmPerDegLng = KM_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180);
   return {
-    lat: Number(cfg.location_lat) + FORECAST_ORIGIN_OFFSET_KM / KM_PER_DEG_LAT,
-    lng: Number(cfg.location_lng),
-    label: `10 km north of ${cfg.location_label || 'the forecast'}`,
+    lat: lat + FORECAST_ORIGIN_NORTH_KM / KM_PER_DEG_LAT,
+    lng: lng - FORECAST_ORIGIN_WEST_KM / kmPerDegLng,
+    label: `the open country west of ${cfg.location_label || 'the forecast'}`,
   };
 }
 

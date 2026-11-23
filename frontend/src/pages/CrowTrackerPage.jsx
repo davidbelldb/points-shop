@@ -58,8 +58,10 @@ const MARAUDERS_STYLE = [
 
 // Reject stray / null coordinates (they coerce to 0 and would blow the fit out to
 // the "Europe" world view). Cambridge / UK bounding box.
-const inUK = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
-  && p.lat > 49 && p.lat < 56 && p.lng > -6 && p.lng < 2;
+// Any valid point on Earth — the crow now flies internationally (e.g. a forecast
+// to Pondicherry), so the auto-frame must include non-UK coordinates too.
+const validPt = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+  && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180;
 
 const FIT_PADDING = { top: 71, bottom: 210, left: 56, right: 56 };
 const RECENTER_DELAY_MS = 5000;
@@ -245,8 +247,8 @@ export default function CrowTrackerPage() {
   // be it one location or many.
   useEffect(() => {
     const pts = [];
-    for (const fv of flightViews) { if (inUK(fv.crowAt)) pts.push(fv.crowAt); if (inUK(fv.dest)) pts.push(fv.dest); }
-    perches.forEach((p) => { if (inUK(p)) pts.push({ lat: p.lat, lng: p.lng }); });
+    for (const fv of flightViews) { if (validPt(fv.crowAt)) pts.push(fv.crowAt); if (validPt(fv.dest)) pts.push(fv.dest); }
+    perches.forEach((p) => { if (validPt(p)) pts.push({ lat: p.lat, lng: p.lng }); });
     fitPointsRef.current = pts;
   }, [flightViews, perches]);
 
@@ -436,8 +438,8 @@ export default function CrowTrackerPage() {
         {focusFlight && (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: 17 }}>
-                {focusFlight.traveller_name} <span style={{ opacity: 0.55, fontWeight: 500 }}>→ {focusFlight.dest_label || 'destination'}</span>
+              <p className="scroll-gradient-text" style={{ margin: 0, fontFamily: 'AnandaNamaste', fontWeight: 700, fontSize: 19 }}>
+                {focusFlight.traveller_name} <span style={{ opacity: 0.6, fontWeight: 500 }}>→ {focusFlight.dest_label || 'destination'}</span>
               </p>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 {focusFlight.arrived ? (
@@ -451,7 +453,7 @@ export default function CrowTrackerPage() {
                 )}
               </div>
             </div>
-            {cardMessage && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#000' }}>{cardMessage}</p>}
+            {cardMessage && <p className="scroll-gradient-text" style={{ margin: '4px 0 0', fontFamily: 'AnandaNamaste', fontSize: 15 }}>{cardMessage}</p>}
             {/* Journey bar: travelled portion solid black; untravelled track lower-opacity black. */}
             <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.22)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.round((focusProgress || 0) * 100)}%`, background: '#000', transition: 'width 0.2s linear' }} />
