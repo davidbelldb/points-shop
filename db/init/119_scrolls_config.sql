@@ -40,14 +40,16 @@ CREATE TABLE IF NOT EXISTS scrolls_settings (
   -- 1     = authentically medieval (London->NY takes days)
   -- 60    = 1 raven-hour passes each real minute
   -- 99999 = effectively instant (handy for testing)
-  speed_multiplier  DOUBLE PRECISION NOT NULL DEFAULT 60,
+  -- 1 = true raven time (no compression); a scroll takes as long as a real
+  -- raven at crow_speed_kmh would take to fly the great-circle distance.
+  speed_multiplier  DOUBLE PRECISION NOT NULL DEFAULT 1,
   -- Clamp real-world delay so testing never hangs and lore never feels broken.
   min_flight_seconds INTEGER    NOT NULL DEFAULT 5,
-  max_flight_seconds INTEGER    NOT NULL DEFAULT 86400,  -- 24h hard cap
+  max_flight_seconds INTEGER    NOT NULL DEFAULT 1728000,  -- 20d cap (effectively none)
 
   -- Compose constraints (tuned during testing).
   max_chars         INTEGER     NOT NULL DEFAULT 280,
-  scroll_font       TEXT        NOT NULL DEFAULT 'Cinzel',  -- placeholder olde font
+  scroll_font       TEXT        NOT NULL DEFAULT 'AnandaNamaste',  -- /scrolls/fonts/NamasteRegular.ttf
 
   -- Sprite / image asset filenames (resolved against the frontend scroll-asset
   -- folder). Placeholders until the real art lands.

@@ -16,6 +16,24 @@ const CAMBRIDGE_VIEWBOX = '0.02,52.27,0.25,52.12';
 const ELLESMERE_VIEWBOX = '-3.06,53.34,-2.82,53.22';
 const isEllesmereQuery = (q) => /^\s*ch\s?6[56]/i.test(q);
 
+// Chennai → Pondicherry corridor (Tamil Nadu / Puducherry, India) — searched when
+// the query is an Indian PIN code in the 600xxx–605xxx range (Chennai down the ECR
+// through Mahabalipuram to Puducherry) or names a place along it. Lets scrolls be
+// sent anywhere in that area while Squishy's out there. Format: lonW,latN,lonE,latS.
+const CHENNAI_PONDI_VIEWBOX = '79.60,13.35,80.45,11.80';
+const INDIA_PLACES_RE = /\b(chennai|madras|pondicherry|puducherry|pondy|mahabalipuram|mamallapuram|ecr|east coast road|kanchipuram|chengalpattu|tindivanam|villupuram|auroville|marakkanam|cuddalore)\b/i;
+// India if the query names a corridor place, OR holds a 6-digit PIN in
+// 600000–605999 (spaces anywhere ignored, so "605 004" still matches).
+const isIndiaQuery = (q) => INDIA_PLACES_RE.test(q) || /\b60[0-5]\d{3}\b/.test(q.replace(/\s/g, ''));
+
+// Resolve which region a destination query belongs to: its country filter, OSM
+// bounding box, and whether to accept postcode/place results (no street road).
+function resolveRegion(query) {
+  if (isIndiaQuery(query)) return { cc: 'in', viewbox: CHENNAI_PONDI_VIEWBOX, loose: true };
+  if (isEllesmereQuery(query)) return { cc: 'gb', viewbox: ELLESMERE_VIEWBOX, loose: true };
+  return { cc: 'gb', viewbox: CAMBRIDGE_VIEWBOX, loose: false };
+}
+
 // Message constraints. Up to SHRINK_AT characters render at full size; beyond
 // that the text steps down to a medium size so up to MAX_TOTAL chars still fit
 // the parchment. The text wraps NATURALLY (CSS), so it always reflows to fill
@@ -79,26 +97,27 @@ function DestinationPicker({ value, onPick, font }) {
   async function search(query) {
     if (!query.trim()) { setResults([]); setOpen(false); return; }
     const customs = customMatches(query);
-    // CH65 / CH66 postcodes look up in the Cheshire (Ellesmere Port) box; everything
-    // else stays bounded to Cambridge. There we also accept postcode/place results
-    // (they have no street road), so a full postcode like "CH66 3AB" is selectable.
-    const ellesmere = isEllesmereQuery(query);
-    const viewbox = ellesmere ? ELLESMERE_VIEWBOX : CAMBRIDGE_VIEWBOX;
+    // The query picks its region: an Indian PIN (600xxx–605xxx) or corridor place
+    // searches the Chennai→Pondicherry box; CH65 / CH66 the Cheshire box; everything
+    // else stays bounded to Cambridge. In the "loose" regions we also accept
+    // postcode/place results (no street road), so a full PIN like "605004" or a
+    // postcode like "CH66 3AB" is selectable.
+    const region = resolveRegion(query);
     setBusy(true);
     let streets = [];
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`
-        + `&limit=6&addressdetails=1&countrycodes=gb&viewbox=${viewbox}&bounded=1`,
+        + `&limit=6&addressdetails=1&countrycodes=${region.cc}&viewbox=${region.viewbox}&bounded=1`,
         { headers: { 'Accept-Language': 'en' } },
       );
       const data = await res.json();
-      // Street names, de-duplicated. In the Ellesmere Port area, fall back to the postcode
+      // Street names, de-duplicated. In the loose regions, fall back to the postcode/PIN
       // (or the first part of the address) when there's no road, so postcodes still appear.
       const seen = new Set();
       for (const r of (Array.isArray(data) ? data : [])) {
         const label = r.address?.road
-          || (ellesmere ? (r.address?.postcode || r.display_name?.split(',')[0].trim()) : null);
+          || (region.loose ? (r.address?.postcode || r.display_name?.split(',')[0].trim()) : null);
         if (!label || seen.has(label)) continue;
         seen.add(label);
         streets.push({ ...r, road: label });
@@ -186,7 +205,7 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
   const [sealBroken, setSealBroken] = useState(false);
   const [kbHeight, setKbHeight] = useState(0);
 
-  const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
+  const font = `${settings.scroll_font || 'AnandaNamaste'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
   const bgUrl = assetUrl(settings.scroll_bg_file);
   const sealOpen = assetUrl(settings.seal_open_file);
   const sealStamped = assetUrl(settings.seal_stamped_file);
@@ -297,7 +316,7 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
             onChange={(e) => setBody(capMessage(e.target.value))}
             placeholder="Pen thy message…"
             rows={body.replace(/\n/g, '').length > SHRINK_AT ? SMALL_ROWS : FULL_ROWS}
-            className="w-full resize-none bg-transparent text-center leading-snug text-black placeholder-black/40 focus:outline-none"
+            className="scroll-gradient-text w-full resize-none bg-transparent text-center leading-snug focus:outline-none"
             style={{
               fontFamily: font,
               whiteSpace: 'pre-wrap',

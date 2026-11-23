@@ -3,6 +3,30 @@ import WidgetKit
 import SwiftUI
 
 private let bg = Color(red: 0.122, green: 0.122, blue: 0.118)      // #1f1f1e background
+
+// Ananda Namaste display font (bundled as NamasteRegular.ttf via UIAppFonts).
+private func scrollFont(_ size: CGFloat) -> Font { Font.custom("AnandaNamaste", size: size) }
+
+// Colourful watercolour sweep for the scroll text, matching the in-app reader.
+// Two variants: the oxblood→gold sweep reads on the pale parchment tile of the
+// lock-screen banner, but its dark end would disappear on the Dynamic Island's
+// black background, so the island uses a brightened sweep instead.
+private let scrollGradientOnLight = LinearGradient(
+    colors: [
+        Color(red: 0.49, green: 0.11, blue: 0.07), Color(red: 0.70, green: 0.25, blue: 0.18),
+        Color(red: 0.75, green: 0.22, blue: 0.17), Color(red: 0.65, green: 0.16, blue: 0.42),
+        Color(red: 0.43, green: 0.23, blue: 0.62), Color(red: 0.18, green: 0.37, blue: 0.64),
+        Color(red: 0.16, green: 0.56, blue: 0.56), Color(red: 0.25, green: 0.61, blue: 0.25),
+        Color(red: 0.73, green: 0.59, blue: 0.18),
+    ],
+    startPoint: .topLeading, endPoint: .bottomTrailing)
+private let scrollGradientOnDark = LinearGradient(
+    colors: [
+        Color(red: 1.00, green: 0.42, blue: 0.37), Color(red: 1.00, green: 0.55, blue: 0.81),
+        Color(red: 0.72, green: 0.61, blue: 1.00), Color(red: 0.43, green: 0.78, blue: 1.00),
+        Color(red: 0.37, green: 0.89, blue: 0.75), Color(red: 1.00, green: 0.84, blue: 0.42),
+    ],
+    startPoint: .leading, endPoint: .trailing)
 // Tapping the crow / weather Live Activity opens the in-app straight-line flight
 // tracker (both normal scrolls and forecast scrolls use this same activity).
 private let deepLink = URL(string: "sneakystuff://crow-tracker")
@@ -62,7 +86,8 @@ struct CrowWidgetLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 6) {
                         Text(title(context.state, context.attributes))
-                            .font(.headline).foregroundColor(.white)
+                            .font(scrollFont(18))
+                            .foregroundStyle(scrollGradientOnDark)
                         // The same flight trail as the banner, but tinted for the
                         // black Dynamic Island: white line/fill/nodes with the
                         // gliding crow riding along, gone once landed.
@@ -185,12 +210,13 @@ struct CrowLockScreenView: View {
             Image("tile").resizable().scaledToFill()
             VStack(spacing: 8) {
                 Text(title(context.state, context.attributes))
-                    .font(.custom("ImperialBlack", size: 22))
-                    .foregroundColor(.black)
+                    .font(scrollFont(22))
+                    .foregroundStyle(scrollGradientOnLight)
+                    .shadow(color: Color(red: 0.24, green: 0.08, blue: 0.04).opacity(0.28), radius: 1, y: 1)
                     .multilineTextAlignment(.center)
 
                 Text(subtitle(context.state, context.attributes))
-                    .font(.custom("ImperialBlack", size: 12))
+                    .font(scrollFont(12))
                     .foregroundColor(.black)
                     .opacity(0.85)
                     .multilineTextAlignment(.center)

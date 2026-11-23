@@ -18,7 +18,7 @@ function formatSent(ts) {
    (rendered as a real <img> so the whole scroll shows). Closed via the stamped
    wax-seal CLOSE button at the bottom. */
 export default function ScrollReader({ scroll, settings = {}, onClose }) {
-  const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
+  const font = `${settings.scroll_font || 'AnandaNamaste'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
   const bgUrl = assetUrl(settings.scroll_bg_file);
   const sealStamped = assetUrl(settings.seal_stamped_file);
   const [sealBroken, setSealBroken] = useState(false);
@@ -69,7 +69,7 @@ export default function ScrollReader({ scroll, settings = {}, onClose }) {
         >
           <div className="flex flex-1 flex-col items-center justify-center">
             <p
-              className="text-black"
+              className="scroll-gradient-text"
               style={{ fontFamily: font, fontSize: bodyFontSize, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}
             >
               {scroll.body}

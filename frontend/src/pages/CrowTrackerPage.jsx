@@ -405,7 +405,7 @@ export default function CrowTrackerPage() {
           <span style={{
             position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', lineHeight: 1.02, pointerEvents: 'none',
-            fontFamily: 'ImperialBlack', color: '#fff', fontSize: 15, letterSpacing: '0.02em',
+            fontFamily: 'AnandaNamaste', color: '#fff', fontSize: 15, letterSpacing: '0.02em',
             textShadow: '0 1px 3px rgba(60,15,5,0.7)',
             transform: stamped ? 'scale(0.94)' : 'none', transition: 'transform 0.12s ease-out',
           }}>

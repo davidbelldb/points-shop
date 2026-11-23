@@ -686,13 +686,41 @@ html .ht-theme-main-dark .wtBorder.corner {
   50%      { transform: translateX(-50%) translateY(-5px); }
 }
 
-/* Scroll display font. Referenced by scrolls_settings.scroll_font = 'ImperialBlack'. */
+/* Scroll display font. Referenced by scrolls_settings.scroll_font = 'AnandaNamaste'. */
 @font-face {
-  font-family: 'ImperialBlack';
-  src: url('/scrolls/fonts/ImperialBlack-zr5A0.ttf') format('truetype');
+  font-family: 'AnandaNamaste';
+  src: url('/scrolls/fonts/NamasteRegular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
+}
+
+/* Colourful watercolour-style gradient fill for scroll text — the glyphs are
+   painted with a diagonal multi-hue sweep (oxblood → magenta → violet → blue →
+   teal → green → gold) clipped to the letter shapes, so the parchment still
+   shows through the gaps. WebKit (and thus iOS WKWebView) + Blink + modern
+   Gecko all support this. A faint shadow keeps the lighter hues legible on the
+   pale parchment. */
+.scroll-gradient-text {
+  background-image: linear-gradient(
+    125deg,
+    #7c1d12 0%, #b3402f 13%, #c0392b 23%, #a52a6b 36%,
+    #6d3a9e 49%, #2e5fa3 62%, #2a8f8f 74%, #3f9b3f 86%, #b9962e 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* Keep the pale end of the sweep readable over parchment. */
+  filter: drop-shadow(0 1px 1px rgba(60, 20, 10, 0.28));
+  /* On a textarea the transparent fill would also hide the caret. */
+  caret-color: #7c1d12;
+}
+/* Restore a visible placeholder — the transparent text-fill above would
+   otherwise paint it invisible on the compose textarea. */
+.scroll-gradient-text::placeholder {
+  -webkit-text-fill-color: rgba(0, 0, 0, 0.4);
+  color: rgba(0, 0, 0, 0.4);
 }
 
 

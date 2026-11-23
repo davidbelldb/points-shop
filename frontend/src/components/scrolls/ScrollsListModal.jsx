@@ -20,7 +20,7 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
   // the crow tracker, whose parchment map wants a light modal with black text).
   const isDark = light ? false : theme === 'dark';
   const [openScroll, setOpenScroll] = useState(null);
-  const font = `${settings.scroll_font || 'Cinzel'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
+  const font = `${settings.scroll_font || 'AnandaNamaste'}, "UnifrakturMaguntia", "Cinzel Decorative", Georgia, serif`;
 
   // `cardBg` prop overrides the themed default (the crow tracker passes its parchment).
   const cardBackground = cardBg ?? (isDark ? '#171717' : '#ffffff');
