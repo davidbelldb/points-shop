@@ -92,7 +92,7 @@ export default function ScrollsListModal({ scrolls = [], settings = {}, onRead, 
                       : <span className="h-14 w-14 rounded-full shadow" style={{ background: 'radial-gradient(circle at 35% 30%, #b3402f, #7c1d12)' }} />}
                     <span
                       className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-bold tracking-wide"
-                      style={{ color: '#000000', textShadow: '0 1px 2px rgba(255,255,255,0.4)', fontFamily: font }}
+                      style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
                     >
                       Open
                     </span>

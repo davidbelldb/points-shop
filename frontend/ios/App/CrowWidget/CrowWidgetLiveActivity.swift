@@ -32,6 +32,17 @@ private let scrollGradientOnDark = LinearGradient(
     ],
     startPoint: .leading, endPoint: .trailing)
 
+// A darker shade of the earthy sweep, used as the title's shadow so the halo
+// matches the letters' own colours rather than a flat brown.
+private let scrollGradientShadow = LinearGradient(
+    colors: [
+        Color(red: 0.28, green: 0.15, blue: 0.07), Color(red: 0.26, green: 0.08, blue: 0.08),
+        Color(red: 0.24, green: 0.07, blue: 0.15), Color(red: 0.20, green: 0.09, blue: 0.21),
+        Color(red: 0.12, green: 0.12, blue: 0.25), Color(red: 0.07, green: 0.17, blue: 0.25),
+        Color(red: 0.07, green: 0.21, blue: 0.20),
+    ],
+    startPoint: .topLeading, endPoint: .bottomTrailing)
+
 // Blue flight-trail: a dark→light blue gradient line, blue waypoint nodes, and a
 // blue progress fill.
 private let trailGradient = LinearGradient(
@@ -40,12 +51,24 @@ private let trailGradient = LinearGradient(
 private let trailNode = Color(red: 0.08, green: 0.18, blue: 0.44)
 private let trailFill = Color(red: 0.11, green: 0.27, blue: 0.55)
 
-// Dark halo under the text — applied to the main banner title only.
-private extension View {
-    func scrollTextShadow() -> some View {
-        self
-            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.55), radius: 1.1, x: 0, y: 0.5)
-            .shadow(color: Color(red: 0.12, green: 0.05, blue: 0.02).opacity(0.35), radius: 0.6, x: 0, y: 0)
+// The banner title: gradient text with a soft shadow painted in a DARKER shade of
+// the same gradient (SwiftUI shadows are single-colour, so we layer a blurred,
+// darkened gradient copy behind the text instead of a flat halo).
+struct GradientTitle: View {
+    let text: String
+    var body: some View {
+        ZStack {
+            Text(text)
+                .font(scrollFont(22))
+                .foregroundStyle(scrollGradientShadow)
+                .multilineTextAlignment(.center)
+                .offset(y: 1)
+                .blur(radius: 1.1)
+            Text(text)
+                .font(scrollFont(22))
+                .foregroundStyle(scrollGradientOnLight)
+                .multilineTextAlignment(.center)
+        }
     }
 }
 // Tapping the crow / weather Live Activity opens the in-app straight-line flight
@@ -230,11 +253,7 @@ struct CrowLockScreenView: View {
         ZStack {
             Image("tile1").resizable().scaledToFill()
             VStack(spacing: 8) {
-                Text(title(context.state, context.attributes))
-                    .font(scrollFont(22))
-                    .foregroundStyle(scrollGradientOnLight)
-                    .scrollTextShadow()
-                    .multilineTextAlignment(.center)
+                GradientTitle(text: title(context.state, context.attributes))
 
                 Text(subtitle(context.state, context.attributes))
                     .font(scrollFont(12))
