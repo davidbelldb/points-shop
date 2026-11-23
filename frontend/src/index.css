@@ -704,7 +704,7 @@ html .ht-theme-main-dark .wtBorder.corner {
 .scroll-gradient-text {
   background-image: linear-gradient(
     125deg,
-    #3fae5a 0%, #c0392b 30%, #a52a6b 48%,
+    #ff3d8f 0%, #c0392b 30%, #a52a6b 48%,
     #6d3a9e 70%, #213f78 100%
   );
   -webkit-background-clip: text;

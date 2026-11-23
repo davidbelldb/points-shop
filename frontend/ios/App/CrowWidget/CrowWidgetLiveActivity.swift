@@ -13,7 +13,7 @@ private func scrollFont(_ size: CGFloat) -> Font { Font.custom("AnandaNamaste", 
 // black background, so the island uses a brightened sweep instead.
 private let scrollGradientOnLight = LinearGradient(
     colors: [
-        Color(red: 0.25, green: 0.68, blue: 0.35),
+        Color(red: 1.0, green: 0.24, blue: 0.56),
         Color(red: 0.75, green: 0.22, blue: 0.17), Color(red: 0.65, green: 0.16, blue: 0.42),
         Color(red: 0.43, green: 0.23, blue: 0.62), Color(red: 0.13, green: 0.25, blue: 0.47),
     ],
