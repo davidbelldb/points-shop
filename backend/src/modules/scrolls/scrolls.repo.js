@@ -494,8 +494,8 @@ export async function reissueStaleCrowActivities() {
 // makes a short, real local journey in over the land (streets reverse-geocoded
 // along the way) wherever the forecast is for. Offsets are converted from km to
 // degrees — latitude is ~constant; longitude shrinks by cos(latitude).
-const FORECAST_ORIGIN_NORTH_KM = 4;   // a touch north…
-const FORECAST_ORIGIN_WEST_KM = 12;   // …and well to the west of the centre
+const FORECAST_ORIGIN_NORTH_KM = 2;   // a touch north…
+const FORECAST_ORIGIN_WEST_KM = 6;    // …and to the west of the centre (~6 km out)
 const KM_PER_DEG_LAT = 110.574;
 const FORECAST_FROM_LABEL = 'the Three-Eyed Crow';
 

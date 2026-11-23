@@ -440,7 +440,7 @@ export default function CrowTrackerPage() {
           }}
         >
           <img
-            src={`/scrolls/${stamped ? 'seal_stamped' : 'seal_unstamped'}.png`}
+            src={`/scrolls/${stamped ? 'seal_stamped_india' : 'seal_unstamped_india'}.png`}
             alt="" draggable={false}
             style={{
               width: '100%', height: '100%', objectFit: 'contain', display: 'block',
@@ -451,8 +451,8 @@ export default function CrowTrackerPage() {
           <span style={{
             position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', lineHeight: 1.02, pointerEvents: 'none',
-            fontFamily: 'AnandaNamaste', color: '#fff', fontSize: 15, letterSpacing: '0.02em',
-            textShadow: '0 1px 3px rgba(60,15,5,0.7)',
+            fontFamily: 'AnandaNamaste', color: '#000', fontSize: 15, letterSpacing: '0.02em',
+            textShadow: '0 1px 2px rgba(255,255,255,0.4)',
             transform: stamped ? 'scale(0.94)' : 'none', transition: 'transform 0.12s ease-out',
           }}>
             <span>Pen</span>

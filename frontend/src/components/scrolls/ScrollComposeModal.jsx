@@ -356,7 +356,7 @@ export default function ScrollComposeModal({ settings = {}, testMode = false, on
               })()}
               <span
                 className="pointer-events-none absolute inset-0 flex items-center justify-center text-base font-bold tracking-[0.06em]"
-                style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(60,15,5,0.7)', fontFamily: font }}
+                style={{ color: '#000000', textShadow: '0 1px 2px rgba(255,255,255,0.4)', fontFamily: font }}
               >
                 {sending ? '···' : 'Seal'}
               </span>
