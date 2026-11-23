@@ -20,10 +20,12 @@ function LocationPicker({ onPick }) {
     if (!query.trim()) { setResults([]); return; }
     setBusy(true);
     try {
+      // Worldwide search (no country lock) so the forecast can point anywhere —
+      // e.g. Pondicherry while Squishy's travelling, not just the UK.
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`
-        + '&limit=6&addressdetails=1&countrycodes=gb',
-        { headers: { 'Accept-Language': 'en-GB' } },
+        + '&limit=6&addressdetails=1',
+        { headers: { 'Accept-Language': 'en' } },
       );
       const data = await res.json();
       setResults(Array.isArray(data) ? data : []);

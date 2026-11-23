@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { assetUrl } from '../components/scrolls/scrollAssets.js';
 
@@ -344,6 +345,18 @@ export default function AdminScrollsSection() {
 
   return (
     <div className="space-y-4">
+      {/* In-app entry to the private crow test harness (/new-chat) — the native
+          app has no address bar, so this is the only way to reach it on device.
+          Sends loop back to your own phone (simulate), so you can watch the whole
+          crow + Live Activity + scroll on your own device. */}
+      <Link
+        to="/new-chat"
+        className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 transition active:scale-[0.99]"
+      >
+        <span>🐦‍⬛ Open crow test harness</span>
+        <span className="text-xs font-normal text-amber-700">sends to you →</span>
+      </Link>
+
       <EnabledToggle enabled={!!config.settings?.enabled} onSaved={load} />
       <p className="text-xs text-neutral-500">
         Coordinates are on a 0–100 stage (0 = left/top, 100 = right/bottom), responsive across devices.
