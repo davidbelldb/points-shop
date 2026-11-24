@@ -97,10 +97,10 @@ struct CrowWidgetLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(crowLeft).resizable().scaledToFit().frame(width: 34.5, height: 34.5)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(crowRight).resizable().scaledToFit().frame(width: 34.5, height: 34.5)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 6) {
@@ -207,7 +207,7 @@ struct CrowTrail: View {
             if !landed {
                 GeometryReader { geo in
                     Image(crowMover).resizable().scaledToFit()
-                        .frame(width: 30, height: 30)
+                        .frame(width: 34.5, height: 34.5)
                         .position(x: crowMoverFrac(phase) * geo.size.width,
                                   y: geo.size.height / 2)
                         .animation(.easeInOut(duration: 1.2), value: phase)
@@ -246,12 +246,12 @@ struct CrowLockScreenView: View {
                     // gliding crow flies out from here and the perched crow waits
                     // on the right. The trail fills solid black left → right as the
                     // crow flies, its three waypoint nodes popping as it passes.
-                    Image(crowLeft).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(crowLeft).resizable().scaledToFit().frame(width: 34.5, height: 34.5)
                     CrowTrail(startedAt: context.state.startedAt,
                               arrivesAt: context.state.arrivesAt,
                               landed: context.state.landed,
                               phase: context.state.phase)
-                    Image(crowRight).resizable().scaledToFit().frame(width: 30, height: 30)
+                    Image(crowRight).resizable().scaledToFit().frame(width: 34.5, height: 34.5)
                 }
             }
             .padding(.horizontal, 18)
