@@ -28,7 +28,7 @@ const CARD_BG = '#f7db9b'; // journey tile + "Unread scrolls" modal background
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 // Flapping-flight loop: alternate the two send wing poses (wings up / wings down)
 // while the crow is travelling, to animate it flying.
-const FLY_FRAMES = ['/scrolls/crow_send_03.png', '/scrolls/crow_send_04.png'];
+const FLY_FRAMES = ['/scrolls/crow_send_03-1.png', '/scrolls/crow_send_04-1.png'];
 // The perched crow (final landing frame) that sits at a destination holding an
 // unread scroll, until it's opened.
 const PERCH_SPRITE = '/scrolls/crow_land_10.png';
@@ -371,7 +371,7 @@ export default function CrowTrackerPage() {
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                   <span style={{
                     position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, boxSizing: 'border-box',
-                    padding: '0 5px', borderRadius: 999, background: '#5e1a13', color: '#fff',
+                    padding: '0 5px', borderRadius: 999, background: '#ff6666', color: '#fff',
                     fontSize: 12, fontWeight: 800, lineHeight: '18px', textAlign: 'center',
                     border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
                   }}>{p.count}</span>
