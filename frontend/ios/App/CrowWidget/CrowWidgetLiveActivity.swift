@@ -50,7 +50,7 @@ private extension View {
 // tracker (both normal scrolls and forecast scrolls use this same activity).
 private let deepLink = URL(string: "sneakystuff://crow-tracker")
 
-// A crow at each end of the journey: crow_land_00 departs on the left,
+// A bird at each end of the journey: crow_land_00 departs on the left,
 // crow_land_10 waits (perched) on the right. Both are shown at all times.
 private let crowLeft = "crow_land_00-1"
 private let crowRight = "crow_land_10-1"
@@ -75,7 +75,7 @@ private func crowMoverFrac(_ phase: Int) -> CGFloat {
 
 private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     s.landed
-        ? (a.kind == "forecast" ? "A Three-Eyed Crow has arrived" : "News from \(a.originLabel).")
+        ? (a.kind == "forecast" ? "An Indian Roller has arrived" : "News from \(a.originLabel).")
         : "A scroll will shortly be arriving."
 }
 
@@ -83,9 +83,9 @@ private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAt
 // `message`); landed → the scroll's text (passed in `message`).
 private func subtitle(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     if s.landed {
-        return s.message.isEmpty ? "A crow has arrived" : s.message
+        return s.message.isEmpty ? "A bird has arrived" : s.message
     }
-    return s.message.isEmpty ? "A crow has been dispatched from \(a.originLabel)" : s.message
+    return s.message.isEmpty ? "A bird has been dispatched from \(a.originLabel)" : s.message
 }
 
 struct CrowWidgetLiveActivity: Widget {

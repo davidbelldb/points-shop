@@ -21,8 +21,8 @@ const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // Marauder's Map palette. Parchment is painted under the map (no grey flash before
 // tiles load); the route line + destination node use the deep oxblood red.
 const PARCHMENT = '#e6d9b0';  // page + map fallback background (matches the map's land)
-const DEST_DOT = '#5e1a13';   // brown destination node (original)
-const LINE_COLOR = '#5e1a13'; // brown journey line (original)
+const DEST_DOT = '#ff6666';   // coral destination node
+const LINE_COLOR = '#2e6ea0'; // blue journey/flight-path line
 const CARD_BG = '#f7db9b'; // journey tile + "Unread scrolls" modal background
 // Initial zoom-13 centre — 52°10'38.3"N 0°07'33.0"E (same as the OMW map).
 const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
@@ -49,6 +49,7 @@ const MARAUDERS_STYLE = [
   { featureType: 'road', elementType: 'all', stylers: [{ color: '#fff0bc' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ lightness: 10 }, { saturation: -30 }] },
   { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ saturation: 25 }, { lightness: 25 }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#ccff33' }, { lightness: 0 }, { saturation: 0 }] },
   { featureType: 'transit.line', elementType: 'all', stylers: [{ color: '#4b0202' }, { weight: 0.5 }] },
   { featureType: 'water', elementType: 'all', stylers: [{ lightness: -20 }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#a9c8d8' }] },
@@ -458,7 +459,7 @@ export default function CrowTrackerPage() {
             {cardMessage && <p className="scroll-gradient-text" style={{ margin: '4px 0 0', fontFamily: 'AnandaNamaste', fontSize: 15 }}>{cardMessage}</p>}
             {/* Journey bar: travelled portion solid black; untravelled track lower-opacity black. */}
             <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.22)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round((focusProgress || 0) * 100)}%`, background: '#000', transition: 'width 0.2s linear' }} />
+              <div style={{ height: '100%', width: `${Math.round((focusProgress || 0) * 100)}%`, background: '#ccff33', transition: 'width 0.2s linear' }} />
             </div>
           </>
         )}

@@ -149,7 +149,7 @@ async function startLiveActivityFor(scroll) {
       contentState: crowContentState({
         startedAtMs, arrivesAtMs, landed: false,
         // Forecast scrolls open with their own line before street narration.
-        message: scroll.from_label ? 'A Three-Eyed Crow travels south with news' : '',
+        message: scroll.from_label ? 'A prophetic bird travels east with news' : '',
       }),
       attributes: {
         kind: scroll.from_label ? 'forecast' : 'scroll',
@@ -160,8 +160,8 @@ async function startLiveActivityFor(scroll) {
       alert: {
         title: 'A scroll will shortly be arriving.',
         body: scroll.from_label
-          ? 'A Three-Eyed Crow travels south with news'
-          : `A crow has been dispatched from ${scroll.origin_label || 'afar'}`,
+          ? 'A prophetic bird travels east with news'
+          : `A bird has been dispatched from ${scroll.origin_label || 'afar'}`,
       },
     });
     }
@@ -396,7 +396,7 @@ export async function pushStreetSubtitleUpdates() {
         startedAtMs, arrivesAtMs, landed: false, message: msg, phase: target,
       });
       // A little ping/vibration as the crow passes each waypoint.
-      const alert = { title: s.from_label ? 'The Three-Eyed Crow' : 'A crow en route', body: msg };
+      const alert = { title: s.from_label ? 'The Indian Roller' : 'A bird en route', body: msg };
       if (s.la_channel_id) {
         await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert });
       } else {
@@ -494,14 +494,14 @@ export async function reissueStaleCrowActivities() {
 // ---------------------------------------------------------------------------
 
 // The flight always lands at the centre of the configured forecast location and
-// sets off to the WEST (with a touch of north) of it, so the Three-Eyed Crow
+// sets off to the WEST (with a touch of north) of it, so the Indian Roller
 // makes a short, real local journey in over the land (streets reverse-geocoded
 // along the way) wherever the forecast is for. Offsets are converted from km to
 // degrees — latitude is ~constant; longitude shrinks by cos(latitude).
 const FORECAST_ORIGIN_NORTH_KM = 2;   // a touch north…
 const FORECAST_ORIGIN_WEST_KM = 6;    // …and to the west of the centre (~6 km out)
 const KM_PER_DEG_LAT = 110.574;
-const FORECAST_FROM_LABEL = 'the Three-Eyed Crow';
+const FORECAST_FROM_LABEL = 'the Indian Roller';
 
 // Origin point + label for a forecast whose destination is the given location.
 function forecastOrigin(cfg) {
@@ -784,7 +784,7 @@ export async function createScroll({
 }
 
 // Recipient's received scrolls (only those whose crow has actually arrived).
-// Forecast scrolls (from_label set — "the Three-Eyed Crow") are intentionally
+// Forecast scrolls (from_label set — "the Indian Roller") are intentionally
 // excluded: they live only as a Live Activity notification and must never show
 // up as an unread scroll in /messages. Standard scrolls (from_label NULL) list
 // as normal.
@@ -921,12 +921,12 @@ export function buildCrowFlight(s) {
 
   let message = '';
   if (landed) message = isForecast ? (s.body || '').replace(/\s+/g, ' ').trim() : 'Your scroll has landed.';
-  else message = `A crow is on its way from ${from}`;   // opening line, before waypoint 1
+  else message = `A bird is on its way from ${from}`;   // opening line, before waypoint 1
 
   return {
     id: s.id,
     kind: isForecast ? 'forecast' : 'scroll',
-    traveller_name: isForecast ? 'The Three-Eyed Crow' : 'A crow',
+    traveller_name: isForecast ? 'The Indian Roller' : 'A bird',
     origin_label: s.origin_label,
     dest_label: s.dest_label,
     from_label: s.from_label,
@@ -965,7 +965,7 @@ export async function getActiveCrowFlights(recipientId) {
         AND (
           s.deliver_at > NOW()                                                         -- still in flight
           OR (s.from_label IS NULL AND s.delivered = TRUE AND s.delivered_at > NOW() - make_interval(mins => $2))  -- standard: brief "Arrived" linger (the perch then persists via the unread list)
-          OR (s.from_label IS NOT NULL AND s.deliver_at >= date_trunc('day', NOW()))   -- forecast (Three-Eyed Crow): perch stays all day, time-based so it never blinks out at landing
+          OR (s.from_label IS NOT NULL AND s.deliver_at >= date_trunc('day', NOW()))   -- forecast (Indian Roller): perch stays all day, time-based so it never blinks out at landing
         )
       ORDER BY s.deliver_at ASC`,
     [recipientId, CROW_TRACKER_LINGER_MIN],
@@ -1064,8 +1064,8 @@ export async function resolveDueScrolls() {
   for (const s of rows) {
     try {
       const origin = s.from_label || s.origin_label || 'afar';
-      // Forecast scrolls (from the Three-Eyed Crow) get their own arrival title.
-      const arrivedTitle = s.from_label ? 'A Three-Eyed Crow has arrived' : `News from ${origin}.`;
+      // Forecast scrolls (from the Indian Roller) get their own arrival title.
+      const arrivedTitle = s.from_label ? 'An Indian Roller has arrived' : `News from ${origin}.`;
       // The scroll's own text becomes the landed subtitle (widget truncates).
       const preview = (s.body || '').replace(/\s+/g, ' ').trim().slice(0, 140);
       // While muted, finalise silently (no alert) and never raise a banner.
@@ -1073,7 +1073,7 @@ export async function resolveDueScrolls() {
       const arrivesAtMs = Date.now();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const state = crowContentState({ startedAtMs, arrivesAtMs, landed: true, message: preview, phase: 4 });
-      const alert = muted ? undefined : { title: arrivedTitle, body: preview || 'A crow has arrived' };
+      const alert = muted ? undefined : { title: arrivedTitle, body: preview || 'A bird has arrived' };
 
       if (s.la_channel_id) {
         // Broadcast the landing to the channel — reaches a closed app, in-scroll.
@@ -1086,11 +1086,11 @@ export async function resolveDueScrolls() {
           }
         } else {
           // No Live Activity reachable — fall back to the classic alert push.
-          // Forecast (Three-Eyed Crow) scrolls live only on the tracker, so send
+          // Forecast (Indian Roller) scrolls live only on the tracker, so send
           // there; a normal scroll opens the reader in /messages.
           await sendPush(s.recipient_id, {
             title: arrivedTitle,
-            body: preview || 'A crow has arrived',
+            body: preview || 'A bird has arrived',
             url: s.from_label ? '/crow-tracker' : '/messages?scrolls=1',
             tag: 'scroll-arrival',
           });
