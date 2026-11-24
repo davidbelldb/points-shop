@@ -20,7 +20,7 @@ import ScrollsListModal from '../components/scrolls/ScrollsListModal.jsx';
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 // Marauder's Map palette. Parchment is painted under the map (no grey flash before
 // tiles load); the route line + destination node use the deep oxblood red.
-const PARCHMENT = '#ebc876';  // page + map fallback background (matches the map's land)
+const PARCHMENT = '#e6d9b0';  // page + map fallback background (matches the map's land)
 const DEST_DOT = '#5e1a13';   // brown destination node (original)
 const LINE_COLOR = '#5e1a13'; // brown journey line (original)
 const CARD_BG = '#f7db9b'; // journey tile + "Unread scrolls" modal background
@@ -37,7 +37,7 @@ const PERCH_SPRITE = '/scrolls/crow_land_10.png';
 // borders, cream roads. Applied to the crow tracker only (OMW keeps its dark map).
 const MARAUDERS_STYLE = [
   { featureType: 'all', elementType: 'all', stylers: [{ color: '#4b0202' }, { gamma: 2.38 }, { saturation: 0 }, { visibility: 'simplified' }] },
-  { featureType: 'all', elementType: 'geometry', stylers: [{ color: '#ebc876' }] },
+  { featureType: 'all', elementType: 'geometry', stylers: [{ color: '#e6d9b0' }] },
   { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ gamma: 0.01 }, { lightness: 20 }] },
   { featureType: 'all', elementType: 'labels.text.stroke', stylers: [{ saturation: -31 }, { lightness: -33 }, { weight: 2 }, { gamma: 0.8 }] },
   { featureType: 'all', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
@@ -54,7 +54,7 @@ const MARAUDERS_STYLE = [
   { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ saturation: 25 }, { lightness: 25 }] },
   { featureType: 'transit.line', elementType: 'all', stylers: [{ color: '#4b0202' }, { weight: 0.5 }] },
   { featureType: 'water', elementType: 'all', stylers: [{ lightness: -20 }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#d6a95d' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#a9c8d8' }] },
 ];
 
 // Reject stray / null coordinates (they coerce to 0 and would blow the fit out to
