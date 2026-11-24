@@ -49,7 +49,7 @@ const MARAUDERS_STYLE = [
   { featureType: 'road', elementType: 'all', stylers: [{ color: '#fff0bc' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ lightness: 10 }, { saturation: -30 }] },
   { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ saturation: 25 }, { lightness: 25 }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#66ff33' }, { lightness: 0 }, { saturation: 0 }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#9fff80' }, { lightness: 0 }, { saturation: 0 }] },
   { featureType: 'transit.line', elementType: 'all', stylers: [{ color: '#4b0202' }, { weight: 0.5 }] },
   { featureType: 'water', elementType: 'all', stylers: [{ lightness: -20 }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#a9c8d8' }] },
@@ -459,7 +459,7 @@ export default function CrowTrackerPage() {
             {cardMessage && <p className="scroll-gradient-text" style={{ margin: '4px 0 0', fontFamily: 'AnandaNamaste', fontSize: 15 }}>{cardMessage}</p>}
             {/* Journey bar: travelled portion solid black; untravelled track lower-opacity black. */}
             <div style={{ marginTop: 9, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.22)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round((focusProgress || 0) * 100)}%`, background: '#66ff33', transition: 'width 0.2s linear' }} />
+              <div style={{ height: '100%', width: `${Math.round((focusProgress || 0) * 100)}%`, background: '#9fff80', transition: 'width 0.2s linear' }} />
             </div>
           </>
         )}

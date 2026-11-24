@@ -34,9 +34,9 @@ private let scrollGradientOnDark = LinearGradient(
 
 // Blue flight-trail: a solid blue dashed line, blue waypoint nodes, and a blue
 // progress fill (no gradient).
-private let trailLine = Color(red: 0.11, green: 0.27, blue: 0.55)
-private let trailNode = Color(red: 0.08, green: 0.18, blue: 0.44)
-private let trailFill = Color(red: 0.11, green: 0.27, blue: 0.55)
+private let trailLine = Color(red: 0.624, green: 1.00, blue: 0.502)  // #9fff80
+private let trailNode = Color(red: 0.624, green: 1.00, blue: 0.502)  // #9fff80
+private let trailFill = Color(red: 0.624, green: 1.00, blue: 0.502)  // #9fff80
 
 // Solid dark halo under the banner title (not a gradient).
 private extension View {
@@ -226,7 +226,7 @@ struct CrowLockScreenView: View {
 
     var body: some View {
         ZStack {
-            Image("tile1").resizable().scaledToFill()
+            Image("tile2").resizable().scaledToFill()
             VStack(spacing: 8) {
                 Text(title(context.state, context.attributes))
                     .font(scrollFont(22))
