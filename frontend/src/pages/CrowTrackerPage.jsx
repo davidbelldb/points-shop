@@ -398,7 +398,7 @@ export default function CrowTrackerPage() {
           }}
         >
           <img
-            src={`/scrolls/${stamped ? 'seal_stamped' : 'seal_unstamped'}.png`}
+            src={`/scrolls/${stamped ? 'seal_stamped-1' : 'seal_unstamped-1'}.png`}
             alt="" draggable={false}
             style={{
               width: '100%', height: '100%', objectFit: 'contain', display: 'block',
