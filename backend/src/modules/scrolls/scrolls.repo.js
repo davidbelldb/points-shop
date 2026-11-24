@@ -411,11 +411,11 @@ export async function pushStreetSubtitleUpdates() {
   return rows.length;
 }
 
-// iOS ends a Live Activity after ~8 hours. We re-issue a fresh one at 6h (margin)
+// iOS ends a Live Activity after ~8 hours. We re-issue a fresh one at 4h (margin)
 // so a multi-day crow keeps a live lock-screen / Dynamic Island card the whole way.
 // Override with env LA_CYCLE_MINUTES (e.g. 4) to watch the swap happen in minutes
-// during a loop-to-self test; leave unset for the 6h (360-minute) production value.
-const LA_CYCLE_MINUTES = Number(process.env.LA_CYCLE_MINUTES) || 360;
+// during a loop-to-self test; leave unset for the 4h (240-minute) production value.
+const LA_CYCLE_MINUTES = Number(process.env.LA_CYCLE_MINUTES) || 240;
 const LA_CYCLE_MS = LA_CYCLE_MINUTES * 60 * 1000;
 
 // Replace the crow Live Activity for any in-flight scroll whose current card is
@@ -445,6 +445,11 @@ export async function reissueStaleCrowActivities() {
       const targets = await ptsTokensByApp(s.recipient_id);
       if (!targets.length) continue;
 
+      // The broadcast channel + its manage/send hosts must match the device's
+      // APNs environment (Debug build → sandbox, Release/TestFlight → production).
+      // Mirror startLiveActivityFor: key off the first target's env.
+      const sandbox = !!targets[0]?.sandbox;
+
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const phase = reachedPhase(startedAtMs, arrivesAtMs);
@@ -453,7 +458,7 @@ export async function reissueStaleCrowActivities() {
 
       // Fresh channel + fresh activity carrying the current flight state.
       let newChannel = null;
-      try { newChannel = await createBroadcastChannel(); } catch { /* skip this cycle */ }
+      try { newChannel = await createBroadcastChannel(sandbox); } catch { /* skip this cycle */ }
       if (!newChannel) continue;
 
       const state = crowContentState({ startedAtMs, arrivesAtMs, landed: false, message, phase });
@@ -476,12 +481,12 @@ export async function reissueStaleCrowActivities() {
       // Point the scroll at the new channel BEFORE ending the old one, so a
       // landing or street update that races in never targets a dead channel.
       await query(
-        `UPDATE scrolls SET la_channel_id = $1, la_cycle_started_at = NOW() WHERE id = $2`,
-        [newChannel, s.id],
+        `UPDATE scrolls SET la_channel_id = $1, la_cycle_started_at = NOW(), la_sandbox = $3 WHERE id = $2`,
+        [newChannel, s.id, sandbox],
       );
 
       // Dismiss the previous card and tear down its channel — only the new remains.
-      sendBroadcast(oldChannel, { event: 'end', contentState: state, dismissalMs: Date.now() })
+      sendBroadcast(oldChannel, { event: 'end', contentState: state, dismissalMs: Date.now(), sandbox })
         .then(() => deleteBroadcastChannel(oldChannel))
         .catch(() => {});
     } catch { /* best effort per scroll */ }

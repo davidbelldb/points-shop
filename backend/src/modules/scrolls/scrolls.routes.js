@@ -26,13 +26,16 @@ function startResolver() {
   setInterval(() => { pushStreetSubtitleUpdates().catch(() => {}); }, 2_000);
   // Daily weather forecast scroll — checked once a minute against the schedule.
   setInterval(() => { runForecastScheduler().catch(() => {}); }, 60_000);
-  // DISABLED: the 6h re-issue scheduler fires a push-to-start (+ a new broadcast
-  // channel) per lingering in-flight crow. With true-raven-time flights lasting
-  // days, test crows never clear and this churns push-to-start in the background,
-  // exhausting iOS's push-to-start budget so genuine new cards get silently
-  // dropped. Re-enable only once flights are short again / backlog is cleared.
-  // setInterval(() => { reissueStaleCrowActivities().catch(() => {}); }, 60_000);
-  void reissueStaleCrowActivities;
+  // Re-issue a fresh Live Activity every LA_CYCLE_MINUTES (4h default) for each
+  // in-flight crow, so a multi-day flight keeps a live lock-screen / Dynamic
+  // Island card the whole way (iOS otherwise force-ends an Activity after ~8h).
+  // reissueStaleCrowActivities() only touches scrolls whose current card is older
+  // than the cycle, pushes to a NEW broadcast channel on the device's own APNs
+  // env (sandbox vs production), then ends the old one — one card, no stack.
+  // NOTE: with true-raven-time flights lasting days, watch iOS's push-to-start
+  // budget — if genuine new cards start getting dropped, lengthen the cycle or
+  // clear stale test crows.
+  setInterval(() => { reissueStaleCrowActivities().catch(() => {}); }, 60_000);
 }
 
 export default async function scrollRoutes(fastify) {
