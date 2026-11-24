@@ -232,6 +232,22 @@ export async function reverseStreet(lat, lng) {
   } catch { return null; }
 }
 
+// Reverse-geocode a single point to its COUNTRY (Nominatim, low zoom so it
+// resolves the nation rather than a street). Returns null over open water or on
+// any failure — the narrator renders that as "out over the open sea".
+export async function reverseCountry(lat, lng) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=3&addressdetails=1`
+      + `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'SneakyStuff/1.0 (crow flight narration)', 'Accept-Language': 'en-GB' },
+    });
+    if (!res.ok) return null;
+    const a = (await res.json())?.address ?? {};
+    return a.country || null;
+  } catch { return null; }
+}
+
 // Single source of truth: the three waypoint nodes sit at these fractions of the
 // journey. The widget draws nodes here, the geocoder samples streets here, and
 // the scheduler fires each node's update as the progress bar reaches it.
@@ -293,6 +309,43 @@ async function computeRouteStreets(scroll) {
     await query(`UPDATE scrolls SET route_streets = $1 WHERE id = $2`,
       [JSON.stringify(out), scroll.id]).catch(() => {});
   }
+}
+
+// Six evenly-spaced sample points along the flight (kept off the very start/end
+// so the first/last beats aren't the origin/destination country). On a long-haul
+// flight the narrator reads these out one by one as the crow passes them, giving
+// ~6 country beats (e.g. France → Turkey → Iran → Pakistan → India).
+export const COUNTRY_FRACS = [0.12, 0.26, 0.40, 0.54, 0.68, 0.82];
+
+// Reverse-geocode each of the six country-sample points along the origin→dest
+// line and store them on the scroll. Best-effort + async, like computeRouteStreets.
+// Entries are null over open water (narrated as "the open sea").
+async function computeRouteCountries(scroll) {
+  const aLat = Number(scroll.origin_lat); const aLng = Number(scroll.origin_lng);
+  const bLat = Number(scroll.dest_lat); const bLng = Number(scroll.dest_lng);
+  if (![aLat, aLng, bLat, bLng].every(Number.isFinite)) return;
+  const out = [];
+  for (const t of COUNTRY_FRACS) {
+    const lat = aLat + (bLat - aLat) * t;
+    const lng = aLng + (bLng - aLng) * t;
+    /* eslint-disable no-await-in-loop */
+    const name = await reverseCountry(lat, lng);
+    // Collapse a repeated country to null so we don't narrate it twice running
+    // (the renderer skips nulls as "open sea"), but keep it if the crow re-enters.
+    out.push(name && name !== lastNonNull(out) ? name : null);
+    await new Promise((r) => setTimeout(r, 1100)); // honour Nominatim's 1 req/s
+    /* eslint-enable no-await-in-loop */
+  }
+  if (out.some(Boolean)) {
+    await query(`UPDATE scrolls SET route_countries = $1 WHERE id = $2`,
+      [JSON.stringify(out), scroll.id]).catch(() => {});
+  }
+}
+
+// The most recent non-null entry in a partially-built country list.
+function lastNonNull(arr) {
+  for (let i = arr.length - 1; i >= 0; i -= 1) if (arr[i]) return arr[i];
+  return null;
 }
 
 // The street that best sits at `frac` of the way along the origin→dest line.
@@ -371,11 +424,45 @@ function reachedPhase(startedAtMs, arrivesAtMs) {
   return phase;
 }
 
+// How many of the six country-sample points the crow has passed right now (0–6),
+// fired the same LEAD_MS early as the node phase. Independent of the 3 visual
+// waypoint nodes — it only drives the subtitle country narration.
+function reachedCountryStep(startedAtMs, arrivesAtMs) {
+  const total = Math.max(1, arrivesAtMs - startedAtMs);
+  const lead = Math.min(LEAD_MS, total * 0.1);
+  const at = Date.now() + lead;
+  let step = 0;
+  for (let i = 0; i < COUNTRY_FRACS.length; i += 1) {
+    if (at >= startedAtMs + COUNTRY_FRACS[i] * total) step = i + 1;
+  }
+  return step;
+}
+
+// Country narration for a long-haul flight. Phase 4 is always the landing beat.
+// A null country-sample means open water. Verb varies gently across the journey.
+const COUNTRY_LEADS = ['Setting out over', 'Now over', 'Soaring over', 'Crossing', 'Passing over', 'Nearly through'];
+function countryNarration(scroll, nodePhase, countryStep) {
+  if (nodePhase >= 4) return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
+  const list = Array.isArray(scroll.route_countries) ? scroll.route_countries : null;
+  const country = list && countryStep > 0 ? list[countryStep - 1] : null;
+  if (country) return `${COUNTRY_LEADS[Math.min(countryStep - 1, COUNTRY_LEADS.length - 1)]} ${country}`;
+  return countryStep > 0 ? 'Out over the open sea' : '';
+}
+
+// The right subtitle for this moment: country narration on a long-haul flight
+// (once route_countries is computed), else the Cambridge street narration.
+function narrationFor(scroll, nodePhase, countryStep) {
+  const hasCountries = Array.isArray(scroll.route_countries) && scroll.route_countries.some(Boolean);
+  if (!isLocalJourney(scroll) && hasCountries) return countryNarration(scroll, nodePhase, countryStep);
+  return streetMessage(nodePhase, scroll);
+}
+
 // Called on the resolver tick: nudge each in-flight crow's subtitle forward when
 // it crosses into a new phase. Only touches scrolls with a live update token.
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
     `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
+            s.la_country_step, s.route_countries,
             s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets, s.la_channel_id, s.la_sandbox, s.from_label
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
@@ -388,15 +475,22 @@ export async function pushStreetSubtitleUpdates() {
       if (await isMuted(s.recipient_id)) continue; // muted → no live narration
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
-      const target = reachedPhase(startedAtMs, arrivesAtMs);
-      if (target <= (Number(s.la_phase) || 0)) continue;
+      const nodePhase = reachedPhase(startedAtMs, arrivesAtMs);
+      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs);
+      const nodeAdvanced = nodePhase > (Number(s.la_phase) || 0);
+      const countryAdvanced = countryStep > (Number(s.la_country_step) || 0);
+      // The crow has moved on if it crossed a visual node OR a country-sample point.
+      if (!nodeAdvanced && !countryAdvanced) continue;
 
-      const msg = streetMessage(target, s);
+      const msg = narrationFor(s, nodePhase, countryStep);
       const state = crowContentState({
-        startedAtMs, arrivesAtMs, landed: false, message: msg, phase: target,
+        startedAtMs, arrivesAtMs, landed: false, message: msg, phase: nodePhase,
       });
-      // A little ping/vibration as the crow passes each waypoint.
-      const alert = { title: s.from_label ? 'The Indian Roller' : 'A bird en route', body: msg };
+      // A ping/vibration only when a visual waypoint node pops — country-only
+      // beats update the text silently so a long-haul flight doesn't buzz ~9 times.
+      const alert = nodeAdvanced
+        ? { title: s.from_label ? 'The Indian Roller' : 'A bird en route', body: msg }
+        : undefined;
       if (s.la_channel_id) {
         await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert, sandbox: s.la_sandbox });
       } else {
@@ -405,7 +499,8 @@ export async function pushStreetSubtitleUpdates() {
           await sendLiveActivityPush(token, { event: 'update', contentState: state, alert });
         }
       }
-      await query(`UPDATE scrolls SET la_phase = $1 WHERE id = $2`, [target, s.id]);
+      await query(`UPDATE scrolls SET la_phase = $1, la_country_step = $2 WHERE id = $3`,
+        [nodePhase, countryStep, s.id]);
     } catch { /* best effort per scroll */ }
   }
   return rows.length;
@@ -429,7 +524,7 @@ export async function reissueStaleCrowActivities() {
   const { rows } = await query(
     `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label,
             s.origin_label, s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng,
-            s.route_streets, s.la_channel_id, s.la_phase, s.from_label
+            s.route_streets, s.route_countries, s.la_channel_id, s.la_phase, s.from_label
        FROM scrolls s
       WHERE s.delivered = FALSE
         AND s.deliver_at > NOW()
@@ -453,7 +548,8 @@ export async function reissueStaleCrowActivities() {
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const phase = reachedPhase(startedAtMs, arrivesAtMs);
-      const message = phase > 0 ? streetMessage(phase, s) : '';
+      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs);
+      const message = (phase > 0 || countryStep > 0) ? narrationFor(s, phase, countryStep) : '';
       const oldChannel = s.la_channel_id;
 
       // Fresh channel + fresh activity carrying the current flight state.
@@ -781,8 +877,10 @@ export async function createScroll({
     ],
   );
   const scroll = rows[0];
-  // Reverse-geocode the streets the crow will pass over (best-effort, async).
+  // Reverse-geocode the streets (local hop) and countries (long-haul) the crow
+  // will pass over (best-effort, async).
   computeRouteStreets(scroll).catch(() => {});
+  computeRouteCountries(scroll).catch(() => {});
   // Fire the crow Live Activity on the recipient's device (push-to-start).
   startLiveActivityFor(scroll).catch(() => {});
   return scroll;
