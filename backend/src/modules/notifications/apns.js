@@ -205,7 +205,7 @@ export async function sendLiveActivityPush(token, { event, contentState, attribu
 
 /** Create a broadcast channel for a Live Activity. Returns the channel id (base64
  *  string) or null on failure. */
-export async function createBroadcastChannel() {
+export async function createBroadcastChannel(sandbox = false) {
   if (!enabled) return null;
   // message-storage-policy 1 = keep most-recent message so a device that connects
   // a little late still gets the latest update. push-type is PascalCase here.
@@ -213,7 +213,10 @@ export async function createBroadcastChannel() {
   return new Promise((resolve) => {
     let client;
     try {
-      client = http2.connect(MANAGE_HOST);
+      // The channel MUST be created on the same APNs environment as the device
+      // token it will serve — a Debug build is on sandbox. A production channel
+      // referenced by a sandbox push-to-start can't bind, so iOS drops the start.
+      client = http2.connect(sandbox ? SANDBOX_MANAGE_HOST : MANAGE_HOST);
       client.on('error', () => resolve(null));
       const jwt = providerToken();
       let status = 0; let data = ''; let channelId = null;

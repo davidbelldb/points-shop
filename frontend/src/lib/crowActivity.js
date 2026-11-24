@@ -15,11 +15,11 @@ export function enableCrowPush() {
   if (!Capacitor.isNativePlatform() || wired) return;
   wired = true;
   try {
-    Native.addListener('ptsToken', ({ token }) => {
-      api.registerLiveActivityToken('pts', token).catch(() => {});
+    Native.addListener('ptsToken', ({ token, environment }) => {
+      api.registerLiveActivityToken('pts', token, null, environment).catch(() => {});
     });
-    Native.addListener('updateToken', ({ scrollId, token }) => {
-      api.registerLiveActivityToken('update', token, scrollId).catch(() => {});
+    Native.addListener('updateToken', ({ scrollId, token, environment }) => {
+      api.registerLiveActivityToken('update', token, scrollId, environment).catch(() => {});
     });
     Native.enablePush();
   } catch { /* plugin unavailable — ignore */ }

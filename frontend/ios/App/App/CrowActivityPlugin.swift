@@ -21,6 +21,18 @@ public class CrowActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "enablePush", returnType: CAPPluginReturnPromise),
     ]
 
+    // The APNs environment this build talks to: a Debug build (Cmd+R to device)
+    // registers tokens on the SANDBOX gateway; a Release build (Archive/TestFlight)
+    // on production. The backend must push to the matching gateway or iOS silently
+    // drops the push-to-start, so we report it with every token.
+    private var apnsEnv: String {
+        #if DEBUG
+        return "development"
+        #else
+        return "production"
+        #endif
+    }
+
     // Start observing the push-to-start token and every activity's update token,
     // emitting them to the web layer (see crowActivity.js) which posts them to
     // the backend. This is what lets the server start/update the crow activity
@@ -30,7 +42,7 @@ public class CrowActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             Task {
                 for await data in Activity<CrowActivityAttributes>.pushToStartTokenUpdates {
                     let hex = data.map { String(format: "%02x", $0) }.joined()
-                    self.notifyListeners("ptsToken", data: ["token": hex])
+                    self.notifyListeners("ptsToken", data: ["token": hex, "environment": self.apnsEnv])
                 }
             }
         }
@@ -55,7 +67,7 @@ public class CrowActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         Task {
             for await tokenData in activity.pushTokenUpdates {
                 let hex = tokenData.map { String(format: "%02x", $0) }.joined()
-                self.notifyListeners("updateToken", data: ["scrollId": scrollId, "token": hex])
+                self.notifyListeners("updateToken", data: ["scrollId": scrollId, "token": hex, "environment": self.apnsEnv])
             }
         }
     }

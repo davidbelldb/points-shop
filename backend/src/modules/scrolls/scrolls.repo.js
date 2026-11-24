@@ -124,9 +124,12 @@ async function startLiveActivityFor(scroll) {
     const startedAtMs = arrivesAtMs - (Number(scroll.flight_seconds) || 0) * 1000;
     // Create a broadcast channel so live updates + the landing reach the recipient
     // even with their app fully closed (no device-captured token needed). Falls
-    // back to the device-token path if channel creation fails.
+    // back to the device-token path if channel creation fails. The channel MUST be
+    // on the same APNs environment as the device (sandbox for a Debug build) or the
+    // start can't bind it.
+    const sandbox = !!targets[0]?.sandbox;
     let channelId = null;
-    try { channelId = await createBroadcastChannel(); } catch { /* fall back */ }
+    try { channelId = await createBroadcastChannel(sandbox); } catch { /* fall back */ }
     if (channelId) {
       // Stamp the re-issue cycle clock so reissueStaleCrowActivities() knows when
       // this card was last (re)started and can replace it before the ~8h iOS cap.

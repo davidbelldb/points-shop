@@ -341,8 +341,8 @@ export const api = {
   entertainmentWheel: () => request('/entertainment/wheel'),
 
   // Crow Live Activity push tokens (push-to-start / per-scroll update).
-  registerLiveActivityToken: (kind, token, scrollId) =>
-    request('/scrolls/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, scrollId }) }),
+  registerLiveActivityToken: (kind, token, scrollId, environment) =>
+    request('/scrolls/live-activity-token', { method: 'POST', body: JSON.stringify({ kind, token, scrollId, environment }) }),
 
   // On My Way — live-location Live Activity.
   omw: {
