@@ -55,7 +55,7 @@ export default function NewChatPage() {
   // The perched crow uses the final landing frame's sprite.
   const landFrames = scrolls.config.land || [];
   const landLast = landFrames[landFrames.length - 1];
-  const landCrowFile = landLast?.sprite_file || 'crow_land_10.png';
+  const landCrowFile = landLast?.sprite_file || 'crow_land_10-1.png';
   const landCrowX = landLast?.x ?? 88;
   const landCrowY = landLast?.y ?? 50;
   const landCrowScale = Number(landLast?.scale) || 1;

@@ -2019,7 +2019,7 @@ export default function MessagesPage() {
   const scrollFps = scrollSettings.frame_rate_fps || 12;
   const scrollLandFrames = scrolls.config.land || [];
   const scrollLandLast = scrollLandFrames[scrollLandFrames.length - 1];
-  const scrollLandCrowFile = scrollLandLast?.sprite_file || 'crow_land_10.png';
+  const scrollLandCrowFile = scrollLandLast?.sprite_file || 'crow_land_10-1.png';
   const scrollLandCrowX = scrollLandLast?.x ?? 88;
   const scrollLandCrowY = scrollLandLast?.y ?? 50;
   const scrollLandCrowScale = Number(scrollLandLast?.scale) || 1;

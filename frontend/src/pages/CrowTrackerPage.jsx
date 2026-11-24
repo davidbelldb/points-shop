@@ -31,7 +31,7 @@ const DEFAULT_CENTER = { lat: 52.177306, lng: 0.125833 };
 const FLY_FRAMES = ['/scrolls/crow_send_03-1.png', '/scrolls/crow_send_04-1.png'];
 // The perched crow (final landing frame) that sits at a destination holding an
 // unread scroll, until it's opened.
-const PERCH_SPRITE = '/scrolls/crow_land_10.png';
+const PERCH_SPRITE = '/scrolls/crow_land_10-1.png';
 
 // "The Marauder's Map" — Snazzy Maps #101918 (Tomas): parchment land, oxblood
 // borders, cream roads. Applied to the crow tracker only (OMW keeps its dark map).
