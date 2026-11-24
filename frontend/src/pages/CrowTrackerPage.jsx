@@ -467,6 +467,19 @@ export default function CrowTrackerPage() {
         )}
       </div>
 
+      {/* Our earthy watercolour gradient washed over the whole map. Google Maps
+          can't gradient the land itself, so this is a low-opacity overlay with a
+          soft-light blend — the streets + labels still read through, and it sits
+          under the parchment texture. Tune `opacity` to taste. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0, zIndex: 12, pointerEvents: 'none',
+          backgroundImage: 'linear-gradient(125deg, #b5612b, #a83232, #9c2f5e, #7d3b86, #4a4a9e, #2e6ea0, #2f857e)',
+          opacity: 0.5, mixBlendMode: 'soft-light',
+        }}
+      />
+
       {/* Aged-parchment texture laid over the ENTIRE view — the map, the crow, the
           flight-path route lines, the progress card and the pen-scroll seal all read
           as ink on one sheet of paper. 40% opacity + boosted saturation (same as the
