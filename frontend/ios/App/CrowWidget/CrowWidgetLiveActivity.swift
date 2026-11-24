@@ -76,7 +76,7 @@ private func crowMoverFrac(_ phase: Int) -> CGFloat {
 private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     s.landed
         ? (a.kind == "forecast" ? "An Indian Roller has arrived" : "News from \(a.originLabel).")
-        : "A scroll will shortly be arriving."
+        : "A roll will shortly be arriving."
 }
 
 // Subtitle: in flight → "dispatched from …" (or the live street narration in
