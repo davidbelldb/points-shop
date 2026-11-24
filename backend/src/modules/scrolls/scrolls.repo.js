@@ -134,8 +134,8 @@ async function startLiveActivityFor(scroll) {
       // Stamp the re-issue cycle clock so reissueStaleCrowActivities() knows when
       // this card was last (re)started and can replace it before the ~8h iOS cap.
       await query(
-        `UPDATE scrolls SET la_channel_id = $1, la_cycle_started_at = NOW() WHERE id = $2`,
-        [channelId, scroll.id],
+        `UPDATE scrolls SET la_channel_id = $1, la_cycle_started_at = NOW(), la_sandbox = $3 WHERE id = $2`,
+        [channelId, scroll.id, sandbox],
       ).catch(() => {});
     }
     // One start per app the recipient has installed. A channel is shared, so
@@ -376,7 +376,7 @@ function reachedPhase(startedAtMs, arrivesAtMs) {
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
     `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
-            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets, s.la_channel_id, s.from_label
+            s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets, s.la_channel_id, s.la_sandbox, s.from_label
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
         AND (s.la_channel_id IS NOT NULL OR EXISTS (
@@ -398,7 +398,7 @@ export async function pushStreetSubtitleUpdates() {
       // A little ping/vibration as the crow passes each waypoint.
       const alert = { title: s.from_label ? 'The Indian Roller' : 'A bird en route', body: msg };
       if (s.la_channel_id) {
-        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert });
+        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert, sandbox: s.la_sandbox });
       } else {
         const tokens = await updateTokensFor(s.id);
         for (const token of tokens) {
@@ -1029,11 +1029,11 @@ export async function unreadCount(recipientId) {
 export async function markRead(scrollId, accountId) {
   try {
     const state = crowContentState({ startedAtMs: Date.now() - 1000, arrivesAtMs: Date.now(), landed: true });
-    const { rows } = await query(`SELECT la_channel_id FROM scrolls WHERE id = $1`, [scrollId]);
+    const { rows } = await query(`SELECT la_channel_id, la_sandbox FROM scrolls WHERE id = $1`, [scrollId]);
     const channelId = rows[0]?.la_channel_id;
     if (channelId) {
       // End + tear down the broadcast channel.
-      sendBroadcast(channelId, { event: 'end', contentState: state, dismissalMs: Date.now() })
+      sendBroadcast(channelId, { event: 'end', contentState: state, dismissalMs: Date.now(), sandbox: rows[0]?.la_sandbox })
         .then(() => deleteBroadcastChannel(channelId))
         .catch(() => {});
     } else {
@@ -1059,7 +1059,7 @@ export async function resolveDueScrolls() {
     `UPDATE scrolls
         SET delivered = TRUE, delivered_at = NOW(), status = 'delivered'
       WHERE delivered = FALSE AND deliver_at <= NOW()
-      RETURNING id, recipient_id, origin_label, from_label, flight_seconds, body, la_channel_id`,
+      RETURNING id, recipient_id, origin_label, from_label, flight_seconds, body, la_channel_id, la_sandbox`,
   );
   for (const s of rows) {
     try {
@@ -1077,7 +1077,7 @@ export async function resolveDueScrolls() {
 
       if (s.la_channel_id) {
         // Broadcast the landing to the channel — reaches a closed app, in-scroll.
-        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert });
+        await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert, sandbox: s.la_sandbox });
       } else {
         const tokens = await updateTokensFor(s.id);
         if (tokens.length) {

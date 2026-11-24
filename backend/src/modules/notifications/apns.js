@@ -270,7 +270,7 @@ export async function deleteBroadcastChannel(channelId) {
 
 /** Broadcast a Live Activity update/end to every device subscribed to a channel.
  *  No device token needed — works with the recipient's app fully closed. */
-export async function sendBroadcast(channelId, { event, contentState, alert, dismissalMs, sound } = {}) {
+export async function sendBroadcast(channelId, { event, contentState, alert, dismissalMs, sound, sandbox = false } = {}) {
   if (!enabled || !channelId) return 0;
   const aps = { timestamp: Math.floor(Date.now() / 1000), event, 'content-state': contentState || {} };
   if (alert) aps.alert = alert;
@@ -281,7 +281,9 @@ export async function sendBroadcast(channelId, { event, contentState, alert, dis
   return new Promise((resolve) => {
     let client;
     try {
-      client = http2.connect(HOST);
+      // Updates must go to the same gateway the channel was created on — sandbox
+      // for a Debug build — or they never reach the activity (phase never advances).
+      client = http2.connect(sandbox ? SANDBOX_HOST : HOST);
       client.on('error', () => resolve(0));
       const jwt = providerToken();
       let status = 0; let data = '';
