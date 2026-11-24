@@ -52,12 +52,12 @@ private let deepLink = URL(string: "sneakystuff://crow-tracker")
 
 // A crow at each end of the journey: crow_land_00 departs on the left,
 // crow_land_10 waits (perched) on the right. Both are shown at all times.
-private let crowLeft = "crow_land_00"
-private let crowRight = "crow_land_10"
+private let crowLeft = "crow_land_00-1"
+private let crowRight = "crow_land_10-1"
 // The in-flight crow that glides along the trail (faces right, toward the
 // destination). Shown only while the scroll is still travelling — it vanishes
 // once landed, leaving just the two static bookend crows.
-private let crowMover = "crow_land_00"
+private let crowMover = "crow_land_00-1"
 
 // Where the gliding crow sits, as a fraction of the trail, for each flight phase.
 // It rides just off the left crow at take-off (0.06), lands on each of the three
