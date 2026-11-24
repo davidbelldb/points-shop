@@ -236,7 +236,7 @@ export default function NewChatPage() {
             to="/crow-tracker"
             className="mt-3 flex items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition active:scale-[0.99]"
           >
-            Watch it fly on Crow Tracker →
+            Watch it fly on Bird Tracker →
           </Link>
         </div>
 

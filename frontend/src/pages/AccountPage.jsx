@@ -115,7 +115,7 @@ export default function AccountPage() {
               crow / weather Live Activity. Handy manual entry point for testing. */}
           <Pressable as={Link} to="/crow-tracker"
             className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm font-medium text-amber-700">
-            <span>Crow Tracker</span>
+            <span>Bird Tracker</span>
             <span aria-hidden>&rarr;</span>
           </Pressable>
 

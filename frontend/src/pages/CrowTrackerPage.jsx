@@ -427,10 +427,10 @@ export default function CrowTrackerPage() {
         {focusFlight === undefined && <p style={{ margin: 0, opacity: 0.7 }}>Loading…</p>}
         {focusFlight === null && (
           <>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>No crow in flight</p>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>No roller in flight</p>
             {perchScrolls.length > 0 ? (
               <p style={{ margin: '4px 0 0', opacity: 0.65, fontSize: 13 }}>
-                {perchScrolls.length} scroll{perchScrolls.length === 1 ? '' : 's'} waiting — tap a crow to open.
+                {perchScrolls.length} roll{perchScrolls.length === 1 ? '' : 's'} waiting — tap bird to open.
               </p>
             ) : (
               <p style={{ margin: '4px 0 0', opacity: 0.65, fontSize: 13 }}>This opens live when a scroll is on its way.</p>
