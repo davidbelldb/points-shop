@@ -55,6 +55,24 @@ const MARAUDERS_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#a9c8d8' }] },
 ];
 
+// Human time-left for the tracker card. Over a day → days + hours ("6d 21h");
+// under a day → hours + minutes ("3h 14m"); under an hour → just minutes ("45m").
+function fmtTimeLeft(totalMins) {
+  const m = Math.max(0, Math.round(Number(totalMins) || 0));
+  if (m >= 1440) {
+    let d = Math.floor(m / 1440);
+    let h = Math.round((m - d * 1440) / 60);
+    if (h >= 24) { d += 1; h -= 24; } // remainder rounded up to a full day
+    return h ? `${d}d ${h}h` : `${d}d`;
+  }
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const mins = m % 60;
+    return mins ? `${h}h ${mins}m` : `${h}h`;
+  }
+  return `${m}m`;
+}
+
 // Reject stray / null coordinates (they coerce to 0 and would blow the fit out to
 // the "Europe" world view). Cambridge / UK bounding box.
 // Any valid point on Earth — the crow now flies internationally (e.g. a forecast
@@ -449,7 +467,7 @@ export default function CrowTrackerPage() {
                   <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>Arrived</p>
                 ) : (
                   <>
-                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>{focusFlight.eta_minutes} min</p>
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 18, color: '#000' }}>{fmtTimeLeft(focusFlight.eta_minutes)}</p>
                     {/* Distance remaining — lower-opacity black. */}
                     {focusFlight.distance_km != null && <p style={{ margin: 0, fontSize: 11, color: 'rgba(0,0,0,0.55)' }}>{focusFlight.distance_km} km</p>}
                   </>
