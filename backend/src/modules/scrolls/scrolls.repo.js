@@ -311,11 +311,13 @@ async function computeRouteStreets(scroll) {
   }
 }
 
-// Six evenly-spaced sample points along the flight (kept off the very start/end
-// so the first/last beats aren't the origin/destination country). On a long-haul
-// flight the narrator reads these out one by one as the crow passes them, giving
-// ~6 country beats (e.g. France → Turkey → Iran → Pakistan → India).
-export const COUNTRY_FRACS = [0.12, 0.26, 0.40, 0.54, 0.68, 0.82];
+// Evenly-spaced sample points along the flight (kept off the very start/end so
+// the first/last beats aren't the origin/destination country). On a long-haul
+// flight the narrator reads these out one by one as the crow passes them. 13
+// points (an N=14 division) gives rich, roughly-twice-daily country beats on a
+// week-long flight — e.g. France → Germany → Croatia → Serbia → Bulgaria →
+// Türkiye → Syria → Iraq → Kuwait → the Gulf → UAE → Arabian Sea → India.
+export const COUNTRY_FRACS = Array.from({ length: 13 }, (_, i) => Number(((i + 1) / 14).toFixed(3)));
 
 // Reverse-geocode each of the six country-sample points along the origin→dest
 // line and store them on the scroll. Best-effort + async, like computeRouteStreets.
@@ -330,9 +332,11 @@ async function computeRouteCountries(scroll) {
     const lng = aLng + (bLng - aLng) * t;
     /* eslint-disable no-await-in-loop */
     const name = await reverseCountry(lat, lng);
-    // Collapse a repeated country to null so we don't narrate it twice running
-    // (the renderer skips nulls as "open sea"), but keep it if the crow re-enters.
-    out.push(name && name !== lastNonNull(out) ? name : null);
+    // Keep every sample's own country (null = over open water → "the open sea").
+    // With dense sampling a big country legitimately spans several beats, and the
+    // narrator varies its verb each time, so repeats read fine ("Crossing Türkiye"
+    // → "Soaring over Türkiye") rather than being collapsed to a false sea gap.
+    out.push(name || null);
     await new Promise((r) => setTimeout(r, 1100)); // honour Nominatim's 1 req/s
     /* eslint-enable no-await-in-loop */
   }
@@ -340,12 +344,6 @@ async function computeRouteCountries(scroll) {
     await query(`UPDATE scrolls SET route_countries = $1 WHERE id = $2`,
       [JSON.stringify(out), scroll.id]).catch(() => {});
   }
-}
-
-// The most recent non-null entry in a partially-built country list.
-function lastNonNull(arr) {
-  for (let i = arr.length - 1; i >= 0; i -= 1) if (arr[i]) return arr[i];
-  return null;
 }
 
 // The street that best sits at `frac` of the way along the origin→dest line.
@@ -424,29 +422,37 @@ function reachedPhase(startedAtMs, arrivesAtMs) {
   return phase;
 }
 
-// How many of the six country-sample points the crow has passed right now (0–6),
+// How many country-sample points the crow has passed right now (0–`count`),
 // fired the same LEAD_MS early as the node phase. Independent of the 3 visual
-// waypoint nodes — it only drives the subtitle country narration.
-function reachedCountryStep(startedAtMs, arrivesAtMs) {
+// waypoint nodes — it only drives the subtitle country narration. `count` is the
+// stored route_countries length, and the sample points are evenly spaced at
+// (i+1)/(count+1) — the same spacing computeRouteCountries used — so an older
+// scroll with a shorter stored list keeps narrating correctly after the sampling
+// density changed (no recompute needed).
+function reachedCountryStep(startedAtMs, arrivesAtMs, count) {
+  if (!count) return 0;
   const total = Math.max(1, arrivesAtMs - startedAtMs);
   const lead = Math.min(LEAD_MS, total * 0.1);
   const at = Date.now() + lead;
   let step = 0;
-  for (let i = 0; i < COUNTRY_FRACS.length; i += 1) {
-    if (at >= startedAtMs + COUNTRY_FRACS[i] * total) step = i + 1;
+  for (let i = 0; i < count; i += 1) {
+    if (at >= startedAtMs + ((i + 1) / (count + 1)) * total) step = i + 1;
   }
   return step;
 }
 
 // Country narration for a long-haul flight. Phase 4 is always the landing beat.
 // A null country-sample means open water. Verb varies gently across the journey.
-const COUNTRY_LEADS = ['Setting out over', 'Now over', 'Soaring over', 'Crossing', 'Passing over', 'Nearly through'];
+// Rotating verbs so a many-beat flight doesn't repeat the same phrasing; the very
+// first beat gets its own "Setting out over" opener.
+const COUNTRY_LEADS = ['Now over', 'Crossing', 'Passing over', 'Soaring over', 'Gliding across', 'Sailing over'];
 function countryNarration(scroll, nodePhase, countryStep) {
   if (nodePhase >= 4) return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
   const list = Array.isArray(scroll.route_countries) ? scroll.route_countries : null;
   const country = list && countryStep > 0 ? list[countryStep - 1] : null;
-  if (country) return `${COUNTRY_LEADS[Math.min(countryStep - 1, COUNTRY_LEADS.length - 1)]} ${country}`;
-  return countryStep > 0 ? 'Out over the open sea' : '';
+  if (!country) return countryStep > 0 ? 'Out over the open sea' : '';
+  if (countryStep === 1) return `Setting out over ${country}`;
+  return `${COUNTRY_LEADS[(countryStep - 2) % COUNTRY_LEADS.length]} ${country}`;
 }
 
 // The right subtitle for this moment: country narration on a long-haul flight
@@ -476,7 +482,7 @@ export async function pushStreetSubtitleUpdates() {
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const nodePhase = reachedPhase(startedAtMs, arrivesAtMs);
-      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs);
+      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs, Array.isArray(s.route_countries) ? s.route_countries.length : 0);
       const nodeAdvanced = nodePhase > (Number(s.la_phase) || 0);
       const countryAdvanced = countryStep > (Number(s.la_country_step) || 0);
       // The crow has moved on if it crossed a visual node OR a country-sample point.
@@ -548,7 +554,7 @@ export async function reissueStaleCrowActivities() {
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const phase = reachedPhase(startedAtMs, arrivesAtMs);
-      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs);
+      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs, Array.isArray(s.route_countries) ? s.route_countries.length : 0);
       const message = (phase > 0 || countryStep > 0) ? narrationFor(s, phase, countryStep) : '';
       const oldChannel = s.la_channel_id;
 

@@ -16,7 +16,14 @@ A real-time, two-player set-collection card game for Sneaky Points, recreating *
 > 5. How the Tic-Tac-Face and Dirty Wordle leaderboards are built, so Piles' leaderboard follows the same pattern.
 > 6. How Plinko is kept URL-only and admin-gated (`main.jsx` route, `PlinkoPage.jsx`, `plinko.routes.js`).
 >
-> Confirm or correct the assumptions in §2, then build in the order given in §11. Follow `CLAUDE.md`: complete files, Tailwind with `dark:` support, and the two deployment blocks at the end of each code answer. No art: use the placeholder system in §8 until assets arrive.
+> Confirm or correct the assumptions in §2, then build in the order given in §11. Follow `CLAUDE.md`: complete files, and Tailwind with `dark:` support. **Every answer that changes the repo ends with three blocks:** (1) the Mac git push, (2) the Hetzner VPS pull and rebuild, with the migration pipe whenever a `.sql` file is added, and (3) the iOS block below whenever anything under `frontend/` changes, because the Capacitor app bundles the frontend:
+>
+> ```bash
+> cd /Users/davidbell/Documents/projects/development/points-shop/frontend
+> npm run cap:sync      # vite build + npx cap sync ios
+> npx cap open ios      # Xcode: bump Build number → Product → Archive → Distribute → TestFlight
+> ```
+> No art: use the placeholder system in §8 until assets arrive.
 
 ---
 
@@ -277,9 +284,11 @@ export default {
   variant: false,            // true → +1 type, centreBase 8 (needs ≥14 types; off in V1)
   countdownMs: 3000,
   lockoutMs: 3000,
-  heartbeatIntervalMs: 5000,
-  heartbeatTimeoutMs: 15000,
-  ticketTtlMs: 30000,
+  presenceSweepMs: 5000,
+  presenceTimeoutMs: 15000,
+  pollHoldMs: 20000,         // long-poll hold; keep below native/proxy timeouts
+  eventLogSize: 500,
+  challengeTtlMs: 60000,
   revealAllOnGameOver: true,
   familyWeighting: 0.7,      // share of types drawn from lookalike families
   leaderboardMetrics: ['wins','losses','bestTimeMs','avgSwaps','avgDeclaresFailed'],
@@ -301,6 +310,7 @@ Add a `"test": "node --test src/modules/piles/engine/"` script to `backend/packa
 - **Declare:** valid → completed, public, hand empty. Invalid (lookalike pile) → `penalty`, every action `locked` until `now ≥ lockedUntil`, then allowed again.
 - **Win:** the 6th valid set → `gameOver { reason: 'sets' }`, and every later action → `not_playing`.
 - **Forfeits:** a `leave` during play → `forfeit_left`. A disconnect handled by the room → `forfeit_disconnect`. A disconnect in the lobby → no game over.
+- **Rooms (with an injected clock):** a player not present for `presenceTimeoutMs` during play → `forfeit_disconnect`, and in the lobby → only unready. A long-poll waiting on `/events` is woken by the opponent's action. A `since` older than the log → `resync`.
 - **No countdown actions:** every play action during `countdown` → `not_playing`.
 - **Projection leak test** (§5.1).
 
@@ -310,9 +320,9 @@ Add a `"test": "node --test src/modules/piles/engine/"` script to `backend/packa
 
 1. Report on §0 items 1–5 and confirm or correct §2.
 2. Engine (`deck.js`, `rules.js`, `view.js`, `ids.js`, `config.js`) plus the full test suite, green.
-3. `184_piles.sql`, `piles.repo.js`, `piles.routes.js` (ticket, leaderboard, history), all admin-gated.
-4. `@fastify/websocket`, `socket.js`, `rooms.js`: lobby/ready, countdown, play, heartbeat, forfeits, reconnect snapshot.
-5. Frontend: socket client, optimistic reducer, `PilesPage` with placeholder cards and Lobby → Countdown → Board → Result.
+3. `184_piles.sql`, `piles.repo.js`, leaderboard and history routes, all gated by `canAccessPiles`.
+4. `rooms.js` and the live routes: challenge ring + push, `/state`, `/action`, `/events` long-poll, `/leave`, presence sweep, forfeits.
+5. Frontend: long-poll client (`/events?since=` loop with resync), optimistic reducer, `PilesPage` with SVG shape cards and Lobby → Countdown → Board → Result. Handle `/piles?join=1` from the push deep link.
 6. Two-device test: David on device 1, David impersonating Squishy on device 2, on web and iOS.
 
 ## 12. Out of scope (for now)
