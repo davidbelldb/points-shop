@@ -443,14 +443,22 @@ function reachedCountryStep(startedAtMs, arrivesAtMs, count) {
 
 // Country narration for a long-haul flight. Phase 4 is always the landing beat.
 // A null country-sample means open water. Verb varies gently across the journey.
-// Rotating verbs so a many-beat flight doesn't repeat the same phrasing; the very
-// first beat gets its own "Setting out over" opener.
+// Bespoke, hand-written lines for specific countries (keyed by the exact name in
+// route_countries). When present, the custom line wins over the generic verb —
+// a little love note in the local tongue as the roller passes over. Add more here.
+const COUNTRY_PHRASES = {
+  Germany: 'Hoch hinaus, meine Liebe!',
+  Austria: 'Servus, mein Überflieger!',
+};
+// Rotating verbs for countries without a bespoke line, so a many-beat flight
+// doesn't repeat the same phrasing; the very first beat gets a "Setting out" opener.
 const COUNTRY_LEADS = ['Now over', 'Crossing', 'Passing over', 'Soaring over', 'Gliding across', 'Sailing over'];
 function countryNarration(scroll, nodePhase, countryStep) {
   if (nodePhase >= 4) return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
   const list = Array.isArray(scroll.route_countries) ? scroll.route_countries : null;
   const country = list && countryStep > 0 ? list[countryStep - 1] : null;
   if (!country) return countryStep > 0 ? 'Out over the open sea' : '';
+  if (COUNTRY_PHRASES[country]) return COUNTRY_PHRASES[country];
   if (countryStep === 1) return `Setting out over ${country}`;
   return `${COUNTRY_LEADS[(countryStep - 2) % COUNTRY_LEADS.length]} ${country}`;
 }
