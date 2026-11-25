@@ -55,7 +55,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let cacheTypes: Set<String> = [
             WKWebsiteDataTypeDiskCache,
             WKWebsiteDataTypeMemoryCache,
-            WKWebsiteDataTypeOfflineWebApplicationCache,
             WKWebsiteDataTypeFetchCache,
         ]
         WKWebsiteDataStore.default().removeData(
