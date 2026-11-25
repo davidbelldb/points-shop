@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import UserNotifications
+import WebKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -19,6 +20,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // scene, a cold-launch Quick Action arrives via the scene's
         // connectionOptions, and the active/resign callbacks are the scene's — not
         // this delegate's. This method keeps only the app-wide setup.
+        // After an app update, WKWebView can keep serving web assets it cached
+        // from the previous build (its cache lives in the app container, which an
+        // in-place update doesn't wipe — only a delete would). That's what left a
+        // heavily-used device showing the OLD map/fonts/sprites on a NEW build.
+        // Clear ONLY the webview's HTTP/resource caches when the build changes —
+        // cookies/localStorage (the login session) are left intact, and OS
+        // permissions (location/notifications) are untouched — so a plain update
+        // now always pulls the new bundle in, no reinstall needed.
+        clearWebViewCacheIfBuildChanged()
         registerChatReplyCategory()
         // Force the custom Capacitor plugin to load so its @objc class is
         // registered with the Objective-C runtime and Capacitor's auto-discovery
@@ -28,6 +38,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ = OmwActivityPlugin.self
         _ = NfcPlugin.self
         return true
+    }
+
+    // Purge the webview's cached HTTP responses (disk + memory + offline + fetch
+    // caches) the first time the app runs after its build number changes, so the
+    // freshly-bundled web assets load instead of stale cached ones. Deliberately
+    // does NOT clear cookies / localStorage / IndexedDB (that would log the user
+    // out and wipe their data); those are preserved. Runs at most once per update.
+    private func clearWebViewCacheIfBuildChanged() {
+        let key = "lastRunBundleVersion"
+        let current = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        let previous = UserDefaults.standard.string(forKey: key)
+        guard current != previous else { return }   // same build — nothing to do
+        UserDefaults.standard.set(current, forKey: key)
+
+        let cacheTypes: Set<String> = [
+            WKWebsiteDataTypeDiskCache,
+            WKWebsiteDataTypeMemoryCache,
+            WKWebsiteDataTypeOfflineWebApplicationCache,
+            WKWebsiteDataTypeFetchCache,
+        ]
+        WKWebsiteDataStore.default().removeData(
+            ofTypes: cacheTypes,
+            modifiedSince: Date(timeIntervalSince1970: 0)
+        ) {
+            // If the webview already loaded from the stale cache before the purge
+            // finished, reload it from origin so this takes effect on first launch
+            // rather than the next one.
+            DispatchQueue.main.async {
+                if let vc = self.window?.rootViewController as? CAPBridgeViewController {
+                    vc.bridge?.webView?.reloadFromOrigin()
+                }
+            }
+        }
     }
 
     // Defines the "Reply" text-input action shown on chat-message push banners.
