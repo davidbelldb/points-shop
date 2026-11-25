@@ -50,7 +50,7 @@ const MARAUDERS_STYLE = [
   { featureType: 'road', elementType: 'geometry', stylers: [{ lightness: 10 }, { saturation: -30 }] },
   { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ saturation: 25 }, { lightness: 25 }] },
   { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#9fff80' }, { lightness: 0 }, { saturation: 0 }] },
-  { featureType: 'transit.line', elementType: 'all', stylers: [{ color: '#4b0202' }, { weight: 0.5 }] },
+  { featureType: 'transit.line', elementType: 'geometry', stylers: [{ color: '#ff1493' }, { weight: 2.2 }, { visibility: 'on' }] },
   { featureType: 'water', elementType: 'all', stylers: [{ lightness: -20 }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#a9c8d8' }] },
 ];
