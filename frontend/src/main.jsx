@@ -100,6 +100,19 @@ window.addEventListener('vite:preloadError', (event) => {
 // fights with Capacitor's asset server. Native push will use APNs via
 // @capacitor/push-notifications (phase 2), not the web-push SW.
 if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator) {
+  // Auto-reload once when a NEW service worker takes control (i.e. after a deploy
+  // that bumped the cache version). Guarded to the update case — only arm it when
+  // a controller already exists at load, so a first-ever visit never reloads
+  // itself. This is what flushes an already-open tab off a stale bundle without
+  // the user needing to hard-reload.
+  if (navigator.serviceWorker.controller) {
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+  }
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((reg) => {
       reg.update().catch(() => {});

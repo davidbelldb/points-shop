@@ -7,10 +7,10 @@
                   offline. The fresh index.html always wins when online.
    - /api/* and /media/* are untouched (media has HTTP immutable caching). */
 
-const ASSET_CACHE  = 'sneaky-assets-v6';
-const SHELL_CACHE  = 'sneaky-shell-v6';
-const MODEL_CACHE  = 'sneaky-models-v6';
-const MEDIA_CACHE  = 'sneaky-media-v6';
+const ASSET_CACHE  = 'sneaky-assets-v7';
+const SHELL_CACHE  = 'sneaky-shell-v7';
+const MODEL_CACHE  = 'sneaky-models-v7';
+const MEDIA_CACHE  = 'sneaky-media-v7';
 
 // Large static files that are expensive to re-download.
 // Cache-first forever (filenames never change).
