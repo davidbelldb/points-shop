@@ -1024,12 +1024,12 @@ export function buildCrowFlight(s) {
 
   let message = '';
   if (landed) message = isForecast ? (s.body || '').replace(/\s+/g, ' ').trim() : 'Your scroll has landed.';
-  else message = `A bird is on its way from ${from}`;   // opening line, before waypoint 1
+  else message = `An Indian Roller is on its way from ${from}`;   // opening line, before waypoint 1
 
   return {
     id: s.id,
     kind: isForecast ? 'forecast' : 'scroll',
-    traveller_name: isForecast ? 'The Indian Roller' : 'A bird',
+    traveller_name: isForecast ? 'The Indian Roller' : 'An Indian Roller',
     origin_label: s.origin_label,
     dest_label: s.dest_label,
     from_label: s.from_label,
