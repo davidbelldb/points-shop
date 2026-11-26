@@ -607,6 +607,11 @@ export async function reissueStaleCrowActivities() {
       if (!newChannel) continue;
 
       const state = crowContentState({ startedAtMs, arrivesAtMs, landed: false, message, phase });
+      // A push-to-start needs an alert to reliably render — a silent one gets a
+      // 200 from APNs but iOS often won't raise the card. Carry the current
+      // narration as the alert so the re-raised card actually appears (on every
+      // bound device, incl. the sender's mirror).
+      const alert = { title: s.from_label ? 'The Indian Roller' : 'A bird en route', body: message || 'A bird en route' };
       for (const target of targets) {
         await sendLiveActivityPush(target.token, {
           event: 'start',
@@ -614,6 +619,7 @@ export async function reissueStaleCrowActivities() {
           bundleId: target.bundleId,
           sandbox: target.sandbox,
           contentState: state,
+          alert,
           attributes: {
             kind: s.from_label ? 'forecast' : 'scroll',
             originLabel: s.from_label || s.origin_label || 'afar',
