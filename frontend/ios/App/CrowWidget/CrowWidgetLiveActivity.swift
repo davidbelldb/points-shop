@@ -76,7 +76,7 @@ private func crowMoverFrac(_ phase: Int) -> CGFloat {
 private func title(_ s: CrowActivityAttributes.ContentState, _ a: CrowActivityAttributes) -> String {
     s.landed
         ? (a.kind == "forecast" ? "An Indian Roller has arrived" : "News from \(a.originLabel).")
-        : "A roll will shortly be arriving."
+        : "A roll will be arriving… eventually."
 }
 
 // Subtitle: in flight → "dispatched from …" (or the live street narration in
@@ -104,9 +104,13 @@ struct CrowWidgetLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 6) {
-                        Text(title(context.state, context.attributes))
+                        // The pun / live narration headlines here too.
+                        Text(subtitle(context.state, context.attributes))
                             .font(scrollFont(18))
                             .foregroundStyle(scrollGradientOnDark)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
                         // The same flight trail as the banner, but tinted for the
                         // black Dynamic Island: white line/fill/nodes with the
                         // gliding crow riding along, gone once landed.
@@ -228,18 +232,22 @@ struct CrowLockScreenView: View {
         ZStack {
             Image("tile2").resizable().scaledToFill()
             VStack(spacing: 8) {
-                Text(title(context.state, context.attributes))
+                // Flipped: the live narration / country pun is now the headline,
+                // and the generic line drops to the small secondary slot.
+                Text(subtitle(context.state, context.attributes))
                     .font(scrollFont(22))
                     .foregroundStyle(scrollGradientOnLight)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)                 // longer puns wrap to two lines…
+                    .minimumScaleFactor(0.7)      // …and shrink a touch if still too wide
 
-                Text(subtitle(context.state, context.attributes))
+                Text(title(context.state, context.attributes))
                     .font(scrollFont(12))
                     .foregroundStyle(scrollGradientOnLight)
                     .multilineTextAlignment(.center)
-                    .lineLimit(1)                 // landed scroll text → one line…
-                    .truncationMode(.tail)        // …with a trailing ellipsis
-                    .padding(.horizontal, 20)     // truncate ~6 chars sooner, off the edge
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 20)
 
                 HStack(spacing: 10) {
                     // Static "leave" crow bookends the trail on the left; the
