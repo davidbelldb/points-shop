@@ -118,6 +118,7 @@ struct CrowWidgetLiveActivity: Widget {
                                   arrivesAt: context.state.arrivesAt,
                                   landed: context.state.landed,
                                   phase: context.state.phase,
+                                  trailFrac: context.state.trailFrac,
                                   tint: .white)
                             .frame(maxWidth: 195)
                     }
@@ -189,6 +190,7 @@ struct CrowTrail: View {
     var arrivesAt: Date
     var landed: Bool
     var phase: Int
+    var trailFrac: Double = 0   // live 0…1 progress — where the gliding crow sits
     var tint: Color = .black    // black on the tile banner, white on the Dynamic Island
     var body: some View {
         let reached = landed ? 3 : phase
@@ -206,15 +208,16 @@ struct CrowTrail: View {
             }
             WaypointNodes(reached: reached, color: trailNode)
             // The gliding crow — above the trail + nodes, hidden once delivered.
-            // Its position steps between waypoints as phase updates arrive, easing
-            // between them so it appears to fly rather than teleport.
+            // Rides at the live progress fraction (updated on every beat), clamped
+            // just inside the ends so it never overlaps the static bookend sprites,
+            // easing between pushes so it flies rather than teleports.
             if !landed {
                 GeometryReader { geo in
                     Image(crowMover).resizable().scaledToFit()
                         .frame(width: 34.5, height: 34.5)
-                        .position(x: crowMoverFrac(phase) * geo.size.width,
+                        .position(x: max(0.04, min(0.96, trailFrac)) * geo.size.width,
                                   y: geo.size.height / 2)
-                        .animation(.easeInOut(duration: 1.2), value: phase)
+                        .animation(.easeInOut(duration: 1.2), value: trailFrac)
                 }
                 .zIndex(1)
             }
@@ -258,7 +261,8 @@ struct CrowLockScreenView: View {
                     CrowTrail(startedAt: context.state.startedAt,
                               arrivesAt: context.state.arrivesAt,
                               landed: context.state.landed,
-                              phase: context.state.phase)
+                              phase: context.state.phase,
+                              trailFrac: context.state.trailFrac)
                     Image(crowRight).resizable().scaledToFit().frame(width: 34.5, height: 34.5)
                 }
             }

@@ -106,12 +106,17 @@ function toRefDate(ms) { return Math.round((ms / 1000 - REF_DATE) * 1000) / 1000
 /** Build the crow activity's ContentState in Swift-Codable form. `message` is
  *  always included (Swift requires the key) — "" means "use the default subtitle". */
 export function crowContentState({ startedAtMs, arrivesAtMs, landed, message = '', phase = 0 }) {
+  // Live progress fraction at push time, so the gliding crow sits where the bird
+  // actually is (updated on every beat) rather than only hopping between nodes.
+  const total = Math.max(1, Number(arrivesAtMs) - Number(startedAtMs));
+  const trailFrac = landed ? 1 : Math.max(0, Math.min(1, (Date.now() - Number(startedAtMs)) / total));
   return {
     startedAt: toRefDate(startedAtMs),
     arrivesAt: toRefDate(arrivesAtMs),
     landed: !!landed,
     message: message || '',
     phase: Number(phase) || 0,
+    trailFrac,
   };
 }
 

@@ -21,6 +21,10 @@ struct CrowActivityAttributes: ActivityAttributes {
         /// How many of the 3 waypoint nodes the crow has passed (0–3; 4 = landed).
         /// Drives the node "pop" on the timeline. Always sent by the backend.
         var phase: Int = 0
+        /// Live fraction of the journey done (0…1) at the moment of this push.
+        /// Positions the gliding crow along the trail so it tracks real progress
+        /// (updated on every beat) rather than only hopping between the 3 nodes.
+        var trailFrac: Double = 0
     }
 
     /// Static info — fixed for the life of one flight.
