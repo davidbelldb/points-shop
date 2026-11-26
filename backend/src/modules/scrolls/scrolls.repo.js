@@ -447,15 +447,33 @@ function reachedCountryStep(startedAtMs, arrivesAtMs, count) {
 // route_countries). When present, the custom line wins over the generic verb —
 // a little love note in the local tongue as the roller passes over. Add more here.
 const COUNTRY_PHRASES = {
+  France: 'Eiffel for these views (and your face, ofc)',
   Germany: 'Hoch hinaus, meine Liebe!',
   Austria: 'Servus, mein Überflieger!',
+  Croatia: "As nice as this is, it's time to… Split.",
+  Serbia: "Danube-lieve it?! I'm still going strong!",
+  Bulgaria: "Less talkin', more Balkan amiright?",
+  Turkey: 'An-kara be honest—this is some view',
+  Syria: "It's as cold as is-is up here...",
+  Iraq: "Iraq and roller, me. 'Cos I'm a roller, get it?",
+  Kuwait: 'Just Ku-wait and see… my face next week.',
+  'United Arab Emirates': 'Emirate-ing south for Katie James',
+  'Arabian Sea': 'Araaabian flights amiright?!',
+  India: 'Head India clouds, thinking about that butt hole',
 };
 // Rotating verbs for countries without a bespoke line, so a many-beat flight
 // doesn't repeat the same phrasing; the very first beat gets a "Setting out" opener.
 const COUNTRY_LEADS = ['Now over', 'Crossing', 'Passing over', 'Soaring over', 'Gliding across', 'Sailing over'];
 function countryNarration(scroll, nodePhase, countryStep) {
-  if (nodePhase >= 4) return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
   const list = Array.isArray(scroll.route_countries) ? scroll.route_countries : null;
+  if (nodePhase >= 4) {
+    // Landing beat: use the destination country's bespoke line if there is one
+    // (the last named country in the route), so it's the final thing shown — else
+    // the default "coming in to land".
+    const destCountry = list ? [...list].reverse().find(Boolean) : null;
+    if (destCountry && COUNTRY_PHRASES[destCountry]) return COUNTRY_PHRASES[destCountry];
+    return `Coming in to land at ${scroll.dest_label || 'its destination'}`;
+  }
   const country = list && countryStep > 0 ? list[countryStep - 1] : null;
   if (!country) return countryStep > 0 ? 'Out over the open sea' : '';
   if (COUNTRY_PHRASES[country]) return COUNTRY_PHRASES[country];
