@@ -465,7 +465,7 @@ const COUNTRY_PHRASES = {
   Germany: 'Hoch hinaus, meine Liebe!',
   Italy: 'So much worse than penne-pal down',
   Croatia: "As nice as this is, it's time to… Split.",
-  'Bosnia and Herzegovina': 'Herze-going where my heart takes me',
+  'Bosnia and Herzegovina': 'Herze-going wherever my heart takes me',
   Greece: 'Herculean task, this!',
   Turkey: 'An-kara be honest—this is some view',
   Syria: "It's as cold as isis up here...",
