@@ -463,7 +463,7 @@ function reachedCountryStep(startedAtMs, arrivesAtMs, count, fracs) {
 const COUNTRY_PHRASES = {
   France: 'Eiffel for these views (and your face, ofc)',
   Germany: 'Hoch hinaus, meine Liebe!',
-  Austria: 'Servus, mein Überflieger!',
+  Italy: 'So much worse than penne-pal down',
   Croatia: "As nice as this is, it's time to… Split.",
   'Bosnia and Herzegovina': "Less Balkan, more squarkin'!",
   Greece: 'Herculean task, this!',
