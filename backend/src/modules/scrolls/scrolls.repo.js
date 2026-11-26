@@ -534,9 +534,12 @@ export async function pushStreetSubtitleUpdates() {
       });
       // A ping/vibration only when a visual waypoint node pops — country-only
       // beats update the text silently so a long-haul flight doesn't buzz ~9 times.
-      const alert = nodeAdvanced
-        ? { title: s.from_label ? 'The Indian Roller' : 'A bird en route', body: msg }
-        : undefined;
+      // Buzz on every beat — a country crossing or a waypoint — with the current
+      // line as the body, so she gets a gentle ping for each pun as the roller
+      // reaches a new country. Server-side only (the alert rides the push); no app
+      // change. iOS still respects her Focus / Do Not Disturb, so an overnight
+      // crossing stays quiet if she has Sleep Focus on.
+      const alert = { title: s.from_label ? 'The Indian Roller' : 'A bird en route', body: msg };
       if (s.la_channel_id) {
         await sendBroadcast(s.la_channel_id, { event: 'update', contentState: state, alert, sandbox: s.la_sandbox });
       } else {
