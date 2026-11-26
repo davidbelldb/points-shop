@@ -425,18 +425,20 @@ function reachedPhase(startedAtMs, arrivesAtMs) {
 // How many country-sample points the crow has passed right now (0–`count`),
 // fired the same LEAD_MS early as the node phase. Independent of the 3 visual
 // waypoint nodes — it only drives the subtitle country narration. `count` is the
-// stored route_countries length, and the sample points are evenly spaced at
-// (i+1)/(count+1) — the same spacing computeRouteCountries used — so an older
-// scroll with a shorter stored list keeps narrating correctly after the sampling
-// density changed (no recompute needed).
-function reachedCountryStep(startedAtMs, arrivesAtMs, count) {
+// stored route_countries length. If `fracs` (route_country_fracs) is given it is
+// the fraction-of-journey at which each country is actually crossed, so the beats
+// track the real path; otherwise the points are spaced evenly at (i+1)/(count+1),
+// which also keeps older/auto scrolls narrating correctly (no recompute needed).
+function reachedCountryStep(startedAtMs, arrivesAtMs, count, fracs) {
   if (!count) return 0;
   const total = Math.max(1, arrivesAtMs - startedAtMs);
   const lead = Math.min(LEAD_MS, total * 0.1);
   const at = Date.now() + lead;
+  const useCustom = Array.isArray(fracs) && fracs.length === count;
   let step = 0;
   for (let i = 0; i < count; i += 1) {
-    if (at >= startedAtMs + ((i + 1) / (count + 1)) * total) step = i + 1;
+    const frac = useCustom ? Number(fracs[i]) : (i + 1) / (count + 1);
+    if (at >= startedAtMs + frac * total) step = i + 1;
   }
   return step;
 }
@@ -451,10 +453,10 @@ const COUNTRY_PHRASES = {
   Germany: 'Hoch hinaus, meine Liebe!',
   Austria: 'Servus, mein Überflieger!',
   Croatia: "As nice as this is, it's time to… Split.",
-  Serbia: "Danube-lieve it?! I'm still going strong!",
-  Bulgaria: "Less talkin', more Balkan amiright?",
+  'Bosnia and Herzegovina': "Less Balkan, more squarkin'!",
+  Greece: 'Herculean task, this!',
   Turkey: 'An-kara be honest—this is some view',
-  Syria: "It's as cold as is-is up here...",
+  Syria: "It's as cold as isis up here...",
   Iraq: "Iraq and roller, me. 'Cos I'm a roller, get it?",
   Kuwait: 'Just Ku-wait and see… my face next week.',
   'United Arab Emirates': 'Emirate-ing south for Katie James',
@@ -494,7 +496,7 @@ function narrationFor(scroll, nodePhase, countryStep) {
 export async function pushStreetSubtitleUpdates() {
   const { rows } = await query(
     `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label, s.la_phase,
-            s.la_country_step, s.route_countries,
+            s.la_country_step, s.route_countries, s.route_country_fracs,
             s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng, s.route_streets, s.la_channel_id, s.la_sandbox, s.from_label
        FROM scrolls s
       WHERE s.delivered = FALSE AND s.deliver_at > NOW()
@@ -508,7 +510,7 @@ export async function pushStreetSubtitleUpdates() {
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const nodePhase = reachedPhase(startedAtMs, arrivesAtMs);
-      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs, Array.isArray(s.route_countries) ? s.route_countries.length : 0);
+      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs, Array.isArray(s.route_countries) ? s.route_countries.length : 0, s.route_country_fracs);
       const nodeAdvanced = nodePhase > (Number(s.la_phase) || 0);
       const countryAdvanced = countryStep > (Number(s.la_country_step) || 0);
       // The crow has moved on if it crossed a visual node OR a country-sample point.
@@ -556,7 +558,7 @@ export async function reissueStaleCrowActivities() {
   const { rows } = await query(
     `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label,
             s.origin_label, s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng,
-            s.route_streets, s.route_countries, s.la_channel_id, s.la_phase, s.from_label
+            s.route_streets, s.route_countries, s.route_country_fracs, s.la_channel_id, s.la_phase, s.from_label
        FROM scrolls s
       WHERE s.delivered = FALSE
         AND s.deliver_at > NOW()
@@ -580,7 +582,7 @@ export async function reissueStaleCrowActivities() {
       const arrivesAtMs = new Date(s.deliver_at).getTime();
       const startedAtMs = arrivesAtMs - (Number(s.flight_seconds) || 0) * 1000;
       const phase = reachedPhase(startedAtMs, arrivesAtMs);
-      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs, Array.isArray(s.route_countries) ? s.route_countries.length : 0);
+      const countryStep = reachedCountryStep(startedAtMs, arrivesAtMs, Array.isArray(s.route_countries) ? s.route_countries.length : 0, s.route_country_fracs);
       const message = (phase > 0 || countryStep > 0) ? narrationFor(s, phase, countryStep) : '';
       const oldChannel = s.la_channel_id;
 
