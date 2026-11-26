@@ -64,6 +64,18 @@ async function ptsTokensByApp(accountId) {
   }));
 }
 
+// Push-to-start tokens for BOTH the recipient and the sender, so the sender can
+// follow the same Live Activity on their own lock screen. Recipient first (its
+// env keys the broadcast channel); deduped by token. Both devices bind to the one
+// channel, so every broadcast update reaches both at once.
+async function bothPartyPtsTokens(recipientId, senderId) {
+  const recip = await ptsTokensByApp(recipientId);
+  if (!senderId || senderId === recipientId) return recip;
+  const seen = new Set(recip.map((t) => t.token));
+  const sender = (await ptsTokensByApp(senderId)).filter((t) => !seen.has(t.token));
+  return [...recip, ...sender];
+}
+
 async function updateTokensFor(scrollId) {
   const { rows } = await query(
     `SELECT token FROM live_activity_tokens WHERE scroll_id = $1 AND kind = 'update'`,
@@ -117,7 +129,7 @@ async function startLiveActivityFor(scroll) {
   try {
     // Respect the recipient's mute window — no new Live Activity while muted.
     if (await isMuted(scroll.recipient_id)) { console.warn(`[crow-la] ${scroll.id} muted — skipped`); return; }
-    const targets = await ptsTokensByApp(scroll.recipient_id);
+    const targets = await bothPartyPtsTokens(scroll.recipient_id, scroll.sender_id);
     if (!targets.length) { console.warn(`[crow-la] ${scroll.id} no pts token for ${scroll.recipient_id}`); return; }
     console.log(`[crow-la] ${scroll.id} start: ${targets.length} target(s) [${targets.map((t) => (t.sandbox ? 'sandbox' : 'prod')).join(', ')}] bundle=${targets.map((t) => t.bundleId).join(',')}`);
     const arrivesAtMs = new Date(scroll.deliver_at).getTime();
@@ -556,7 +568,7 @@ const LA_CYCLE_MS = LA_CYCLE_MINUTES * 60 * 1000;
 // update pushes. Runs on the resolver tick; best-effort per scroll.
 export async function reissueStaleCrowActivities() {
   const { rows } = await query(
-    `SELECT s.id, s.recipient_id, s.deliver_at, s.flight_seconds, s.dest_label,
+    `SELECT s.id, s.recipient_id, s.sender_id, s.deliver_at, s.flight_seconds, s.dest_label,
             s.origin_label, s.origin_lat, s.origin_lng, s.dest_lat, s.dest_lng,
             s.route_streets, s.route_countries, s.route_country_fracs, s.la_channel_id, s.la_phase, s.from_label
        FROM scrolls s
@@ -571,7 +583,7 @@ export async function reissueStaleCrowActivities() {
     try {
       // Muted → let the card lapse rather than re-raising it.
       if (await isMuted(s.recipient_id)) continue;
-      const targets = await ptsTokensByApp(s.recipient_id);
+      const targets = await bothPartyPtsTokens(s.recipient_id, s.sender_id);
       if (!targets.length) continue;
 
       // The broadcast channel + its manage/send hosts must match the device's
