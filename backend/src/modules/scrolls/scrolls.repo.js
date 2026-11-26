@@ -466,6 +466,8 @@ const COUNTRY_PHRASES = {
   Italy: 'So much worse than penne-pal down',
   Croatia: "As nice as this is, it's time to… Split.",
   'Bosnia and Herzegovina': 'Herzego-ing wherever my heart takes me',
+  Albania: "I'll Berat there… in about 5 days time.",
+  'North Macedonia': "'Donia just miss me? Flying Vardar than ever before.",
   Greece: 'Herculean task, this!',
   Turkey: 'An-kara be honest—this is some view',
   Syria: "It's as cold as isis up here...",
