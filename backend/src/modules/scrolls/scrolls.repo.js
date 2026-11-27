@@ -470,7 +470,7 @@ const COUNTRY_PHRASES = {
   'North Macedonia': "'Donia just miss me? Flying Vardar than ever before.",
   Greece: 'Herculean task, this!',
   'Aegean Sea': 'Aegean Sea? More like Aegean fast.',
-  Turkey: 'An-kara be honest—this is some view',
+  Turkey: 'An-kara be honest, I could do with a snooze.',
   Syria: "It's as cold as isis up here...",
   Iraq: "Iraq… and I roll. 'Cos I'm a roller, innit.",
   Kuwait: 'Just Ku-wait and see… my face next week.',
