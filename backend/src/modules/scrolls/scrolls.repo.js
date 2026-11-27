@@ -469,6 +469,7 @@ const COUNTRY_PHRASES = {
   Albania: "I'll Berat there… in about 5 days time.",
   'North Macedonia': "'Donia just miss me? Flying Vardar than ever before.",
   Greece: 'Herculean task, this!',
+  'Aegean Sea': 'Aegean Sea? More like Aegean fast.',
   Turkey: 'An-kara be honest—this is some view',
   Syria: "It's as cold as isis up here...",
   Iraq: "Iraq… and I roll. 'Cos I'm a roller, innit.",
