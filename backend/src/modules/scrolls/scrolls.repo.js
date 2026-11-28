@@ -471,6 +471,7 @@ const COUNTRY_PHRASES = {
   Greece: 'Herculean task, this!',
   'Aegean Sea': 'Aegean Sea? More like Aegean fast.',
   Turkey: 'An-kara be honest, I could do with a snooze myself',
+  Lebanon: 'Wishing you could Beirut here...',
   Syria: "It's as cold as isis up here...",
   Iraq: "Iraq… and I roll. 'Cos I'm a roller, innit.",
   Kuwait: 'Just Ku-wait and see… my face next week.',
